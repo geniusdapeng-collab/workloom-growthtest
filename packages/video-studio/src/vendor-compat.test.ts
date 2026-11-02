@@ -1359,20 +1359,28 @@ console.log("RESULT " + JSON.stringify({
         sha256: expect.stringMatching(/^[a-f0-9]{64}$/u),
       });
     }
+    const sourceBlueprint = {
+      _metadata: {
+        _originalStoryText: story,
+        _prd: {
+          projectDefinition: { sourceIntent: story, _originalStoryText: story },
+          characterSystem: { characters: [{ characterId: "char_1", name: "猫", authorization: "not-applicable" }] },
+          shotContract: actions.map((action, index) => ({
+            shotId: `SC-0${index + 1}`,
+            purpose: action,
+            action,
+          })),
+        },
+      },
+    };
     const report = renderPreproductionAuditReport({
-      productionResult: { shots: [], prompts },
+      productionResult: {
+        shots: [],
+        prompts: prompts.map((prompt) => ({ ...prompt, _blueprint: sourceBlueprint })),
+      },
       scriptResult: {
         _metadata: {
-          _originalStoryText: story,
-          _prd: {
-            projectDefinition: { sourceIntent: story, _originalStoryText: story },
-            characterSystem: { characters: [{ characterId: "char_1", name: "猫", authorization: "not-applicable" }] },
-            shotContract: actions.map((action, index) => ({
-              shotId: `SC-0${index + 1}`,
-              purpose: action,
-              action,
-            })),
-          },
+          noIndependentSourceInOuterResult: true,
         },
       },
       timing: {},

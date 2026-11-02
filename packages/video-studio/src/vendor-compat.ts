@@ -6778,9 +6778,16 @@ export function renderPreproductionAuditReport(input: {
       promptContract: contract,
     };
   });
-  const blueprint = recordValue(input.scriptResult.blueprint ?? input.scriptResult);
+  const directBlueprint = recordValue(input.scriptResult.blueprint ?? input.scriptResult);
+  const promptBlueprint = recordValue(prompts[0]?._blueprint);
+  const blueprint = Object.keys(directBlueprint).length > 0 ? directBlueprint : promptBlueprint;
   const characterSystem = recordValue(blueprint.character_system);
-  const scriptMetadata = recordValue(blueprint._metadata ?? blueprint.meta);
+  const scriptMetadata = {
+    ...recordValue(recordValue(promptBlueprint.meta)._metadata),
+    ...recordValue(promptBlueprint._metadata),
+    ...recordValue(recordValue(directBlueprint.meta)._metadata),
+    ...recordValue(directBlueprint._metadata),
+  };
   const sourcePrd = recordValue(scriptMetadata._prd);
   const sourceCharacterSystem = recordValue(sourcePrd.characterSystem);
   const rawScriptCharacters = [
@@ -6796,6 +6803,7 @@ export function renderPreproductionAuditReport(input: {
     scriptMetadata._originalStoryText
       ?? sourceProject._originalStoryText
       ?? sourceProject.sourceIntent
+      ?? blueprint._originalStoryText
       ?? "",
   ).trim();
   const sourceShotContracts = Array.isArray(sourcePrd.shotContract)
@@ -6969,6 +6977,7 @@ export function renderPreproductionAuditReport(input: {
     `- 有效处理时间：${elapsedMs}ms（${(elapsedMs / 60_000).toFixed(1)}分钟）`,
     `- 镜头 ID 与提示词 ID 一一对应：${idsMatch ? "是" : "否"}`,
     `- 镜头语义合同：最终提示词绑定的结构化镜头卡，语义摘要 sha256=${semanticHash}`,
+    `- 原始源证据：${sourceOriginal && sourceShotContracts.length > 0 ? "原始需求与源镜头合同正文已内联，可逐镜对照" : "未提供独立原文，禁止声称已核实对源 brief 的忠实度"}`,
     `- 渲染提交：否；G8 预算、资格与质量提交闸未触发`,
     "",
     "## 三件套状态",
@@ -7068,6 +7077,7 @@ export function renderPreproductionAuditReport(input: {
     jsonWithoutNull({
       schema: "workloom.preproduction-contract/v1",
       sourceOfTruth: "original-requirement-and-final-prompt-bound-shot-contract",
+      sourceEvidenceIncluded: Boolean(sourceOriginal && sourceShotContracts.length > 0),
       shotCount: shotCards.length,
       totalDurationSeconds: Number(totalSeconds.toFixed(3)),
       semanticHash,
