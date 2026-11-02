@@ -1,0 +1,149 @@
+{
+  "schema": "workloom.live-video-matrix/v1",
+  "taskId": "T-2026-1102-9006",
+  "cases": [
+    {
+      "id": "N01-HUMAN-15",
+      "project": "T9006-N01-HUMAN-15",
+      "output": "N01-HUMAN-15",
+      "route": "narrative",
+      "duration": 15,
+      "platform": "douyin",
+      "expect": { "allSpeechForbidden": true },
+      "intent": "雨夜，一个年轻人收伞回到出租屋，开门、换鞋、拧亮旧台灯，随后坐在灯下安静地听雨。全片无台词、无旁白、无字幕，仅保留动作与环境声。\nid=chen-zhuo;name=陈卓;portraitRef=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png;authorization=real-authorized"
+    },
+    {
+      "id": "N02-CAT-15",
+      "project": "T9006-N02-CAT-15",
+      "output": "N02-CAT-15",
+      "route": "narrative",
+      "duration": 15,
+      "platform": "douyin",
+      "expect": { "allSpeechForbidden": true, "noCharacters": true },
+      "intent": "雨后夜晚，一只橘猫从纸箱探头，伸爪接屋檐滴水，最后缩回纸箱盘成一团。无人物、无品牌、无字幕、无旁白，仅保留环境声。"
+    },
+    {
+      "id": "N03-EMPTY-30",
+      "project": "T9006-N03-EMPTY-30",
+      "output": "N03-EMPTY-30",
+      "route": "narrative",
+      "duration": 30,
+      "platform": "douyin",
+      "expect": { "allSpeechForbidden": true, "noCharacters": true, "noAnimals": true },
+      "intent": "清晨薄雾中的无名高原湖，湖面只倒映远山和芦苇，风吹起细小涟漪，薄雾缓慢散开。无人物、无动物、无品牌、无文字、无字幕、无旁白，仅保留环境声。"
+    },
+    {
+      "id": "N04-PRODUCT-30",
+      "project": "T9006-N04-PRODUCT-30",
+      "output": "N04-PRODUCT-30",
+      "route": "narrative",
+      "duration": 30,
+      "platform": "douyin",
+      "expect": { "allSpeechForbidden": true, "noCharacters": true, "noAnimals": true },
+      "intent": "桌面上的一把白色陶瓷茶壶，晨光从窗边斜照，蒸汽缓慢升起，镜头只观察釉面、壶嘴水滴和光影变化。无人物、无动物、无品牌、无文字、无字幕、无旁白，仅保留环境声。"
+    },
+    {
+      "id": "D01-15-DECK",
+      "project": "T9006-D01-15-DECK",
+      "output": "D01-15-DECK",
+      "route": "narrative",
+      "duration": 15,
+      "platform": "douyin",
+      "expect": { "allSpeechForbidden": true, "noCharacters": true, "noAnimals": true },
+      "intent": "秋日木栈道上，落叶被风分层推过栏杆缝隙，光斑随树叶晃动。无人物、无动物、无品牌、无文字、无字幕、无旁白，仅保留环境声。"
+    },
+    {
+      "id": "D02-15-CITY",
+      "project": "T9006-D02-15-CITY",
+      "output": "D02-15-CITY",
+      "route": "narrative",
+      "duration": 15,
+      "platform": "douyin",
+      "expect": { "allSpeechForbidden": true, "noCharacters": true },
+      "intent": "雨停后的城市路面，低机位只拍水洼倒影、信号灯变色和雨滴击水，不出现人脸与车辆主体。无人物、无动物、无品牌、无文字、无字幕、无旁白，仅保留环境声。"
+    },
+    {
+      "id": "D03-30-FOREST",
+      "project": "T9006-D03-30-FOREST",
+      "output": "D03-30-FOREST",
+      "route": "narrative",
+      "duration": 30,
+      "platform": "douyin",
+      "expect": { "allSpeechForbidden": true, "noCharacters": true, "noAnimals": true },
+      "intent": "清晨森林，阳光穿过树叶形成移动光柱，露水从苔藓滴落，风让枝叶有节奏摆动。无人物、无动物、无品牌、无文字、无字幕、无旁白，仅保留环境声。"
+    },
+    {
+      "id": "D04-30-OCEAN",
+      "project": "T9006-D04-30-OCEAN",
+      "output": "D04-30-OCEAN",
+      "route": "narrative",
+      "duration": 30,
+      "platform": "douyin",
+      "expect": { "allSpeechForbidden": true, "noCharacters": true, "noAnimals": true },
+      "intent": "傍晚海边，长浪缓慢推上湿沙又退去，泡沫纹理和天空云层逐渐变色。无人物、无动物、无品牌、无文字、无字幕、无旁白，仅保留环境声。"
+    },
+    {
+      "id": "D05-60-SEASONS",
+      "project": "T9006-D05-60-SEASONS",
+      "output": "D05-60-SEASONS",
+      "route": "narrative",
+      "duration": 60,
+      "platform": "douyin",
+      "expect": { "allSpeechForbidden": true, "noCharacters": true, "noAnimals": true },
+      "intent": "同一棵树的四季变化：春芽、夏叶、秋黄、冬雪，固定机位记录光线和天气变化。无人物、无动物、无品牌、无文字、无字幕、无旁白，仅保留环境声。"
+    },
+    {
+      "id": "C01-30-MULTI",
+      "project": "T9006-C01-30-MULTI",
+      "output": "C01-30-MULTI",
+      "route": "narrative",
+      "duration": 30,
+      "platform": "douyin",
+      "expect": { "allSpeechForbidden": false, "dialogueAllowed": true, "voiceoverForbidden": true },
+      "intent": "深夜小面馆里，两位厨师连续配合：一人拉面、一人看火并递碗，最后同时把两碗面放到窗口。允许简短对白，但不得添加字幕和旁白。"
+    },
+    {
+      "id": "C02-15-COOK",
+      "project": "T9006-C02-15-COOK",
+      "output": "C02-15-COOK",
+      "route": "narrative",
+      "duration": 15,
+      "platform": "douyin",
+      "expect": { "allSpeechForbidden": true },
+      "intent": "陈卓在窄小厨房里完成一段连续动作：洗菜、切菜、起锅、装盘，机位跟随但不切断动作。无台词、无旁白、无字幕，仅保留环境声。\nid=chen-zhuo;name=陈卓;portraitRef=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png;authorization=real-authorized"
+    },
+    {
+      "id": "M01-PRICE",
+      "project": "T9006-M01-PRICE",
+      "output": "M01-PRICE",
+      "route": "marketing",
+      "duration": 30,
+      "platform": "douyin",
+      "intent": "给米家空气净化器 4 Lite 做一条抖音种草视频，重点讲清官方价格 599 元、优惠信息和适用面积。",
+      "args": ["--product", "米家空气净化器 4 Lite", "--brand", "米家", "--category", "空气净化器", "--model", "4 Lite"],
+      "primeSearch": "stress/fixtures/mijia-air-purifier-4-lite-official-search.json"
+    },
+    {
+      "id": "M02-UNIT",
+      "project": "T9006-M02-UNIT",
+      "output": "M02-UNIT",
+      "route": "marketing",
+      "duration": 30,
+      "platform": "douyin",
+      "intent": "给米家空气净化器 4 Lite 做一条抖音卖点视频，突出建议最大适用面积 45㎡和颗粒物 CADR 380m³/h。",
+      "args": ["--product", "米家空气净化器 4 Lite", "--brand", "米家", "--category", "空气净化器", "--model", "4 Lite"],
+      "primeSearch": "stress/fixtures/mijia-air-purifier-4-lite-official-search.json"
+    },
+    {
+      "id": "M03-BRAND",
+      "project": "T9006-M03-BRAND",
+      "output": "M03-BRAND",
+      "route": "marketing",
+      "duration": 30,
+      "platform": "douyin",
+      "intent": "给米家空气净化器 4 Lite 做一条抖音短视频，讲清品牌米家、型号 4 Lite 与可验证的净化能力。",
+      "args": ["--product", "米家空气净化器 4 Lite", "--brand", "米家", "--category", "空气净化器", "--model", "4 Lite"],
+      "primeSearch": "stress/fixtures/mijia-air-purifier-4-lite-official-search.json"
+    }
+  ]
+}

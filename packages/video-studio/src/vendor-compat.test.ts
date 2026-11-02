@@ -812,8 +812,8 @@ console.log("RESULT " + JSON.stringify({
     expect(shots.every((shot) => typeof shot.cameraMovement === "string")).toBe(true);
     expect(shots.every((shot) => Array.isArray(shot.audioAnchors))).toBe(true);
     expect(String(shots[0]!.purpose)).toContain("第一次对准锁孔");
-    expect(shots[3]!.purpose).toBe("手指靠近开关");
-    expect(shots[7]!.purpose).toBe("静物收尾");
+    expect(String(shots[3]!.purpose)).toContain("手指靠近开关");
+    expect(String(shots[7]!.purpose)).toContain("静物收尾");
     expect(shots[0]!.shotSize).toBe("establishing");
     expect(String(shots[0]!.lighting)).toContain("楼道近乎全暗");
     expect(String(shots[0]!.colorTemperature)).toContain("5600K");
@@ -823,8 +823,68 @@ console.log("RESULT " + JSON.stringify({
     ]));
     const delivery = prd.deliveryStandard as Record<string, unknown>;
     expect(delivery.subtitles).toEqual({ mode: "none", burned: false, sidecar: false });
+    expect(delivery.platformConstraints).toMatchObject({
+      safeArea: true,
+      safeAreaInsets: { topPercent: 6, bottomPercent: 12, rightRailPercent: 11 },
+    });
+    expect(String((delivery.acceptanceCriteria as Record<string, unknown>).technical)).toContain("ebur128");
+    expect(delivery.audioVerification).toMatchObject({
+      measurementTool: "ffmpeg-ebur128",
+      integratedLoudnessMeasured: false,
+      truePeakMeasured: false,
+    });
+    expect(String((delivery.fallbackPlan as Record<string, unknown>).trigger)).not.toMatch(/0\.7|0\.8|数值/u);
     expect(delivery.listeningVerification).toMatchObject({ verified: false });
     expect(prd.shotContract as unknown).toBeTruthy();
+  });
+
+  it("PRD 删除未进入镜头合同的模型高潮，并给出可测音频、安全区和反馈式重试口径", () => {
+    const source = "雨夜，一个年轻人收伞回到出租屋，开门、换鞋、拧亮旧台灯，随后坐在灯下安静地听雨。全片无台词、无旁白、无字幕，仅保留动作与环境声。";
+    const prd = normalizeNarrativePrdContract({
+      projectDefinition: { sourceIntent: source },
+      productPositioning: { targetDuration: 15, aspectRatio: "9:16", targetPlatform: "douyin" },
+      creativeCore: {
+        creativeHook: "她站在空屋中央，手里攥着伞和包，视线无处安放",
+        keyMessages: ["P0：她站在空屋中央，手里攥着伞和包"],
+        twistPoint: "她突然听见门外有人叫她",
+      },
+      scenePlan: {
+        scenes: [
+          { sceneId: "SC01", duration: 5, purpose: "收伞回到出租屋、开门", keyProps: ["雨伞", "门"] },
+          { sceneId: "SC02", duration: 5, purpose: "换鞋", keyProps: ["鞋"] },
+          { sceneId: "SC03", duration: 5, purpose: "拧亮旧台灯、坐下听雨", keyProps: ["台灯"] },
+        ],
+        shotMapping: [
+          { sceneId: "SC01", estimatedShots: 2, shotBreakdownHint: ["wide", "close-up"] },
+          { sceneId: "SC02", estimatedShots: 1, shotBreakdownHint: ["close-up"] },
+          { sceneId: "SC03", estimatedShots: 2, shotBreakdownHint: ["close-up", "medium"] },
+        ],
+      },
+      deliveryStandard: {
+        deliverables: [{ item: "video_master" }],
+        outputFormat: {},
+        fallbackPlan: { trigger: "视觉质量低于 0.75", action: "整片重新生成" },
+      },
+    }, {
+      upstreamFields: {
+        duration_sec: 15,
+        aspect_ratio: "9:16",
+        platform_id: "douyin",
+        dialogue_requirement: "全片无台词、无旁白、无字幕，仅保留动作与环境声。",
+        _originalStoryText: source,
+      },
+    });
+    const creative = prd.creativeCore as Record<string, unknown>;
+    expect(String(creative.creativeHook)).toContain("收伞");
+    expect(JSON.stringify(creative.keyMessages)).toMatch(/开门|换鞋|拧亮|坐下/u);
+    expect(JSON.stringify(creative)).not.toMatch(/空屋中央|突然听见门外/u);
+    const delivery = prd.deliveryStandard as Record<string, unknown>;
+    expect(String((delivery.fallbackPlan as Record<string, unknown>).trigger)).not.toMatch(/0\.75|低于/u);
+    const markdown = renderPrdContractMarkdown(prd);
+    expect(markdown).toContain("ffmpeg ebur128/loudnorm");
+    expect(markdown).toContain("顶部 6%");
+    expect(markdown).toContain("底部 12%");
+    expect(markdown).toContain("右侧栏 11%");
   });
 
   it("Phase3 单镜降级只做一次真实重试，重试仍降级则失败关闭", async () => {

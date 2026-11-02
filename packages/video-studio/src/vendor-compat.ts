@@ -34,6 +34,7 @@ import {
   CinematicSkillError, cinematicSkillHash, checkCinematicSkillCompliance, planCinematicSkills,
   type CinematicSkillRouter, type CinematicSkillStatus,
 } from "./cinematic-skill-policy.js";
+import { getCoverSpec } from "./cover-platforms.js";
 
 /**
  * 注入依赖保活桥（2026-09-22 真机根因）
@@ -1590,12 +1591,12 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
   const paired = risks.map((risk) => {
     const text = `${String(risk.risk ?? "")} ${String(risk.impact ?? "")}`;
     if (/(?:微表情|表情.*(?:僵硬|停滞)|眼神.*空洞|静坐.*(?:面部|情绪|长镜)|面部.*(?:漂移|变形))/u.test(text)
-      && !/(?:台灯|旋钮|开关|钨丝)/u.test(text)) {
+      && !/(?:台灯|旋钮|开关|钨丝|身份|定妆|角色一致)/u.test(text)) {
       return "把静止情绪拆成背影或侧影、手部自然放下与肩线下沉三个局部短镜，不要求正脸长特写；用雨声、呼吸和衣料轻响承接停顿，逐镜保持同一姿态终点。";
     }
-    if (/(?:低照度|曝光|色偏|噪点|白平衡|主辅光比)/u.test(text)
-      && !/(?:微表情|静坐|手部|手指|旋钮|开关)/u.test(text)) {
-      return "固定曝光、白平衡、主辅光比与LUT，分别锁定室内外冷暖光源；逐镜检查暗部噪点、色温漂移、雨丝连续性及高光滚降，不使用跨场景复用的雨幕参数。";
+    if (/(?:低照度|曝光|色偏|白平衡|主辅光比)|噪点.*(?:闪烁|堆积|漂移)/u.test(text)
+      && !/(?:微表情|静坐|手部|手指|旋钮|开关|微质感|塑料|指纹|磨白|发黄|材质|纹理)/u.test(text)) {
+      return "固定低照度曝光、青灰白平衡、主辅光比与LUT，分别锁定室内外冷暖光源；逐镜检查暗部噪点、色温漂移、雨丝连续性及高光滚降，不使用跨场景复用的雨幕参数。";
     }
     const semantic = semanticMitigation(text);
     if (semantic) return semantic;
@@ -2778,6 +2779,7 @@ function dominantColorTemperature(value: unknown, subjectLabel: string): string 
 function buildShotContract(
   prd: Record<string, unknown>,
   canonicalCharacters: Array<Record<string, unknown>>,
+  safeAreaInsets: { topPercent: number; bottomPercent: number; rightRailPercent: number },
 ): Array<Record<string, unknown>> {
   const scenePlan = recordValue(prd.scenePlan);
   const scenes = Array.isArray(scenePlan.scenes)
@@ -2786,6 +2788,14 @@ function buildShotContract(
   const mappings = Array.isArray(scenePlan.shotMapping)
     ? scenePlan.shotMapping.map(recordValue)
     : [];
+  const sourceIntent = String(recordValue(prd.projectDefinition).sourceIntent ?? "");
+  const globalActions = extractNarrativeActions({}, {
+    _originalStoryText: [
+      sourceIntent,
+      ...scenes.map((scene) => String(scene.purpose ?? "")),
+    ].join("；"),
+  });
+  const totalRows = mappings.reduce((sum, mapping) => sum + Math.max(1, Math.round(Number(mapping.estimatedShots ?? 1))), 0);
   const visual = recordValue(prd.visualSpecification);
   const globalLighting = String(visual.lightingDirection ?? "按已确认视觉方案执行");
   const constraintText = (Array.isArray(recordValue(prd.productionConstraints).technicalConstraints)
@@ -2796,6 +2806,7 @@ function buildShotContract(
     : null;
   const rows: Array<Record<string, unknown>> = [];
   let cursor = 0;
+  let rowIndex = 0;
   for (const mapping of mappings) {
     const sceneId = String(mapping.sceneId ?? "");
     const scene = scenes.find((item) => String(item.sceneId ?? "") === sceneId) ?? {};
@@ -2816,7 +2827,22 @@ function buildShotContract(
       const movement = hint === "static" ? "static"
         : /track|follow|handheld/iu.test(hint) ? hint
           : "locked";
-      const purpose = String(visualRequirements[index] ?? scene.purpose ?? "");
+      const basePurpose = String(visualRequirements[index] ?? scene.purpose ?? "");
+      const action = globalActions[Math.min(
+        globalActions.length - 1,
+        Math.floor(rowIndex * globalActions.length / Math.max(1, totalRows)),
+      )] ?? "";
+      const actionPrefix = action.slice(0, Math.min(4, action.length));
+      const purpose = action && actionPrefix.length >= 2 && !basePurpose.includes(actionPrefix)
+        ? `${action}；${basePurpose}`
+        : basePurpose;
+      const direction = deriveNarrativeShotDirection({
+        action,
+        fallbackScene: String(scene.setting ?? ""),
+        fallbackLighting: sceneLightingText || globalLighting,
+        fallbackColor: String(recordValue(visual.colorPalette).dominant ?? ""),
+        fallbackProps: Array.isArray(scene.keyProps) ? scene.keyProps.map(String) : [],
+      });
       const localBodyOrProp = /(?:只拍|第一帧只|局部|不露脸|人未入画|伞尖|鞋底|湿印|手部特写|脚部特写|肩背特写|背影特写)/u.test(purpose);
       const subjectIds = localBodyOrProp
         ? []
@@ -2828,13 +2854,16 @@ function buildShotContract(
           : canonicalCharacters.map((item) => String(item.name ?? item.id ?? "角色")).join("、");
       const rawShotLighting = visualRequirements[index] || "";
       const hasShotLighting = /(?:光|灯|钨丝|明亮|暗部|过曝|逆光|侧光|主光|补光|色温)/u.test(rawShotLighting);
-      const shotLightingText = hasShotLighting
-        ? rawShotLighting
-        : (globalLighting || sceneLightingText || "按已确认视觉方案执行");
+      const shotLightingText = direction.lighting
+        || (hasShotLighting
+          ? rawShotLighting
+          : (globalLighting || sceneLightingText || "按已确认视觉方案执行"));
       const shotColorTemperature = dominantColorTemperature(shotLightingText, subjectLabel);
-      const colorTemperature = shotColorTemperature === "色温按已确认视觉方案执行"
-        ? dominantColorTemperature(`${sceneLightingText} ${globalLighting}`, subjectLabel)
-        : shotColorTemperature;
+      const colorTemperature = direction.action
+        ? dominantColorTemperature(direction.color || shotLightingText, subjectLabel)
+        : (shotColorTemperature === "色温按已确认视觉方案执行"
+          ? dominantColorTemperature(`${sceneLightingText} ${globalLighting}`, subjectLabel)
+          : shotColorTemperature);
       rows.push({
         shotId: `${sceneId || "SC"}-S${String(index + 1).padStart(2, "0")}`,
         sceneId: sceneId || null,
@@ -2846,20 +2875,24 @@ function buildShotContract(
         cameraMovement: movement,
         cameraHint: hint,
         purpose,
-        location: scene.setting ?? "",
+        location: direction.scene || scene.setting || "",
         lighting: conciseLighting(shotLightingText),
         colorTemperature,
         warmAreaMaxRatio: warmRatio,
         subjectIds,
         subjectLabel,
         subjectCount: canonicalCharacters.length,
-        keyProps: Array.isArray(scene.keyProps) ? scene.keyProps : [],
+        keyProps: direction.props.length > 0
+          ? direction.props
+          : (Array.isArray(scene.keyProps) ? scene.keyProps : []),
         dialogue: scene.dialogue ?? "",
         audio: Array.isArray(scene.audioRequirements) ? scene.audioRequirements : [],
         audioAnchors: Array.isArray(scene.audioRequirements) ? scene.audioRequirements : [],
         safeArea: true,
+        safeAreaInsets,
         listeningVerified: false,
       });
+      rowIndex += 1;
     }
     cursor += sceneDuration;
   }
@@ -2884,6 +2917,12 @@ export function normalizeNarrativePrdContract(
   const platform = canonicalPlatformId(
     upstream.platform_id ?? upstream.platform ?? positioning.targetPlatform,
   );
+  const platformSpec = getCoverSpec(platform);
+  const safeAreaInsets = {
+    topPercent: Math.round(platformSpec.safeArea.topMinRatio * 100),
+    bottomPercent: Math.round(platformSpec.safeArea.bottomReservedRatio * 100),
+    rightRailPercent: Math.round(platformSpec.safeArea.rightRailRatio * 100),
+  };
   if (platform && platform !== "通用") positioning.targetPlatform = platform;
   if (duration > 0) positioning.targetDuration = duration;
   positioning.aspectRatio = aspect;
@@ -2906,6 +2945,17 @@ export function normalizeNarrativePrdContract(
     upstream.audio_design,
     upstream.dialogue_requirement,
   ].map(String).join(" ");
+  const sourceActions = extractNarrativeActions({}, {
+    _originalStoryText: String(upstream._originalStoryText ?? upstream.description ?? ""),
+  });
+  if (sourceActions.length > 0) {
+    const creative = recordValue(prd.creativeCore);
+    creative.creativeHook = `第一帧：${sourceActions[0]}；动作对象、空间和声音同时成立，不使用源文本之外的悬念或隐喻`;
+    creative.keyMessages = sourceActions.slice(0, 5).map((action, index) =>
+      `${index === 0 ? "P0" : "P1"}：镜头必须完整呈现“${action}”，并保留其动作对象、场景状态与同步声音`);
+    creative.twistPoint = `最后落在“${sourceActions.at(-1)}”，由动作、光线和空间关系收束，不追加源文本之外的剧情反转`;
+    prd.creativeCore = creative;
+  }
   const musicForbidden = /(?:无|不加|不要|禁止|不出现)[^。；\n]{0,8}(?:配乐|音乐|旋律)|(?:仅|只)保留(?:人物|主体)?(?:动作)?(?:与)?(?:画外)?(?:环境声|实拍声)/u.test(storyPolicy);
   if (musicForbidden) {
     const audioSpecification = recordValue(prd.audioSpecification);
@@ -3059,17 +3109,19 @@ export function normalizeNarrativePrdContract(
   delivery.acceptanceCriteria = {
     ...recordValue(delivery.acceptanceCriteria),
     ...qualityThresholds,
-    technical: "ffprobe 核验画幅、时长、帧率、编码、音频流与响度；所有项须绑定当前导出文件",
+    technical: "ffprobe 核验画幅、时长、帧率、编码、音频流；ffmpeg ebur128/loudnorm 实测 integrated loudness 与 true peak；首中尾帧核平台安全区；所有项绑定当前导出文件",
   };
   delivery.subtitles = subtitleContract(upstream);
   delivery.platformConstraints = platform
     ? {
         platform,
         safeArea: true,
+        safeAreaInsets,
+        safeAreaReview: `顶部 ${safeAreaInsets.topPercent}% / 底部 ${safeAreaInsets.bottomPercent}% / 右侧栏 ${safeAreaInsets.rightRailPercent}% 内不放关键文字或主体动作；首中尾帧逐项复核`,
         firstFrameReview: true,
         canvasVerified: true,
       }
-    : { platform: "未指定", safeArea: false, firstFrameReview: false, canvasVerified: false };
+    : { platform: "未指定", safeArea: false, safeAreaInsets: null, firstFrameReview: false, canvasVerified: false };
   delivery.visualVerification = {
     warmAreaMaxRatio: /暖区[^。；]{0,12}(?:不超过|≤)[^。；]{0,4}(?:三分之一|1\/3)/u.test(
       (Array.isArray(constraints.technicalConstraints) ? constraints.technicalConstraints as unknown[] : []).map(String).join(" "),
@@ -3079,6 +3131,9 @@ export function normalizeNarrativePrdContract(
   };
   delivery.audioVerification = {
     streamProbe: true,
+    measurementTool: "ffmpeg-ebur128",
+    integratedLoudnessMeasured: false,
+    truePeakMeasured: false,
     loudnessTargetLufs: -14,
     truePeakTargetDbtp: -1,
     contentAnchorsRequired: true,
@@ -3086,7 +3141,12 @@ export function normalizeNarrativePrdContract(
   };
   delivery.listeningVerification = {
     verified: false,
-    reason: "ffprobe 只核验音频流与响度参数，不证明旋钮声、雨声等内容锚点已被人工听审",
+    reason: "ffprobe 只核验音频流，响度与 true peak 须由 ffmpeg ebur128/loudnorm 实测；两者都不证明旋钮声、雨声等内容锚点已被人工听审",
+  };
+  delivery.fallbackPlan = {
+    trigger: "逐镜核对角色、动作、场景、光源、道具、构图与平台安全区；任一硬契约失败，或同一镜连续两次定向修复仍无改善",
+    action: "锁定失败镜头 ID 与失败字段，只重做该镜；保留已通过镜头、角色锚点和灯态，不做整片无依据重生成",
+    expectedOutput: "失败镜定向修复；无法修复时保留未验证状态并停止渲染提交",
   };
   if (recordValue(delivery.subtitles).mode === "none") {
     const audience = recordValue(prd.audienceProfile);
@@ -3141,7 +3201,7 @@ export function normalizeNarrativePrdContract(
       : `色温基准 ${canonicalK}`;
     prd.visualSpecification = visual;
   }
-  prd.shotContract = buildShotContract(prd, canonicalCharacters);
+  prd.shotContract = buildShotContract(prd, canonicalCharacters, safeAreaInsets);
   const normalizedCharacters = Array.isArray(recordValue(prd.characterSystem).characters)
     ? (recordValue(prd.characterSystem).characters as unknown[]).map(recordValue)
     : [];
@@ -3239,6 +3299,9 @@ export function renderPrdContractMarkdown(prd: Record<string, unknown>): string 
   const delivery = recordValue(prd.deliveryStandard);
   const output = recordValue(delivery.outputFormat);
   const subtitles = recordValue(delivery.subtitles);
+  const platformConstraints = recordValue(delivery.platformConstraints);
+  const safeAreaInsets = recordValue(platformConstraints.safeAreaInsets);
+  const safeAreaLabel = `是（顶部 ${String(safeAreaInsets.topPercent ?? "?")}% / 底部 ${String(safeAreaInsets.bottomPercent ?? "?")}% / 右侧栏 ${String(safeAreaInsets.rightRailPercent ?? "?")}% 避让）`;
   const characters = Array.isArray(recordValue(prd.characterSystem).characters)
     ? (recordValue(prd.characterSystem).characters as unknown[]).map(recordValue)
     : [];
@@ -3254,7 +3317,7 @@ export function renderPrdContractMarkdown(prd: Record<string, unknown>): string 
     `- **视频**：${String(output.videoCodec ?? "H.264")} / ${String(output.container ?? "MP4")}`,
     `- **音频**：${String(output.audioCodec ?? "AAC")} / ${output.audioSampleRate ?? 48000}Hz / ${output.audioChannels ?? 2}ch / ${output.audioLoudnessLufs ?? -14} LUFS / true peak ${output.audioTruePeakDbtp ?? -1} dBTP`,
     `- **字幕**：mode=${String(subtitles.mode ?? "unverified")}；burned=${String(subtitles.burned ?? false)}；sidecar=${String(subtitles.sidecar ?? false)}`,
-    `- **验收方法**：ffprobe 校验画幅、时长、帧率、音频流；抽首帧/中段/尾帧核字幕与平台安全区`,
+    `- **验收方法**：ffprobe 校验画幅、时长、帧率与音频流；ffmpeg ebur128/loudnorm 实测 integrated loudness 与 true peak；抽首帧/中段/尾帧核字幕与平台安全区（${safeAreaLabel}）`,
     "",
     "### 角色可执行锚点",
     "",
@@ -3274,7 +3337,7 @@ export function renderPrdContractMarkdown(prd: Record<string, unknown>): string 
     "|---|---|---|---:|---|---|---|---|---|---|",
     ...(shots.length > 0
       ? shots.map((shot) =>
-        `| ${String(shot.shotId)} | ${String(shot.sceneId ?? "-") } | ${shot.startSeconds}-${shot.endSeconds}s | ${shot.durationSeconds}s | ${String(shot.shotSize)} / ${String(shot.cameraMovement)} | ${String(shot.subjectLabel ?? (Array.isArray(shot.subjectIds) && shot.subjectIds.length ? shot.subjectIds.join("、") : "无"))} | ${Array.isArray(shot.keyProps) ? shot.keyProps.join("、") : "无"} | ${String(shot.lighting ?? "未指定")} / ${String(shot.colorTemperature ?? "未指定")} | ${Array.isArray(shot.audioAnchors) && shot.audioAnchors.length ? shot.audioAnchors.join("、") : "无"} | ${shot.safeArea === true ? "是" : "否"} |`)
+        `| ${String(shot.shotId)} | ${String(shot.sceneId ?? "-") } | ${shot.startSeconds}-${shot.endSeconds}s | ${shot.durationSeconds}s | ${String(shot.shotSize)} / ${String(shot.cameraMovement)} | ${String(shot.subjectLabel ?? (Array.isArray(shot.subjectIds) && shot.subjectIds.length ? shot.subjectIds.join("、") : "无"))} | ${Array.isArray(shot.keyProps) ? shot.keyProps.join("、") : "无"} | ${String(shot.lighting ?? "未指定")} / ${String(shot.colorTemperature ?? "未指定")} | ${Array.isArray(shot.audioAnchors) && shot.audioAnchors.length ? shot.audioAnchors.join("、") : "无"} | ${shot.safeArea === true ? safeAreaLabel : "否"} |`)
       : ["| - | - | - | - | - | - | - | - | - | - |"]),
   ].join("\n");
 }
@@ -4326,6 +4389,18 @@ export function installVendorDurationProjectionBridge(options: DurationProjectio
       });
     let result = projectOnce(true);
     if (!result.ok && planningMode) {
+      if (result.reason === "voice-floor-exceeds-target"
+        && (source === "dcm.constrain" || source === "phase-3")) {
+        emit({
+          kind: "infeasible",
+          source,
+          targetSeconds: Number(targetSeconds),
+          totalSeconds: records.reduce((sum, record) => sum + durationOf(record), 0),
+          shots: result.entries.map((entry) => ({ ...entry })),
+          message: `${result.reason}：${result.suggestions.join("；")}`,
+        });
+        return false;
+      }
       /**
        * 剪辑时间线不是供应商单镜请求。15s 成片可由 5 个 3s 剪辑镜头组成，
        * 不能把供应商 4s 单镜下限直接套在这条时间线上；规划阶段只在镜数确实
@@ -4441,10 +4516,10 @@ export function installVendorDurationProjectionBridge(options: DurationProjectio
         const explicitTarget = Number(opts.targetDuration);
         const sum = scenes.reduce((total, scene) => total + durationOf(scene), 0);
         const target = Number.isFinite(explicitTarget) && explicitTarget > 0 ? explicitTarget : sum;
-        projectRecords(scenes, target, "dcm.constrain", "SC");
+        const projected = projectRecords(scenes, target, "dcm.constrain", "SC", true);
         const ensure = prototype._ensureSequentialTiming as ((this: unknown, list: Recordish[]) => void) | undefined;
         if (typeof ensure === "function") ensure.call(this, scenes);
-        return { scenes, adjustments: [], valid: true };
+        return { scenes, adjustments: [], valid: projected };
       };
       prototype.constrain = patched;
       restores.push(() => {
@@ -4487,7 +4562,15 @@ export function installVendorDurationProjectionBridge(options: DurationProjectio
       const config = (blueprint?.config ?? {}) as Recordish;
       const meta = (blueprint?.meta ?? {}) as Recordish;
       const target = Number(config.target_duration ?? meta.target_duration ?? blueprint?.targetDuration);
-      projectRecords(after, Number.isFinite(target) && target > 0 ? target : null, "phase-3", "S");
+      const hasTarget = Number.isFinite(target) && target > 0;
+      const projected = projectRecords(
+        after,
+        hasTarget ? target : null,
+        "phase-3",
+        "S",
+        true,
+      );
+      if (hasTarget && !projected) throw new Error("PHASE3_DURATION_PROJECTION_FAILED");
       return after;
     };
     prototype._checkDialogueTiming = patched;
