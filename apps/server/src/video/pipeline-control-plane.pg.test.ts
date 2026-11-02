@@ -268,7 +268,7 @@ describe.runIf(RUN_DB)("视频管线持久化控制面", () => {
       quest: "pg-auto-approval",
       name: "PG 自动审批",
       version: "v1",
-      steps: [{ step_key: "script", name: "剧本", owner: "scriptwriter", gate: "G1", outputs: ["script_blueprint"] }],
+      steps: [{ step_key: "script", name: "来源档案", owner: "scriptwriter", gate: "G1", outputs: ["dossier"] }],
     }, {
       adapterRegistry: [{ id: "vendor-preproduction", pipelineKeys: ["pg-auto-approval"] }],
       knownGates: new Set(["G1"]),
@@ -301,8 +301,10 @@ describe.runIf(RUN_DB)("视频管线持久化控制面", () => {
       nodeKey: "script",
       idempotencyKey: `auto-output-${suffix}`,
       artifacts: [{
-        role: "script_blueprint",
-        schemaVersion: "workloom.script/v1",
+        // G1 belongs to the dossier contract. A generic script artifact must not
+        // satisfy the hardened server auto-approval evidence validator.
+        role: "dossier",
+        schemaVersion: autoPlan.steps[0]!.outputContract[0]!.schema,
         ref: `pg-auto/${suffix}/script.json`,
         sha256: hash,
         logicalHash: hash,
