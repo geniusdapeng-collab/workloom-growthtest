@@ -1087,6 +1087,19 @@ function isNarrativeAnimal(name: unknown): boolean {
   return /(?:橘猫|猫咪|猫|小狗|狗狗|狗|小鸟|鸟儿|鸟|马|羊|牛|鹿|兔|鱼|虎|豹|狮子|熊|鸡|鸭|鹅)/u.test(String(name ?? ""));
 }
 
+function cleanNarrativeAnimalAppearance(value: unknown): string {
+  let text = String(value ?? "")
+    .replace(/[；;]?\s*(?:角色ID|模特ID|定妆照|授权)=[^；;\n]*/gu, "")
+    .replace(/[；;]?\s*动物外观由文字锚点与跨镜参考帧锁定[^；;\n]*/gu, "")
+    .replace(/(?:^|[；;])\s*跨镜参考帧锁定[^；;\n]*/gu, "");
+  const humanTemplate = /[，,；;]\s*(?:从站立过渡到站立|站立姿态|缓慢走动|张开双臂|自然下垂|抱头(?:或伸展)?|伸展|指向(?:或握拳)?|握拳|微笑(?:或点头)?|点头|紧张移动|自然)(?=[，,；;。]|$)/gu;
+  for (let index = 0; index < 8; index += 1) text = text.replace(humanTemplate, "");
+  return text
+    .replace(/[，,；;]{2,}/gu, "；")
+    .replace(/^[，,；;。\s]+|[，,；;。\s]+$/gu, "")
+    .trim();
+}
+
 function canonicalCharacterFromEvidence(upstream: Record<string, unknown>): Array<Record<string, unknown>> {
   const explicit = upstream?.character && typeof upstream.character === "object"
     ? upstream.character as Record<string, unknown>
@@ -3050,15 +3063,17 @@ function reconcileNarrativeScenePlan(
   const audioForPurpose = (purpose: string): string[] => {
     const kind = animalActionKind(purpose);
     const matched = sourceAudio.filter((item) =>
-      kind === "reach"
+      kind === "reach" || kind === "contact"
         ? /(?:滴水|水滴|爪|接触|水花)/u.test(item)
-        : kind === "retreat"
+        : kind === "retreat" || kind === "curl"
           ? /(?:纸箱|摩擦|呼吸|环境)/u.test(item)
           : /(?:雨|屋檐|纸箱|环境|呼吸)/u.test(item));
     if (matched.length > 0) return [...new Set(matched)].slice(0, 4);
     if (kind === "probe") return ["纸箱摩擦声", "猫呼吸声", "雨声"];
     if (kind === "reach") return ["屋檐滴水声", "爪垫触水轻响", "雨声"];
+    if (kind === "contact") return ["水滴落在爪垫上的轻响", "细小水花声", "雨声"];
     if (kind === "retreat") return ["纸箱受压摩擦声", "猫呼吸声", "雨声"];
+    if (kind === "curl") return ["纸箱受压摩擦声", "猫呼吸声", "雨声"];
     return ["现场环境声", "主体动作声"];
   };
   const sanitizeSetting = (value: string): string => {
@@ -3641,6 +3656,7 @@ export function normalizeNarrativePrdContract(
       const name = String(authoritative?.name ?? item.name ?? generated[index]?.name ?? `角色${index + 1}`);
       const animal = isNarrativeAnimal(name);
       if (animal) {
+        const animalAppearance = cleanNarrativeAnimalAppearance(authoritativeAppearance || baseAppearance);
         return {
           ...(generated[index] ?? {}),
           characterId: id,
@@ -3648,12 +3664,12 @@ export function normalizeNarrativePrdContract(
           role: String(item.role ?? generated[index]?.role ?? "protagonist"),
           gender: null,
           ageRange: null,
-          appearance: `${authoritativeAppearance || baseAppearance}；角色ID=${id}；动物外观由文字锚点与跨镜参考帧锁定`,
+          appearance: `${animalAppearance || "动物主体；外观以源需求中的品种、体型、毛色、湿度与动作描述为准"}；角色ID=${id}；身份证据=仅文字外观锚点；无已登记图片参考资产`,
           costume: "不适用（动物自然外观）",
           portraitPath: "",
           portraitEvidence: { exists: false, reason: "animal-character-no-human-portrait" },
           authorization: "not-applicable",
-          consistencyRequirements: `所有镜头绑定 ${id} 的品种、体型、毛色、湿度与动作指纹；不得变更物种或替换为未登记人物`,
+          consistencyRequirements: `所有镜头复用 ${id} 的同一段文字外观锚点（品种、体型、毛色、湿度与动作描述）；本审计轮无图片参考资产，跨镜视觉一致性未验证；不得变更物种或替换为未登记人物`,
         };
       }
       return {
@@ -3799,9 +3815,14 @@ export function normalizeNarrativePrdContract(
   } else if (!requiresPortraits) {
     delivery.characterAssets = {
       required: false,
-      reason: "动物角色以文字外观、动作与跨镜参考帧锁定；不要求人像定妆照",
+      reason: "动物角色只复用文字外观与动作锚点；不要求人像定妆照，本审计轮也没有已登记图片参考资产",
       humanPortrait: "not_applicable",
-      referenceStrategy: "生成前锁定文字外观锚点与固定机位；正式生产以首个通过审核的关键帧作为后续镜头参考，跨镜保持品种、体型、毛色、斑纹、眼睛颜色与湿度一致",
+      referenceStrategy: "本审计轮只校验同一段文字锚点被重复使用；正式生产前如采用首个通过审核的关键帧，须另行登记资产路径、哈希与授权，之后才可作为后续镜头参考",
+      identityEvidence: {
+        mode: "text-anchor",
+        assetStatus: "not-registered",
+        visualVerification: "not-performed",
+      },
       auditStatus: "not_generated_in_this_audit_only_run",
     };
   }
@@ -5745,8 +5766,11 @@ export function applyNarrativeFinalPromptContract(
       && canonicalAnimalNames.length > 0
       && canonicalAnimalNames.length === characterNames.length;
     const canonicalNoActors = canonicalNoPerson && canonicalAnimalNames.length === 0;
+    const animalAppearanceAnchor = canonicalAnimalOnly
+      ? cleanNarrativeAnimalAppearance(profileAppearance)
+      : profileAppearance;
     const roles = canonicalAnimalOnly
-      ? `${canonicalAnimalNames.join("、")}作为本镜唯一动物主体入画；外观锚点=${profileAppearance || "沿用当前授权动物参考帧中的品种、体型、毛色、斑纹、眼睛颜色与湿度"}；画面不出现人物、人影或人体局部。`
+      ? `${canonicalAnimalNames.join("、")}作为本镜唯一动物主体入画；外观锚点=${animalAppearanceAnchor || "以源需求中的品种、体型、毛色、眼睛颜色、湿度与动作描述为准"}；身份证据仅文字外观锚点，本审计轮无已登记图片参考资产；画面不出现人物、人影或人体局部。`
       : canonicalNoPerson
         ? "无人物、无人影、无人体局部入画。"
       : characterNames.length > 0
@@ -5768,7 +5792,7 @@ export function applyNarrativeFinalPromptContract(
       : makeupTextForAction(projectedAction);
     const portraitText = canonicalAnimalOnly
       ? (profiles.filter((item) => item.path).map((item) => `${item.name}=${item.path}`).join("；")
-        || "不适用人像定妆照：动物主体仅用文字外观锚点与跨镜参考帧锁定，不生成人物肖像。")
+        || "不适用人像定妆照：动物主体只复用同一段文字外观锚点；本审计轮无已登记参考帧或图片资产，不声称图像锁定，不生成人物肖像。")
       : canonicalNoPerson
         ? "不适用：本镜无人物，不生成也不引用人像定妆照。"
       : (options.characterPortraits ?? []).filter((item) => characterNames.includes(item.name) && item.path)
@@ -5944,13 +5968,28 @@ export function applyNarrativeFinalPromptContract(
       audio: audioText,
       timeline: timelineText,
       emotion: emotionText,
-      portraitAssets: profiles.map((item) => ({
-        name: item.name,
-        path: item.path,
-        authorization: item.authorization ?? "unverified",
-        sha256: item.sha256 ?? null,
-        bytes: item.bytes ?? null,
-      })),
+      portraitAssets: profiles
+        .filter((item) => String(item.path ?? "").trim())
+        .map((item) => ({
+          name: item.name,
+          path: item.path,
+          authorization: item.authorization ?? "unverified",
+          sha256: item.sha256 ?? null,
+          bytes: item.bytes ?? null,
+        })),
+      ...(canonicalAnimalOnly ? {
+        identityAnchor: {
+          mode: "text",
+          subject: canonicalAnimalNames.join("、"),
+          text: animalAppearanceAnchor || "以源需求中的动物品种、体型、毛色、眼睛颜色、湿度与动作描述为准",
+          sha256: createHash("sha256")
+            .update(animalAppearanceAnchor || "以源需求中的动物品种、体型、毛色、眼睛颜色、湿度与动作描述为准")
+            .digest("hex"),
+          authorization: "not-applicable",
+          assetStatus: "not-registered",
+          visualVerification: "not-performed",
+        },
+      } : {}),
     };
   }
   next.prompt = prompt;
@@ -6082,10 +6121,12 @@ function narrativeActionKind(action: string): "umbrella" | "open" | "close" | "s
   return "other";
 }
 
-function animalActionKind(action: string): "probe" | "reach" | "withdraw" | "retreat" | "none" {
+function animalActionKind(action: string): "probe" | "reach" | "contact" | "withdraw" | "retreat" | "curl" | "none" {
   if (/(?:缩爪|缩回前爪|收回前爪|前爪.*回收|前腿.*回收)/u.test(action)) return "withdraw";
+  if (/(?:盘成|蜷缩|蜷紧|尾尖.*(?:口鼻|鼻)|贴住(?:口鼻|鼻)|盘紧|闭眼)/u.test(action)) return "curl";
+  if (/(?:水滴.*(?:落|接触|砸).*(?:爪|爪垫|爪背)|(?:爪|爪垫|爪背).*(?:接触|接住).*水滴|溅起.*水花)/u.test(action)) return "contact";
   if (/(?:伸爪|伸出前爪|抬起前爪|抬爪|前爪.*伸向|接水|接住.*水滴|爪垫.*水|爪尖.*水|水滴.*爪)/u.test(action)) return "reach";
-  if (/(?:缩回|退入|退回箱|盘成|蜷缩|蜷紧|收拢|合拢|尾巴.*收|尾尖.*贴|贴住(?:口鼻|鼻)|盘紧|闭眼)/u.test(action)) return "retreat";
+  if (/(?:缩回|退入|退回箱|收拢|合拢|尾巴.*收)/u.test(action)) return "retreat";
   if (/(?:探头|探出|耳朵.*转|鼻尖.*探|抬眼观察)/u.test(action)) return "probe";
   return "none";
 }
@@ -6094,9 +6135,11 @@ function narrativeAnimalActionRank(action: string): number {
   switch (animalActionKind(action)) {
     case "probe": return 0;
     case "reach": return 1;
-    case "withdraw": return 2;
-    case "retreat": return 3;
-    default: return 1.5;
+    case "contact": return 2;
+    case "withdraw": return 3;
+    case "retreat": return 4;
+    case "curl": return 5;
+    default: return 2.5;
   }
 }
 
@@ -6170,8 +6213,8 @@ export function projectNarrativeActionSequence(actions: string[], shotCount: num
     ];
   }
   const animalProbe = clean.some((action) => animalActionKind(action) === "probe");
-  const animalReach = clean.some((action) => animalActionKind(action) === "reach");
-  const animalRetreat = clean.some((action) => animalActionKind(action) === "retreat");
+  const animalReach = clean.some((action) => ["reach", "contact"].includes(animalActionKind(action)));
+  const animalRetreat = clean.some((action) => ["retreat", "curl"].includes(animalActionKind(action)));
   if (animalProbe && animalReach && animalRetreat && shotCount >= 3) {
     const stages = [
       "橘猫从纸箱探头观察屋檐滴水",
@@ -6213,15 +6256,15 @@ function timelineTextForAction(action: string, duration: number): string {
   const beats = animalKind === "probe"
     ? ["猫耳先向滴水声转动，眼睛从纸箱暗部露出", "鼻尖探出箱沿，胡须擦过潮湿纸板，头部只出半截", "视线锁住屋檐水线，身体仍低伏在箱内"]
     : animalKind === "reach"
-      ? /(?:水滴.*爪|接触|落在.*爪)/u.test(action)
-        ? ["前爪停在滴水线下方，肉垫朝上并保持趾数稳定", "水滴落在爪背或肉垫上，趾节轻颤并溅起细小水花", "前爪短暂停住，视线仍锁定水滴"]
-        : ["前爪从胸口抬起，爪尖靠近屋檐滴水线", "前腿继续伸向箱口外，掌面缓慢翻开去迎水滴", "爪尖停在滴水线下方，身体重心仍留在箱内"]
+      ? ["前爪从胸口抬起，爪尖靠近屋檐滴水线", "前腿继续伸向箱口外，掌面缓慢翻开去迎水滴", "爪尖停在滴水线下方，身体重心仍留在箱内"]
+      : animalKind === "contact"
+        ? ["前爪已停在滴水线下方，肉垫朝上并保持趾数稳定", "水滴落在爪背或肉垫上，趾节轻颤并溅起细小水花", "前爪短暂停住，视线仍锁定水滴，不提前回缩"]
       : animalKind === "withdraw"
         ? ["前爪从滴水线下方收回，爪背带起细小水珠", "前腿撤回箱沿内侧，身体重心向纸箱暗部后移", "前爪收到胸前，头部仍朝外观察"]
       : animalKind === "retreat"
-        ? /(?:盘成|蜷|尾尖|闭眼)/u.test(action)
+        ? ["耳朵后压，头部开始缩回纸箱阴影", "肩背和身体重心继续退入纸箱暗部", "前爪收到胸前，箱口只剩模糊暖橘轮廓"]
+        : animalKind === "curl"
           ? ["肩背先向内收，尾巴从身侧扫过箱底", "身体盘紧成团，尾尖贴住口鼻", "眼皮缓慢合拢，只留一小团呼吸起伏"]
-          : ["耳朵后压，头部开始缩回纸箱阴影", "肩背和身体重心继续退入纸箱暗部", "前爪收到胸前，箱口只剩模糊暖橘轮廓"]
         : kind === "umbrella"
     ? ["固定机位起幅，伞骨合拢，伞尖离地滴水", "把收拢的湿伞换到持伞侧，另一只手摸到钥匙", "在门前站定，呼气，钥匙尖对准锁孔"]
     : kind === "open"
@@ -6277,11 +6320,15 @@ function emotionTextForAnimalAction(action: string, names: string[]): string {
     case "probe":
       return `${subject}耳尖先转向滴水声，眼睛从纸箱暗部缓慢露出，鼻尖轻颤，头部只探出半截，颈部保持低伏；不拟人化微笑或夸张凝视。`;
     case "reach":
-      return `${subject}视线锁定下落水滴，前爪抬起并保持趾数稳定，爪垫接触水面时趾节轻颤，耳朵略向前，身体重心仍留在纸箱内。`;
+      return `${subject}视线锁定下落水滴，前爪从胸口抬起、缓慢伸向滴水线，爪尖保持趾数稳定，身体重心仍留在纸箱内。`;
+    case "contact":
+      return `${subject}视线锁定已到爪前的单颗水滴，爪垫保持朝上，水珠接触爪背或肉垫时趾节轻颤并溅起细小水花；本镜不提前回缩。`;
     case "withdraw":
       return `${subject}耳尖向后轻压，视线仍追着水滴，前爪从接触点迅速收回胸前，肩背内收但头部保持朝外观察。`;
     case "retreat":
-      return `${subject}耳朵后压，眼睛半合，肩背向内收，尾巴逐圈贴近身体，最后鼻尖靠向爪垫；呼吸幅度变小，情绪由警觉转为安定。`;
+      return `${subject}耳朵后压，头部先缩回纸箱阴影，肩背与身体重心继续退入暗部，末段前爪收到胸前，呼吸仍保持警觉。`;
+    case "curl":
+      return `${subject}肩背向内收，尾巴逐圈贴近身体，尾尖最后盖住口鼻，眼皮缓慢合拢，呼吸幅度变小；情绪由警觉转为安定。`;
     default:
       return `${subject}眼神跟随本镜可见目标，耳尖、鼻翼、爪部和身体重心做小幅连续变化，不拟人化表演。`;
   }
@@ -6298,11 +6345,15 @@ function pacingTextForAction(action: string, duration: number): string {
   const body = animalKind === "probe"
     ? "前段先动耳尖与眼睛，中段探头出箱沿，末段视线锁定屋檐水线"
     : animalKind === "reach"
-      ? "前段抬爪靠近水滴，中段完成接触与水花，末段前爪停稳或回缩"
+      ? "前段抬爪离箱，中段伸向滴水线，末段停在滴水线下方"
+      : animalKind === "contact"
+        ? "前段保持爪垫接水姿态，中段完成接触与水花，末段短暂停稳"
       : animalKind === "withdraw"
         ? "前段前爪离开滴水线，中段前腿撤回箱内，末段身体重心稳定"
         : animalKind === "retreat"
-          ? "前段头部缩回，中段身体收进纸箱，末段盘紧并闭眼静止"
+          ? "前段头部缩回，中段肩背退入纸箱暗部，末段前爪收到胸前"
+          : animalKind === "curl"
+            ? "前段肩背内收，中段尾巴贴住口鼻，末段闭眼并保持呼吸起伏"
           : kind === "umbrella"
     ? "前段只为收伞起势，中段推进到门边，末段在门前停顿"
     : kind === "open"
@@ -6382,6 +6433,10 @@ function narrativeEraEvidence(scene: string, props: string[]): string {
 }
 
 function shotSizeForAction(action: string): string | null {
+  const animalKind = animalActionKind(action);
+  if (animalKind === "probe" || animalKind === "retreat") return "medium";
+  if (animalKind === "reach" || animalKind === "withdraw" || animalKind === "curl") return "close-up";
+  if (animalKind === "contact") return "extreme-close-up";
   switch (narrativeActionKind(action)) {
     case "umbrella": return "medium";
     case "open": return "medium";
@@ -6708,12 +6763,26 @@ export function renderPreproductionAuditReport(input: {
   });
   const blueprint = recordValue(input.scriptResult.blueprint);
   const characterSystem = recordValue(blueprint.character_system);
-  const rawScriptCharacters = Array.isArray(characterSystem.characters)
-    ? characterSystem.characters.map(recordValue)
-    : [];
+  const scriptMetadata = recordValue(blueprint._metadata ?? blueprint.meta);
+  const sourcePrd = recordValue(scriptMetadata._prd);
+  const sourceCharacterSystem = recordValue(sourcePrd.characterSystem);
+  const rawScriptCharacters = [
+    ...(Array.isArray(characterSystem.characters) ? characterSystem.characters.map(recordValue) : []),
+    ...(Array.isArray(sourceCharacterSystem.characters) ? sourceCharacterSystem.characters.map(recordValue) : []),
+  ];
   const structure = recordValue(blueprint.structure);
   const scenes: FusionRecord[] = Array.isArray(structure.scenes)
     ? structure.scenes.map((value) => recordValue(value))
+    : [];
+  const sourceProject = recordValue(sourcePrd.projectDefinition);
+  const sourceOriginal = String(
+    scriptMetadata._originalStoryText
+      ?? sourceProject._originalStoryText
+      ?? sourceProject.sourceIntent
+      ?? "",
+  ).trim();
+  const sourceShotContracts = Array.isArray(sourcePrd.shotContract)
+    ? sourcePrd.shotContract.map(recordValue)
     : [];
   const shotIds = shotCards.map((shot) => String(shot.shotId ?? ""));
   const promptIds = prompts.map((prompt) => String(prompt.shotId ?? prompt.shot_id ?? ""));
@@ -6790,6 +6859,22 @@ export function renderPreproductionAuditReport(input: {
     }),
     ...promptPortraitAssets.map((item) => String(item.name ?? "").trim()).filter(Boolean),
   ])];
+  const animalIdentityOnly = promptCharacterNames.length > 0
+    && promptCharacterNames.every((name) => isNarrativeAnimal(name));
+  const identityAnchorByKey = new Map<string, FusionRecord>();
+  for (const shot of shotCards) {
+    const contract = recordValue(shot.promptContract);
+    const identityAnchor = recordValue(contract.identityAnchor);
+    if (identityAnchor.mode !== "text") continue;
+    const key = `${String(identityAnchor.subject ?? "")}\u0000${String(identityAnchor.sha256 ?? "")}`;
+    if (!identityAnchorByKey.has(key)) identityAnchorByKey.set(key, identityAnchor);
+  }
+  const identityAnchors = [...identityAnchorByKey.values()];
+  const identityEvidenceStatus = animalIdentityOnly
+    ? "text-anchor-only"
+    : portraitAssetsVerified
+      ? "verified-source-assets"
+      : "unverified";
   const characters: FusionRecord[] = promptCharacterNames.length > 0
     ? promptCharacterNames.map((name) => {
       const rawMatches = rawScriptCharacters.filter((character) =>
@@ -6819,6 +6904,16 @@ export function renderPreproductionAuditReport(input: {
     shots: evidenceHash(shotCards),
     prompts: evidenceHash(prompts),
     portraits: evidenceHash(portraitConfirmation),
+  };
+  const sourceEvidence = {
+    originalRequirement: sourceOriginal,
+    originalRequirementSha256: sourceOriginal
+      ? createHash("sha256").update(sourceOriginal).digest("hex")
+      : null,
+    sourceShotContracts,
+    sourceShotContractSha256: sourceShotContracts.length
+      ? evidenceHash(sourceShotContracts)
+      : null,
   };
   const semanticHash = evidenceHash(shotCards.map((shot) => ({
     shotId: shot.shotId,
@@ -6850,7 +6945,9 @@ export function renderPreproductionAuditReport(input: {
     `- 镜头卡：已内联，共 ${shotCards.length} 镜；全部场景与字段见下表，来源为最终提示词绑定合同`,
     `- 提示词：已内联，共 ${prompts.length} 条；正文见下方完整字段块`,
     portraitsNotApplicable
-      ? `- 定妆照生成：not_applicable（本轮未生成新定妆照，仅复用已登记源资产）；角色引用资产：${portraitAssetsVerified ? `verified，${portraitAssets.length} 个已登记源定妆照` : "unverified"}`
+      ? animalIdentityOnly
+        ? "- 定妆照生成：not_applicable（动物角色不要求人像定妆照）；角色身份证据：text-anchor（文字锚点可复核，跨镜视觉一致性未验证）"
+        : `- 定妆照生成：not_applicable（本轮未生成新定妆照，仅复用已登记源资产）；角色引用资产：${portraitAssetsVerified ? `verified，${portraitAssets.length} 个已登记源定妆照` : "unverified"}`
       : `- 定妆照：状态=${portraitReason || "unverified"}；未声明为已完成，除非另有真实图片回执`,
     ...portraitAssets.map((item) =>
       `- 源定妆照 ${String(item.name ?? "未命名")}：path=${String(item.path ?? "未指定")}；授权=${String(item.authorization ?? "unknown")}；sha256=${String(item.sha256 ?? "未核验")}`),
@@ -6863,14 +6960,31 @@ export function renderPreproductionAuditReport(input: {
     ...shotCards.map((shot) =>
       `- 场景 ${String(shot.shotId)}：${String(shot.action)}；时长=${String(shot.duration)}s；场景状态=${String(shot.scene)}`),
     "",
-    "> 脚本证据按最终提示词绑定的镜头合同重投影；原始剧本文本仅以 sha256 留痕，避免旧场景命名覆盖已通过的 G6 合同。",
+    "> 脚本证据按最终提示词绑定的镜头合同重投影；最终 G7 视图另内联原始需求与源镜头合同正文，旧脚本字段不得覆盖已通过的 G6 合同。",
+    "",
+    "## 原始源证据（未改写）",
+    "",
+    `- 原始需求正文：${sourceEvidence.originalRequirement || "本次输入未提供可直接核验的原文"}`,
+    `- 原始需求 SHA-256：${sourceEvidence.originalRequirementSha256 ?? "未提供"}`,
+    `- 源镜头合同 SHA-256：${sourceEvidence.sourceShotContractSha256 ?? "未提供"}`,
+    ...(sourceShotContracts.length > 0
+      ? sourceShotContracts.map((shot, index) => {
+        const id = String(shot.shotId ?? shot.shot_id ?? `SOURCE-${index + 1}`);
+        const purpose = String(shot.purpose ?? shot.action ?? "").trim();
+        return `- 源镜头 ${id}：${purpose || "未提供动作正文"}`;
+      })
+      : ["- 源镜头合同逐镜正文：未提供"]),
     "",
     "## 源定妆照证据链",
     "",
     `- 新增定妆照生成：${portraitsNotApplicable ? "not_applicable（审计关闭）" : "unverified"}`,
-    `- 角色身份引用资产：${portraitAssetsVerified ? "verified（仅复用已登记源资产）" : "unverified"}`,
+    animalIdentityOnly
+      ? "- 源角色资产：not_applicable（动物主体无已登记图片定妆资产；只复用文字外观锚点）"
+      : `- 源角色资产：${portraitAssetsVerified ? "verified（仅复用已登记源资产）" : "unverified"}`,
     ...portraitAssets.map((item) =>
       `- ${String(item.name ?? "未命名")}：path=${String(item.path ?? "未指定")}；授权范围=${String(item.authorization ?? "unknown")}；文件 SHA-256=${String(item.sha256 ?? "未核验")}`),
+    ...identityAnchors.map((anchor) =>
+      `- 文字身份锚点 ${String(anchor.subject ?? "未命名")}：sha256=${String(anchor.sha256 ?? "未核验")}；授权=${String(anchor.authorization ?? "unknown")}；资产状态=${String(anchor.assetStatus ?? "unknown")}；视觉验证=${String(anchor.visualVerification ?? "not-performed")}`),
     "- 审批边界：源资产授权只证明可复用已登记身份参考；本轮未声称生成新定妆照，也未将其作为渲染或发布许可。",
     "",
     "## 镜头卡与提示词交叉引用",
@@ -6915,13 +7029,16 @@ export function renderPreproductionAuditReport(input: {
     "```json",
     jsonWithoutNull({
       schema: "workloom.preproduction-contract/v1",
-      sourceOfTruth: "final-prompt-bound-shot-contract",
+      sourceOfTruth: "original-requirement-and-final-prompt-bound-shot-contract",
       shotCount: shotCards.length,
       totalDurationSeconds: Number(totalSeconds.toFixed(3)),
       semanticHash,
       shotIds,
+      sourceEvidence,
       portraitAssets,
       portraitAssetsVerified,
+      identityEvidenceStatus,
+      identityAnchors,
       shots: shotCards.map((shot) => ({
         ...recordValue(shot.promptContract),
         shotId: shot.shotId,
@@ -6936,7 +7053,8 @@ export function renderPreproductionAuditReport(input: {
     `- 镜头/提示词 ID 与数量：${idsMatch ? "通过" : "失败"}`,
     `- 场景正文截断：${shotCards.some((shot) => /(?:\.\.\.|…)$/u.test(promptFieldText(shot.scene).trim())) ? "失败" : "通过"}`,
     `- 镜头卡与提示词语义绑定：${shotCards.every((shot) => recordValue(shot.promptContract).shotId === shot.shotId) ? "通过" : "失败"}`,
-    `- 定妆照生成：${portraitsNotApplicable ? "not_applicable" : "unverified"}；源角色资产：${portraitAssetsVerified ? "verified" : "unverified"}`,
+    `- 定妆照生成：${portraitsNotApplicable ? "not_applicable" : "unverified"}；身份证据：${identityEvidenceStatus}`,
+    `- 原始需求与源镜头合同：${sourceOriginal || sourceShotContracts.length ? "已内联并绑定 SHA-256" : "未提供"}`,
     "- 渲染/G8：未提交，故预算、资格与质量提交闸为 not_run；本报告不把预生产通过写成可渲染或可发布",
     "",
     "本报告为机器证据包，不要求人工口头确认；由外部门禁回调直接审核。",

@@ -1283,6 +1283,116 @@ console.log("RESULT " + JSON.stringify({
     expect(props).not.toContain("积水");
   });
 
+  it("猫片五镜按动作分配景别与节奏，G7 只声明可核验的文字身份锚点", () => {
+    const story = "雨后夜晚，一只橘猫从纸箱探头，伸爪接屋檐滴水，最后缩回纸箱盘成一团。无人物、无品牌、无字幕、无旁白，仅保留环境声。";
+    const actions = projectNarrativeActionSequence([
+      "橘猫从纸箱探头观察屋檐滴水",
+      "橘猫抬起前爪伸向屋檐滴水线",
+      "水滴落在橘猫爪垫上并溅起细小水花",
+      "橘猫把身体退入纸箱暗部",
+      "橘猫盘成一团，尾尖盖住口鼻并缓慢闭眼",
+    ], 5);
+    const policy = {
+      noDialogue: true,
+      maxLength: 3000,
+      noCharacters: true,
+      noAnimals: false,
+      noMusic: true,
+      noTitles: true,
+      durationSeconds: 15,
+      aspectRatio: "9:16",
+      resolution: "1080x1920",
+      colorTemperature: "5600K",
+      characterNames: ["猫"],
+      characterPortraits: [{
+        name: "猫",
+        path: "",
+        appearance: "一只瘦小的橘色短毛猫，毛被雨水打湿贴在身上，耳朵边缘挂着细水珠，眼睛呈琥珀色，体型与盘卧姿态固定；角色ID=char_1；动物外观由文字锚点与跨镜参考帧锁定，站立姿态，缓慢走动，张开双臂或自然下垂",
+        costume: "不适用（动物自然外观）",
+        authorization: "not-applicable",
+      }],
+      projectScene: "雨夜深巷屋檐下的旧纸箱旁，地面湿亮反光，屋檐断续滴水，冷蓝环境包裹，唯纸箱口有一小片暖黄反光。",
+      projectLighting: "低照度环境光，冷蓝月色与雨雾作主光包裹画面；屋檐灯源形成暖黄反光。",
+      projectColor: "冷蓝灰雨夜色与屋檐暖黄反光",
+      projectProps: ["纸箱", "屋檐", "水滴"],
+      projectActions: actions,
+    };
+    const prompts = normalizeNarrativePromptsForReview(
+      actions.map((_action, index) => ({
+        shotId: `SC-0${index + 1}`,
+        duration: 3,
+        shotSize: "establishing",
+        cameraHint: "establishing",
+        prompt: "01.【场景】错误模板",
+        fields: {},
+      })),
+      policy,
+    );
+    const field = (shot: Record<string, unknown>, label: string): string =>
+      new RegExp(`^\\s*\\d+\\.【${label}】([^\\n]*)$`, "mu").exec(String(shot.prompt ?? ""))?.[1]?.trim() ?? "";
+    expect(prompts.map((shot) => field(shot, "构图").replace(/景别.*/u, "").trim())).toEqual([
+      "medium",
+      "close-up",
+      "extreme-close-up",
+      "medium",
+      "close-up",
+    ]);
+    expect(field(prompts[1]!, "情绪")).not.toMatch(/接触水面|趾节轻颤/u);
+    expect(field(prompts[1]!, "节奏")).not.toMatch(/接触|水花/u);
+    expect(field(prompts[2]!, "情绪")).toMatch(/接触|趾节轻颤/u);
+    expect(field(prompts[2]!, "节奏")).toMatch(/接触|水花/u);
+    expect(field(prompts[3]!, "情绪")).not.toMatch(/尾尖|贴住口鼻|闭眼/u);
+    expect(field(prompts[3]!, "节奏")).not.toMatch(/盘紧|闭眼/u);
+    expect(field(prompts[4]!, "情绪")).toMatch(/尾尖|口鼻|闭眼/u);
+    expect(field(prompts[4]!, "节奏")).toMatch(/盘紧|闭眼/u);
+    for (const shot of prompts) {
+      const prompt = String(shot.prompt);
+      const contract = shot._workloomShotContract as Record<string, unknown>;
+      expect(prompt).not.toMatch(/站立姿态|张开双臂|自然下垂|缓慢走动|跨镜参考帧锁定/u);
+      expect(prompt).toContain("文字外观锚点");
+      expect(contract.portraitAssets).toEqual([]);
+      expect(contract.identityAnchor).toMatchObject({
+        mode: "text",
+        authorization: "not-applicable",
+        assetStatus: "not-registered",
+        visualVerification: "not-performed",
+        sha256: expect.stringMatching(/^[a-f0-9]{64}$/u),
+      });
+    }
+    const report = renderPreproductionAuditReport({
+      productionResult: { shots: [], prompts },
+      scriptResult: {
+        blueprint: {
+          _metadata: {
+            _originalStoryText: story,
+            _prd: {
+              projectDefinition: { sourceIntent: story, _originalStoryText: story },
+              characterSystem: { characters: [{ characterId: "char_1", name: "猫", authorization: "not-applicable" }] },
+              shotContract: actions.map((action, index) => ({
+                shotId: `SC-0${index + 1}`,
+                purpose: action,
+                action,
+              })),
+            },
+          },
+        },
+      },
+      timing: {},
+      confirmations: {
+        portraitGeneration: { approved: true, reason: "audit-portrait-gate-not-applicable" },
+      },
+      effectiveMs: 60_000,
+    });
+    expect(report).toContain(story);
+    expect(report).toContain("文字外观锚点");
+    expect(report).toContain("源角色资产：not_applicable");
+    expect(report).toContain("授权=not-applicable");
+    expect(report).not.toContain("授权=unknown");
+    expect(report).not.toContain("跨镜参考帧锁定");
+    expect(report).toContain('"identityAnchors"');
+    expect(report).toContain('"sourceOfTruth": "original-requirement-and-final-prompt-bound-shot-contract"');
+  });
+
   it("叙事道具从场景证据抽取，关键道具不会因窄词表遗漏", () => {
     const props = inferNarrativeProps({
       intent: "人物使用内置默认模特，不出现商品参数或价格",

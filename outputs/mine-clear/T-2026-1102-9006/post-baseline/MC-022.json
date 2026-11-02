@@ -1,0 +1,63 @@
+{
+  "id": "MC-022",
+  "kind": "problem",
+  "level": "L4",
+  "severity": "P1",
+  "batch": 2,
+  "title": "猫片五镜被统一成 establishing，接触/退箱/蜷缩节奏串镜，G7 又虚构跨镜参考帧证据",
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "packages/video-studio/src/vendor-compat.ts:6085@21099882b6404c5885c5be424be0c0c618e2cf8b",
+      "note": "动物动作只分 probe/reach/withdraw/retreat，水滴接触与蜷缩闭眼分别被并入 reach 和 retreat。"
+    },
+    {
+      "type": "code",
+      "ref": "packages/video-studio/src/vendor-compat.ts:6384@21099882b6404c5885c5be424be0c0c618e2cf8b",
+      "note": "shotSizeForAction 对动物动作全部返回 null，最终五镜沿用上游 establishing。"
+    },
+    {
+      "type": "log",
+      "ref": "outputs/live-video-matrix/T-2026-1102-9006/N02-r45-fix13/N02-CAT-15/gates.jsonl",
+      "commit": "21099882b6404c5885c5be424be0c0c618e2cf8b",
+      "note": "真实 G7=58：景别全为 establishing，SC-02/SC-04/SC-05 节奏串镜，文字锚点与授权证据自相矛盾。"
+    }
+  ],
+  "root_cause": {
+    "file": "packages/video-studio/src/vendor-compat.ts",
+    "line": 6085,
+    "commit": "21099882b6404c5885c5be424be0c0c618e2cf8b",
+    "symbol": "animalActionKind"
+  },
+  "trigger_path": "真实 N02 五镜将探头、抬爪、接触、退入、蜷缩拆成连续动作；现有分类、景别和 G7 报告仍复用粗粒度动物模板。",
+  "fix_plan": "细分 contact/curl；按动作映射 medium/close-up/extreme-close-up/medium/close-up；逐类重写情绪、节奏与时间轴；动物只用可哈希的文字外观锚点，删除参考帧锁定断言，并在 G7 内联原文与源镜头合同。",
+  "blast_radius": "影响叙事片动物动作分类、最终提示词投影和 G7 证据报告；人物定妆照资产链、供应商提交与渲染行为不变。",
+  "conflict_paths": [
+    "packages/video-studio/src/vendor-compat.ts",
+    "packages/video-studio/src/vendor-compat.test.ts"
+  ],
+  "assertions": [
+    {
+      "kind": "property",
+      "given": "N02 五镜动作依次为探头、抬爪、接触、退入、蜷缩；动物没有图片定妆资产",
+      "expect": "景别为 medium/close-up/extreme-close-up/medium/close-up；接触与蜷缩只出现在对应镜头；提示词不声称跨镜参考帧；G7 内联原文与源镜头合同，角色授权统一为 not-applicable",
+      "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '猫片五镜按动作分配景别与节奏'",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": [
+          "run",
+          "packages/video-studio/src/vendor-compat.test.ts",
+          "-t",
+          "猫片五镜按动作分配景别与节奏"
+        ]
+      }
+    }
+  ],
+  "regression": {
+    "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '猫片五镜按动作分配景别与节奏'",
+    "evidence": null
+  },
+  "rollback": "回退动物动作细分、景别映射与 G7 文字锚点/源证据，恢复后 N02 会重新出现全 establishing 和跨镜节奏冲突。",
+  "fixed_by": null,
+  "verified_by": null
+}
