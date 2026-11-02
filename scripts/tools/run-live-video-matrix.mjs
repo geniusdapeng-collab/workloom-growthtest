@@ -6,6 +6,7 @@ import { createWriteStream, existsSync, mkdirSync, readFileSync, writeFileSync }
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { effectivePipelineFailures, promptSpeechViolationShotIds } from "./live-video-matrix-classification.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const arg = (name, fallback = "") => {
@@ -140,6 +141,8 @@ async function runCase(item) {
   const gates = readJsonl(gatesPath);
   const events = readJsonl(eventsPath);
   const shotRows = Array.isArray(readJson(shotsPath)) ? readJson(shotsPath) : [];
+  const production = result?.stages?.productionEngine;
+  const promptRows = Array.isArray(production?.prompts) ? production.prompts : [];
   const rejectedGates = gates.filter((gate) => gate.approved !== true);
   const requiredGates = item.route === "marketing"
     ? ["G1_DOSSIER", "G2_THEME", "G3_INSIGHT", "G4_PRD", "G5_PORTRAIT", "G6_PROMPT", "G7_FINAL"]
@@ -150,7 +153,7 @@ async function runCase(item) {
   const packageCheckPassed = packageChecks.length > 0
     && packageChecks.every((event) => event?.payload?.pass === true);
   const durationInfeasible = events.filter((event) => event?.kind === "pipeline.duration.infeasible");
-  const failedEvents = events.filter((event) => event?.kind === "pipeline.failed");
+  const failedEvents = effectivePipelineFailures(events, result);
   const declaredDuration = Number(item.duration);
   const actualDuration = shotRows.reduce((sum, shot) => sum + Math.max(0, Number(shot?.duration ?? shot?.timing?.duration ?? 0)), 0);
   const durationMatches = Math.abs(actualDuration - declaredDuration) <= 0.05;
@@ -158,11 +161,7 @@ async function runCase(item) {
     ? shotRows.filter((shot) => dialogueText(shot)).map((shot) => String(shot?.shotId ?? "?"))
     : [];
   const promptSpeechViolations = item.expect?.allSpeechForbidden
-    ? shotRows.filter((shot) => {
-        const prompt = String(shot?.prompt ?? "");
-        const line = prompt.split("\n").find((value) => /【台词】/u.test(value)) ?? "";
-        return !/不适用/u.test(line);
-      }).map((shot) => String(shot?.shotId ?? "?"))
+    ? promptSpeechViolationShotIds(shotRows, promptRows)
     : [];
   const failureReasons = [
     exit.code !== 0 ? `exitCode=${exit.code ?? "null"}` : "",
@@ -225,6 +224,8 @@ async function runCase(item) {
     rejectedGates,
     renderSubmitted: meta?.renderSubmitted ?? null,
     portraitsEnabled: meta?.portraitsEnabled ?? null,
+    preproductionAudit: result?.preproductionAudit ?? null,
+    deliveryStatus: result?.deliveryStatus ?? null,
     dataMining: summary?.dataMining ?? null,
     resultRef: existsSync(resultPath) ? relative(outRoot, resultPath) : null,
     summaryRef: existsSync(summaryPath) ? relative(outRoot, summaryPath) : null,

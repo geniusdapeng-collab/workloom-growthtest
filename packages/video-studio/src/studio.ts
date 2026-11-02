@@ -80,7 +80,8 @@ export type EventSink = (event: {
     | "pipeline.duration.skipped"
     | "pipeline.duration.package_check"
     | "pipeline.finished"
-    | "pipeline.failed";
+    | "pipeline.failed"
+    | "pipeline.deferred_render_incomplete";
   projectId: string;
   runId: string | null;
   gate?: string;
@@ -639,7 +640,11 @@ export class VideoStudio {
           log(`[studio] 作品级校验跳过：${err instanceof Error ? err.message : String(err)}`);
         }
         await emit({
-          kind: result.success ? "pipeline.finished" : "pipeline.failed",
+          kind: result.success
+            ? "pipeline.finished"
+            : cfg.deferRender === true
+              ? "pipeline.deferred_render_incomplete"
+              : "pipeline.failed",
           projectId: input.projectId,
           runId,
           payload: { stages: Object.keys(result.stages ?? {}) }
