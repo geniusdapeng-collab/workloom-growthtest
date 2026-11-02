@@ -5283,6 +5283,177 @@ export function normalizeNarrativePromptsForReview(
   });
 }
 
+function evidenceHash(value: unknown): string {
+  return createHash("sha256").update(JSON.stringify(value ?? null)).digest("hex");
+}
+
+/**
+ * G7 是预生产交付收口，不是摘要页。报告必须让评审直接看到脚本、镜头卡、
+ * 提示词正文及三者绑定摘要；定妆照在审计关闭时必须明确 N/A，不能把 pending
+ * 规格包写成已出图。
+ */
+export function renderPreproductionAuditReport(input: {
+  productionResult: FusionRecord;
+  scriptResult: FusionRecord;
+  timing: FusionRecord;
+  confirmations: FusionRecord;
+  effectiveMs: number;
+}): string {
+  const shots: FusionRecord[] = Array.isArray(input.productionResult.shots)
+    ? input.productionResult.shots.map((value, index) => fusionRecord(value, `shot[${index}]`))
+    : [];
+  const prompts: FusionRecord[] = Array.isArray(input.productionResult.prompts)
+    ? input.productionResult.prompts.map((value, index) => fusionRecord(value, `prompt[${index}]`))
+    : [];
+  const blueprint = recordValue(input.scriptResult.blueprint);
+  const characterSystem = recordValue(blueprint.character_system);
+  const characters = Array.isArray(characterSystem.characters)
+    ? characterSystem.characters.map(recordValue)
+    : [];
+  const structure = recordValue(blueprint.structure);
+  const scenes: FusionRecord[] = Array.isArray(structure.scenes)
+    ? structure.scenes.map((value) => recordValue(value))
+    : [];
+  const promptById = new Map(prompts.map((prompt) => [String(prompt.shotId ?? prompt.shot_id ?? ""), prompt]));
+  const shotIds = shots.map((shot) => String(shot.shotId ?? shot.shot_id ?? ""));
+  const promptIds = prompts.map((prompt) => String(prompt.shotId ?? prompt.shot_id ?? ""));
+  const idsMatch = shotIds.length === promptIds.length
+    && shotIds.every((id, index) => id.length > 0 && id === promptIds[index]);
+  const totalSeconds = shots.reduce((sum, shot) => sum + Number(shot.duration ?? recordValue(shot.timing).duration ?? 0), 0);
+  const portraitConfirmation = recordValue(input.confirmations.portraitGeneration);
+  const portraitReason = String(portraitConfirmation.reason ?? portraitConfirmation.status ?? "");
+  const portraitsNotApplicable = /not[-_ ]?applicable|审计|audit-portrait/i.test(portraitReason);
+  const elapsedMs = Math.max(0, Number(input.effectiveMs) || 0);
+  const artifacts = {
+    script: evidenceHash(input.scriptResult),
+    shots: evidenceHash(shots),
+    prompts: evidenceHash(prompts),
+    portraits: evidenceHash(portraitConfirmation),
+  };
+  const lines = [
+    "# 预生产交付收口（G7）",
+    "",
+    "## 机器可核验摘要",
+    "",
+    `- 镜头卡：${shots.length} 镜，sha256=${artifacts.shots}`,
+    `- 提示词正文：${prompts.length} 条，sha256=${artifacts.prompts}`,
+    `- 剧本：${scenes.length} 场，sha256=${artifacts.script}`,
+    `- 总时长：${Number(totalSeconds.toFixed(3))}s`,
+    `- 有效处理时间：${elapsedMs}ms（${(elapsedMs / 60_000).toFixed(1)}分钟）`,
+    `- 镜头 ID 与提示词 ID 一一对应：${idsMatch ? "是" : "否"}`,
+    `- 渲染提交：否；G8 预算、资格与质量提交闸未触发`,
+    "",
+    "## 三件套状态",
+    "",
+    `- 镜头卡：已内联，共 ${shots.length} 镜；全部场景与字段见下表`,
+    `- 提示词：已内联，共 ${prompts.length} 条；正文见下方完整字段块`,
+    portraitsNotApplicable
+      ? "- 定妆照：not_applicable；本轮审计显式关闭定妆照生成，无图片或 pending 规格包被当作真实交付"
+      : `- 定妆照：状态=${portraitReason || "unverified"}；未声明为已完成，除非另有真实图片回执`,
+    "",
+    "## 脚本证据",
+    "",
+    `- 角色数：${characters.length}`,
+    ...characters.map((character) =>
+      `- 角色 ${String(character.name ?? character.characterId ?? "未命名")}：ID=${String(character.characterId ?? character.id ?? "未指定")}；授权=${String(character.authorization ?? "unknown")}`),
+    ...scenes.map((scene, index) =>
+      `- 场景 ${String(scene.scene_id ?? scene.sceneId ?? index + 1)}：${String(scene.scene_name ?? scene.name ?? scene.purpose ?? "完整场景")}；时长=${String(recordValue(scene.timing).duration ?? scene.duration ?? "?")}s`),
+    "",
+    "## 镜头卡与提示词交叉引用",
+    "",
+    "| 镜头 | 时长 | 类型 | 完整场景 | 动作 | 灯光 | 提示词 SHA-256 |",
+    "|---|---:|---|---|---|---|---|",
+    ...shots.map((shot, index) => {
+      const id = String(shot.shotId ?? shot.shot_id ?? `S-${index + 1}`);
+      const prompt = String(promptById.get(id)?.prompt ?? "");
+      return `| ${id} | ${String(shot.duration ?? recordValue(shot.timing).duration ?? "?")}s | ${String(shot.sceneType ?? shot.type ?? "content")} | ${promptFieldText(shot.scene ?? shot.sceneDescription).replace(/\|/gu, "／")} | ${promptFieldText(shot.action).replace(/\|/gu, "／")} | ${promptFieldText(shot.lighting).replace(/\|/gu, "／")} | ${createHash("sha256").update(prompt).digest("hex")} |`;
+    }),
+    "",
+    "## 时间轴连续性",
+    "",
+    "| 镜头 | 累计起点 | 时长 | 累计终点 |",
+    "|---|---:|---:|---:|",
+    ...(() => {
+      let cursor = 0;
+      return shots.map((shot, index) => {
+        const seconds = Number(shot.duration ?? recordValue(shot.timing).duration ?? 0);
+        const start = cursor;
+        cursor += seconds;
+        return `| ${String(shot.shotId ?? shot.shot_id ?? `S-${index + 1}`)} | ${start.toFixed(2)}s | ${seconds.toFixed(2)}s | ${cursor.toFixed(2)}s |`;
+      });
+    })(),
+    "",
+    "## 提示词正文（逐镜完整）",
+    "",
+    ...prompts.flatMap((prompt, index) => {
+      const id = String(prompt.shotId ?? prompt.shot_id ?? `PROMPT-${index + 1}`);
+      return [
+        `### ${id}`,
+        "",
+        "```markdown",
+        String(prompt.prompt ?? ""),
+        "```",
+        "",
+      ];
+    }),
+    "## 检查结论",
+    "",
+    `- 镜头/提示词 ID 与数量：${idsMatch ? "通过" : "失败"}`,
+    `- 场景正文截断：${shots.some((shot) => /(?:\.\.\.|…)$/u.test(promptFieldText(shot.scene ?? shot.sceneDescription).trim())) ? "失败" : "通过"}`,
+    `- 定妆照审计状态：${portraitsNotApplicable ? "not_applicable（不是通过）" : "unverified"}`,
+    "- 渲染/G8：未提交，故预算、资格与质量提交闸为 not_run；本报告不把预生产通过写成可渲染或可发布",
+    "",
+    "本报告为机器证据包，不要求人工口头确认；由外部门禁回调直接审核。",
+  ];
+  return lines.join("\n");
+}
+
+export function installVendorPreproductionReviewBridge(options: { log?: (line: string) => void } = {}): () => void {
+  const log = options.log ?? (() => undefined);
+  const repoRoot = videoRuntimeRoot(import.meta.url);
+  const vendorRequire = createRequire(resolvePath(repoRoot, "package.json"));
+  const systemPath = resolvePath(repoRoot, "vendor/supermickey/hyperreality-system/index.js");
+  const mod = vendorRequire(systemPath) as { HyperrealitySystem?: { prototype?: Record<string, unknown> } };
+  const prototype = mod.HyperrealitySystem?.prototype;
+  if (!prototype || typeof prototype._generatePreproductionReport !== "function") return () => undefined;
+  const originalCreate = prototype.create as ((this: Record<string, unknown>, ...args: unknown[]) => Promise<unknown>) | undefined;
+  const originalReport = prototype._generatePreproductionReport as (
+    this: Record<string, unknown>,
+    productionResult: FusionRecord,
+    scriptResult: FusionRecord,
+    timing: FusionRecord,
+    confirmations: FusionRecord,
+  ) => string;
+  if (typeof originalCreate === "function") {
+    prototype.create = async function trackedCreate(this: Record<string, unknown>, ...args: unknown[]) {
+      this._workloomPreproductionStartedAt = Date.now();
+      return originalCreate.apply(this, args);
+    };
+  }
+  prototype._generatePreproductionReport = function patchedPreproductionReport(
+    this: Record<string, unknown>,
+    productionResult: FusionRecord,
+    scriptResult: FusionRecord,
+    timing: FusionRecord,
+    confirmations: FusionRecord,
+  ) {
+    const started = Number(this._workloomPreproductionStartedAt);
+    const effectiveMs = Number.isFinite(started) && started > 0 ? Date.now() - started : Number(timing.effective ?? timing.total ?? 0);
+    return renderPreproductionAuditReport({
+      productionResult,
+      scriptResult,
+      timing,
+      confirmations,
+      effectiveMs,
+    });
+  };
+  log("[vendor-compat] G7 预生产收口桥已安装（完整三件套、摘要、时间轴与未提交边界）");
+  return () => {
+    if (typeof originalCreate === "function") prototype.create = originalCreate;
+    prototype._generatePreproductionReport = originalReport;
+  };
+}
+
 /** Rebuild every prompt from the Phase 3 policy immediately before the G6 report is generated. */
 export function installVendorNarrativePromptReviewBridge(options: { log?: (line: string) => void } = {}): () => void {
   const log = options.log ?? (() => undefined);

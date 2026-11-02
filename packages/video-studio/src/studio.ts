@@ -35,6 +35,7 @@ import {
   installVendorPhaseDiagnosticsBridge,
   installVendorPromptRebuildBridge,
   installVendorNarrativePromptReviewBridge,
+  installVendorPreproductionReviewBridge,
   installSharedBridge
 } from "./vendor-compat.js";
 import { AUDIO_DISCIPLINE_CLAUSE, AUDIO_NEGATIVE_TERMS } from "./shot-spec.js";
@@ -415,6 +416,8 @@ export class VideoStudio {
         keep(installVendorPromptRebuildBridge({ log }));
         /** 后续字段质检/标题/导演增强会再改 prompt；G6 前必须重新按冻结策略投影。 */
         keep(installVendorNarrativePromptReviewBridge({ log }));
+        /** G7 消费完整三件套、摘要、时间轴和真实有效处理时间，不接受截断摘要。 */
+        keep(installVendorPreproductionReviewBridge({ log }));
         /** 需求洞察 _fillDefaults 修复（数组保形 + 消除 const 重赋值，静态审计发现） */
         keep(installVendorDiscoveryFixBridge({ log }));
         /** 叙事/营销隔离、人物契约补全与需求洞察首个 JSON 修复 */

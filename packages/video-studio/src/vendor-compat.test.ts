@@ -18,6 +18,7 @@ import {
   renderPrdContractMarkdown,
   applyNarrativeFinalPromptContract,
   normalizeNarrativePromptsForReview,
+  renderPreproductionAuditReport,
   promptFieldText,
   rebuildPromptsFromFields,
 } from "./vendor-compat.js";
@@ -1765,6 +1766,47 @@ console.log("RESULT " + JSON.stringify({
       color: expect.stringContaining("2700K"),
       props: expect.arrayContaining(["台灯", "窗", "坐具"]),
     });
+  });
+
+  it("G7 收口报告内联完整三件套、哈希、时间轴与未提交的 G8 边界", () => {
+    const fullScene = "雨夜出租屋玄关：门已经关上，湿伞靠墙，鞋架、地垫、门后挂钩与旧台灯处在同一可见空间，人物正从门外进入。";
+    const prompt = "01.【语言约束】全部字段使用中文。\n02.【场景】" + fullScene + "\n03.【动作】陈卓收伞后开门。\n04.【灯光设计】旧台灯关闭。";
+    const report = renderPreproductionAuditReport({
+      productionResult: {
+        shots: [{
+          shotId: "S-1",
+          duration: 3,
+          sceneType: "opening",
+          scene: fullScene,
+          action: "陈卓收伞后开门",
+          lighting: "旧台灯关闭；门外冷光进入",
+        }],
+        prompts: [{ shotId: "S-1", prompt }],
+      },
+      scriptResult: {
+        blueprint: {
+          character_system: { characters: [{ characterId: "chen-zhuo", name: "陈卓", authorization: "real-authorized" }] },
+          structure: { scenes: [{ sceneId: "SC01", purpose: "收伞、开门", duration: 3 }] },
+        },
+      },
+      timing: {},
+      confirmations: {
+        portraitGeneration: { approved: true, reason: "audit-portrait-gate-not-applicable" },
+      },
+      effectiveMs: 126_000,
+    });
+    expect(report).toContain(fullScene);
+    expect(report).toContain("陈卓收伞后开门");
+    expect(report).toContain(prompt);
+    expect(report).toContain("镜头 ID 与提示词 ID 一一对应：是");
+    expect(report).toContain("有效处理时间：126000ms（2.1分钟）");
+    expect(report).toContain("定妆照：not_applicable");
+    expect(report).toContain("G8");
+    expect(report).toContain("渲染提交：否");
+    expect(report).toMatch(/镜头卡：1 镜，sha256=[a-f0-9]{64}/u);
+    expect(report).toMatch(/提示词正文：1 条，sha256=[a-f0-9]{64}/u);
+    expect(report).not.toContain("请回复");
+    expect(report).not.toMatch(/场景描述[^\n]*\.\.\./u);
   });
 
   it("G6 审核报告不再追加无标题片头字段、旧长度和裸编号", () => {

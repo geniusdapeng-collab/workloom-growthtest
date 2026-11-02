@@ -58,6 +58,7 @@ vi.mock("./vendor-compat.js", () => {
     installVendorContractBridge: install("contract"),
     installVendorPromptRebuildBridge: install("prompt"),
     installVendorNarrativePromptReviewBridge: install("prompt-review"),
+    installVendorPreproductionReviewBridge: install("preproduction-review"),
     installVendorDiscoveryFixBridge: install("discovery"),
     installVendorDiscoveryNarrativeBridge: install("discovery-narrative"),
     installVendorPhaseInternalsDiagnostics: install("inner"),
