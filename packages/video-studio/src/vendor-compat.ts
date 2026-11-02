@@ -5649,6 +5649,10 @@ export function applyNarrativeFinalPromptContract(
     replaceField("台词", "不适用：本片无台词、无旁白、无口播。");
   }
   const characterNames = (options.characterNames ?? []).map((name) => String(name).trim()).filter(Boolean);
+  const sourceEnvironmentProhibitions = [...new Set(
+    promptFieldText(next.negative ?? (next.fields as FusionRecord).negative ?? next.negative_prompt)
+      .match(/(?:无|禁止|不出现)(?:船只|建筑|现代设备)/gu) ?? [],
+  )];
   const shotCharacterEvidence = promptFieldText(next.character ?? (next.fields as FusionRecord).character);
   const shotCharacterRef = promptFieldText(next.characterRef);
   const explicitNoPersonInShot = /^(?:无|none|n\/a)$/iu.test(shotCharacterRef)
@@ -5681,51 +5685,32 @@ export function applyNarrativeFinalPromptContract(
     replaceField("时间轴", `T00:00-T00:${duration.toFixed(1)} 起幅建立本镜空间，中段只执行动作字段中的连续变化，落幅保持同一光位并接到下一镜。`);
   }
   if (options.noCharacters) {
-    prompt = prompt
-      .replace(/[^。；\n]{0,20}(?:机器后撤|镜头同步后撤|镜头后撤|后拉|后撤)[^。；\n]*/gu, "镜位保持稳定")
-      .replace(/约?[零一二三四五六七八九十百\d.]+厘米/gu, "低机位高度")
-      .replace(/比上一镜[^，。；\n]*/gu, "按统一景别序列执行");
-    if (options.colorTemperature) {
-      prompt = prompt.replace(/\b\d{4}\s*K\b/giu, options.colorTemperature);
-    }
-    replaceField("场景", fieldValue("场景")
-      .replace(/清晨\s*/gu, "清晨")
-      .replace(/(?:海拔|六点|五点半|日出前)[^，。；\s]*/gu, "")
-      .replace(/，{2,}/gu, "，"));
-    const colorTemperature = String(options.colorTemperature ?? "统一自然晨光");
-    replaceField("灯光设计", `${colorTemperature}；低角度自然侧逆光经薄雾柔化，无人工光源；全片保持同一主光方向、白平衡与光比，不自行切换冷暖基调。`);
-    replaceField("明亮约束", "自然景物高光不过曝，暗部保留材质细节；本镜不涉及人物面部或肤色。");
-    replaceField("角色", "无人物、无人影、无动物入画；主体仅来自源证据中的湖面、芦苇、山体、雾、水痕等自然景物。");
+    // “无人物”只约束演员；厨房、商品、建筑和人工灯光仍按源合同执行。
+    replaceField("场景", promptFieldText(options.projectScene ?? next.scene ?? (next.fields as FusionRecord).scene)
+      || fieldValue("场景") || "按本镜已确认场景执行");
+    replaceField("灯光设计", promptFieldText(options.projectLighting ?? next.lighting ?? (next.fields as FusionRecord).lighting)
+      || fieldValue("灯光设计") || "沿用已确认灯光方向、白平衡与光比，不新增光源");
+    replaceField("明亮约束", "画面主体高光不过曝，暗部保留材质细节；本镜不涉及人物面部或肤色。");
+    replaceField("角色", `无人物、无人影、无人体局部入画；画面主体仅来自本镜源合同${options.noAnimals ? "；无动物入画" : ""}。`);
     replaceField("服装", "不适用：无人物出场。");
     replaceField("化妆", "不适用：无人物出场。");
     replaceField("定妆照", "不适用：无人物出场，不生成也不引用人像定妆照。");
-    const action = fieldValue("动作")
-      .replace(/[^；。\n]*(?:水黾|飞鸟|鸟鸣|动物|猫|狗|鱼|站立姿态|缓慢走动|张开双臂|指向|握拳|抱头|微笑|点头|人物动作)[^；。\n]*[；。]?/gu, "")
-      .replace(/^[；。\s]+|[；。\s]+$/gu, "");
-    replaceField("动作", action || "画面内仅有源证据中的自然物理运动：薄雾慢移、水面细涟漪、芦苇与草叶随风轻摆；无人物、无动物。");
-    const props = promptFieldText((next.fields as FusionRecord).props ?? next.props)
-      .replace(/[^；。\n]*(?:动物|人物|角色)[^；。\n]*[；。]?/gu, "")
-      .trim();
-    replaceField("道具", `${props || "源证据中的自然物"}；不添加人工道具、人物或动物。`);
+    const action = actionSource;
+    replaceField("动作", action || "按本镜源合同执行主体的连续变化，不新增人物动作。");
+    const props = options.projectProps?.length
+      ? options.projectProps.join("、")
+      : promptFieldText((next.fields as FusionRecord).props ?? next.props) || fieldValue("道具");
+    replaceField("道具", props || "仅使用本镜源合同中的物件，不新增道具。");
     const movement = promptFieldText((next.fields as FusionRecord).camera_movement ?? next.camera_movement);
-    const normalizedMovement = /(?:固定|锁死|locked|static|零位移)/iu.test(movement)
-      ? "固定机位，三脚架锁死，全镜零推拉零横移零变焦"
-      : /推近|推镜/u.test(movement)
-        ? "极缓单次推近，速度连续且逐渐减速停稳，不跨越景别等级"
-        : /横移|平移/u.test(movement)
-          ? "极缓单次横移，速度连续且停稳，不跨越景别等级"
-          : "固定机位，不做推拉摇移或变焦";
-    replaceField("运镜", `${normalizedMovement}；从起幅到落幅连续稳定，不写厘米、米每秒或其他无法兑现的位移参数。`);
-    replaceField("情绪", "平静、克制；仅通过光线、水面、雾层和芦苇的节奏表达，不要求人物表情。");
-    replaceField("节奏", "整体节奏依据源证据中的自然变化连续推进，不使用人工强转折或情绪性加速。");
-    replaceField("角色约束", "画面禁止人物、人影、人体局部和拟人化表演模板；仅允许源证据中的自然景物。");
-    replaceField("角色一致性", "本镜无角色；场景、自然物位置、光源方向与时间阶段以源证据和统一视觉方案为准，不追加未经核实的参数。");
+    if (movement) replaceField("运镜", movement);
+    replaceField("情绪", "通过源合同中的主体变化、光线与空间关系表达，不要求人物表情。");
+    replaceField("节奏", "按源动作的先后顺序连续推进，不使用无关的强转折或情绪性加速。");
+    replaceField("角色约束", "画面禁止人物、人影、人体局部和拟人化表演模板；主体以源合同为准。");
+    replaceField("角色一致性", "本镜无人物；场景、物件位置、光源方向与时间阶段以源证据为准，不追加未经核实的参数。");
     replaceField("转场", options.isLastShot
       ? "本镜为全片最后一镜；落幅定格0.5秒后淡出至黑，持续1秒，无其他转场特效。"
       : "本镜落幅后硬切至下一镜；不使用叠化、黑场或其他转场特效。");
-    if (duration > 0) {
-      replaceField("时间轴", `T00:00-T00:${duration.toFixed(1)} 从静止起幅开始，风、雾、水、光在连续物理范围内完成变化；落幅保持同一空间与光源方向，不跨越下一镜。`);
-    }
+    if (duration > 0) replaceField("时间轴", timelineTextForAction(action || actionSource, duration));
   }
   if (options.noMusic || options.noDialogue) {
     const rawAudio = promptFieldText((next.fields as FusionRecord).audio ?? next.audio);
@@ -5742,10 +5727,8 @@ export function applyNarrativeFinalPromptContract(
       .filter((item) => item.length >= 2 && !prohibited.test(item) && !forbiddenAnimal?.test(item))
       .filter((item) => !/(?:音效上加入|拟音|后期|叠加)/u.test(item))
       .map((item) => item.replace(/^(?:仅有|只有|仅保留|只保留)+/u, "").trim())
-      .filter((item) => /(?:风|水|波|涟漪|雾|芦苇|雨|环境|动作|呼吸|草|叶|石|泥)/u.test(item)
-        || !options.noMusic && MUSIC_CUE_PATTERN.test(item)
-        || !options.noDialogue && /(?:台词|人声|人物.*说|对话|旁白|口播|voiceover)/iu.test(item));
-    const fallbackAudio = options.noCharacters ? "风声、水面涟漪声、芦苇摩擦声" : "与画面同步的环境声和主体动作声";
+      .filter(Boolean);
+    const fallbackAudio = "与画面同步的环境声和主体动作声";
     const audio = anchors.length > 0 ? [...new Set(anchors)].slice(0, 6).join("、") : fallbackAudio;
     replaceField("音频", `仅有${audio}${options.noDialogue ? "；无人物声、无旁白" : "，以及合同允许的人声与台词"}${options.noMusic ? "；无音乐、无配乐、无音乐节拍" : ""}。`);
   }
@@ -5754,8 +5737,8 @@ export function applyNarrativeFinalPromptContract(
       "无文字", "无字幕", "无水印", "无品牌标识",
       ...(options.noCharacters ? ["无人物", "无人影", "无人体局部"] : []),
       ...(shotNoPerson ? ["无人物", "无人影", "无人体局部"] : []),
-      ...(options.noAnimals || options.noCharacters ? ["无动物", "无飞鸟"] : []),
-      ...(options.noCharacters ? ["无船只", "无建筑", "无现代设备"] : []),
+      ...(options.noAnimals ? ["无动物", "无飞鸟"] : []),
+      ...sourceEnvironmentProhibitions,
       "无镜头光晕伪影", "无生成特效", "无模糊", "无过曝",
     ];
     replaceField("负面约束", [...new Set(forbidden)].join("、"));
@@ -5887,7 +5870,7 @@ export function applyNarrativeFinalPromptContract(
     const actions = options.projectActions ?? [];
     const subjectlessFallback = canonicalAnimalOnly
       ? `${canonicalAnimalNames.join("、")}在${cleanText(options.projectScene ?? "") || "已确认空间"}完成本镜可见动作`
-      : "风、雾、水面、光线与植物在连续物理范围内完成本镜自然变化，无人物动作";
+      : "按本镜源合同执行主体与场景的连续变化，无人物动作";
     const assignedAction = canonicalAnimalOnly
       ? (projectedAction || visibleAction || subjectlessFallback)
       : canonicalNoPerson
@@ -5915,7 +5898,7 @@ export function applyNarrativeFinalPromptContract(
     const compositionText = canonicalAnimalOnly
       ? `${shotSize}景别，${aspect}构图；${canonicalAnimalNames.join("、")}作为唯一动物主体清晰可辨，画面边缘保留安全区，不增加人物。`
       : canonicalNoPerson
-        ? `${shotSize}景别，${aspect}构图；自然景物主体清晰，画面边缘保留安全区，不增加人物或动物。`
+        ? `${shotSize}景别，${aspect}构图；源合同主体清晰，画面边缘保留安全区，不增加人物${options.noAnimals ? "或动物" : ""}。`
       : `${shotSize}景别，${aspect}构图；${characterNames.join("、") || "已登记角色"}位于可执行表演区并保持可辨轮廓，为其动作和视线保留空间。`;
     const cameraSource = promptFieldText(next.camera_movement ?? (next.fields as FusionRecord).camera_movement) || "固定机位";
     const cameraText = /(?:固定|锁死|locked|static|零位移)/iu.test(cameraSource)
@@ -5930,15 +5913,15 @@ export function applyNarrativeFinalPromptContract(
     const emotionText = canonicalAnimalOnly
       ? emotionTextForAnimalAction(assignedAction, canonicalAnimalNames)
       : canonicalNoPerson
-        ? "平静、克制；情绪只通过自然变化、光线与空间关系表达。"
+        ? "情绪只通过源动作、光线与空间关系表达，不要求人物表情。"
       : emotionTextForAction(assignedAction);
     const baseText = cleanText(fieldValue("基础") || "电影级写实质感；保留真实材质、自然颗粒与连续物理运动。")
       .replace(/\b(?:8K|4K)\b/giu, "电影级");
     const forbidden = [
       "无文字", "无字幕", "无水印", "无品牌标识",
       ...(canonicalNoPerson ? ["无人物", "无人影", "无人体局部"] : []),
-      ...(options.noAnimals || canonicalNoActors ? ["无动物", "无飞鸟"] : []),
-      ...(canonicalNoActors ? ["无船只", "无建筑", "无现代设备"] : []),
+      ...(options.noAnimals ? ["无动物", "无飞鸟"] : []),
+      ...sourceEnvironmentProhibitions,
       "无生成特效", "无镜头光晕伪影", "无模糊", "无过曝", "无未声明角色",
     ];
     const portraitLine = portraitText.startsWith("不适用") ? portraitText : `使用 ${portraitText}；跨镜不得替换。`;
@@ -5971,14 +5954,14 @@ export function applyNarrativeFinalPromptContract(
       `核对声音事件与画面动作同帧，且不新增合同外人物、文字、品牌、字幕或配乐`,
     ].join("；");
     const brightnessText = canonicalAnimalOnly
-      ? "动物主体高光不过曝，湿毛、爪垫与纸箱纤维保留纹理，暗部不死黑；不要求人物面部曝光。"
+      ? "动物主体高光不过曝，按源合同保留主体表面与所接触物件的真实纹理，暗部不死黑；不要求人物面部曝光。"
       : canonicalNoPerson
-        ? "自然景物高光不过曝，暗部保留材质细节；不涉及人物面部。"
+        ? "画面主体高光不过曝，暗部保留材质细节；不涉及人物面部。"
         : brightnessTextForAction(assignedAction);
     const directorIntent = canonicalAnimalOnly
       ? "克制写实的动物观察短片；以动物动作、空间关系和真实光线推进，不拟人化、不增加无关叙事或模板表演。"
       : canonicalNoPerson
-        ? "克制写实的自然观察短片；以自然运动、材质反射和真实光线推进，不增加无关叙事、特效或模板表演。"
+        ? "按源合同观察场景与物件；以主体变化、空间关系和已确认光线推进，不增加无关叙事、特效或人物表演。"
         : "克制写实的自然长镜或稳定短镜；以人物动作、空间关系和真实光线推进，不增加无关叙事、特效或模板表演。";
     prompt = [
       "01.【语言约束】全部字段使用中文；画幅、分辨率、帧率、编码、时间码与资产路径可作为受控制作标记。",
@@ -6263,8 +6246,8 @@ function depthTextForShotSize(shotSize: string, noCharacters: boolean, animalOnl
   }
   if (noCharacters) {
     return /(?:close|特写)/iu.test(shotSize)
-      ? "近距浅景深，焦点锁定当前自然物与水滴，前后景柔和分离。"
-      : "近中远景层次连续，主体与倒影可辨，使用中等至深景深保证空间关系清楚。";
+      ? "近距浅景深，焦点锁定本镜源合同的主体与当前变化位置，前后景柔和分离。"
+      : "近中远景层次连续，本镜主体可辨，使用中等至深景深保证空间关系清楚。";
   }
   if (/(?:extreme-close|close|特写|近景)/iu.test(shotSize)) {
     return "浅景深，焦点锁定眼睫、手指或当前接触点，前后景自然虚化；面部与动作接触点始终清晰。";
