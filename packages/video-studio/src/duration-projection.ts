@@ -68,7 +68,7 @@ export type ProjectionResult =
   | {
       ok: false;
       error: "INFEASIBLE";
-      reason: "voice-floor-exceeds-target" | "min-duration-exceeds-target" | "capacity-below-target";
+      reason: "voice-floor-exceeds-target" | "voice-floor-exceeds-model-limit" | "min-duration-exceeds-target" | "capacity-below-target";
       overloadSeconds: number;
       entries: ProjectionEntry[];
       suggestions: string[];
@@ -284,7 +284,7 @@ export function projectShotDurations(shots: ProjectionShotInput[], options: Proj
      * 此时必须在 [min,max] 内重新守恒分配，最终台词下限由 Phase3 再强制。
      */
     const bound = options.enforceVoiceFloor === false ? 0 : floor.seconds;
-    return { shot, floor, lower: Math.max(min, Math.min(max, Math.max(bound, min))) };
+    return { shot, floor, lower: Math.max(min, bound) };
   });
   const lowerSum = floors.reduce((sum, f) => sum + f.lower, 0);
   const capacity = shots.length * max;
@@ -301,6 +301,21 @@ export function projectShotDurations(shots: ProjectionShotInput[], options: Proj
       lowered: false,
     };
   });
+
+  const aboveModelLimit = floors.filter(({ lower }) => lower > max);
+  if (aboveModelLimit.length > 0) {
+    return {
+      ok: false,
+      error: "INFEASIBLE",
+      reason: "voice-floor-exceeds-model-limit",
+      overloadSeconds: Math.max(...aboveModelLimit.map(({ lower }) => lower - max)),
+      entries,
+      suggestions: [
+        ...aboveModelLimit.map(({ shot, floor }) => `${shot.shotId} 台词硬下限 ${floor.seconds}s > 模型单镜上限 ${max}s，当前镜头无法完整容纳原台词`),
+        "须在前期明确修订该镜的台词或拆镜合同；不截断原台词、不把台词下限裁成模型上限，也不宣称时长已满足",
+      ],
+    };
+  }
 
   if (lowerSum > target) {
     const overload = lowerSum - target;

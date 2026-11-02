@@ -5105,7 +5105,7 @@ export function installVendorDurationProjectionBridge(options: DurationProjectio
       });
     let result = projectOnce(true);
     if (!result.ok && planningMode) {
-      if (result.reason === "voice-floor-exceeds-target"
+      if ((result.reason === "voice-floor-exceeds-target" || result.reason === "voice-floor-exceeds-model-limit")
         && (source === "dcm.constrain" || source === "phase-3")) {
         emit({
           kind: "infeasible",
