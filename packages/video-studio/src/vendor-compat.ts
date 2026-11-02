@@ -5650,8 +5650,8 @@ export function applyNarrativeFinalPromptContract(
   }
   const characterNames = (options.characterNames ?? []).map((name) => String(name).trim()).filter(Boolean);
   const sourceEnvironmentProhibitions = [...new Set(
-    promptFieldText(next.negative ?? (next.fields as FusionRecord).negative ?? next.negative_prompt)
-      .match(/(?:无|禁止|不出现)(?:船只|建筑|现代设备)/gu) ?? [],
+    [promptFieldText(next.negative ?? (next.fields as FusionRecord).negative ?? next.negative_prompt), fieldValue("负面约束")]
+      .join("；").match(/(?:无|禁止|不出现)(?:船只|建筑|现代设备)/gu) ?? [],
   )];
   const shotCharacterEvidence = promptFieldText(next.character ?? (next.fields as FusionRecord).character);
   const shotCharacterRef = promptFieldText(next.characterRef);

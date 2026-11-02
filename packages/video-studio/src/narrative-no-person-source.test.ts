@@ -40,3 +40,11 @@ it('an animal without people keeps its actual surface and prop evidence', () => 
   expect(result.prompt).toContain(action);
   expect(result.prompt).not.toMatch(/橘猫|纸箱|屋檐|湿毛/u);
 });
+
+it.each([false, true])('keeps source environment prohibitions declared only in the prompt field (canonicalize=%s)', canonicalize => {
+  const shot = { shotId: 'SOURCE-NEGATIVE', duration: 8, action: '树叶随风摆动', scene: '树林空镜', prompt: '01.【场景】树林空镜\n02.【负面约束】无建筑、无现代设备' };
+  const result = applyNarrativeFinalPromptContract(shot, { noDialogue: true, noCharacters: true, noAnimals: true, canonicalize, chineseOnly: true, maxLength: 3000, projectScene: '树林空镜', projectActions: ['树叶随风摆动'], projectProps: ['树叶'] });
+  expect(result.prompt).toContain('无建筑');
+  expect(result.prompt).toContain('无现代设备');
+  expect(shot.prompt).toBe('01.【场景】树林空镜\n02.【负面约束】无建筑、无现代设备');
+});
