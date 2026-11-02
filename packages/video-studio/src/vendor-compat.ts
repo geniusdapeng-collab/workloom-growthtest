@@ -3071,7 +3071,10 @@ function reconcileNarrativeScenePlan(
       ? recordValue(prd.audioSpecification).soundEffects as unknown[]
       : []),
     String(recordValue(prd.audioSpecification).soundDesign ?? ""),
-  ].map(String).filter(Boolean);
+  ].map(String)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .filter((item) => !/(?:不使用配乐|仅保留环境声|环境声与动作声|现场声|主体动作声)/u.test(item));
   const audioForPurpose = (purpose: string): string[] => {
     const kind = animalActionKind(purpose);
     const matched = sourceAudio.filter((item) =>
@@ -3128,7 +3131,9 @@ function reconcileNarrativeScenePlan(
       purpose,
       ...(Array.isArray(previous.visualRequirements)
         ? previous.visualRequirements.map(String).filter((item) =>
-          item !== purpose && !/单镜头|固定单镜|一镜到底/u.test(item))
+          item !== purpose
+          && !/单镜头|固定单镜|一镜到底/u.test(item)
+          && (index === 0 || !/第一帧/u.test(item)))
         : []),
       ...(Array.isArray(node.keyElements) ? node.keyElements.map(String) : []),
     ].filter((item, itemIndex, list) => item && list.indexOf(item) === itemIndex).slice(0, 6);
@@ -3238,6 +3243,9 @@ function dominantColorTemperature(value: unknown, subjectLabel: string): string 
   if (picked) return `${picked}K`;
   const text = String(value ?? "");
   if (/(?:冷暖|双色温)/u.test(text) && /(?:青蓝|冷)/u.test(text) && /(?:暖|钨丝)/u.test(text)) {
+    return "2700K / 5600K";
+  }
+  if (/(?:冷蓝|冷光|蓝灰|雨光|月光|5600K)/u.test(text) && /(?:暖黄|暖光|钨丝|台灯|2700K)/u.test(text)) {
     return "2700K / 5600K";
   }
   if (/(?:冷蓝|冷光|蓝灰|雨光|月光)/u.test(text)) return "5600K";
@@ -3404,6 +3412,25 @@ function buildShotContract(
     cursor += sceneDuration;
   }
   return rows;
+}
+
+function reconcileShotContractExecutionCoherence(prd: Record<string, unknown>): void {
+  const shots = Array.isArray(prd.shotContract) ? prd.shotContract.map(recordValue) : [];
+  if (shots.length === 0) return;
+  const visual = recordValue(prd.visualSpecification);
+  const movements = [...new Set(shots.map((shot) => String(shot.cameraMovement ?? "").trim()).filter(Boolean))];
+  if (movements.length === 1 && /^(?:locked|static)$/iu.test(movements[0]!)) {
+    visual.cameraLanguage = "固定机位，三脚架锁死；镜头内只做焦点在猫眼、爪部、水滴和纸箱边缘之间的转移，不做机位位移、变焦或运镜摇摆。";
+  }
+  const visualTemperature = colorTemperatureFromText(JSON.stringify(visual));
+  if (visualTemperature && /\b2700K\b/u.test(visualTemperature) && /\b5600K\b/u.test(visualTemperature)) {
+    shots.forEach((shot) => {
+      const current = String(shot.colorTemperature ?? "");
+      if (/\b(?:2700|5600)K\b/u.test(current)) shot.colorTemperature = "2700K / 5600K";
+    });
+  }
+  prd.visualSpecification = visual;
+  prd.shotContract = shots;
 }
 
 export function normalizeHomecomingPrdContinuity(prd: Record<string, unknown>, musicForbidden: boolean): boolean {
@@ -3945,6 +3972,7 @@ export function normalizeNarrativePrdContract(
   if (normalizeHomecomingPrdContinuity(prd, musicForbidden)) {
     prd.shotContract = buildShotContract(prd, canonicalCharacters, safeAreaInsets);
   }
+  reconcileShotContractExecutionCoherence(prd);
   return sanitizePrdText(prd, duration || 30, speechForbidden) as Record<string, unknown>;
 }
 
@@ -3955,6 +3983,7 @@ export function renderPrdContractMarkdown(prd: Record<string, unknown>): string 
   const subtitles = recordValue(delivery.subtitles);
   const platformConstraints = recordValue(delivery.platformConstraints);
   const safeAreaInsets = recordValue(platformConstraints.safeAreaInsets);
+  const characterAssets = recordValue(delivery.characterAssets);
   const safeAreaLabel = `是（顶部 ${String(safeAreaInsets.topPercent ?? "?")}% / 底部 ${String(safeAreaInsets.bottomPercent ?? "?")}% / 右侧栏 ${String(safeAreaInsets.rightRailPercent ?? "?")}% 避让）`;
   const characters = Array.isArray(recordValue(prd.characterSystem).characters)
     ? (recordValue(prd.characterSystem).characters as unknown[]).map(recordValue)
@@ -3984,6 +4013,11 @@ export function renderPrdContractMarkdown(prd: Record<string, unknown>): string 
         return `- ${String(item.name ?? "未命名")}：ID=${String(item.characterId ?? "未指定")}；性别=${String(item.gender ?? "未标注")}；年龄=${String(item.ageRange ?? "未标注")}；定妆照=${String(item.portraitPath ?? "未指定")}；授权=${String(item.authorization ?? "unknown")}；文件存在=${String(evidence.exists ?? false)}；尺寸=${evidence.width ?? "?"}x${evidence.height ?? "?"}；sha256=${String(evidence.sha256 ?? "未核验")}`;
       })
       : ["- 本次无角色或角色锚点未提供，不得生成真人主体。"]),
+    ...(Object.keys(characterAssets).length > 0
+      ? [
+        `- **角色资产规则**：required=${String(characterAssets.required ?? "unverified")}；humanPortrait=${String(characterAssets.humanPortrait ?? "unverified")}；reason=${String(characterAssets.reason ?? "未说明")}；identityEvidence=${String(recordValue(characterAssets.identityEvidence).mode ?? "unverified")}/${String(recordValue(characterAssets.identityEvidence).visualVerification ?? "unverified")}`,
+      ]
+      : []),
     "",
     "### 结构化镜头合同",
     "",

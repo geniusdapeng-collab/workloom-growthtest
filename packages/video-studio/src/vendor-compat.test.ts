@@ -2628,7 +2628,7 @@ console.log("RESULT " + JSON.stringify({
     expect(shots).toHaveLength(3);
     for (const shot of shots) {
       expect(String(shot.lighting).length).toBeLessThanOrEqual(160);
-      expect(String(shot.colorTemperature).match(/\d{4}\s*K/gu)).toHaveLength(1);
+      expect(String(shot.colorTemperature).match(/\d{4}\s*K/gu)).toEqual(["2700K", "5600K"]);
     }
     expect(shots[0]).toMatchObject({
       subjectIds: [],
@@ -3189,9 +3189,17 @@ console.log("RESULT " + JSON.stringify({
     ]);
     expect((prd.shotContract as any[]).reduce((sum, shot) => sum + Number(shot.durationSeconds), 0)).toBe(15);
     expect(String((prd.visualSpecification as any).cameraLanguage)).not.toMatch(/单镜头|一镜到底/u);
+    expect(String((prd.visualSpecification as any).cameraLanguage)).toContain("固定机位");
+    expect((prd.shotContract as any[]).every((shot) => shot.cameraMovement === "locked")).toBe(true);
     expect(JSON.stringify(prd.shotContract)).toContain("2700K / 5600K");
+    expect((prd.shotContract as any[]).every((shot) => shot.colorTemperature === "2700K / 5600K")).toBe(true);
+    expect(scenePlan.scenes.slice(1).every((scene: any) =>
+      (scene.visualRequirements as string[]).every((item) => !item.includes("第一帧")))).toBe(true);
+    expect(scenePlan.scenes[1].audioRequirements.join("；")).toMatch(/滴水|水滴|爪|水花/u);
+    expect(scenePlan.scenes[2].audioRequirements.join("；")).toMatch(/纸箱|呼吸|环境/u);
     expect(JSON.stringify(prd.scenePlan)).not.toMatch(/水桶|铁管|积水/u);
     expect((prd.deliveryStandard as any).characterAssets.referenceStrategy).toContain("关键帧");
+    expect(renderPrdContractMarkdown(prd)).toContain("**角色资产规则**");
     expect(JSON.stringify(prd)).not.toContain("未记录ms");
   });
 
