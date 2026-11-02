@@ -1092,7 +1092,7 @@ function cleanNarrativeAnimalAppearance(value: unknown): string {
     .replace(/[；;]?\s*(?:角色ID|模特ID|定妆照|授权)=[^；;\n]*/gu, "")
     .replace(/[；;]?\s*动物外观由文字锚点与跨镜参考帧锁定[^；;\n]*/gu, "")
     .replace(/(?:^|[；;])\s*跨镜参考帧锁定[^；;\n]*/gu, "");
-  const humanTemplate = /[，,；;]\s*(?:从站立过渡到站立|站立姿态|缓慢走动|张开双臂|自然下垂|抱头(?:或伸展)?|伸展|指向(?:或握拳)?|握拳|微笑(?:或点头)?|点头|紧张移动|自然)(?=[，,；;。]|$)/gu;
+  const humanTemplate = /[，,；;。]\s*(?:从站立过渡到站立|站立姿态|缓慢走动|张开双臂(?:或自然下垂)?|自然下垂|抱头(?:或伸展)?|伸展|指向(?:或握拳)?|握拳|微笑(?:或点头)?|点头|紧张移动|自然)(?=[，,；;。]|$)/gu;
   for (let index = 0; index < 8; index += 1) text = text.replace(humanTemplate, "");
   return text
     .replace(/[，,；;]{2,}/gu, "；")
@@ -6698,6 +6698,21 @@ function promptDerivedShotContract(prompt: FusionRecord, fallbackId: string): Fu
   const durationSeconds = Number(prompt.duration ?? recordValue(prompt.timing).duration ?? 0);
   const composition = promptReviewField(prompt, "构图");
   const propsText = promptReviewField(prompt, "道具");
+  const roleText = promptReviewField(prompt, "角色");
+  const animalSubject = roleText.match(/^([^；，。]+)作为本镜唯一动物主体/u)?.[1]?.trim() ?? "";
+  const appearanceAnchor = roleText.match(/外观锚点=([^；\n]+)/u)?.[1]?.trim() ?? "";
+  const animal = Boolean(animalSubject) && isNarrativeAnimal(animalSubject);
+  const identityAnchor = animal && appearanceAnchor
+    ? {
+      mode: "text",
+      subject: animalSubject,
+      text: appearanceAnchor,
+      sha256: createHash("sha256").update(appearanceAnchor).digest("hex"),
+      authorization: "not-applicable",
+      assetStatus: "not-registered",
+      visualVerification: "not-performed",
+    }
+    : undefined;
   return {
     schema: "workloom.prompt-shot-contract/parsed-v1",
     source: "parsed-final-prompt",
@@ -6715,6 +6730,8 @@ function promptDerivedShotContract(prompt: FusionRecord, fallbackId: string): Fu
     timeline: promptReviewField(prompt, "时间轴"),
     emotion: promptReviewField(prompt, "情绪"),
     portraitAssets: [],
+    characterNames: animal ? [animalSubject] : [],
+    ...(identityAnchor ? { identityAnchor } : {}),
   };
 }
 
@@ -6761,7 +6778,7 @@ export function renderPreproductionAuditReport(input: {
       promptContract: contract,
     };
   });
-  const blueprint = recordValue(input.scriptResult.blueprint);
+  const blueprint = recordValue(input.scriptResult.blueprint ?? input.scriptResult);
   const characterSystem = recordValue(blueprint.character_system);
   const scriptMetadata = recordValue(blueprint._metadata ?? blueprint.meta);
   const sourcePrd = recordValue(scriptMetadata._prd);
@@ -6870,6 +6887,20 @@ export function renderPreproductionAuditReport(input: {
     if (!identityAnchorByKey.has(key)) identityAnchorByKey.set(key, identityAnchor);
   }
   const identityAnchors = [...identityAnchorByKey.values()];
+  const identityAnchorReferences = shotCards.map((shot) => {
+    const anchor = recordValue(recordValue(shot.promptContract).identityAnchor);
+    return {
+      shotId: String(shot.shotId ?? ""),
+      sha256: String(anchor.sha256 ?? ""),
+    };
+  });
+  const identityAnchorHashes = new Set(
+    identityAnchorReferences.map((item) => item.sha256).filter((value) => /^[a-f0-9]{64}$/u.test(value)),
+  );
+  const identityAnchorConsistent = animalIdentityOnly
+    && identityAnchorReferences.length === shotCards.length
+    && identityAnchorReferences.every((item) => /^[a-f0-9]{64}$/u.test(item.sha256))
+    && identityAnchorHashes.size === 1;
   const identityEvidenceStatus = animalIdentityOnly
     ? "text-anchor-only"
     : portraitAssetsVerified
@@ -6960,7 +6991,9 @@ export function renderPreproductionAuditReport(input: {
     ...shotCards.map((shot) =>
       `- 场景 ${String(shot.shotId)}：${String(shot.action)}；时长=${String(shot.duration)}s；场景状态=${String(shot.scene)}`),
     "",
-    "> 脚本证据按最终提示词绑定的镜头合同重投影；最终 G7 视图另内联原始需求与源镜头合同正文，旧脚本字段不得覆盖已通过的 G6 合同。",
+    sourceOriginal || sourceShotContracts.length
+      ? "> 脚本证据按最终提示词绑定的镜头合同重投影；最终 G7 视图另内联原始需求与源镜头合同正文，旧脚本字段不得覆盖已通过的 G6 合同。"
+      : "> 脚本证据按最终提示词绑定的镜头合同重投影；本报告未收到独立原文，以下只声明可复算的内部自洽，不声称已核实对源 brief 的忠实度。",
     "",
     "## 原始源证据（未改写）",
     "",
@@ -6985,6 +7018,11 @@ export function renderPreproductionAuditReport(input: {
       `- ${String(item.name ?? "未命名")}：path=${String(item.path ?? "未指定")}；授权范围=${String(item.authorization ?? "unknown")}；文件 SHA-256=${String(item.sha256 ?? "未核验")}`),
     ...identityAnchors.map((anchor) =>
       `- 文字身份锚点 ${String(anchor.subject ?? "未命名")}：sha256=${String(anchor.sha256 ?? "未核验")}；授权=${String(anchor.authorization ?? "unknown")}；资产状态=${String(anchor.assetStatus ?? "unknown")}；视觉验证=${String(anchor.visualVerification ?? "not-performed")}`),
+    ...(animalIdentityOnly
+      ? [
+        `- 文字锚点跨镜比对：${identityAnchorReferences.filter((item) => /^[a-f0-9]{64}$/u.test(item.sha256)).length}/${shotCards.length} 镜可复算；唯一哈希数=${identityAnchorHashes.size}；结论=${identityAnchorConsistent ? "consistent（仅文字锚点一致，未做图像视觉验证）" : "failed（文字锚点不一致）"}`,
+      ]
+      : []),
     "- 审批边界：源资产授权只证明可复用已登记身份参考；本轮未声称生成新定妆照，也未将其作为渲染或发布许可。",
     "",
     "## 镜头卡与提示词交叉引用",
@@ -7039,6 +7077,15 @@ export function renderPreproductionAuditReport(input: {
       portraitAssetsVerified,
       identityEvidenceStatus,
       identityAnchors,
+      identityAnchorConsistency: {
+        applicable: animalIdentityOnly,
+        scope: "text-only",
+        checkedShots: identityAnchorReferences.filter((item) => /^[a-f0-9]{64}$/u.test(item.sha256)).length,
+        totalShots: shotCards.length,
+        uniqueHashes: identityAnchorHashes.size,
+        consistent: identityAnchorConsistent,
+        visualVerification: "not-performed",
+      },
       shots: shotCards.map((shot) => ({
         ...recordValue(shot.promptContract),
         shotId: shot.shotId,

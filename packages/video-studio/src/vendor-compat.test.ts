@@ -1307,7 +1307,7 @@ console.log("RESULT " + JSON.stringify({
       characterPortraits: [{
         name: "猫",
         path: "",
-        appearance: "一只瘦小的橘色短毛猫，毛被雨水打湿贴在身上，耳朵边缘挂着细水珠，眼睛呈琥珀色，体型与盘卧姿态固定；角色ID=char_1；动物外观由文字锚点与跨镜参考帧锁定，站立姿态，缓慢走动，张开双臂或自然下垂",
+        appearance: "一只瘦小的橘色短毛猫，毛被雨水打湿贴在身上，耳朵边缘挂着细水珠，眼睛呈琥珀色，体型与盘卧姿态固定。，站立姿态，缓慢走动，张开双臂或自然下垂；角色ID=char_1；动物外观由文字锚点与跨镜参考帧锁定",
         costume: "不适用（动物自然外观）",
         authorization: "not-applicable",
       }],
@@ -1362,18 +1362,16 @@ console.log("RESULT " + JSON.stringify({
     const report = renderPreproductionAuditReport({
       productionResult: { shots: [], prompts },
       scriptResult: {
-        blueprint: {
-          _metadata: {
-            _originalStoryText: story,
-            _prd: {
-              projectDefinition: { sourceIntent: story, _originalStoryText: story },
-              characterSystem: { characters: [{ characterId: "char_1", name: "猫", authorization: "not-applicable" }] },
-              shotContract: actions.map((action, index) => ({
-                shotId: `SC-0${index + 1}`,
-                purpose: action,
-                action,
-              })),
-            },
+        _metadata: {
+          _originalStoryText: story,
+          _prd: {
+            projectDefinition: { sourceIntent: story, _originalStoryText: story },
+            characterSystem: { characters: [{ characterId: "char_1", name: "猫", authorization: "not-applicable" }] },
+            shotContract: actions.map((action, index) => ({
+              shotId: `SC-0${index + 1}`,
+              purpose: action,
+              action,
+            })),
           },
         },
       },
@@ -1385,6 +1383,7 @@ console.log("RESULT " + JSON.stringify({
     });
     expect(report).toContain(story);
     expect(report).toContain("文字外观锚点");
+    expect(report).toContain("结论=consistent（仅文字锚点一致，未做图像视觉验证）");
     expect(report).toContain("源角色资产：not_applicable");
     expect(report).toContain("授权=not-applicable");
     expect(report).not.toContain("授权=unknown");
