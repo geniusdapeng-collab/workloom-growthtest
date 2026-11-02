@@ -525,8 +525,7 @@ export function installVendorFieldQualityBridge(options: { log?: (line: string) 
           const row = shot as Record<string, unknown>;
           const prompt = typeof row.prompt === "string" ? row.prompt : "";
           const fieldCount = (prompt.match(/^\s*\d{2}\.【[^】]+】/gmu) ?? []).length;
-          return fieldCount >= 25
-            && prompt.length >= 1200;
+          return fieldCount >= 25;
         });
         if (frozenNarrativeContract) {
           log(`[vendor-compat] 字段质检跳过无条件模型重写：${list.length} 镜均为完整编号合同，继续由 G6 监制评审`);

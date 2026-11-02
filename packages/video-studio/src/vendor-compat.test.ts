@@ -333,9 +333,11 @@ import { installVendorFieldQualityBridge } from ${JSON.stringify(resolve(here, "
 const require = createRequire(${JSON.stringify(join(repoRoot, "package.json"))});
 const { FieldQualityPipeline } = require(${JSON.stringify(join(repoRoot, "vendor/supermickey/hyperreality-system/engines/field-quality/field-quality-pipeline.js"))});
 const prompt = Array.from({ length: 26 }, (_, index) => String(index + 1).padStart(2, "0") + ".【字段" + (index + 1) + "】" + "完整可执行内容。".repeat(8)).join("\\n");
+const shortPrompt = Array.from({ length: 26 }, (_, index) => String(index + 1).padStart(2, "0") + ".【字段" + (index + 1) + "】内容").join("\\n");
 const shots = [
   { shotId: "S1", duration: 3, prompt, _workloomPromptReviewPolicy: { noDialogue: true, noTitles: true } },
-  { shotId: "S2", duration: 3, prompt }
+  { shotId: "S2", duration: 3, prompt },
+  { shotId: "S3", duration: 3, prompt: shortPrompt }
 ];
 const uninstall = installVendorFieldQualityBridge({ log: () => undefined });
 const output = await new FieldQualityPipeline({ maxRounds: 2 }).runAll(shots);
@@ -345,6 +347,7 @@ console.log("RESULT " + JSON.stringify({
   reason: output.summary.reason,
   samePrompt: output.finalShots[0].prompt === prompt,
   samePromptWithoutPolicy: output.finalShots[1].prompt === prompt,
+  sameShortPrompt: output.finalShots[2].prompt === shortPrompt,
   reports: output.allReports.length,
   logs: output.allLogs.length
 }));
@@ -354,6 +357,7 @@ console.log("RESULT " + JSON.stringify({
     expect(String(result.reason)).toContain("frozen");
     expect(result.samePrompt).toBe(true);
     expect(result.samePromptWithoutPolicy).toBe(true);
+    expect(result.sameShortPrompt).toBe(true);
     expect(result.reports).toBe(0);
     expect(result.logs).toBe(0);
   }, 60_000);
