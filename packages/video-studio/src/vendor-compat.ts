@@ -5899,10 +5899,10 @@ export function applyNarrativeFinalPromptContract(
       || "中景";
     const shotSize = shotSizeRaw.replace(/景别$/u, "");
     const compositionText = canonicalAnimalOnly
-      ? `${shotSize}景别，9:16竖构图；${canonicalAnimalNames.join("、")}作为唯一动物主体清晰可辨，画面边缘保留安全区，不增加人物。`
+      ? `${shotSize}景别，${aspect}构图；${canonicalAnimalNames.join("、")}作为唯一动物主体清晰可辨，画面边缘保留安全区，不增加人物。`
       : canonicalNoPerson
-        ? `${shotSize}景别，9:16竖构图；自然景物主体清晰，画面边缘保留安全区，不增加人物或动物。`
-      : `${shotSize}景别，9:16竖构图；${characterNames.join("、") || "已登记角色"}位于可执行表演区并保持可辨轮廓，为其动作和视线保留空间。`;
+        ? `${shotSize}景别，${aspect}构图；自然景物主体清晰，画面边缘保留安全区，不增加人物或动物。`
+      : `${shotSize}景别，${aspect}构图；${characterNames.join("、") || "已登记角色"}位于可执行表演区并保持可辨轮廓，为其动作和视线保留空间。`;
     const cameraSource = promptFieldText(next.camera_movement ?? (next.fields as FusionRecord).camera_movement) || "固定机位";
     const cameraText = /(?:固定|锁死|locked|static|零位移)/iu.test(cameraSource)
       ? "固定机位，三脚架锁死，全镜零推拉零横移零变焦"
