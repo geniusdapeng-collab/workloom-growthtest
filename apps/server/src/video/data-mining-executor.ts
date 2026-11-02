@@ -367,13 +367,20 @@ export function createWebSearch(options: {
   const paceMs = options.paceMs ?? 1_200;
   const cache = loadSearchCache(options.cacheFile);
   const lastCallAt = new Map<string, number>();
+  const pacingQueues = new Map<string, Promise<void>>();
   const cooldownUntil = new Map<string, number>();
 
-  const pace = async (provider: string): Promise<void> => {
-    const last = lastCallAt.get(provider) ?? 0;
-    const wait = paceMs - (Date.now() - last);
-    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
-    lastCallAt.set(provider, Date.now());
+  const pace = (provider: string): Promise<void> => {
+    // 查询本身并发，但同一引擎的启动槽位必须串行取得。多个调用若同时
+    // 读取 lastCallAt 再等待，会在同一时刻醒来并成批请求，实际突破限速。
+    const next = (pacingQueues.get(provider) ?? Promise.resolve()).then(async () => {
+      const last = lastCallAt.get(provider);
+      const wait = last === undefined ? 0 : paceMs - (Date.now() - last);
+      if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+      lastCallAt.set(provider, Date.now());
+    });
+    pacingQueues.set(provider, next);
+    return next;
   };
 
   return async (query: string, limit: number): Promise<SearchHit[]> => {
@@ -441,6 +448,11 @@ export function createWebSearch(options: {
       }
       try {
         await pace(provider);
+        // 排队期间先前请求可能已经触发熔断；取得槽位后须重新核对。
+        if (Date.now() < (cooldownUntil.get(provider) ?? 0)) {
+          perProvider.push(`${provider}=cooldown`);
+          continue;
+        }
         const { hits, blocked } = await searchOneProvider(provider, query, limit, timeoutMs);
         if (blocked) {
           const minutes = 15;
