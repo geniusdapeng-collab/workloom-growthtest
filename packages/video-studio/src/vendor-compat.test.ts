@@ -1152,6 +1152,7 @@ console.log("RESULT " + JSON.stringify({
     expect(openingLine).toMatch(/空间=(?:楼道|室外|门口)/u);
     expect(openingLine).toMatch(/光位=(?:冷|路灯)/u);
     expect(openDoorLine).toContain("光位=室内未开灯");
+    expect(openDoorLine).toContain("空间=出租屋门口");
     expect(endingLine).toContain("坐下听雨");
     expect(endingLine).toMatch(/关键元素=.*台灯/u);
     expect(markdown).toContain("- **道具**（");
@@ -1166,6 +1167,9 @@ console.log("RESULT " + JSON.stringify({
     expect(markdown).toContain("坐具");
     const endingNode = (discovery.sceneStructure as any).ending;
     expect(endingNode.keyElements).toEqual(expect.arrayContaining(["坐具"]));
+    const lampNode = (discovery.sceneStructure as any).scenes.find((node: any) => String(node.purpose).includes("拧亮"));
+    expect(lampNode.keyElements).toEqual(expect.arrayContaining(["旧台灯", "台灯开关/旋钮"]));
+    expect(JSON.stringify(lampNode.keyElements)).not.toMatch(/未亮|黑着|暖光下/u);
     expect(endingLine).toMatch(/机位=中景/u);
   });
 
@@ -1215,6 +1219,23 @@ console.log("RESULT " + JSON.stringify({
     expect(pairs[1]).toMatch(/雨珠|挂珠|滴水/u);
     expect(pairs[1]).not.toBe(pairs[0]);
     expect(pairs[2]).toMatch(/姿态|湿痕|道具|首帧|参考帧/u);
+  });
+
+  it("真实低照度与静坐微表情风险不会互相串用台灯或人物拆镜模板", () => {
+    const pairs = pairRiskMitigations({
+      technicalRisks: [
+        { risk: "低照度雨夜与湿润反光：雨丝、墙面颗粒、水洼反光、暖黄台灯与冷蓝轮廓光需在多镜头间保持一致", level: "medium" },
+        { risk: "灯下静坐听雨的微表情长镜头：人物呼吸、眼神、肩颈微动和面部光影需长时间稳定", level: "high" },
+      ],
+      mitigationSuggestions: [
+        "把台灯开关拆成暗态静帧、指节接触旋钮、钨丝起亮三个短特写",
+        "静坐结尾拆为手部、肩颈、侧脸剪影、灯下影子4个短静态特写",
+      ],
+    });
+    expect(pairs[0]).toMatch(/曝光|白平衡|噪点|色温/u);
+    expect(pairs[0]).not.toMatch(/台灯开关拆成|静坐结尾拆为/u);
+    expect(pairs[1]).toMatch(/背影|侧影|肩线/u);
+    expect(pairs[1]).not.toMatch(/台灯开关拆成|曝光|白平衡/u);
   });
 
   it("G3 清除评审指令、拆分过载主体场景、去重内容期望并过滤空动作", () => {

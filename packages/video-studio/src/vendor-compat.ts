@@ -1418,12 +1418,10 @@ function sceneElementsForPurpose(purpose: string, elements: string[]): string[] 
       .slice(0, 5);
   }
   if (/^拧亮.*台灯/u.test(purpose)) {
-    return unique.filter((item) => /(?:台灯|旋钮|开关|桌面|墙)/u.test(item)).slice(0, 6);
+    return ["旧台灯", "台灯开关/旋钮", "桌面"];
   }
   if (/^坐下.*听雨/u.test(purpose)) {
-    const filtered = unique.filter((item) => /(?:台灯|窗|杯|桌面|椅子|凳|沙发|坐具)/u.test(item)).slice(0, 6);
-    if (!filtered.some((item) => /(?:椅子|凳|沙发|坐具)/u.test(item))) filtered.push("坐具");
-    return filtered;
+    return ["旧台灯", "窗", "坐具"];
   }
   return unique;
 }
@@ -1591,6 +1589,14 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
   };
   const paired = risks.map((risk) => {
     const text = `${String(risk.risk ?? "")} ${String(risk.impact ?? "")}`;
+    if (/(?:微表情|表情.*(?:僵硬|停滞)|眼神.*空洞|静坐.*(?:面部|情绪|长镜)|面部.*(?:漂移|变形))/u.test(text)
+      && !/(?:台灯|旋钮|开关|钨丝)/u.test(text)) {
+      return "把静止情绪拆成背影或侧影、手部自然放下与肩线下沉三个局部短镜，不要求正脸长特写；用雨声、呼吸和衣料轻响承接停顿，逐镜保持同一姿态终点。";
+    }
+    if (/(?:低照度|曝光|色偏|噪点|白平衡|主辅光比)/u.test(text)
+      && !/(?:微表情|静坐|手部|手指|旋钮|开关)/u.test(text)) {
+      return "固定曝光、白平衡、主辅光比与LUT，分别锁定室内外冷暖光源；逐镜检查暗部噪点、色温漂移、雨丝连续性及高光滚降，不使用跨场景复用的雨幕参数。";
+    }
     const semantic = semanticMitigation(text);
     if (semantic) return semantic;
     if (/(?:手持|微晃|微表情|表情.*僵硬|眼神.*空洞|情绪停顿|静止.*情绪)/u.test(text)) {
@@ -1783,9 +1789,12 @@ export function normalizeNarrativeRequirementMarkdown(
     const exteriorOpening = label === "开场"
       && /(?:收伞|雨夜|路灯|积水|水珠)/u.test(localContext)
       && !/(?:室内|门内|客厅|屋内)/u.test(localContext);
-    const space = exteriorOpening
+    let space = exteriorOpening
       ? pick(/(?:楼道|外廊|室外|门口|街口|街道|路面|屋檐下)/u, localContext) || "楼道/室外门口"
       : pick(/(?:出租屋|小面馆|厨房|森林|海边|木栈道|城市路面|湖面|纸箱里|纸箱内|屋檐下|窗边|门口|室内|玄关|楼道|外廊|街口|河边|树林里|桌面上)/u);
+    if (/^开门/u.test(purpose)) space = "出租屋门口";
+    else if (/^换鞋/u.test(purpose)) space = "出租屋玄关内侧";
+    else if (/(?:拧亮.*台灯|坐下听雨)/u.test(purpose)) space = "出租屋室内";
     const localLighting = pick(/(?:冷白路灯|冷蓝路灯|路灯|单一暖黄钨丝光|暖黄钨丝光|冷蓝|暖黄|逆光|侧光|顶光|环境光|暖光|冷光|月光|自然光)/u, localContext);
     let lighting = exteriorOpening
       ? (localLighting || "冷蓝路灯/楼道冷光")
