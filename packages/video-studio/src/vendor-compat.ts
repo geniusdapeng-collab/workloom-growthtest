@@ -6040,7 +6040,7 @@ export function renderPreproductionAuditReport(input: {
     "",
     `- 镜头卡：${shotCards.length} 镜，sha256=${artifacts.shots}`,
     `- 提示词正文：${prompts.length} 条，sha256=${artifacts.prompts}`,
-    `- 剧本：${scenes.length} 场，sha256=${artifacts.script}`,
+    `- 剧本：${shotCards.length} 镜（最终收口视图），源剧本 sha256=${artifacts.script}`,
     `- 总时长：${Number(totalSeconds.toFixed(3))}s`,
     `- 有效处理时间：${elapsedMs}ms（${(elapsedMs / 60_000).toFixed(1)}分钟）`,
     `- 镜头 ID 与提示词 ID 一一对应：${idsMatch ? "是" : "否"}`,
@@ -6062,8 +6062,18 @@ export function renderPreproductionAuditReport(input: {
     `- 角色数：${characters.length}`,
     ...characters.map((character) =>
       `- 角色 ${String(character.name ?? character.characterId ?? "未命名")}：ID=${String(character.characterId ?? character.id ?? "未指定")}；授权=${String(character.authorization ?? "unknown")}`),
-    ...scenes.map((scene, index) =>
-      `- 场景 ${String(scene.scene_id ?? scene.sceneId ?? index + 1)}：${String(scene.scene_name ?? scene.name ?? scene.purpose ?? "完整场景")}；时长=${String(recordValue(scene.timing).duration ?? scene.duration ?? "?")}s`),
+    ...shotCards.map((shot) =>
+      `- 场景 ${String(shot.shotId)}：${String(shot.action)}；时长=${String(shot.duration)}s；场景状态=${String(shot.scene)}`),
+    "",
+    "> 脚本证据按最终提示词绑定的镜头合同重投影；原始剧本文本仅以 sha256 留痕，避免旧场景命名覆盖已通过的 G6 合同。",
+    "",
+    "## 源定妆照证据链",
+    "",
+    `- 新增定妆照生成：${portraitsNotApplicable ? "not_applicable（审计关闭）" : "unverified"}`,
+    `- 角色身份引用资产：${portraitAssetsVerified ? "verified（仅复用已登记源资产）" : "unverified"}`,
+    ...portraitAssets.map((item) =>
+      `- ${String(item.name ?? "未命名")}：path=${String(item.path ?? "未指定")}；授权范围=${String(item.authorization ?? "unknown")}；文件 SHA-256=${String(item.sha256 ?? "未核验")}`),
+    "- 审批边界：源资产授权只证明可复用已登记身份参考；本轮未声称生成新定妆照，也未将其作为渲染或发布许可。",
     "",
     "## 镜头卡与提示词交叉引用",
     "",

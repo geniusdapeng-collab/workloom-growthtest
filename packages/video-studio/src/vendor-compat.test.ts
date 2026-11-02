@@ -1978,7 +1978,7 @@ console.log("RESULT " + JSON.stringify({
       scriptResult: {
         blueprint: {
           character_system: { characters: [{ characterId: "chen-zhuo", name: "陈卓", authorization: "real-authorized" }] },
-          structure: { scenes: [{ sceneId: "SC01", purpose: "收伞、开门", duration: 3 }] },
+          structure: { scenes: [{ sceneId: "SC01", purpose: "错误旧脚本动作", duration: 3 }] },
         },
       },
       timing: {},
@@ -1992,6 +1992,8 @@ console.log("RESULT " + JSON.stringify({
     expect(report).toContain(prompt);
     expect(report).not.toContain("错误：黎明山谷雾景");
     expect(report).not.toContain("错误：画面内没有人物动作");
+    expect(report).not.toContain("错误旧脚本动作");
+    expect(report).toContain("脚本证据按最终提示词绑定的镜头合同重投影");
     expect(report).toContain("镜头 ID 与提示词 ID 一一对应：是");
     expect(report).toContain("有效处理时间：126000ms（2.1分钟）");
     expect(report).toContain("定妆照生成：not_applicable");
