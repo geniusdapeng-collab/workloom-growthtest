@@ -2133,6 +2133,9 @@ export function normalizeNarrativeRequirementMarkdown(
     upstream.special_notes,
     upstream.description,
   ].map(String).join(" "));
+  const groundEvidence = /(?:地面|路面|地砖|台阶|水洼|积水|湿沙|沙滩)/u.test(
+    String(upstream._originalStoryText ?? ""),
+  );
   const pairedMitigations = pairRiskMitigations(risk).map((item) => {
     let value = item;
     if (sceneDurationsForContract.length > 0) {
@@ -2143,6 +2146,9 @@ export function normalizeNarrativeRequirementMarkdown(
     }
     if (!umbrellaEvidence) {
       value = value.replace(/(?:雨具|雨伞|伞面|伞骨|伞尖)/gu, "雨滴与屋檐落水");
+    }
+    if (!groundEvidence) {
+      value = value.replace(/(?:地面)?积水|地面积水/gu, "纸箱接水面");
     }
     return value;
   });
@@ -2178,6 +2184,7 @@ export function normalizeNarrativeRequirementMarkdown(
     upstream,
   }).filter((item) =>
     (noCharacterContract || !["薄雾", "远山", "水面", "涟漪"].includes(item))
+    && (item !== "积水" || groundEvidence)
     && groundedProp(item));
   if (/(?:地面|路面|地砖|台阶|水洼)/u.test(propEvidence)
     && /(?:雨|湿|积水)/u.test(propEvidence)

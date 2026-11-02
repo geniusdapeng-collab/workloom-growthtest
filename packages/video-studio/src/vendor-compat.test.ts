@@ -1254,6 +1254,9 @@ console.log("RESULT " + JSON.stringify({
     expect(sequence[2]).toMatch(/缩回|盘成/u);
     const pairs = pairRiskMitigations(discovery.riskAssessment as Record<string, unknown>);
     expect(pairs[1]).toMatch(/背光剪影|跳切/u);
+    const props = inferNarrativeProps({ intent: story, discovery, upstream });
+    expect(props).toContain("水滴");
+    expect(props).not.toContain("积水");
   });
 
   it("叙事道具从场景证据抽取，关键道具不会因窄词表遗漏", () => {
