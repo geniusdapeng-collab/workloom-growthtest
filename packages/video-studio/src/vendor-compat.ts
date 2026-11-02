@@ -5720,7 +5720,9 @@ export function applyNarrativeFinalPromptContract(
   }
   if (options.noMusic || options.noDialogue) {
     const rawAudio = promptFieldText((next.fields as FusionRecord).audio ?? next.audio);
-    const prohibited = /(?:音乐|配乐|旋律|弦乐|钢琴|氛围音|铺底|BPM|BGM|soundtrack|music|score|台词|人声|对话|旁白|口播|voiceover)/iu;
+    const prohibited = options.noDialogue
+      ? /(?:音乐|配乐|旋律|弦乐|钢琴|氛围音|铺底|BPM|BGM|soundtrack|music|score|台词|人声|对话|旁白|口播|voiceover)/iu
+      : /(?:音乐|配乐|旋律|弦乐|钢琴|氛围音|铺底|BPM|BGM|soundtrack|music|score)/iu;
     const forbiddenAnimal = options.noAnimals ? /(?:鸟|虫|动物|水黾)/u : null;
     const anchors = rawAudio
       .split(/[；;。，,、|\n]+/u)
@@ -5731,7 +5733,7 @@ export function applyNarrativeFinalPromptContract(
       .filter((item) => /(?:风|水|波|涟漪|雾|芦苇|雨|环境|动作|呼吸|草|叶|石|泥)/u.test(item));
     const fallbackAudio = options.noCharacters ? "风声、水面涟漪声、芦苇摩擦声" : "与画面同步的环境声和主体动作声";
     const audio = anchors.length > 0 ? [...new Set(anchors)].slice(0, 6).join("、") : fallbackAudio;
-    replaceField("音频", `仅有${audio}；无人物声、无旁白、无音乐、无配乐、无音乐节拍。`);
+    replaceField("音频", `仅有${audio}${options.noDialogue ? "；无人物声、无旁白" : "，以及合同允许的人声与台词"}；无音乐、无配乐、无音乐节拍。`);
   }
   if (options.chineseOnly) {
     const forbidden = [
@@ -5858,9 +5860,11 @@ export function applyNarrativeFinalPromptContract(
     const dialogueText = options.noDialogue
       ? "不适用：本片无台词、无旁白、无口播。"
       : promptFieldText(next.dialogue ?? (next.fields as FusionRecord).dialogue) || "按已确认台词合同执行。";
-    const audioText = options.noMusic || options.noDialogue
+    const audioText = options.noDialogue
       ? "仅保留真实环境声与主体动作声；无人物声、无旁白、无音乐、无配乐、无节拍。"
-      : fieldValue("音频") || "环境声、主体动作声与合同允许的人声同步；无未声明配乐。";
+      : options.noMusic
+        ? "仅保留真实环境声、主体动作声与合同允许的人声和台词；无音乐、无配乐、无节拍。"
+        : fieldValue("音频") || "环境声、主体动作声与合同允许的人声同步；无未声明配乐。";
     const rawAction = cleanText(actionSource)
       .replace(/[^；。\n]*(?:画面内无人物|没有实体肢体入画|无角色出场|空镜无角色)[^；。\n]*[；。]?/gu, "")
       .trim();
