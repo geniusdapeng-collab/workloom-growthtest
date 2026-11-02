@@ -1276,7 +1276,10 @@ export function extractNarrativeActions(
   const purposes = [
     ...scenePurposes,
     String(upstream._originalStoryText ?? upstream.original_story_text ?? ""),
-    String(upstream.special_notes ?? ""),
+    String(upstream.special_notes ?? "")
+      .split(/\n+/u)
+      .filter((line) => line.trim() && !/(?:视觉锚点|物理锚点|动作锚点|声音锚点)/u.test(line))
+      .join("\n"),
   ].filter(Boolean);
   const actions: string[] = [];
   const actionFamilies = new Set<string>();
@@ -1315,6 +1318,18 @@ export function extractNarrativeActions(
       else if (/^换鞋/u.test(phrase)) phrase = "换鞋";
       else if (/^拧亮.*台灯/u.test(phrase)) phrase = "拧亮旧台灯";
       else if (/^(?:坐在|坐回|坐进).*听雨/u.test(phrase) || /^坐在.*听雨/u.test(phrase)) phrase = "坐下听雨";
+      if (/[—…]+$/u.test(phrase)) {
+        const sourceClause = String(upstream._originalStoryText ?? "")
+          .split(/[，。；\n]+/u)
+          .map((item) => item.trim())
+          .find((item) => item.includes(match[0]) && extractNarrativeActions({}, { _originalStoryText: item }).length > 0);
+        if (sourceClause) {
+          phrase = sourceClause
+            .replace(/^(?:最后|随后|然后|接着|再)/u, "")
+            .replace(/^.*(?:一只橘猫|橘猫|猫|狗|鸟)(?=从|伸|缩|钻|跑|跳)/u, match[0])
+            .trim();
+        }
+      }
       const key = actionKey(match[0], phrase);
       const malformed = /(?:绒毛|骨上|undefined|null|未标注|关键词|标签|对象|待补|省略)/iu.test(phrase)
         || /(?:阻尼感|触感|手感|质感|音色)(?:$|[，。；、])/u.test(phrase)
@@ -1361,7 +1376,7 @@ export function inferNarrativeProps(input: {
   const terms: Array<{ pattern: RegExp; name: string }> = [
     { pattern: /(?:老旧|旧|新)?台灯|灯罩|钨丝|旋钮|开关/gu, name: "台灯" },
     { pattern: /(?:一串)?钥匙/gu, name: "钥匙" },
-    { pattern: /(?:门缝|门轴|门框|锁孔|防盗门|木门|玻璃门|(?<!快)门)/gu, name: "门" },
+    { pattern: /(?:门缝|门轴|门框|锁孔|防盗门|木门|玻璃门|开门|关门|门口|(?<!快)门)/gu, name: "门" },
     { pattern: /(?:长柄|折叠|透明|湿)?雨?伞(?:骨|沿|布)?/gu, name: "雨伞" },
     { pattern: /(?:手机)?屏幕|手机/gu, name: "手机" },
     { pattern: /(?:楼梯)?扶手/gu, name: "扶手" },
@@ -1375,13 +1390,25 @@ export function inferNarrativeProps(input: {
     { pattern: /(?:旧)?海报/gu, name: "海报" },
     { pattern: /书(?:本|页)?/gu, name: "书" },
     { pattern: /纸箱/gu, name: "纸箱" },
+    { pattern: /(?:白瓷|陶瓷|瓷)?茶壶(?:壶盖|壶嘴)?/gu, name: "茶壶" },
+    { pattern: /蒸汽/gu, name: "蒸汽" },
+    { pattern: /釉面/gu, name: "釉面" },
+    { pattern: /壶盖/gu, name: "壶盖" },
+    { pattern: /壶嘴/gu, name: "壶嘴" },
+    { pattern: /落叶/gu, name: "落叶" },
+    { pattern: /栏杆/gu, name: "栏杆" },
+    { pattern: /木栈道/gu, name: "木栈道" },
+    { pattern: /信号灯|红绿灯/gu, name: "信号灯" },
+    { pattern: /光斑|光柱/gu, name: "光影" },
+    { pattern: /苔藓/gu, name: "苔藓" },
+    { pattern: /露水/gu, name: "露水" },
     { pattern: /(?:纸船|纸条|照片|信封)/gu, name: "纸质道具" },
     { pattern: /(?:自行|公交|列|汽|火)车/gu, name: "车" },
     { pattern: /(?:陶器|瓷器|文物|石碑|石桥|桥)/gu, name: "场景器物" },
     { pattern: /(?:便利店)?灯箱/gu, name: "灯箱" },
     { pattern: /屋檐|檐口/gu, name: "屋檐" },
     { pattern: /积水|水洼/gu, name: "积水" },
-    { pattern: /水滴|水珠/gu, name: "水滴" },
+    { pattern: /水滴|水珠|雨滴/gu, name: "水滴" },
     { pattern: /薄雾|雾气|雾层|晨雾/gu, name: "薄雾" },
     { pattern: /远山|山形|山脉/gu, name: "远山" },
     { pattern: /芦苇|芦花/gu, name: "芦苇" },
@@ -1392,7 +1419,10 @@ export function inferNarrativeProps(input: {
   const negativeClauses = [...evidence.matchAll(/(?:不出现|不得|禁止|不要|不能)[^。；\n]{0,40}/gu)]
     .map((match) => match[0]);
   for (const term of terms) {
-    if ([...evidence.matchAll(term.pattern)].length > 0
+    const matches = [...evidence.matchAll(term.pattern)];
+    const literalDoor = /(?:门框|门缝|门锁|开门|关门|门口|防盗门|木门|玻璃门)/u.test(evidence);
+    const metaphorOnlyDoor = term.name === "门" && matches.length > 0 && !literalDoor;
+    if (matches.length > 0 && !metaphorOnlyDoor
       && !negativeClauses.some((clause) => clause.includes(term.name))
       && !props.includes(term.name)) props.push(term.name);
   }
@@ -1590,6 +1620,15 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
   };
   const paired = risks.map((risk) => {
     const text = `${String(risk.risk ?? "")} ${String(risk.impact ?? "")}`;
+    if (/耳朵|耳廓|耳尖/u.test(text) && /(?:收|折|贴|后压|抖动)/u.test(text)) {
+      return "把耳朵收拢拆成耳根贴头、耳尖折入和最终静止三个局部短镜；锁定同一猫头参考帧与耳廓轮廓，用箱沿遮挡颈部连接处，逐镜检查耳朵数量、折叠方向与穿模。";
+    }
+    if (/纸箱|箱沿|瓦楞/u.test(text) && /(?:毛边|吸水|潮湿|塌陷|边缘|穿模|形变)/u.test(text)) {
+      return "纸箱边缘固定同一参考帧，先锁定箱角厚度、毛边与水渍分布；猫爪或身体接触处只做局部遮挡和短镜，逐镜核对箱体不塌陷、毛边不增殖、毛发不穿模。";
+    }
+    if (/(?:悬停|将落未落|悬而未落)/u.test(text) && /(?:水珠|水滴|露水)/u.test(text)) {
+      return "悬停水滴锁定单帧形态、挂点和重力方向；坠落前只做轻微鼓胀，不用长镜连续解算流体，落点用下一镜水痕与同步水滴声承接。";
+    }
     if (/(?:微表情|表情.*(?:僵硬|停滞)|眼神.*空洞|静坐.*(?:面部|情绪|长镜)|面部.*(?:漂移|变形))/u.test(text)
       && !/(?:台灯|旋钮|开关|钨丝|身份|定妆|角色一致)/u.test(text)) {
       return "把静止情绪拆成背影或侧影、手部自然放下与肩线下沉三个局部短镜，不要求正脸长特写；用雨声、呼吸和衣料轻响承接停顿，逐镜保持同一姿态终点。";
@@ -1792,24 +1831,35 @@ export function normalizeNarrativeRequirementMarkdown(
       String(upstream.visual_style ?? ""),
       JSON.stringify(recordValue(discovery.audienceProfile)),
     ].join(" ");
+    const storyContext = [
+      String(upstream._originalStoryText ?? ""),
+      String(upstream.description ?? ""),
+      String(upstream.special_notes ?? ""),
+    ].join(" ");
     const pick = (pattern: RegExp, source = context): string => source.match(pattern)?.[0] ?? "";
     const durationText = Number(node.duration) > 0 ? `${Number(node.duration)}秒` : "";
-    const time = pick(/(?:雨夜|深夜|夜晚|清晨|黎明|白天|午后|傍晚|黄昏|春天|夏天|秋天|冬天)/u, localContext)
-      || pick(/(?:雨夜|深夜|夜晚|清晨|黎明|白天|午后|傍晚|黄昏|春天|夏天|秋天|冬天)/u);
+    const time = pick(/(?:雨后|雨停后|雨夜|深夜|夜晚|清晨|黎明|白天|午后|傍晚|黄昏|春天|夏天|秋天|冬天)/u, localContext)
+      || pick(/(?:雨后|雨停后|雨夜|深夜|夜晚|清晨|黎明|白天|午后|傍晚|黄昏|春天|夏天|秋天|冬天)/u, storyContext);
     const exteriorOpening = label === "开场"
       && /(?:收伞|雨夜|路灯|积水|水珠)/u.test(localContext)
       && !/(?:室内|门内|客厅|屋内)/u.test(localContext);
+    const spacePattern = /(?:出租屋|小面馆|厨房|森林|海边|木栈道|栏杆|城市路面|水洼|湖面|高原湖|纸箱里|纸箱内|屋檐下|窗边|门口|室内|玄关|楼道|外廊|街口|河边|树林里|桌面上|茶壶旁)/u;
+    const exteriorSpacePattern = /(?:楼道|外廊|室外|门口|门外|街口|街道|路面|路面|屋檐下|木栈道)/u;
+    const localSpace = pick(spacePattern, localContext);
+    const sourceSpace = pick(spacePattern, storyContext);
+    const externalSpace = pick(exteriorSpacePattern, localContext);
     let space = exteriorOpening
-      ? pick(/(?:楼道|外廊|室外|门口|街口|街道|路面|屋檐下)/u, localContext) || "楼道/室外门口"
-      : pick(/(?:出租屋|小面馆|厨房|森林|海边|木栈道|城市路面|湖面|纸箱里|纸箱内|屋檐下|窗边|门口|室内|玄关|楼道|外廊|街口|河边|树林里|桌面上)/u);
+      ? (externalSpace || (/(?:收伞|回到出租屋)/u.test(localContext) ? "楼道/室外门口" : (localSpace || sourceSpace || "")))
+      : (localSpace || sourceSpace || "");
     if (/^开门/u.test(purpose)) space = "出租屋门口";
     else if (/^换鞋/u.test(purpose)) space = "出租屋玄关内侧";
     else if (/(?:拧亮.*台灯|坐下听雨)/u.test(purpose)) space = "出租屋室内";
-    const localLighting = pick(/(?:冷白路灯|冷蓝路灯|路灯|单一暖黄钨丝光|暖黄钨丝光|冷蓝|暖黄|逆光|侧光|顶光|环境光|暖光|冷光|月光|自然光)/u, localContext);
-    let lighting = exteriorOpening
-      ? (localLighting || "冷蓝路灯/楼道冷光")
-      : (localLighting
-        || (/(?:台灯|开门|换鞋|坐下|听雨)/u.test(localContext) ? "室内旧台灯暖黄" : pick(/(?:单一暖黄钨丝光|暖黄钨丝光|冷蓝|暖黄|逆光|侧光|顶光|环境光|暖光|冷光|月光|自然光)/u)));
+    const localLighting = pick(/(?:信号灯[^。；，]*|冷白路灯|冷蓝路灯|路灯|单一暖黄钨丝光|暖黄钨丝光|冷蓝|暖黄|晨光|逆光|侧逆光|侧光|顶光|环境光|暖光|冷光|月光|自然光|晨光)/u, localContext);
+    const visualLighting = pick(/(?:信号灯[^。；，]*|单一暖黄钨丝光|暖黄钨丝光|冷蓝|暖黄|晨光|侧逆光|逆光|侧光|顶光|环境光|暖光|冷光|月光|自然光)/u, String(upstream.visual_style ?? ""));
+    let lighting = localLighting
+      || (/(?:台灯|开门|换鞋|坐下|听雨)/u.test(localContext) ? "室内旧台灯暖黄" : "")
+      || visualLighting
+      || "按已确认视觉方案执行";
     if (!exteriorOpening
       && /(?:开门|换鞋)/u.test(purpose)
       && !/(?:拧亮|灯下|坐下|听雨)/u.test(purpose)) {
@@ -1818,7 +1868,8 @@ export function normalizeNarrativeRequirementMarkdown(
     const camera = /(?:坐下|静坐|听雨|肩线|人物出画)/u.test(localContext)
       ? "中景"
       : (pick(/(?:低机位|高机位|平视|俯拍|仰拍|近景|中景|广角|特写|微距)/u, localContext)
-        || pick(/(?:低机位|高机位|平视|俯拍|仰拍|近景|中景|广角|特写|微距)/u));
+        || pick(/(?:低机位|高机位|平视|俯拍|仰拍|近景|中景|广角|特写|微距)/u, String(upstream.visual_style ?? ""))
+        || "9:16竖构图，关键元素位于中部安全区");
     const endingStill = label === "结尾" && /(?:半秒|0\.5秒)[^。；\n]{0,12}(?:静止|空镜)|(?:静止|空镜)[^。；\n]{0,12}(?:半秒|0\.5秒)/u.test(context)
       ? "；片尾静止=0.5秒"
       : "";
@@ -1931,6 +1982,14 @@ export function normalizeNarrativeRequirementMarkdown(
       upstream.description,
       upstream.special_notes,
     ].map(String).join(" "));
+  const environmentActionPhrases = String(upstream._originalStoryText ?? "")
+    .split(/[，。；\n]+/u)
+    .map((item) => item.trim())
+    .filter((item) => item.length >= 4)
+    .filter((item) => !/(?:无人物|无动物|无品牌|无文字|无字幕|无旁白|不出现|仅保留环境声|需求口径)/u.test(item))
+    .filter((item) => /(?:倒映|风|薄雾|雾|蒸汽|晨光|光斑|光柱|落叶|涟漪|水洼|信号灯|红绿灯|水滴|升起|散开|晃动|推过|变化)/u.test(item))
+    .map((item) => item.replace(/^镜头(?:只)?/u, "").trim())
+    .slice(0, 5);
   if (inferredRoles.length > 0) {
     normalized = normalized.replace(
       /- \*\*角色\*\*（\d+）：[^\n]*/u,
@@ -1943,7 +2002,10 @@ export function normalizeNarrativeRequirementMarkdown(
   if (noCharacterContract) {
     normalized = normalized
       .replace(/- \*\*角色\*\*（\d+）：[^\n]*/u, "- **角色**（0）：无角色（环境/场景空镜）")
-      .replace(/- \*\*动作\*\*（\d+）：[^\n]*/u, "- **动作**（0）：无角色动作；以风、雾、光线和水面变化推进")
+      .replace(
+        /- \*\*动作\*\*（\d+）：[^\n]*/u,
+        `- **动作**（0）：无角色动作；${environmentActionPhrases.length > 0 ? environmentActionPhrases.join("；") : "以源证据中的自然物理变化推进"}`,
+      )
       .replace(/人物动作与画外环境声/gu, "画外环境声");
   }
   const risk = discovery?.riskAssessment && typeof discovery.riskAssessment === "object"
@@ -1993,7 +2055,9 @@ export function normalizeNarrativeRequirementMarkdown(
     intent: String(upstream?._originalStoryText ?? ""),
     discovery,
     upstream,
-  }).filter((item) => !["薄雾", "远山", "水面", "涟漪"].includes(item) && groundedProp(item));
+  }).filter((item) =>
+    (noCharacterContract || !["薄雾", "远山", "水面", "涟漪"].includes(item))
+    && groundedProp(item));
   if (actions.some((item) => /钥匙/u.test(item)) && !props.includes("钥匙")) props.push("钥匙");
   const endingRecord = recordValue(scene.ending);
   const endingElements = Array.isArray(endingRecord.keyElements)
@@ -2047,14 +2111,22 @@ export function normalizeNarrativeRequirementMarkdown(
     );
   }
   if (narrativeSpeechPolicy(dialogue).allSpeechForbidden && !normalized.includes("- **声音锚点**")) {
-    const soundEvidence = [upstream._originalStoryText, upstream.special_notes, JSON.stringify(scene), normalized].map(String).join(" ");
+    const soundEvidence = [upstream._originalStoryText, JSON.stringify(scene)].map(String).join(" ");
     const soundAnchors = [
-      /雨/u.test(soundEvidence) ? "雨声" : "",
+      /雨(?!后|停)/u.test(soundEvidence) ? "雨声" : "",
+      /屋檐|滴水|露水/u.test(soundEvidence) ? "屋檐滴水声" : "",
+      /风|枝叶|树叶/u.test(soundEvidence) ? "风声与枝叶摆动声" : "",
+      /落叶/u.test(soundEvidence) ? "落叶摩擦声" : "",
+      /涟漪|水面|湖面/u.test(soundEvidence) ? "水面涟漪声" : "",
+      /蒸汽|茶壶/u.test(soundEvidence) ? "蒸汽与陶瓷轻响声" : "",
+      /纸箱/u.test(soundEvidence) ? "纸箱摩擦与受压声" : "",
+      /猫|爪|蜷缩/u.test(soundEvidence) ? "猫爪接触纸箱与呼吸声" : "",
+      /信号灯|红绿灯/u.test(soundEvidence) ? "信号灯继电器与街道底噪" : "",
       /(?:收伞|伞骨|伞尖)/u.test(soundEvidence) ? "伞骨滴水声" : "",
       /(?:开门|门锁|锁孔|钥匙)/u.test(soundEvidence) ? "门锁与开门声" : "",
       /(?:换鞋|鞋跟)/u.test(soundEvidence) ? "换鞋与鞋跟落地声" : "",
       /(?:台灯|旋钮|开关|钨丝)/u.test(soundEvidence) ? "台灯旋钮与钨丝电流声" : "",
-    ].filter(Boolean);
+    ].filter((item, index, list) => Boolean(item) && list.indexOf(item) === index);
     if (soundAnchors.length > 0) {
       normalized = normalized.replace(
         /- \*\*台词\/字幕口径\*\*：[^\n]*/u,
@@ -2185,6 +2257,14 @@ export function normalizeNarrativeDiscovery(
       text = text.replace(/(?:第\s*)?(\d+)\s*秒(?:前后)?/gu, (whole, seconds: string) =>
         Number(seconds) > duration ? `片尾（${duration}秒内）` : whole);
     }
+    if (/[—…]+$|＋$/u.test(text)) {
+      const verb = text.match(/(?:缩回|探出|伸爪|接水|盘成|坐下|站起|抬头|低头|开门|关门)/u)?.[0];
+      const recovered = verb
+        ? sourceActionPhrases.find((item) => item.includes(verb))
+        : undefined;
+      if (recovered) text = recovered;
+      else text = text.replace(/[—…+]+$/u, "").trim();
+    }
     if (text.replace(/[\s，。；、：]/gu, "").length < 4 && !actionable(text)) {
       text = "以动作与画外环境声完成情绪转折";
     }
@@ -2199,6 +2279,7 @@ export function normalizeNarrativeDiscovery(
   const noAnimals = /无动物|不出现动物|无宠物/u.test(storyPolicy);
   const noPeople = /无人物|无真人|不出现人物/u.test(storyPolicy);
   const noText = /无文字|无字幕|不出现文字/u.test(storyPolicy);
+  const noVehicles = /(?:无|不出现|不得出现|禁止出现)[^。；\n]{0,12}车辆/u.test(storyPolicy);
   const groundingText = [
     upstream._originalStoryText,
     upstream.description,
@@ -2296,8 +2377,9 @@ export function normalizeNarrativeDiscovery(
   const purposeViolation = (node: Record<string, unknown>): boolean => {
     const value = String(node.purpose ?? "");
     return (noAnimals && /(?:黑|白|灰|小|一只)?(?:天鹅(?!湖)|水鸟|鸟|猫|狗|鱼|动物)/u.test(value))
-      || (noPeople && /(?:人物|真人|人类|路人|游客|手部|手指|手臂|肩膀|身体|人影|手机|相机|快门|录制|取景框|屏幕|屏息|呼吸声)/u.test(value))
-      || (noText && /(?:字幕|水印|文字)/u.test(value));
+      || (noPeople && /(?:人物|真人|人类|路人|游客|夜归人|手部|手指|手臂|肩膀|身体|人影|手机|相机|快门|录制|取景框|屏幕|屏息|呼吸声|鞋尖|伞尖|他抬|他停|他先|她才)/u.test(value))
+      || (noText && /(?:字幕|水印|文字|数字|倒计时数字)/u.test(value))
+      || (noVehicles && /(?:车辆|汽车|出租车|车流|车型|车牌|车顶灯|尾灯)/u.test(value));
   };
   const keyElementsViolation = (node: Record<string, unknown>): boolean => {
     const values = Array.isArray(node.keyElements) ? node.keyElements.map(String) : [];
@@ -2305,8 +2387,10 @@ export function normalizeNarrativeDiscovery(
       genericScene.test(item)
       || item.trim().length >= 2 && !hasGroundingToken(item)
       || noAnimals && /(?:黑|白|灰|小|一只)?(?:天鹅(?!湖)|水鸟|鸟|猫|狗|鱼|动物)/u.test(item)
-      || noPeople && /(?:人物|真人|人类|路人|游客|手部|手指|手臂|肩膀|身体|人影|手机|相机|快门|录制|取景框|屏幕|屏息|呼吸声)/u.test(item)
-      || noText && /(?:字幕|水印|文字)/u.test(item));
+      || noPeople && /(?:人物|真人|人类|路人|游客|夜归人|手部|手指|手臂|肩膀|身体|人影|手机|相机|快门|录制|取景框|屏幕|屏息|呼吸声|鞋尖|伞尖|他抬|他停|他先|她才)/u.test(item)
+      || noText && /(?:字幕|水印|文字|数字|倒计时数字)/u.test(item)
+      || noVehicles && /(?:车辆|汽车|出租车|车流|车型|车牌|车顶灯|尾灯)/u.test(item)
+      || item === "门" && !/(?:门框|门缝|门锁|开门|关门|门口|防盗门|木门|玻璃门)/u.test(groundingText));
   };
   if (sceneNodes.some((node) =>
     genericScene.test(String(node.purpose ?? ""))
@@ -2439,6 +2523,12 @@ export function normalizeNarrativeDiscovery(
   scene.totalDuration = Number.isFinite(duration) && duration > 0 ? duration : totalDuration;
   if (Number.isFinite(duration) && duration > 0) {
     const audience = recordValue(discovery.audienceProfile);
+    if (Array.isArray(audience.emotionTriggers)) {
+      audience.emotionTriggers = [...new Set((audience.emotionTriggers as unknown[])
+        .map(String)
+        .map((item) => item.trim())
+        .filter((item) => item && !/^只记录自然环境与环境声的缓慢变化$/u.test(item)))];
+    }
     if (Array.isArray(audience.contentExpectations)) {
       audience.contentExpectations = [...new Set((audience.contentExpectations as unknown[]).map((item) => {
         const text = String(item);
@@ -2495,9 +2585,10 @@ export function normalizeNarrativeDiscovery(
     }
   };
   const prohibitedAudiencePattern = [
-    noPeople ? /(?:手机取景框|红色录音点|按下录制|按下快门|屏息|呼吸声|耳边[^。；\n]{0,8}憋气|手伸进|手指|手掌)/u : null,
+    noPeople ? /(?:手机取景框|红色录音点|按下录制|按下快门|屏息|呼吸声|耳边[^。；\n]{0,8}憋气|手伸进|手指|手掌|夜归人|路人|游客|人影|男人|女人|鞋尖|伞尖|他抬|他停|他先|她才)/u : null,
     noAnimals ? /(?:黑天鹅|水鸟|飞鸟|鸟鸣|猫|狗)/u : null,
-    noText ? /(?:字幕|水印|文字卡)/u : null,
+    noText ? /(?:字幕|水印|文字卡|数字|倒计时数字)/u : null,
+    noVehicles ? /(?:车辆|汽车|出租车|车流|车型|车牌|车顶灯|尾灯)/u : null,
   ].filter((pattern): pattern is RegExp => pattern instanceof RegExp);
   if (prohibitedAudiencePattern.length > 0) {
     const sanitizeAudience = (value: unknown): void => {

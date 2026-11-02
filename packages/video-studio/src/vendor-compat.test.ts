@@ -2766,6 +2766,103 @@ console.log("RESULT " + JSON.stringify({
     expect((markdown.match(/> 设备型号、光照参数与实拍可行性未在本轮核实/gu) ?? []).length).toBe(1);
   });
 
+  it("无人物自然与静物案例从源证据生成空间、动作、道具和声音，不继承雨夜模板", () => {
+    const cases = [
+      {
+        story: "秋日木栈道上，落叶被风分层推过栏杆缝隙，光斑随树叶晃动。无人物、无动物、无品牌、无文字、无字幕、无旁白，仅保留环境声。",
+        visual: "自然侧逆光，浅景深，9:16竖构图",
+        space: "木栈道",
+        props: ["落叶", "栏杆"],
+        sounds: ["风声", "落叶摩擦声"],
+        action: "落叶",
+      },
+      {
+        story: "清晨薄雾中的无名高原湖，湖面只倒映远山和芦苇，风吹起细小涟漪，薄雾缓慢散开。无人物、无动物、无品牌、无文字、无字幕、无旁白，仅保留环境声。",
+        visual: "清晨侧逆光，薄雾体积光，低饱和青灰调",
+        space: "高原湖",
+        props: ["薄雾", "远山", "芦苇", "水面", "涟漪"],
+        sounds: ["风声", "水面涟漪声"],
+        action: "风吹起细小涟漪",
+      },
+      {
+        story: "桌面上的一把白色陶瓷茶壶，晨光从窗边斜照，蒸汽缓慢升起，镜头只观察釉面、壶嘴水滴和光影变化。无人物、无动物、无品牌、无文字、无字幕、无旁白，仅保留环境声。",
+        visual: "窗边晨光侧逆光，白瓷高光，9:16竖构图",
+        space: "桌面上",
+        props: ["茶壶", "蒸汽", "釉面", "壶嘴", "水滴"],
+        sounds: ["蒸汽与陶瓷轻响声"],
+        action: "蒸汽",
+      },
+    ];
+    for (const item of cases) {
+      const upstream = {
+        _originalStoryText: item.story,
+        dialogue_requirement: "无台词、无旁白、无字幕，仅保留环境声。",
+        visual_style: item.visual,
+      };
+      const discovery: Record<string, unknown> = {
+        sceneStructure: {
+          opening: { duration: 5, purpose: item.story.split("。")[0], keyElements: [] },
+          scenes: [],
+          ending: { duration: 5, purpose: "保持源场景的自然变化直到收束", keyElements: [] },
+        },
+        audienceProfile: { emotionTriggers: [], contentExpectations: ["只记录自然环境与环境声的缓慢变化"] },
+        riskAssessment: { technicalRisks: [], mitigationSuggestions: [] },
+      };
+      normalizeNarrativeDiscovery(discovery, 10, upstream);
+      const markdown = normalizeNarrativeRequirementMarkdown([
+        "- **角色**（1）：错误角色",
+        "- **动作**（1）：错误动作",
+        "- **场景**（1）：错误空间",
+        "- **道具**（1）：门",
+        "- **台词/字幕口径**：无台词、无旁白、无字幕，仅保留环境声。",
+      ].join("\n"), discovery, 10, upstream);
+      expect(markdown).toContain("- **角色**（0）：无角色");
+      expect(markdown).toMatch(new RegExp(`空间=${item.space}`, "u"));
+      expect(markdown).toContain(item.action);
+      for (const prop of item.props) expect(markdown).toContain(prop);
+      for (const sound of item.sounds) expect(markdown).toContain(sound);
+      expect(markdown).not.toContain("- **声音锚点**（1）：雨声");
+      expect(markdown).not.toMatch(/动作.*以风、雾、光线和水面变化推进/u);
+    }
+  });
+
+  it("橘猫动作保留完整收缩链，箱子、耳朵和悬停水滴的风险缓解各自配对", () => {
+    const upstream = {
+      _originalStoryText: "雨后夜晚，一只橘猫从纸箱探头，伸爪接屋檐滴水，最后缩回纸箱盘成一团。无人物、无品牌、无字幕、无旁白，仅保留环境声。",
+      special_notes: "视觉锚点：①猫爪接水；②缩回时尾巴贴住皮肤；③耳朵最后收进去。",
+      visual_style: "低照度雨夜，单一暖黄钨丝光逆光",
+    };
+    const discovery: Record<string, unknown> = {
+      sceneStructure: {
+        opening: { duration: 5, purpose: "橘猫从纸箱探头", keyElements: ["纸箱", "橘猫"] },
+        scenes: [
+          { duration: 5, purpose: "伸爪接屋檐将落未落的水滴", keyElements: ["猫爪", "水滴"] },
+          { duration: 5, purpose: "缩回箱内盘成一团，耳朵最后收进去", keyElements: ["纸箱", "猫尾巴", "耳朵"] },
+        ],
+        ending: { duration: 0, purpose: "鼻尖抵住爪背", keyElements: ["纸箱"] },
+      },
+      riskAssessment: {
+        technicalRisks: [
+          { risk: "猫耳朵收拢时折叠方向抖动", level: "high" },
+          { risk: "纸箱毛边吸水后箱沿塌陷穿模", level: "high" },
+          { risk: "将落未落的水珠悬停时突然消失", level: "high" },
+        ],
+        mitigationSuggestions: [
+          "固定曝光与白平衡",
+          "预留重试时间",
+          "准备备选方案",
+        ],
+      },
+    };
+    const actions = extractNarrativeActions(discovery, upstream);
+    expect(actions.join("；")).toMatch(/缩回.*盘成/u);
+    expect(actions.join("；")).not.toContain("贴住皮肤");
+    const pairs = pairRiskMitigations(discovery.riskAssessment as Record<string, unknown>);
+    expect(pairs[0]).toMatch(/耳朵/u);
+    expect(pairs[1]).toMatch(/纸箱/u);
+    expect(pairs[2]).toMatch(/悬停水滴/u);
+  });
+
   it("动作与禁止项抽取产出可执行短句，避免重复和整段原文", () => {
     const discovery = {
       sceneStructure: {
