@@ -1814,6 +1814,16 @@ console.log("RESULT " + JSON.stringify({
       "陈卓伸手拧亮旧台灯",
       "陈卓在灯下坐下，抬头安静听雨",
     ]);
+    const sevenShots = projectNarrativeActionSequence([
+      "收伞回到出租屋",
+      "开门",
+      "换鞋",
+      "拧亮旧台灯",
+      "坐下听雨",
+    ], 7);
+    expect(sevenShots).toHaveLength(7);
+    expect(sevenShots[3]).toContain("脱下一只白色湿便鞋");
+    expect(sevenShots[4]).toContain("换穿室内拖鞋");
     const policy = {
       noDialogue: true,
       maxLength: 3000,

@@ -5536,6 +5536,17 @@ export function projectNarrativeActionSequence(actions: string[], shotCount: num
     && /(?:换鞋|脱鞋)/u.test(joined)
     && /(?:台灯|灯)/u.test(joined)
     && /(?:听雨|坐下)/u.test(joined);
+  if (homecoming && shotCount === 7) {
+    return [
+      "陈卓收伞走到出租屋门前",
+      "陈卓用钥匙开门并跨进玄关",
+      "陈卓回身把门关好，确认门锁落位",
+      "陈卓在玄关弯腰脱下一只白色湿便鞋",
+      "陈卓脱下另一只湿便鞋，换穿室内拖鞋并站稳",
+      "陈卓伸手拧亮旧台灯",
+      "陈卓在灯下坐下，抬头安静听雨",
+    ];
+  }
   if (homecoming && shotCount === 6) {
     return [
       "陈卓收伞走到出租屋门前",
