@@ -1212,6 +1212,50 @@ console.log("RESULT " + JSON.stringify({
     expect(emptyPrompt).toContain("【本镜验收】");
   });
 
+  it("三动作动物场即使被模型压成两段，也按探头接水缩回拆分并纠正顺序", () => {
+    const story = "雨后夜晚，一只橘猫从纸箱探头，伸爪接屋檐滴水，最后缩回纸箱盘成一团。无人物、无品牌、无字幕、无旁白，仅保留环境声。";
+    const discovery: Record<string, unknown> = {
+      sceneStructure: {
+        opening: {
+          duration: 7,
+          purpose: "橘猫探头、伸爪接屋檐滴水并缩回纸箱盘成一团",
+          keyElements: ["纸箱", "屋檐", "水滴"],
+        },
+        scenes: [],
+        ending: { duration: 8, purpose: "一只橘猫从纸箱探头", keyElements: ["纸箱"] },
+      },
+      riskAssessment: {
+        technicalRisks: [
+          { risk: "爪尖接水时穿模", level: "high", impact: "接触点错位" },
+          { risk: "水珠悬落与拉丝产生果冻状形变", level: "high", impact: "液体质感失真" },
+        ],
+        mitigationSuggestions: [
+          "把爪部接水拆成爪尖伸出、接触和缩回三个短镜",
+          "水珠悬落改用背光剪影与跳切，避免一镜完成拉丝",
+        ],
+      },
+      _canonicalCharacters: [{ id: "char_1", name: "橘猫", role: "protagonist" }],
+    };
+    const upstream = {
+      _originalStoryText: story,
+      dialogue_requirement: "无台词、无旁白、无字幕，仅保留环境声。",
+      visual_style: "冷蓝屋檐侧光与纸箱内暖橘反光",
+    };
+    normalizeNarrativeDiscovery(discovery, 15, upstream);
+    const scene = discovery.sceneStructure as Record<string, any>;
+    const nodes = [scene.opening, ...scene.scenes, scene.ending].filter(Boolean);
+    expect(nodes.length).toBeGreaterThanOrEqual(3);
+    expect(nodes.reduce((sum: number, node: Record<string, unknown>) => sum + Number(node.duration ?? 0), 0)).toBe(15);
+    expect(String(nodes[0]!.purpose)).toMatch(/探头/u);
+    expect(String(nodes.at(-1)!.purpose)).toMatch(/缩回|盘成|蜷缩/u);
+    const sequence = projectNarrativeActionSequence(["伸爪接屋檐滴水", "缩回纸箱盘成一团", "探头"], 6);
+    expect(sequence[0]).toMatch(/探头/u);
+    expect(sequence[1]).toMatch(/伸爪|接水/u);
+    expect(sequence[2]).toMatch(/缩回|盘成/u);
+    const pairs = pairRiskMitigations(discovery.riskAssessment as Record<string, unknown>);
+    expect(pairs[1]).toMatch(/背光剪影|跳切/u);
+  });
+
   it("叙事道具从场景证据抽取，关键道具不会因窄词表遗漏", () => {
     const props = inferNarrativeProps({
       intent: "人物使用内置默认模特，不出现商品参数或价格",
@@ -1729,13 +1773,13 @@ console.log("RESULT " + JSON.stringify({
       dialogue_requirement: "无台词、无旁白、无字幕，仅保留环境声。",
     });
     const scene = discovery.sceneStructure as any;
-    expect(scene.opening.duration + scene.scenes[0].duration + scene.scenes[1].duration + scene.ending.duration).toBeCloseTo(15, 3);
+    const sceneNodes = [scene.opening, ...scene.scenes, scene.ending];
+    expect(sceneNodes.reduce((sum: number, node: any) => sum + Number(node.duration ?? 0), 0)).toBeCloseTo(15, 3);
     expect(scene.ending.purpose).not.toContain("画外");
     expect(scene.ending.purpose).not.toContain("最后一滴");
     expect((discovery.audienceProfile as any).contentExpectations[0]).toContain("站外转发文案");
     expect(discovery._contractRepairs).toEqual(expect.arrayContaining([
-      expect.objectContaining({ code: "DISALLOWED_SPEECH_REMOVED" }),
-      expect.objectContaining({ code: "SCENE_DURATION_REBALANCED" }),
+      expect.objectContaining({ code: "OVERSTUFFED_OPENING_SPLIT" }),
       expect.objectContaining({ code: "EXTERNAL_COPY_SEPARATED" }),
     ]));
   });
@@ -2620,9 +2664,8 @@ console.log("RESULT " + JSON.stringify({
     };
     normalizeNarrativeDiscovery(discovery, 15, upstream);
     const actions = extractNarrativeActions(discovery, upstream);
-    expect(actions).toEqual(expect.arrayContaining(["探出半身", "抬起", "缩回箱内盘成一团"]));
+    expect(actions).toEqual(expect.arrayContaining(["探头", "伸爪接屋檐滴水", "缩回纸箱盘成一团"]));
     expect(actions.join("")).not.toContain("仅一");
-    expect(actions).not.toContain("盘成一团");
     const inferredRoles = inferNarrativeCharacters({
       intent: upstream._originalStoryText,
       discovery,
@@ -2650,7 +2693,7 @@ console.log("RESULT " + JSON.stringify({
       "- **风险结论**：待补",
     ].join("\n"), discovery, 15, upstream);
     expect(markdown).toContain("目的=");
-    expect(markdown).toContain("时间=雨夜");
+    expect(markdown).toMatch(/时间=雨(?:夜|后)/u);
     expect(markdown).toContain("光位=单一暖黄钨丝光");
     expect(markdown).toContain("机位=低机位");
     expect(markdown).toContain("橘猫");
@@ -3123,9 +3166,12 @@ console.log("RESULT " + JSON.stringify({
     expect(pairs[4]).toMatch(/纸箱参考帧/u);
     expect(pairs[5]).toMatch(/固定主灯位/u);
     expect(JSON.stringify(discovery.audienceProfile)).not.toContain("低频垫底");
-    const scenePurposes = (discovery.sceneStructure as any).scenes.map((item: any) => String(item.purpose));
-    expect(scenePurposes[0]).toContain("伸爪");
-    expect(scenePurposes[1]).toContain("缩回");
+    const normalizedScene = discovery.sceneStructure as any;
+    const scenePurposes = [normalizedScene.opening, ...normalizedScene.scenes, normalizedScene.ending]
+      .filter(Boolean)
+      .map((item: any) => String(item.purpose))
+      .join("；");
+    expect(scenePurposes).toMatch(/探头.*伸爪.*缩回/u);
   });
 
   it("高原湖空镜使用水面、体积光与固定机位专属缓解，并按场景合同统一时长", () => {

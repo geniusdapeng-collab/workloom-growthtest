@@ -1620,6 +1620,10 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
       const found = find(/(?:白瓷|陶瓷|釉面|壶嘴|壶把|微距|焦点堆栈|材质)/u);
       if (found) return found;
     }
+    if (/(?:悬落|拉丝|悬垂|断裂|果冻|流体).*水|水(?:珠|滴).*(?:悬|拉|形变)/u.test(text)) {
+      const found = find(/(?:水珠|水滴).*(?:剪影|散景|跳切|悬垂|拉丝|折射)|(?:悬落|拉丝|果冻).*(?:水珠|水滴)/u);
+      if (found) return found;
+    }
     if (/(?:雨伞|雨珠|伞骨|伞尖|滴水|水痕|湿鞋|积水)/u.test(text)) {
       const found = find(/(?:雨珠|雨伞|伞骨|伞尖|滴水|水痕|湿鞋|积水|液体|水滴)/u);
       if (found) return found;
@@ -2124,13 +2128,24 @@ export function normalizeNarrativeRequirementMarkdown(
   ].filter((item) => Object.keys(item).length > 0)
     .map((item) => Number(item.duration ?? 0))
     .filter((value) => Number.isFinite(value) && value > 0);
-  const pairedMitigations = pairRiskMitigations(risk).map((item) =>
-    sceneDurationsForContract.length > 0
-      ? item.replace(
+  const umbrellaEvidence = /(?:雨伞|伞骨|伞尖|收伞|撑伞|伞面)/u.test([
+    upstream._originalStoryText,
+    upstream.special_notes,
+    upstream.description,
+  ].map(String).join(" "));
+  const pairedMitigations = pairRiskMitigations(risk).map((item) => {
+    let value = item;
+    if (sceneDurationsForContract.length > 0) {
+      value = value.replace(
         /(?:把|将)?\s*\d+\s*秒[^。；]{0,24}(?:拆成|切成)[^。；]{0,24}秒[^。；]{0,12}镜(?:头|位)/gu,
         `镜头切分以场景合同为准：${sceneDurationsForContract.join("/")}秒`,
-      )
-      : item);
+      );
+    }
+    if (!umbrellaEvidence) {
+      value = value.replace(/(?:雨具|雨伞|伞面|伞骨|伞尖)/gu, "雨滴与屋檐落水");
+    }
+    return value;
+  });
   const riskText = risks.length > 0
     ? `${risks.length} 项技术风险：${risks.map((item, index) =>
       `风险${index + 1}（${item.level === "high" ? "高" : item.level === "medium" ? "中" : "低"}）：${String(item.risk ?? "")}；缓解：${pairedMitigations[index] ?? "见技术难点正文"}`).join("；")}`
@@ -2164,9 +2179,14 @@ export function normalizeNarrativeRequirementMarkdown(
   }).filter((item) =>
     (noCharacterContract || !["薄雾", "远山", "水面", "涟漪"].includes(item))
     && groundedProp(item));
-  if (/(?:雨|伞|湿)/u.test(propEvidence)
-    && !props.some((item) => /(?:积水|水洼|水滴|水珠|水面)/u.test(item))) {
-    props.push("积水", "水滴");
+  if (/(?:地面|路面|地砖|台阶|水洼)/u.test(propEvidence)
+    && /(?:雨|湿|积水)/u.test(propEvidence)
+    && !props.some((item) => /(?:积水|水洼|水面)/u.test(item))) {
+    props.push("积水");
+  }
+  if (/(?:滴水|水滴|水珠)/u.test(propEvidence)
+    && !props.some((item) => /(?:水滴|水珠)/u.test(item))) {
+    props.push("水滴");
   }
   if (/(?:茶壶|釉面|壶嘴|蒸汽)/u.test(propEvidence)) {
     for (let index = props.length - 1; index >= 0; index -= 1) {
@@ -2454,9 +2474,14 @@ export function normalizeNarrativeDiscovery(
     .filter((clause) => !/(?:无人物|无动物|无品牌|无文字|无字幕|无旁白|仅保留环境声|需求口径)/u.test(clause))
     .filter((clause) => extractNarrativeActions({}, { _originalStoryText: clause }).length > 0)
     .filter((clause, index, list) => list.indexOf(clause) === index);
-  const sourceActionPhrases = extractNarrativeActions({}, {
+  const extractedSourceActionPhrases = extractNarrativeActions({}, {
     _originalStoryText: String(upstream._originalStoryText ?? ""),
   });
+  const animalStory = /(?:橘猫|猫|狗|鸟|爪|耳朵|尾巴)/u.test(String(upstream._originalStoryText ?? ""));
+  const sourceActionPhrases = animalStory
+    ? [...extractedSourceActionPhrases].sort((left, right) =>
+      narrativeAnimalActionRank(left) - narrativeAnimalActionRank(right))
+    : extractedSourceActionPhrases;
   const splitActionPurposes = sourceActionPhrases.length >= 3 ? sourceActionPhrases : sourceActionClauses;
   const openingActionCount = extractNarrativeActions(
     { sceneStructure: { opening: scene.opening } },
@@ -2472,7 +2497,7 @@ export function normalizeNarrativeDiscovery(
   ].map(recordValue).filter((node) => Object.keys(node).length > 0);
   const overloadedNode = preSplitNodes.some((node) =>
     extractNarrativeActions({ sceneStructure: { opening: node } }, upstream).length >= 3);
-  if (splitActionPurposes.length >= 4
+  if (splitActionPurposes.length >= 3
     && ((openingActionCount >= 3 && openingSourceCoverage >= 3) || overloadedNode)) {
     // 一个开场承载三个以上动作时，逐动作拆镜，避免 3 秒内塞入整条归家链。
     const groupedPurposes = splitActionPurposes.slice(0, 6);
@@ -5912,6 +5937,15 @@ function animalActionKind(action: string): "probe" | "reach" | "retreat" | "none
   return "none";
 }
 
+function narrativeAnimalActionRank(action: string): number {
+  switch (animalActionKind(action)) {
+    case "probe": return 0;
+    case "reach": return 1;
+    case "retreat": return 2;
+    default: return 1.5;
+  }
+}
+
 function shoeWorkPhase(action: string): "first" | "second" | "combined" | "none" {
   if (/另一只/u.test(action)) return "second";
   if (/一只/u.test(action)) return "first";
@@ -5940,7 +5974,11 @@ function sceneMatchesAction(action: string, scene: string | undefined): boolean 
  * door. The transformation is keyed by semantics, not by project IDs.
  */
 export function projectNarrativeActionSequence(actions: string[], shotCount: number): string[] {
-  const clean = [...new Set(actions.map(String).map((item) => item.trim()).filter(Boolean))];
+  const extracted = [...new Set(actions.map(String).map((item) => item.trim()).filter(Boolean))];
+  const clean = /(?:橘猫|猫|狗|鸟|爪|耳朵|尾巴)/u.test(extracted.join("；"))
+    ? [...extracted].sort((left, right) =>
+      narrativeAnimalActionRank(left) - narrativeAnimalActionRank(right))
+    : extracted;
   const joined = clean.join("；");
   const homecoming = /(?:收伞|雨伞)/u.test(joined)
     && /开门/u.test(joined)
