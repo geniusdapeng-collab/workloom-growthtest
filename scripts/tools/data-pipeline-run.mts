@@ -60,6 +60,7 @@ import {
 } from "../../apps/server/src/video/data-mining-executor.js";
 import { prepareMarketingFacts } from "../../apps/server/src/video/marketing-authority.js";
 import { canonicalRenderJson, renderSha256 } from "../../apps/server/src/video/gen/compiled-request.js";
+import { finalizePreproductionAuditOutcome } from "./preproduction-audit-outcome.mjs";
 
 const REPO_ROOT = resolve(import.meta.dirname ?? process.cwd(), "../..");
 
@@ -408,6 +409,16 @@ try {
     });
   }
   (result as Record<string, unknown>).producerAttempts = attempts;
+  const auditOutcome = finalizePreproductionAuditOutcome(
+    result as unknown as Record<string, unknown>,
+    gateRecords,
+    decision.route === "marketing" ? "marketing" : "narrative",
+  );
+  if (auditOutcome.audited && auditOutcome.reason === "preproduction-only-success") {
+    log("预生产审计收口：全部门禁与守卫通过；渲染未提交，后期缺失视频不计为预生产失败");
+  } else if (!auditOutcome.audited) {
+    log(`预生产审计收口未通过：${auditOutcome.reason}`);
+  }
 } catch (err) {
   log(`❌ 运行失败：${err instanceof Error ? err.message : String(err)}`);
   process.exit(4);
