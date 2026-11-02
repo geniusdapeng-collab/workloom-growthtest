@@ -5565,6 +5565,7 @@ export function applyNarrativeFinalPromptContract(
     projectActions?: string[];
     shotIndex?: number;
     postRainOnly?: boolean;
+    sourceFirstFrame?: string;
   },
 ): FusionRecord {
   const next: FusionRecord = {
@@ -5934,9 +5935,12 @@ export function applyNarrativeFinalPromptContract(
       shoeIndex,
     ).map((item) => options.postRainOnly ? normalizePostRainWording(item) : item);
     const propsText = normalizedProps.join("、");
-    const timelineText = duration > 0
+    const actionTimelineText = duration > 0
       ? timelineTextForAction(assignedAction, duration)
       : fieldValue("时间轴") || "按本镜合同执行完整起幅、动作与落幅。";
+    const timelineText = options.sourceFirstFrame
+      ? `首帧约束：${options.sourceFirstFrame.replace(/^第一帧[:：]?/u, "")}；${actionTimelineText}`
+      : actionTimelineText;
     const conciseEvidence = (value: string, max = 140): string => {
       const text = value.replace(/\s+/gu, " ").trim();
       return text.length <= max ? text : `${text.slice(0, Math.max(1, max - 1))}…`;
@@ -6018,6 +6022,7 @@ export function applyNarrativeFinalPromptContract(
       audio: audioText,
       timeline: timelineText,
       emotion: emotionText,
+      ...(options.sourceFirstFrame ? { sourceFirstFrame: options.sourceFirstFrame } : {}),
       portraitAssets: profiles
         .filter((item) => String(item.path ?? "").trim())
         .map((item) => ({
@@ -6068,6 +6073,7 @@ export interface NarrativePromptReviewPolicy {
     bytes?: number;
   }>;
   postRainOnly?: boolean;
+  sourceFirstFrame?: string;
   projectScene?: string;
   projectLighting?: string;
   projectColor?: string;
@@ -6647,6 +6653,7 @@ export function normalizeNarrativePromptsForReview(
     const normalizedPolicy: NarrativePromptReviewPolicy = {
       ...rowPolicy,
       postRainOnly: rowPolicy.postRainOnly ?? policy.postRainOnly,
+      sourceFirstFrame: rowPolicy.sourceFirstFrame ?? policy.sourceFirstFrame,
       projectScene: sceneMatchesAction(action, rowPolicy.projectScene)
         ? rowPolicy.projectScene
         : (direction.scene || rowPolicy.projectScene),
@@ -6678,6 +6685,7 @@ export function normalizeNarrativePromptsForReview(
       canonicalize: true,
       characterPortraits: normalizedPolicy.characterPortraits,
       postRainOnly: normalizedPolicy.postRainOnly,
+      sourceFirstFrame: normalizedPolicy.sourceFirstFrame,
       projectScene: normalizedPolicy.projectScene,
       projectLighting: normalizedPolicy.projectLighting,
       projectColor: normalizedPolicy.projectColor,
@@ -6866,52 +6874,96 @@ export function renderPreproductionAuditReport(input: {
     String(shot.shotId ?? shot.shot_id ?? "").trim().length > 0);
   const hanBigrams = (value: unknown): Set<string> =>
     new Set(String(value ?? "").match(/[\p{Script=Han}]{2}/gu) ?? []);
-  let lastMappedSourceIndex = 0;
-  const sourceShotMapping = shotCards.map((shot, finalIndex) => {
-    const finalText = `${String(shot.action ?? "")} ${String(shot.scene ?? "")}`;
-    const finalGrams = hanBigrams(finalText);
-    let bestSourceIndex = -1;
-    let bestScore = -1;
-    for (let sourceIndex = lastMappedSourceIndex; sourceIndex < sourceShotRows.length; sourceIndex += 1) {
-      const source = sourceShotRows[sourceIndex]!;
-      const sourceGrams = hanBigrams([
-        source.purpose,
-        source.action,
-        source.location,
-        source.scene,
-      ].join(" "));
-      const score = [...finalGrams].filter((gram) => sourceGrams.has(gram)).length;
-      if (score > bestScore) {
-        bestScore = score;
-        bestSourceIndex = sourceIndex;
-      }
+  const sourceDurations = sourceShotRows.map((source) =>
+    Math.max(0, Number(source.durationSeconds ?? source.duration ?? 0)));
+  const finalDurations = shotCards.map((shot) => Math.max(0, Number(shot.duration ?? 0)));
+  const sourceDurationTotal = sourceDurations.reduce((sum, value) => sum + value, 0);
+  const finalDurationTotal = finalDurations.reduce((sum, value) => sum + value, 0);
+  let sourceQuotas: number[] = [];
+  if (sourceShotRows.length > 0 && sourceShotRows.length <= shotCards.length) {
+    const ideal = sourceDurations.map((duration) =>
+      duration > 0 && sourceDurationTotal > 0
+        ? duration / sourceDurationTotal * shotCards.length
+        : shotCards.length / sourceShotRows.length);
+    sourceQuotas = ideal.map((value) => Math.max(1, Math.floor(value)));
+    let assigned = sourceQuotas.reduce((sum, value) => sum + value, 0);
+    while (assigned < shotCards.length) {
+      const index = ideal
+        .map((value, i) => ({ i, remainder: value - Math.floor(value) }))
+        .sort((a, b) => b.remainder - a.remainder || a.i - b.i)[0]!.i;
+      sourceQuotas[index] = (sourceQuotas[index] ?? 1) + 1;
+      assigned += 1;
     }
-    if (bestSourceIndex < 0) {
-      bestSourceIndex = Math.min(
+    while (assigned > shotCards.length) {
+      const index = sourceQuotas
+        .map((value, i) => ({ i, value }))
+        .filter((item) => item.value > 1)
+        .sort((a, b) => b.value - a.value || a.i - b.i)[0]?.i;
+      if (index === undefined) break;
+      sourceQuotas[index] = sourceQuotas[index]! - 1;
+      assigned -= 1;
+    }
+  }
+  let groupStart = 0;
+  const sourceGroups = sourceQuotas.map((quota, sourceIndex) => {
+    const start = groupStart;
+    groupStart += quota;
+    return { sourceIndex, start, end: groupStart };
+  });
+  const sourceShotMapping = shotCards.map((shot, finalIndex) => {
+    const sourceIndex = sourceGroups.find((group) => finalIndex >= group.start && finalIndex < group.end)?.sourceIndex
+      ?? Math.min(
         Math.max(0, sourceShotRows.length - 1),
         Math.floor(finalIndex * sourceShotRows.length / Math.max(1, shotCards.length)),
       );
-      bestScore = 0;
-    }
-    lastMappedSourceIndex = Math.max(lastMappedSourceIndex, bestSourceIndex);
-    const source = sourceShotRows[bestSourceIndex] ?? {};
+    const source = sourceShotRows[sourceIndex] ?? {};
+    const finalGrams = hanBigrams(`${String(shot.action ?? "")} ${String(shot.scene ?? "")}`);
+    const sourceGrams = hanBigrams([source.purpose, source.action, source.location, source.scene].join(" "));
+    const bestScore = [...finalGrams].filter((gram) => sourceGrams.has(gram)).length;
+    const group = sourceGroups.find((candidate) => candidate.sourceIndex === sourceIndex);
+    const groupedCount = group ? group.end - group.start : 1;
+    const finalDurationSeconds = Number(shot.duration ?? 0);
+    const sourceDurationSeconds = Number(source.durationSeconds ?? source.duration ?? 0);
+    const durationDelta = Number((finalDurationSeconds - sourceDurationSeconds).toFixed(3));
     return {
       finalShotId: String(shot.shotId ?? `S-${finalIndex + 1}`),
       sourceShotId: String(source.shotId ?? source.shot_id ?? "未提供"),
-      sourceOrder: bestSourceIndex + 1,
+      sourceOrder: sourceIndex + 1,
       finalOrder: finalIndex + 1,
-      relation: sourceShotRows.length === shotCards.length
-        ? "one-to-one"
-        : sourceShotRows.length > 0 && shotCards.length > sourceShotRows.length
-          ? "source-shot-decomposed"
-          : sourceShotRows.length > shotCards.length
-            ? "source-shots-consolidated"
-            : "unmapped",
+      relation: groupedCount > 1
+        ? (Math.abs(durationDelta) > 0.001
+          ? "source-shot-decomposed-duration-reallocated"
+          : "source-shot-decomposed")
+        : sourceShotRows.length === shotCards.length && Math.abs(durationDelta) <= 0.001
+          ? "one-to-one"
+          : "duration-reallocated",
       actionSimilarityBigrams: bestScore,
-      sourceDurationSeconds: Number(source.durationSeconds ?? source.duration ?? 0),
-      finalDurationSeconds: Number(shot.duration ?? 0),
+      sourceDurationSeconds,
+      finalDurationSeconds,
+      durationDeltaSeconds: durationDelta,
     };
   });
+  const sourceCoverage = sourceShotRows.map((source, sourceIndex) => {
+    const mapped = sourceShotMapping.filter((item) => item.sourceOrder === sourceIndex + 1);
+    const mappedDuration = Number(mapped.reduce((sum, item) => sum + item.finalDurationSeconds, 0).toFixed(3));
+    const sourceDuration = Number(sourceDurations[sourceIndex] ?? 0);
+    return {
+      sourceShotId: String(source.shotId ?? source.shot_id ?? `SOURCE-${sourceIndex + 1}`),
+      sourceDurationSeconds: sourceDuration,
+      mappedFinalShotIds: mapped.map((item) => item.finalShotId),
+      mappedDurationSeconds: mappedDuration,
+      durationDeltaSeconds: Number((mappedDuration - sourceDuration).toFixed(3)),
+      coverage: mapped.length > 0 ? "covered" : "missing",
+    };
+  });
+  const sourceMappingPolicy = {
+    strategy: "duration-proportional semantic groups with global total conservation",
+    sourceDurationSeconds: Number(sourceDurationTotal.toFixed(3)),
+    finalDurationSeconds: Number(finalDurationTotal.toFixed(3)),
+    globalDurationConserved: Math.abs(sourceDurationTotal - finalDurationTotal) <= 0.05,
+    perSourceDurationPreserved: sourceCoverage.every((item) => Math.abs(item.durationDeltaSeconds) <= 0.001),
+    reallocationNote: "Final shots may split a source shot and redistribute duration globally; all source shots must remain covered and total duration must stay equal.",
+  };
   const sourceShotMappingSha256 = sourceShotMapping.length ? evidenceHash(sourceShotMapping) : null;
   const shotIds = shotCards.map((shot) => String(shot.shotId ?? ""));
   const promptIds = prompts.map((prompt) => String(prompt.shotId ?? prompt.shot_id ?? ""));
@@ -7070,6 +7122,8 @@ export function renderPreproductionAuditReport(input: {
       : null,
     sourceShotMapping,
     sourceShotMappingSha256,
+    sourceCoverage,
+    sourceMappingPolicy,
     sourceShotCount: sourceShotRows.length,
     finalShotCount: shotCards.length,
   };
@@ -7139,12 +7193,20 @@ export function renderPreproductionAuditReport(input: {
     "",
     "### 源镜头与最终镜头映射",
     "",
-    `映射关系：${sourceShotRows.length === shotCards.length ? "一对一" : sourceShotRows.length < shotCards.length ? "源镜头拆分" : "源镜头合并"}；映射摘要 sha256=${sourceShotMappingSha256 ?? "未提供"}。`,
+    `映射策略：${sourceMappingPolicy.strategy}；源总时长=${sourceMappingPolicy.sourceDurationSeconds}s；最终总时长=${sourceMappingPolicy.finalDurationSeconds}s；全局守恒=${sourceMappingPolicy.globalDurationConserved ? "是" : "否"}；逐源时长原样保持=${sourceMappingPolicy.perSourceDurationPreserved ? "是" : "否（按全局时长重分配）"}；映射摘要 sha256=${sourceShotMappingSha256 ?? "未提供"}。`,
+    `重分配说明：${sourceMappingPolicy.reallocationNote}`,
     "",
     "| 最终镜头 | 源镜头 | 关系 | 最终时长 | 源时长 | 动作词元匹配数 |",
     "|---|---|---|---:|---:|---:|",
     ...sourceShotMapping.map((mapping) =>
       `| ${String(mapping.finalShotId)} | ${String(mapping.sourceShotId)} | ${String(mapping.relation)} | ${String(mapping.finalDurationSeconds)}s | ${String(mapping.sourceDurationSeconds)}s | ${String(mapping.actionSimilarityBigrams)} |`),
+    "",
+    "#### 源镜头覆盖汇总",
+    "",
+    "| 源镜头 | 源时长 | 映射最终镜头 | 映射时长 | 差值与覆盖 |",
+    "|---|---:|---|---:|---|",
+    ...sourceCoverage.map((item) =>
+      `| ${String(item.sourceShotId)} | ${String(item.sourceDurationSeconds)}s | ${item.mappedFinalShotIds.join("、") || "无"} | ${String(item.mappedDurationSeconds)}s | Δ${String(item.durationDeltaSeconds)}s；${String(item.coverage)} |`),
     "",
     "## 源定妆照证据链",
     "",
@@ -7874,6 +7936,10 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
             ? contractShot.keyProps.map(String).filter(Boolean)
             : [];
           const contractShotPurpose = promptFieldText(contractShot.purpose);
+          const sourceFirstFrameMatch = contractShotPurpose.match(/(?:^|[；;])\s*第一帧[:：]?\s*([^；;。]+)/u);
+          const sourceFirstFrame = sourceFirstFrameMatch
+            ? `第一帧${sourceFirstFrameMatch[1]!.trim()}`
+            : undefined;
           const contractSceneId = promptFieldText(contractShot.sceneId);
           const scenePurpose = promptFieldText(
             promptSceneRecords.find((scene) => promptFieldText(scene.sceneId) === contractSceneId)?.purpose,
@@ -7917,6 +7983,7 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
             projectColor: direction.color || promptReviewPolicy.projectColor,
             projectProps: direction.props.length > 0 ? direction.props : promptReviewPolicy.projectProps,
             projectActions: promptActions,
+            sourceFirstFrame,
           };
           const projectedShot: FusionRecord = {
             ...shot,
@@ -7938,6 +8005,7 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
             isLastShot: shotIndex === allShots.length - 1,
             characterNames: promptCharacters,
             postRainOnly,
+            sourceFirstFrame,
             noTitles: promptNoTitles,
             canonicalize: true,
             characterPortraits: promptCharacterPortraits,

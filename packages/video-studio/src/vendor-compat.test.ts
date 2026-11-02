@@ -1326,6 +1326,14 @@ console.log("RESULT " + JSON.stringify({
         cameraHint: "establishing",
         prompt: "01.【场景】错误模板",
         fields: {},
+        ...(index === 1
+          ? {
+            _workloomPromptReviewPolicy: {
+              ...policy,
+              sourceFirstFrame: "第一帧仅见半只橘猫耳朵与一截胡须探出箱口",
+            },
+          }
+          : {}),
       })),
       policy,
     );
@@ -1340,6 +1348,7 @@ console.log("RESULT " + JSON.stringify({
     ]);
     expect(field(prompts[1]!, "情绪")).not.toMatch(/接触水面|趾节轻颤/u);
     expect(field(prompts[1]!, "节奏")).not.toMatch(/接触|水花/u);
+    expect(field(prompts[1]!, "时间轴")).toContain("半只橘猫耳朵与一截胡须探出箱口");
     expect(field(prompts[2]!, "情绪")).toMatch(/接触|趾节轻颤/u);
     expect(field(prompts[2]!, "节奏")).toMatch(/接触|水花/u);
     expect(field(prompts[3]!, "情绪")).not.toMatch(/尾尖|贴住口鼻|闭眼/u);
