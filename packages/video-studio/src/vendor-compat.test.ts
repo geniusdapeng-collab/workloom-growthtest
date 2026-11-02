@@ -1250,8 +1250,10 @@ console.log("RESULT " + JSON.stringify({
     expect(String(nodes.at(-1)!.purpose)).toMatch(/缩回|盘成|蜷缩/u);
     const sequence = projectNarrativeActionSequence(["伸爪接屋檐滴水", "缩回纸箱盘成一团", "探头"], 6);
     expect(sequence[0]).toMatch(/探头/u);
-    expect(sequence[1]).toMatch(/伸爪|接水/u);
-    expect(sequence[2]).toMatch(/缩回|盘成/u);
+    expect(sequence[1]).toMatch(/抬起前爪|伸向屋檐滴水/u);
+    expect(sequence[2]).toMatch(/水滴.*爪垫/u);
+    expect(sequence[3]).toMatch(/缩回前爪/u);
+    expect(sequence.at(-1)).toMatch(/盘成一团.*闭眼/u);
     const pairs = pairRiskMitigations(discovery.riskAssessment as Record<string, unknown>);
     expect(pairs[1]).toMatch(/背光剪影|跳切/u);
     const props = inferNarrativeProps({ intent: story, discovery, upstream });
@@ -2292,9 +2294,11 @@ const prompt = [
   "02.【场景】雨夜出租屋楼道。",
   "03.【动作】陈卓收伞。",
   "04.【台词】不适用：本片无台词。",
+  "05.【运镜】固定机位，三脚架锁死，全镜零推拉零横移零变焦。",
 ].join("\\n");
 const row = { shotId: "S1", sceneType: "opening", duration: 3, prompt, promptCharCount: 100,
   title_content: "错误标题", title_animation: "4秒越界", opening_audio_design: "大提琴长音",
+  _skillMatched: [{ file: "剧情_斯皮尔伯格_雨夜手持.md" }],
   _workloomPromptReviewPolicy: { noTitles: true },
   _workloomShotContract: { schema: "workloom.prompt-shot-contract/v1", shotId: "S1", durationSeconds: 3,
     space: "雨夜楼道门外", action: "陈卓收伞走到门前", era: "当代", equipment: "固定三脚架",
@@ -2308,6 +2312,7 @@ console.log("RESULT " + JSON.stringify({
   hasStaleLength: report.includes("S1 | 3s | 100"),
   hasTitle: report.includes("主标题内容") || report.includes("大提琴"),
   hasBareNumber: /^\\d{2}\\.$/mu.test(report),
+  hasMismatchedSkill: report.includes("雨夜手持"),
   hasStructuredContract: report.includes("workloom.prompt-review-contract/v1")
     && report.includes("open_then_closed") === false
     && report.includes("real-authorized"),
@@ -2320,9 +2325,10 @@ console.log("RESULT " + JSON.stringify({
     expect(result.hasStaleLength).toBe(false);
     expect(result.hasTitle).toBe(false);
     expect(result.hasBareNumber).toBe(false);
+    expect(result.hasMismatchedSkill).toBe(false);
     expect(result.hasStructuredContract).toBe(true);
     expect(result.restored).toBe(true);
-    expect(String(result.report)).toMatch(/\| S1 \| 3s \| \d+ \| ❌ 4\/25 \|/u);
+    expect(String(result.report)).toMatch(/\| S1 \| 3s \| \d+ \| ❌ 5\/25 \|/u);
     expect(String(result.report)).not.toContain("| S1 | 3s | 100 |");
   }, 60_000);
 

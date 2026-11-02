@@ -5785,14 +5785,8 @@ export function applyNarrativeFinalPromptContract(
     const subjectlessFallback = canonicalAnimalOnly
       ? `${canonicalAnimalNames.join("、")}在${cleanText(options.projectScene ?? "") || "已确认空间"}完成本镜可见动作`
       : "风、雾、水面、光线与植物在连续物理范围内完成本镜自然变化，无人物动作";
-    const animalConflict = canonicalAnimalOnly
-      && /(?:没有|无|不出现|不得出现)[^。；\n]{0,8}(?:动物|猫|狗|鸟)/u.test(visibleAction);
-    const animalActionEvidence = canonicalAnimalOnly
-      && !animalConflict
-      && (canonicalAnimalNames.some((name) => visibleAction.includes(name))
-        || /(?:爪|耳尖|耳朵|尾巴|胡须|肉垫|毛发|探头|盘成|蜷缩)/u.test(visibleAction));
     const assignedAction = canonicalAnimalOnly
-      ? (animalActionEvidence ? visibleAction : projectedAction || subjectlessFallback)
+      ? (projectedAction || visibleAction || subjectlessFallback)
       : canonicalNoPerson
         ? (
           visibleAction
@@ -6079,10 +6073,11 @@ function narrativeActionKind(action: string): "umbrella" | "open" | "close" | "s
   return "other";
 }
 
-function animalActionKind(action: string): "probe" | "reach" | "retreat" | "none" {
-  if (/(?:探头|探出|耳朵.*转|鼻尖.*探)/u.test(action)) return "probe";
-  if (/(?:伸爪|抬爪|接水|接住.*水滴|爪垫.*水|爪尖.*水)/u.test(action)) return "reach";
-  if (/(?:缩回|盘成|蜷缩|尾巴.*收|贴住鼻|盘紧)/u.test(action)) return "retreat";
+function animalActionKind(action: string): "probe" | "reach" | "withdraw" | "retreat" | "none" {
+  if (/(?:缩爪|收回前爪|前爪.*回收|前腿.*回收)/u.test(action)) return "withdraw";
+  if (/(?:伸爪|抬爪|接水|接住.*水滴|爪垫.*水|爪尖.*水|水滴.*爪)/u.test(action)) return "reach";
+  if (/(?:缩回|盘成|蜷缩|蜷紧|收拢|合拢|尾巴.*收|尾尖.*贴|贴住(?:口鼻|鼻)|盘紧|闭眼)/u.test(action)) return "retreat";
+  if (/(?:探头|探出|耳朵.*转|鼻尖.*探|抬眼观察)/u.test(action)) return "probe";
   return "none";
 }
 
@@ -6090,7 +6085,8 @@ function narrativeAnimalActionRank(action: string): number {
   switch (animalActionKind(action)) {
     case "probe": return 0;
     case "reach": return 1;
-    case "retreat": return 2;
+    case "withdraw": return 2;
+    case "retreat": return 3;
     default: return 1.5;
   }
 }
@@ -6164,6 +6160,24 @@ export function projectNarrativeActionSequence(actions: string[], shotCount: num
       "陈卓在灯下坐下，抬头安静听雨",
     ];
   }
+  const animalProbe = clean.some((action) => animalActionKind(action) === "probe");
+  const animalReach = clean.some((action) => animalActionKind(action) === "reach");
+  const animalRetreat = clean.some((action) => animalActionKind(action) === "retreat");
+  if (animalProbe && animalReach && animalRetreat && shotCount >= 3) {
+    const stages = [
+      "橘猫从纸箱探头观察屋檐滴水",
+      "橘猫抬起前爪伸向屋檐滴水线",
+      "水滴落在橘猫爪垫上并溅起细小水花",
+      "橘猫受冷缩回前爪，身体仍留在纸箱内",
+      "橘猫把身体退入纸箱暗部",
+      "橘猫盘成一团，尾尖盖住口鼻并缓慢闭眼",
+    ];
+    if (shotCount === 3) return [stages[0]!, stages[1]!, stages[5]!];
+    if (shotCount === 4) return [stages[0]!, stages[1]!, stages[3]!, stages[5]!];
+    if (shotCount === 5) return [stages[0]!, stages[1]!, stages[2]!, stages[4]!, stages[5]!];
+    return Array.from({ length: shotCount }, (_unused, index) =>
+      stages[index] ?? `${stages[5]}（呼吸保持段）`);
+  }
   if (clean.length === shotCount) return clean;
   const phases = ["起幅", "推进", "落幅"];
   return Array.from({ length: shotCount }, (_unused, index) => {
@@ -6191,6 +6205,8 @@ function timelineTextForAction(action: string, duration: number): string {
     ? ["猫耳先向滴水声转动，眼睛从纸箱暗部露出", "鼻尖探出箱沿，胡须擦过潮湿纸板，头部只出半截", "视线锁住屋檐水线，身体仍低伏在箱内"]
     : animalKind === "reach"
       ? ["前爪从胸口抬起，爪尖靠近屋檐滴水线", "水滴落在爪背或肉垫上，趾节轻颤，胡须随动作微动", "前爪短暂停住后向内回收，身体重心仍留在箱内"]
+      : animalKind === "withdraw"
+        ? ["前爪从滴水线下方收回，爪背带起细小水珠", "前腿撤回箱沿内侧，身体重心向纸箱暗部后移", "前爪收到胸前，头部仍朝外观察"]
       : animalKind === "retreat"
         ? ["耳朵后压，头部开始缩回纸箱阴影", "肩背内收，尾巴从箱底扫入并贴近身体", "身体盘紧，尾尖盖住鼻尖，只留一小团呼吸起伏"]
         : kind === "umbrella"
@@ -6249,6 +6265,8 @@ function emotionTextForAnimalAction(action: string, names: string[]): string {
       return `${subject}耳尖先转向滴水声，眼睛从纸箱暗部缓慢露出，鼻尖轻颤，头部只探出半截，颈部保持低伏；不拟人化微笑或夸张凝视。`;
     case "reach":
       return `${subject}视线锁定下落水滴，前爪抬起并保持趾数稳定，爪垫接触水面时趾节轻颤，耳朵略向前，身体重心仍留在纸箱内。`;
+    case "withdraw":
+      return `${subject}耳尖向后轻压，视线仍追着水滴，前爪从接触点迅速收回胸前，肩背内收但头部保持朝外观察。`;
     case "retreat":
       return `${subject}耳朵后压，眼睛半合，肩背向内收，尾巴逐圈贴近身体，最后鼻尖靠向爪垫；呼吸幅度变小，情绪由警觉转为安定。`;
     default:
@@ -6258,12 +6276,21 @@ function emotionTextForAnimalAction(action: string, names: string[]): string {
 
 function pacingTextForAction(action: string, duration: number): string {
   const kind = narrativeActionKind(action);
+  const animalKind = animalActionKind(action);
   const sourceBeats = action
     .split(/[；。]+/u)
     .map((item) => item.trim())
     .filter(Boolean)
     .slice(0, 3);
-  const body = kind === "umbrella"
+  const body = animalKind === "probe"
+    ? "前段先动耳尖与眼睛，中段探头出箱沿，末段视线锁定屋檐水线"
+    : animalKind === "reach"
+      ? "前段抬爪靠近水滴，中段完成接触与水花，末段前爪停稳或回缩"
+      : animalKind === "withdraw"
+        ? "前段前爪离开滴水线，中段前腿撤回箱内，末段身体重心稳定"
+        : animalKind === "retreat"
+          ? "前段头部缩回，中段身体收进纸箱，末段盘紧并闭眼静止"
+          : kind === "umbrella"
     ? "前段只为收伞起势，中段推进到门边，末段在门前停顿"
     : kind === "open"
       ? "前段锁孔对位，中段转钥推门，末段跨门落定"
@@ -6281,7 +6308,7 @@ function pacingTextForAction(action: string, duration: number): string {
             ? "前段保持暗态，中段旋钮点亮，末段暖光停稳"
             : kind === "listen"
               ? "前段转向坐具，中段坐下，末段静止听雨"
-              : `前段${sourceBeats[0] || "建立空间"}，中段${sourceBeats[1] || "完成主要变化"}，末段${sourceBeats[2] || "动作落定收束"}`;
+                : `前段${sourceBeats[0] || "建立空间"}，中段${sourceBeats[1] || "完成主要变化"}，末段${sourceBeats[2] || "动作落定收束"}`;
   return `${Math.max(0.1, duration).toFixed(1)} 秒内按约 30%/45%/25% 分配：${body}；不做额外加速或无关转场。`;
 }
 
@@ -7087,9 +7114,20 @@ export function installVendorNarrativePromptReviewBridge(options: { log?: (line:
           && typeof row._workloomPromptReviewPolicy === "object"
           ? row._workloomPromptReviewPolicy as NarrativePromptReviewPolicy
           : null;
+        const camera = promptReviewField(row, "运镜");
+        const fixedCamera = /(?:固定机位|三脚架锁死|零推拉零横移零变焦)/u.test(camera);
+        const compatibleSkills = (value: unknown): unknown[] => {
+          if (!Array.isArray(value)) return [];
+          return value.filter((item) => {
+            const file = String(recordValue(item).file ?? item ?? "");
+            return !(fixedCamera && /(?:手持|斯坦尼康|手持推进|推轨|摇臂)/u.test(file));
+          });
+        };
         return {
           ...row,
           promptCharCount: String(row.prompt ?? "").length,
+          _skillMatched: compatibleSkills(row._skillMatched),
+          _appliedSkills: compatibleSkills(row._appliedSkills),
           ...(rowPolicy?.noTitles ? { sceneType: "content" } : {}),
         };
       });
