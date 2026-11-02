@@ -14,3 +14,19 @@ describe('narrative speech and music are independent constraints', () => {
     expect(String(result.prompt).match(/【音频】([^\n]*)/)?.[1]).toMatch(/无人物声|无旁白/);
   });
 });
+
+it.each([false, true])('noDialogue preserves source sound when music was not prohibited, canonicalize=%s', canonicalize => {
+  const result = applyNarrativeFinalPromptContract({ ...shot, audio: '风声；街边音响传出的钢琴音乐' }, { noDialogue: true, noMusic: false, maxLength: 3000, canonicalize });
+  const audio = String(result.prompt).match(/【音频】([^\n]*)/)?.[1] ?? '';
+  expect(audio).toMatch(/无人物声|无旁白/);
+  expect(audio).not.toMatch(/无音乐|无配乐|无节拍/);
+  expect(audio).toContain('钢琴音乐');
+});
+
+it.each([false, true])('neither restriction leaves source audio intact, canonicalize=%s', canonicalize => {
+  const result = applyNarrativeFinalPromptContract(shot, { noDialogue: false, noMusic: false, maxLength: 3000, canonicalize });
+  const audio = String(result.prompt).match(/【音频】([^\n]*)/)?.[1] ?? '';
+  expect(audio).toContain('人物说话声');
+  expect(audio).toContain('钢琴音乐');
+  expect(audio).not.toMatch(/无人物声|无旁白|无音乐/);
+});
