@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   healPromptContract,
+  deriveNarrativeShotDirection,
   extractNarrativeActions,
   inferNarrativeCharacters,
   inferNarrativeProps,
@@ -1635,6 +1636,35 @@ console.log("RESULT " + JSON.stringify({
     }
   });
 
+  it("归家动作逐镜约束门外、开门、换鞋、开灯与落座的场景灯态和道具", () => {
+    expect(deriveNarrativeShotDirection({ action: "收伞回到出租屋" })).toMatchObject({
+      scene: expect.stringContaining("人物尚未进入出租屋"),
+      lighting: expect.stringContaining("旧台灯关闭"),
+      color: expect.stringContaining("冷蓝"),
+      props: expect.arrayContaining(["雨伞"]),
+    });
+    expect(deriveNarrativeShotDirection({ action: "开门" })).toMatchObject({
+      scene: expect.stringContaining("由门外进入玄关"),
+      props: expect.arrayContaining(["门"]),
+    });
+    expect(deriveNarrativeShotDirection({ action: "换鞋" })).toMatchObject({
+      scene: expect.stringContaining("玄关内侧"),
+      props: expect.arrayContaining(["湿鞋", "拖鞋"]),
+    });
+    expect(deriveNarrativeShotDirection({ action: "拧亮旧台灯" })).toMatchObject({
+      scene: expect.stringContaining("台灯"),
+      lighting: expect.stringMatching(/起幅.*关闭.*2700K/),
+      color: expect.stringContaining("2700K"),
+      props: expect.arrayContaining(["台灯", "开关"]),
+    });
+    expect(deriveNarrativeShotDirection({ action: "坐下听雨" })).toMatchObject({
+      scene: expect.stringContaining("窗边或灯下"),
+      lighting: expect.stringMatching(/2700K.*冷蓝/),
+      color: expect.stringContaining("2700K"),
+      props: expect.arrayContaining(["台灯", "窗", "坐具"]),
+    });
+  });
+
   it("G6 审核报告不再追加无标题片头字段、旧长度和裸编号", () => {
     const script = `
 import { createRequire } from "node:module";
@@ -2494,6 +2524,45 @@ console.log("RESULT " + JSON.stringify({
     expect(result.promptHasOverride).toBe(true);
     expect(result.dialogue).toEqual({ has_dialogue: false, lines: [], blocks: [] });
     expect(result.narration).toBeNull();
+  }, 60_000);
+
+  it("十五秒五镜头按剪辑时间线投影到每镜3秒，不把供应商4秒下限当成业务不可行", () => {
+    const script = `
+import { createRequire } from "node:module";
+import { installVendorDurationProjectionBridge } from ${JSON.stringify(resolve(here, "vendor-compat.ts"))};
+const require = createRequire(${JSON.stringify(join(repoRoot, "package.json"))});
+const generatorMod = require(${JSON.stringify(join(repoRoot, "vendor/supermickey/hyperreality-system/engines/script-engine/core/script-generator.js"))});
+const events = [];
+const uninstall = installVendorDurationProjectionBridge({
+  minShotSeconds: 4,
+  maxShotSeconds: 30,
+  log: () => undefined,
+  onEvent: event => events.push(event),
+});
+const parsed = {
+  meta: { target_duration: 15 },
+  structure: { scenes: Array.from({ length: 5 }, (_, index) => ({
+    scene_id: "SC-" + (index + 1),
+    duration: 3,
+    dialogue: { has_dialogue: false, lines: [], blocks: [] },
+  })) },
+};
+new generatorMod.ScriptGenerator({ llmEngine: null })._enforceTargetDuration(parsed, 15);
+uninstall();
+console.log("RESULT " + JSON.stringify({
+  events,
+  durations: parsed.structure.scenes.map(scene => scene.duration),
+  total: parsed.structure.scenes.reduce((sum, scene) => sum + scene.duration, 0),
+}));
+`;
+    const result = runInChild(script);
+    expect(result.durations).toEqual([3, 3, 3, 3, 3]);
+    expect(result.total).toBe(15);
+    expect((result.events as Array<Record<string, unknown>>).map((event) => event.kind)).toEqual(["projected"]);
+    expect((result.events as Array<Record<string, unknown>>)[0]).toMatchObject({
+      source: "script-generator",
+      totalSeconds: 15,
+    });
   }, 60_000);
 });
 

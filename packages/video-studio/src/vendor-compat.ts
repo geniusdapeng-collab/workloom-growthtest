@@ -4308,25 +4308,23 @@ export function installVendorDurationProjectionBridge(options: DurationProjectio
       mood: record.mood as string | undefined,
       sceneType: (record.sceneType ?? record.scene_type) as string | undefined,
     }));
-    const projectOnce = (enforceVoiceFloor: boolean) =>
+    const projectOnce = (enforceVoiceFloor: boolean, minimumSeconds = minShot) =>
       projectShotDurations(inputs, {
         targetSeconds: Number(targetSeconds),
-        minSeconds: minShot,
+        minSeconds: minimumSeconds,
         maxSeconds: maxShot,
         enforceVoiceFloor,
       });
     let result = projectOnce(true);
     if (!result.ok && planningMode) {
-      // 规划阶段：台词尚未精简，硬下限常不可满足——先保守恒与能力区间，交由执行阶段强制下限
-      emit({
-        kind: "infeasible",
-        source,
-        targetSeconds: Number(targetSeconds),
-        totalSeconds: records.reduce((sum, record) => sum + durationOf(record), 0),
-        shots: result.entries.map((entry) => ({ ...entry })),
-        message: `规划阶段台词硬下限暂不可满足（${result.reason}）：${result.suggestions.join("；")}；已按能力区间投影，交由台词修复阶段强制`,
-      });
-      result = projectOnce(false);
+      /**
+       * 剪辑时间线不是供应商单镜请求。15s 成片可由 5 个 3s 剪辑镜头组成，
+       * 不能把供应商 4s 单镜下限直接套在这条时间线上；规划阶段只在镜数确实
+       * 超出目标/3 时降级到可守恒的整数分钟下限，执行形态仍需另行满足供应商约束。
+       */
+      const timelineMin = Math.min(minShot, Math.max(1, Math.floor(Number(targetSeconds) / Math.max(1, records.length))));
+      log(`[vendor-compat] 规划阶段按剪辑时间线投影：${source} 使用下限 ${timelineMin}s（供应商单镜下限 ${minShot}s 不直接套用）`);
+      result = projectOnce(false, timelineMin);
     }
     if (!result.ok) {
       emit({
@@ -5050,6 +5048,84 @@ export interface NarrativePromptReviewPolicy {
   projectActions: string[];
 }
 
+export interface NarrativeShotDirection {
+  action: string;
+  scene?: string;
+  lighting?: string;
+  color?: string;
+  props: string[];
+}
+
+/**
+ * Derive co-located scene, light state and props from the action actually assigned
+ * to a final shot. A generic PRD scene map must not put "open the door" inside the
+ * entryway or "turn on the lamp" in a shot whose prop contract omits the lamp.
+ */
+export function deriveNarrativeShotDirection(input: {
+  action: string;
+  fallbackScene?: string;
+  fallbackLighting?: string;
+  fallbackColor?: string;
+  fallbackProps?: string[];
+}): NarrativeShotDirection {
+  const action = String(input.action ?? "").trim();
+  const fallbackProps = (input.fallbackProps ?? []).map(String).map((item) => item.trim()).filter(Boolean);
+  const props = (...items: string[]): string[] =>
+    [...new Set([...fallbackProps, ...items].filter(Boolean))].slice(0, 10);
+  if (/(?:收伞|抖落.*伞)/u.test(action)) {
+    return {
+      action,
+      scene: "楼道/门外门口：楼道冷光、地垫与门框可见，人物尚未进入出租屋",
+      lighting: "旧台灯关闭；楼道光偏冷，室内只从门缝露出暗部，不在门外提前点亮台灯",
+      color: "冷蓝灰环境色（旧台灯未点亮）",
+      props: props("雨伞", "地垫", "门口"),
+    };
+  }
+  if (/开门/u.test(action)) {
+    return {
+      action,
+      scene: "出租屋门口：门处于开启过程，人物由门外进入玄关",
+      lighting: "旧台灯关闭；门外楼道冷光沿门缝进入，门内保持暗部",
+      color: "冷蓝灰环境色（旧台灯未点亮）",
+      props: props("门", "门把手", "玄关"),
+    };
+  }
+  if (/(?:换鞋|脱鞋|穿鞋)/u.test(action)) {
+    return {
+      action,
+      scene: "出租屋玄关内侧：鞋架、地垫与门后挂钩在同一空间，门已关上",
+      lighting: "旧台灯仍关闭；室内只有窗外或门缝渗入的冷光",
+      color: "冷蓝灰环境色（旧台灯未点亮）",
+      props: props("湿鞋", "拖鞋", "鞋架", "地垫"),
+    };
+  }
+  if (/(?:拧亮|拧开|打开|按下|按动).*(?:台灯|灯)|(?:台灯|灯).*(?:拧亮|拧开|打开|开关|旋钮)/u.test(action)) {
+    return {
+      action,
+      scene: "出租屋室内灯旁：台灯、开关或旋钮与操作手部同框",
+      lighting: "起幅为旧台灯关闭的冷暗环境；接触开关或旋钮后2700K暖光渐亮，门外冷蓝只作勾边",
+      color: "2700K暖光主调，起幅保留冷蓝暗部",
+      props: props("台灯", "开关", "旋钮"),
+    };
+  }
+  if (/(?:坐下|坐回|坐进|坐在).*(?:听雨|灯下|暖光)|听雨/u.test(action)) {
+    return {
+      action,
+      scene: "出租屋室内窗边或灯下：坐具、旧台灯、窗与雨痕在同一空间",
+      lighting: "旧台灯2700K暖光为主，窗外冷蓝只勾人物或窗框边缘",
+      color: "2700K暖光主调，窗外冷蓝仅作边缘勾光",
+      props: props("台灯", "窗", "坐具"),
+    };
+  }
+  return {
+    action,
+    scene: input.fallbackScene,
+    lighting: input.fallbackLighting,
+    color: input.fallbackColor,
+    props: fallbackProps,
+  };
+}
+
 /**
  * Final review projection. The vendor runs several post-fusion quality agents that can
  * append title fields or rewrite framing/audio after the Phase 3 contract. Re-project
@@ -5518,25 +5594,32 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
                 promptActions.length - 1,
                 Math.floor((shotIndex + 0.5) * promptActions.length / Math.max(1, allShots.length)),
               )]);
-          const orderedAction = String(promptActions[Math.min(
-            promptActions.length - 1,
-            Math.floor((shotIndex + 0.5) * promptActions.length / Math.max(1, allShots.length)),
-          )] || contractAction || "");
-          const beforeLampOn = /(?:收伞|开门|换鞋)/u.test(orderedAction)
-            && !/(?:拧亮|坐下|灯下|听雨)/u.test(orderedAction);
+          const orderedAction = String(
+            allShots.length <= promptActions.length
+              ? promptActions[shotIndex]
+              : promptActions[Math.min(
+                promptActions.length - 1,
+                Math.floor((shotIndex + 0.5) * promptActions.length / Math.max(1, allShots.length)),
+              )]
+            || contractAction
+            || "",
+          );
+          const direction = deriveNarrativeShotDirection({
+            action: orderedAction,
+            fallbackScene: contractScene || promptReviewPolicy.projectScene,
+            fallbackLighting: contractLighting || promptReviewPolicy.projectLighting,
+            fallbackColor: contractColor || promptReviewPolicy.projectColor,
+            fallbackProps: contractProps.length > 0 ? contractProps : promptReviewPolicy.projectProps,
+          });
           const contractShotSize = promptFieldText(contractShot.shotSize);
           const contractCameraMovement = promptFieldText(contractShot.cameraMovement);
           const rowPolicy: NarrativePromptReviewPolicy = {
             ...promptReviewPolicy,
-            projectScene: contractScene || promptReviewPolicy.projectScene,
-            projectLighting: beforeLampOn
-              ? (/^收伞/u.test(orderedAction)
-                ? "楼道冷光；室内旧台灯关闭"
-                : "室内未开灯；门外楼道冷光从门缝进入，旧台灯关闭")
-              : (contractLighting || promptReviewPolicy.projectLighting),
-            projectColor: beforeLampOn ? "冷蓝灰（旧台灯未开）" : (contractColor || promptReviewPolicy.projectColor),
-            projectProps: contractProps.length > 0 ? contractProps : promptReviewPolicy.projectProps,
-            projectActions: orderedAction ? [orderedAction] : promptReviewPolicy.projectActions,
+            projectScene: direction.scene || promptReviewPolicy.projectScene,
+            projectLighting: direction.lighting || promptReviewPolicy.projectLighting,
+            projectColor: direction.color || promptReviewPolicy.projectColor,
+            projectProps: direction.props.length > 0 ? direction.props : promptReviewPolicy.projectProps,
+            projectActions: direction.action ? [direction.action] : promptReviewPolicy.projectActions,
           };
           const projectedShot: FusionRecord = {
             ...shot,
