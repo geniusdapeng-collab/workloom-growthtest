@@ -1796,10 +1796,10 @@ console.log("RESULT " + JSON.stringify({
       scene: expect.stringContaining("台灯"),
       lighting: expect.stringMatching(/起幅.*关闭.*2700K/),
       color: expect.stringContaining("2700K"),
-      props: expect.arrayContaining(["台灯", "开关"]),
+      props: expect.arrayContaining(["旧台灯", "旋钮"]),
     });
     expect(deriveNarrativeShotDirection({ action: "坐下听雨" })).toMatchObject({
-      scene: expect.stringContaining("窗边或灯下"),
+      scene: expect.stringContaining("灯下窗边"),
       lighting: expect.stringMatching(/2700K.*冷蓝/),
       color: expect.stringContaining("2700K"),
       props: expect.arrayContaining(["台灯", "窗", "坐具"]),
@@ -1858,7 +1858,7 @@ console.log("RESULT " + JSON.stringify({
       projectProps: ["旧台灯", "旧帆布鞋", "湿鞋"],
       projectActions: actions,
     };
-    const durations = [3, 2, 2, 3, 3, 2];
+    const durations = [2, 3, 2, 2, 4, 2];
     const shotSizes = ["extreme-close-up", "medium", "medium", "medium", "close-up", "close-up"];
     const prompts = normalizeNarrativePromptsForReview(
       durations.map((duration, index) => ({
@@ -1875,8 +1875,10 @@ console.log("RESULT " + JSON.stringify({
     expect(((prompts[0]!.fields as Record<string, unknown>)._workloomShotContract as Record<string, unknown>).shotId).toBe("S1");
     expect(((prompts[0]!._workloomPromptReviewPolicy as Record<string, unknown>).shotContract as Record<string, unknown>).shotId).toBe("S1");
     expect(String(contracts[2]!.space)).toContain("门扇正从开启位置合拢");
+    expect(String(contracts[2]!.timeline)).toContain("湿伞靠到门边");
     expect(String(contracts[0]!.costume)).toMatch(/白色便鞋.*雨水打湿/u);
-    expect(String(contracts[3]!.costume)).toMatch(/第一只.*另一脚.*末段.*双脚/u);
+    expect(String(contracts[3]!.costume)).toMatch(/起幅双脚仍穿.*前段第一只脚.*末段第二只脚.*双脚/u);
+    expect(String(contracts[3]!.shotSize)).toBe("full");
     expect(String(contracts[5]!.costume)).toContain("室内拖鞋");
     expect(prompts.map((prompt) => prompt.duration)).toEqual([3, 2, 2, 4, 2, 2]);
     expect(String(contracts[3]!.timeline)).toMatch(/第一只脚离开湿鞋.*第二只鞋跟松脱.*双脚站稳/u);
@@ -1939,6 +1941,57 @@ console.log("RESULT " + JSON.stringify({
     expect(secondPrompt).not.toMatch(/【情绪】[^\n]*(?:眼睫|瞳孔)/u);
     expect(firstPrompt).toMatch(/【转场】[^\n]*另一只鞋/u);
     expect(secondPrompt).toMatch(/【转场】[^\n]*两只室内拖鞋/u);
+  });
+
+  it("G6 最终归一删除开灯与听雨场景中的或式二义", () => {
+    const base = {
+      noDialogue: true,
+      maxLength: 3000,
+      noCharacters: false,
+      noAnimals: false,
+      noMusic: true,
+      noTitles: true,
+      durationSeconds: 4,
+      aspectRatio: "9:16",
+      resolution: "1080x1920",
+      characterNames: ["陈卓"],
+      characterPortraits: [{
+        name: "陈卓",
+        path: "bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png",
+        authorization: "real-authorized",
+      }],
+      projectScene: "出租屋室内",
+      projectLighting: "窗外冷光",
+      projectColor: "冷蓝灰",
+      projectProps: ["旧台灯", "窗"],
+      projectActions: [],
+    };
+    const normalized = normalizeNarrativePromptsForReview([
+      {
+        shotId: "S1",
+        duration: 2,
+        prompt: "01.【场景】错误模板",
+        _workloomPromptReviewPolicy: {
+          ...base,
+          projectScene: "出租屋室内灯旁：台灯、开关或旋钮与操作手部同框",
+          projectActions: ["陈卓伸手拧亮旧台灯"],
+        },
+      },
+      {
+        shotId: "S2",
+        duration: 2,
+        prompt: "01.【场景】错误模板",
+        _workloomPromptReviewPolicy: {
+          ...base,
+          projectScene: "出租屋室内窗边或灯下：坐具、旧台灯、窗与雨痕在同一空间",
+          projectActions: ["陈卓在灯下坐下，抬头安静听雨"],
+        },
+      },
+    ], base);
+    expect(String(normalized[0]!.prompt)).toContain("旧台灯旋钮、灯罩与操作手部同框");
+    expect(String(normalized[0]!.prompt)).not.toContain("开关或旋钮");
+    expect(String(normalized[1]!.prompt)).toContain("灯下窗边");
+    expect(String(normalized[1]!.prompt)).not.toContain("窗边或灯下");
   });
 
   it("G7 收口报告内联完整三件套、哈希、时间轴与未提交的 G8 边界", () => {

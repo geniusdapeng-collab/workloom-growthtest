@@ -5500,7 +5500,7 @@ export function deriveNarrativeShotDirection(input: {
   if (/(?:关门|门关好|门锁落位|回身.*门)/u.test(action)) {
     return {
       action,
-      scene: "出租屋玄关内侧：门扇正从开启位置合拢，门框、门锁、鞋架与地垫在同一空间；陈卓手中的黑色折叠伞已收拢，仍握在持伞侧",
+      scene: "出租屋玄关内侧：门扇正从开启位置合拢，门框、门锁、鞋架与地垫在同一空间；陈卓把收拢的黑色折叠伞靠到门边挂钩后再确认门锁",
       lighting: "旧台灯仍关闭；门缝冷光随门扇合拢变窄，室内保留冷蓝暗部",
       color: "冷蓝灰环境色（旧台灯未点亮）",
       props: ["黑色折叠伞", "旧防盗门", "门", "门把手", "门锁", "玄关", "鞋架", "地垫"],
@@ -5510,7 +5510,7 @@ export function deriveNarrativeShotDirection(input: {
     return {
       action,
       scene: "出租屋玄关内侧：鞋架、地垫与门后挂钩在同一空间，门已关上；收拢的黑色折叠伞已靠在门边",
-      lighting: "旧台灯仍关闭；室内只有窗外或门缝渗入的冷光",
+      lighting: "旧台灯仍关闭；仅保留窗外雨夜冷光",
       color: "冷蓝灰环境色（旧台灯未点亮）",
       props: ["黑色折叠伞", "白色湿便鞋", "室内拖鞋", "鞋架", "地垫", "门后挂钩", "门", "旧台灯（未亮）"],
     };
@@ -5518,16 +5518,16 @@ export function deriveNarrativeShotDirection(input: {
   if (/(?:拧亮|拧开|打开|按下|按动).*(?:台灯|灯)|(?:台灯|灯).*(?:拧亮|拧开|打开|开关|旋钮)/u.test(action)) {
     return {
       action,
-      scene: "出租屋室内灯旁：台灯、开关或旋钮与操作手部同框",
-      lighting: "起幅为旧台灯关闭的冷暗环境；接触开关或旋钮后2700K暖光渐亮，门外冷蓝只作勾边",
+      scene: "出租屋室内灯旁：旧台灯旋钮、灯罩与操作手部同框",
+      lighting: "起幅为旧台灯关闭的冷暗环境；旋转旋钮后2700K暖光渐亮，门外冷蓝只作勾边",
       color: "2700K暖光主调，起幅保留冷蓝暗部",
-      props: ["旧台灯", "台灯", "开关", "旋钮", "书桌"],
+      props: ["旧台灯", "旋钮", "书桌"],
     };
   }
   if (/(?:坐下|坐回|坐进|坐在).*(?:听雨|灯下|暖光)|听雨/u.test(action)) {
     return {
       action,
-      scene: "出租屋室内窗边或灯下：坐具、旧台灯、窗与雨痕在同一空间",
+      scene: "出租屋室内灯下窗边：坐具、旧台灯、窗与雨痕在同一空间",
       lighting: "旧台灯2700K暖光为主，窗外冷蓝只勾人物或窗框边缘",
       color: "2700K暖光主调，窗外冷蓝仅作边缘勾光",
       props: ["旧台灯", "台灯", "窗", "窗玻璃雨珠", "坐具", "书桌"],
@@ -5561,7 +5561,7 @@ function shoeWorkPhase(action: string): "first" | "second" | "combined" | "none"
 
 function sceneMatchesAction(action: string, scene: string | undefined): boolean {
   const value = String(scene ?? "");
-  if (!value || value.length < 4) return false;
+  if (!value || value.length < 4 || /或/u.test(value)) return false;
   switch (narrativeActionKind(action)) {
     case "umbrella": return /(?:楼道|门外|门口)/u.test(value);
     case "open": return /(?:门口|门.*玄关|玄关)/u.test(value);
@@ -5635,11 +5635,11 @@ function timelineTextForAction(action: string, duration: number): string {
   const kind = narrativeActionKind(action);
   const shoePhase = shoeWorkPhase(action);
   const beats = kind === "umbrella"
-    ? ["低机位起幅，伞骨合拢，伞尖离地滴水", "把收拢的湿伞换到持伞侧，另一只手摸到钥匙", "在门前站定，呼气，钥匙尖对准锁孔"]
+    ? ["固定机位起幅，伞骨合拢，伞尖离地滴水", "把收拢的湿伞换到持伞侧，另一只手摸到钥匙", "在门前站定，呼气，钥匙尖对准锁孔"]
     : kind === "open"
       ? ["钥匙尖对准锁孔，手指稳定握住钥匙", "钥匙转动并推开门，门轴缓慢张开", "跨入门槛，确认门扇仍在身后"]
       : kind === "close"
-        ? ["回身握住门把，视线检查门框", "带门合拢，门扇减速贴入门框", "门锁落位，肩线下沉并转向鞋架"]
+        ? ["回身把收拢的湿伞靠到门边，再握住门把", "带门合拢，门扇减速贴入门框", "门锁落位，肩线下沉并转向鞋架"]
         : kind === "shoes"
           ? shoePhase === "second"
             ? ["重心移到另一只脚，视线落向剩余湿便鞋", "第二只鞋跟松脱，脚掌离开湿便鞋", "第二只脚穿入室内拖鞋并落地，双脚站稳"]
@@ -5750,7 +5750,7 @@ function shotSizeForAction(action: string): string | null {
     case "umbrella": return "medium";
     case "open": return "medium";
     case "close": return "close-up";
-    case "shoes": return "extreme-close-up";
+    case "shoes": return shoeWorkPhase(action) === "combined" ? "full" : "extreme-close-up";
     case "lamp": return "extreme-close-up";
     case "listen": return "medium";
     default: return null;
@@ -5798,7 +5798,7 @@ function costumeTextForFootwear(base: string, action: string, shotIndex: number,
   if (shotIndex < shoeIndex) return `${upper}；脚穿白色便鞋，鞋面与裤脚被雨水打湿，开衫袖口湿润。`;
   if (shoePhase === "second") return `${upper}；第一只白色湿便鞋已放在鞋架旁，一脚已穿室内拖鞋，另一脚仍穿白色湿便鞋并正在脱换。`;
   if (shoePhase === "combined") {
-    return `${upper}；第一只白色湿便鞋已脱在鞋架旁，一脚穿室内拖鞋，另一脚仍穿白色湿便鞋；本镜末段第二只鞋脱换完成，双脚都穿室内拖鞋。`;
+    return `${upper}；起幅双脚仍穿白色湿便鞋，前段第一只脚离鞋并穿入室内拖鞋，末段第二只脚完成脱换，双脚都穿室内拖鞋。`;
   }
   if (shoePhase === "first") {
     return `${upper}；第一只白色湿便鞋正脱在鞋架旁，一脚换入室内拖鞋，另一脚仍穿白色湿便鞋。`;
@@ -5824,7 +5824,7 @@ function normalizeFootwearProps(props: string[], action: string, shotIndex: numb
   return withoutSynonyms([...base, "室内拖鞋"]);
 }
 
-function normalizeCombinedShoeReviewDuration(
+function normalizeHomecomingReviewDurations(
   prompts: FusionRecord[],
   policy: NarrativePromptReviewPolicy,
 ): FusionRecord[] {
@@ -5841,23 +5841,27 @@ function normalizeCombinedShoeReviewDuration(
   if (actions.length !== prompts.length) return prompts;
   const shoeIndex = actions.findIndex((value) => shoeWorkPhase(String(value)) === "combined");
   if (shoeIndex < 0) return prompts;
+  const umbrellaIndex = actions.findIndex((value) => narrativeActionKind(String(value)) === "umbrella");
   const durations = prompts.map((shot) => Math.max(0, Number(shot.duration ?? recordValue(shot.timing).duration ?? 0)));
   const total = Number(durations.reduce((sum, value) => sum + value, 0).toFixed(3));
   const target = Number(policy.durationSeconds);
   if (!Number.isFinite(total) || !Number.isFinite(target) || Math.abs(total - target) > 0.05) return prompts;
-  if (durations[shoeIndex]! >= 4) return prompts;
-  let deficit = 4 - durations[shoeIndex]!;
+  const desired = durations.slice();
+  desired[shoeIndex] = Math.max(desired[shoeIndex]!, 4);
+  if (umbrellaIndex >= 0) desired[umbrellaIndex] = Math.max(desired[umbrellaIndex]!, 3);
+  let deficit = Number(desired.reduce((sum, value, index) => sum + Math.max(0, value - durations[index]!), 0).toFixed(3));
+  if (deficit <= 0.001) return prompts;
   for (let index = durations.length - 1; index >= 0 && deficit > 0.001; index -= 1) {
-    if (index === shoeIndex || durations[index]! <= 2) continue;
+    if (index === shoeIndex || index === umbrellaIndex) continue;
+    if (durations[index]! <= 2) continue;
     const transfer = Math.min(deficit, durations[index]! - 2);
-    durations[index] = Number((durations[index]! - transfer).toFixed(3));
+    desired[index] = Number((desired[index]! - transfer).toFixed(3));
     deficit = Number((deficit - transfer).toFixed(3));
   }
   if (deficit > 0.001) return prompts;
-  durations[shoeIndex] = 4;
   let cursor = 0;
   return prompts.map((shot, index) => {
-    const duration = durations[index]!;
+    const duration = desired[index]!;
     const timing = {
       ...recordValue(shot.timing),
       start: Number(cursor.toFixed(3)),
@@ -5879,7 +5883,7 @@ export function normalizeNarrativePromptsForReview(
   prompts: FusionRecord[],
   policy: NarrativePromptReviewPolicy,
 ): FusionRecord[] {
-  const normalizedPrompts = normalizeCombinedShoeReviewDuration(prompts, policy);
+  const normalizedPrompts = normalizeHomecomingReviewDurations(prompts, policy);
   return normalizedPrompts.map((shot, shotIndex) => {
     const rowPolicy = shot._workloomPromptReviewPolicy
       && typeof shot._workloomPromptReviewPolicy === "object"
@@ -5910,7 +5914,11 @@ export function normalizeNarrativePromptsForReview(
         : (Array.isArray(rowPolicy.projectProps) ? rowPolicy.projectProps : []),
       projectActions: rowActions,
     };
-    const normalized = applyNarrativeFinalPromptContract(shot, {
+    const enforcedShotSize = shotSizeForAction(action);
+    const shotForReview = enforcedShotSize
+      ? { ...shot, shotSize: enforcedShotSize, cameraHint: enforcedShotSize }
+      : shot;
+    const normalized = applyNarrativeFinalPromptContract(shotForReview, {
       noDialogue: normalizedPolicy.noDialogue,
       maxLength: normalizedPolicy.maxLength,
       noCharacters: normalizedPolicy.noCharacters,
