@@ -1,0 +1,33 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest
+
+stderr | apps/server/src/video/marketing-authority.test.ts
+[pii] PII_SALT 未配置，使用 dev 占位盐（仅限开发/测试，生产必须注入 PII_SALT）
+
+ ❯ apps/server/src/video/marketing-authority.test.ts (20 tests | 1 failed | 19 skipped) 337ms
+     × 混币报价从来源提取、G1档案到最终镜头复核始终逐币种表达，保留原始claims 326ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/server/src/video/marketing-authority.test.ts > 营销事实宿主完整执行 > 混币报价从来源提取、G1档案到最终镜头复核始终逐币种表达，保留原始claims
+AssertionError: expected 'USD 99-799' to be 'USD 99-109；CNY 699-799' // Object.is equality
+
+Expected: "USD 99-109；CNY 699-799"
+Received: "USD 99-799"
+
+ ❯ apps/server/src/video/marketing-authority.test.ts:97:86
+     95|   it("混币报价从来源提取、G1档案到最终镜头复核始终逐币种表达，保留原始claims", async () => {
+     96|     const prepared = await prepare({ mixedCurrencies: true });
+     97|     expect((prepared.bundle.dossier.identity as Record<string, unknown…
+       |                                                                                      ^
+     98|     expect(prepared.g1Content).toContain("USD 99-109；CNY 699-799");
+     99|     expect(prepared.g1Content).not.toContain("USD 99-799");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 19 skipped (20)
+   Start at  22:17:49
+   Duration  1.58s (transform 912ms, setup 0ms, import 1.14s, tests 337ms, environment 0ms)
+

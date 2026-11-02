@@ -1,0 +1,39 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest
+
+ ❯ apps/server/src/video/data-mining-pacing.test.ts (3 tests | 1 failed) 20ms
+     × 四个同时到达的查询按实际请求开始时刻间隔，避免等待后成批触发 18ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/server/src/video/data-mining-pacing.test.ts > 营销来源并发检索的逐引擎限速 > 四个同时到达的查询按实际请求开始时刻间隔，避免等待后成批触发
+AssertionError: expected [ 10000, 10050, 10050, 10050 ] to deeply equal [ 10000, 10050, 10100, 10150 ]
+
+- Expected
++ Received
+
+  [
+    10000,
+    10050,
+-   10100,
+-   10150,
++   10050,
++   10050,
+  ]
+
+ ❯ apps/server/src/video/data-mining-pacing.test.ts:25:40
+     23|     await vi.runAllTimersAsync();
+     24|     expect(await pending).toHaveLength(4);
+     25|     expect(calls.map(call => call.at)).toEqual([10_000, 10_050, 10_100…
+       |                                        ^
+     26|   });
+     27|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed (3)
+   Start at  22:01:26
+   Duration  175ms (transform 55ms, setup 0ms, import 69ms, tests 20ms, environment 0ms)
+

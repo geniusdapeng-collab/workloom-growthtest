@@ -1,0 +1,39 @@
+{
+  "actor": "/root/marketing_audit",
+  "role": "independent-review-for-general-and-budget",
+  "runtimeSource": "34d668397db96707ababd8ddf8660dc36f134aa1",
+  "worktreeHead": "3f3d283315b9f521871622deb18ef15bbfad6568",
+  "reviewedAt": "2026-11-02T14:35:58.325949+00:00",
+  "findings": [],
+  "result": "passed-in-local-preview",
+  "tests": [
+    {
+      "command": "RUN_DB_TESTS=1 vitest run production-authority.pg.test.ts production-router.test.ts gen/gen.test.ts narrative-aspect-contract.test.ts narrative-speech-contract.test.ts narrative-source-action.test.ts narrative-no-person-source.test.ts studio-bridge-concurrency.test.ts --maxWorkers 1 --no-file-parallelism",
+      "files": 8,
+      "passed": 134,
+      "failed": 0,
+      "skipped": 0,
+      "exitCode": 0,
+      "log": "work/marketing-evidence/independent-final-frozen.log"
+    },
+    {
+      "command": "tsc -p packages/video-studio/tsconfig.json --noEmit",
+      "exitCode": 0,
+      "log": "work/marketing-evidence/video-studio-typecheck.log"
+    }
+  ],
+  "reviewScope": [
+    "ca9dc847 framing frozen aspect",
+    "ec77c853 and followups independently preserve speech/music",
+    "source action sequence/known source environment preservation and capacity failure before G6",
+    "studio global bridge reference count and async policy/log/event isolation",
+    "b287bd86+c7210855+fe199ec3+5d40da57 G11 pending shot/parallel/accepted/unknown/legacy missing duration",
+    "provider ambiguous acceptance remains unknown and never triggers duplicate POST"
+  ],
+  "method": "变化与直接函数精读；大vendor-compat.ts文件整体C，其他完整文件见coverage；真实隔离PG端口56437，模型/媒体网络协议替身，无真实付费，非生产全链审美或吞吐验收。",
+  "notes": [
+    "修复者分别为root/general或submission代理；本角色未修改其实现。",
+    "本角色自行修过的营销四问题不由该记录自验，应由root/submission独立验。",
+    "先前独立review提出的noDialogue对偶与旧render_jobs NULL预算问题均已在最终源码修正并回归。"
+  ]
+}

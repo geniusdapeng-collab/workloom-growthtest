@@ -1,0 +1,19 @@
+{
+  "checkedAt": "2026-11-02T14:46:19.475Z",
+  "source": "3f3d283315b9f521871622deb18ef15bbfad6568",
+  "mainBefore": "5ffe5047767c3e0e41feeac865ed36a76c0f9428",
+  "checks": [
+    {
+      "name": "ui-contract",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/geniusdapeng-collab/workloom-growthtest/actions/runs/41463891674/job/125339597512"
+    },
+    {
+      "name": "gate",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/geniusdapeng-collab/workloom-growthtest/actions/runs/41463891507/job/125339597385"
+    }
+  ]
+}

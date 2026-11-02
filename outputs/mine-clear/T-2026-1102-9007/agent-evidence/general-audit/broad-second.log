@@ -1,0 +1,434 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest
+
+[RenderingEngine] 无法加载现有渲染核心: Cannot find module './prompt-guardian'
+Require stack:
+- /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest/[eval]
+[RenderingEngine] 将使用内置模拟模式
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+[ScriptGenerator] ⚠️ 未配置模型名，请设置 SUPERMICKEY_LLM_MODEL（兼容旧名 STORMAXE_LLM_MODEL）或传入 options.model
+[ScriptGenerator] ⚠️ 未配置模型名，请设置 SUPERMICKEY_LLM_MODEL（兼容旧名 STORMAXE_LLM_MODEL）或传入 options.model
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+[ScriptGenerator] ⚠️ 未配置模型名，请设置 SUPERMICKEY_LLM_MODEL（兼容旧名 STORMAXE_LLM_MODEL）或传入 options.model
+[PromptFusionAgent] ⚠️ 镜头 S1 精炼后仅 557 字符，低于精炼后下限 1200，请检查上游字段是否过薄
+[PromptFusionAgent] ⚠️ 镜头 S1 中文占比过低(28.5%), 尝试修正为中文输出
+[PromptFusionAgent] ⚠️ 镜头 S1 精炼后仅 596 字符，低于精炼后下限 1200，请检查上游字段是否过薄
+[PromptFusionAgent] ⚠️ 镜头 S1 精炼后仅 557 字符，低于精炼后下限 1200，请检查上游字段是否过薄
+[PromptFusionAgent] ⚠️ 镜头 S1 中文占比过低(28.5%), 尝试修正为中文输出
+[PromptFusionAgent] ⚠️ timeout收敛: 请求119989ms > budget上限119988ms, 收敛为119988ms (≤上限)
+[PromptFusionAgent] 尝试 1/3 失败: [BudgetExhausted] LLM引擎返回失败: offline-budget-fixture | type=NETWORK | retryable=false
+[PromptFusionAgent] 🔴 不可重试错误(NETWORK)，停止重试: 底层判定不可重试
+[PromptFusionAgent] 所有 1 次尝试均失败，最后错误: [BudgetExhausted] LLM引擎返回失败: offline-budget-fixture
+[PromptFusionAgent] 备用模型也失败: PHASE3_BUDGET_EXHAUSTED: 提供商调用前剩余预算不足 5 秒
+[PromptFusionAgent] 极限重试失败: PHASE3_BUDGET_EXHAUSTED: 提供商调用前剩余预算不足 5 秒
+[PromptFusionAgent] 降级结果为null/undefined: LLM failed after 1 attempts: [BudgetExhausted] LLM引擎返回失败: offline-budget-fixture
+[PromptFusionAgent] 尝试 1/3 失败: [BudgetExhausted] LLM引擎返回失败: offline-budget-fixture | type=NETWORK | retryable=false
+[PromptFusionAgent] 🔴 不可重试错误(NETWORK)，停止重试: 底层判定不可重试
+[PromptFusionAgent] 所有 1 次尝试均失败，最后错误: [BudgetExhausted] LLM引擎返回失败: offline-budget-fixture
+[PromptFusionAgent] 备用模型也失败: PHASE3_BUDGET_EXHAUSTED: 提供商调用前剩余预算不足 5 秒
+[PromptFusionAgent] 极限重试失败: PHASE3_BUDGET_EXHAUSTED: 提供商调用前剩余预算不足 5 秒
+[PromptFusionAgent] 降级结果为null/undefined: LLM failed after 1 attempts: [BudgetExhausted] LLM引擎返回失败: offline-budget-fixture
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+ ❯ packages/video-studio/src/vendor-compat.test.ts (107 tests | 1 failed) 6133ms
+     × PRD 镜头合同总时长守恒到交付口径，并补齐字幕、运镜、光位和音频锚点 11ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/video-studio/src/vendor-compat.test.ts > 定妆照绑定桥（真机故障复现 → 修复） > PRD 镜头合同总时长守恒到交付口径，并补齐字幕、运镜、光位和音频锚点
+AssertionError: expected [ { shotId: 'SC01-S01', …(27) }, …(7) ] to deeply equal ArrayContaining{…}
+
+- Expected
++ Received
+
+- ArrayContaining [
+-   ObjectContaining {
+-     "cameraMovement": "static",
++ [
++   {
++     "audio": [
++       "雨声",
++       "钥匙碰撞",
++     ],
++     "audioAnchors": [
++       "雨声",
++       "钥匙碰撞",
++     ],
++     "cameraHint": "establishing",
++     "cameraMovement": "locked",
++     "colorTemperature": "5600K",
++     "costumeState": "not_applicable",
++     "dialogue": "",
++     "durationSeconds": 3.33,
++     "endSeconds": 3.33,
++     "faceVisible": false,
++     "footwearState": "not_applicable",
++     "keyProps": [
++       "钥匙",
++     ],
++     "lampState": "off",
++     "lighting": "第一次对准锁孔，楼道近乎全暗，雨光冷蓝勾边",
++     "listeningVerified": false,
++     "location": "",
++     "purpose": "摸黑进门（起幅段）；第一次对准锁孔，楼道近乎全暗，雨光冷蓝勾边",
++     "safeArea": true,
++     "safeAreaInsets": {
++       "bottomPercent": 12,
++       "rightRailPercent": 11,
++       "topPercent": 6,
++     },
++     "sceneId": "SC01",
++     "shotId": "SC01-S01",
++     "shotSize": "establishing",
++     "startSeconds": 0,
++     "status": "planned",
++     "subjectCount": 1,
++     "subjectIds": [
++       "chen-zhuo",
++     ],
++     "subjectLabel": "陈卓（局部入画）",
++     "warmAreaMaxRatio": 0.3333333333333333,
++   },
++   {
++     "audio": [
++       "雨声",
++       "钥匙碰撞",
++     ],
++     "audioAnchors": [
++       "雨声",
++       "钥匙碰撞",
++     ],
++     "cameraHint": "medium",
++     "cameraMovement": "locked",
++     "colorTemperature": "5600K",
++     "costumeState": "not_applicable",
++     "dialogue": "",
++     "durationSeconds": 3.34,
++     "endSeconds": 6.67,
++     "faceVisible": false,
++     "footwearState": "not_applicable",
++     "keyProps": [
++       "钥匙",
++     ],
++     "lampState": "off",
++     "lighting": "第一次对准锁孔，楼道近乎全暗，雨光冷蓝勾边",
++     "listeningVerified": false,
++     "location": "",
++     "purpose": "摸黑进门（推进段）；第二次对准锁孔，冷蓝雨光",
++     "safeArea": true,
++     "safeAreaInsets": {
++       "bottomPercent": 12,
++       "rightRailPercent": 11,
++       "topPercent": 6,
++     },
++     "sceneId": "SC01",
++     "shotId": "SC01-S02",
+      "shotSize": "medium",
++     "startSeconds": 3.33,
++     "status": "planned",
++     "subjectCount": 1,
++     "subjectIds": [
++       "chen-zhuo",
++     ],
++     "subjectLabel": "陈卓（局部入画）",
++     "warmAreaMaxRatio": 0.3333333333333333,
++   },
++   {
++     "audio": [
++       "雨声",
++       "钥匙碰撞",
++     ],
++     "audioAnchors": [
++       "雨声",
++       "钥匙碰撞",
++     ],
++     "cameraHint": "close-up",
++     "cameraMovement": "locked",
++     "colorTemperature": "5600K",
++     "costumeState": "not_applicable",
++     "dialogue": "",
++     "durationSeconds": 3.33,
++     "endSeconds": 10,
++     "faceVisible": false,
++     "footwearState": "not_applicable",
++     "keyProps": [
++       "钥匙",
++     ],
++     "lampState": "off",
++     "lighting": "第一次对准锁孔，楼道近乎全暗，雨光冷蓝勾边",
++     "listeningVerified": false,
++     "location": "",
++     "purpose": "摸黑进门（落幅段）；钥匙终于插入，冷蓝雨光",
++     "safeArea": true,
++     "safeAreaInsets": {
++       "bottomPercent": 12,
++       "rightRailPercent": 11,
++       "topPercent": 6,
++     },
++     "sceneId": "SC01",
++     "shotId": "SC01-S03",
++     "shotSize": "close-up",
++     "startSeconds": 6.67,
++     "status": "planned",
++     "subjectCount": 1,
++     "subjectIds": [
++       "chen-zhuo",
++     ],
++     "subjectLabel": "陈卓（局部入画）",
++     "warmAreaMaxRatio": 0.3333333333333333,
++   },
++   {
++     "audio": [
++       "旋钮咔响",
++       "钨丝电流",
++     ],
++     "audioAnchors": [
++       "旋钮咔响",
++       "钨丝电流",
++     ],
++     "cameraHint": "close-up",
++     "cameraMovement": "locked",
++     "colorTemperature": "2700K",
++     "costumeState": "not_applicable",
++     "dialogue": "",
++     "durationSeconds": 4,
++     "endSeconds": 14,
++     "faceVisible": false,
++     "footwearState": "not_applicable",
++     "keyProps": [
++       "台灯",
++     ],
++     "lampState": "off",
++     "lighting": "台灯作唯一暖源，冷蓝环境光包围",
++     "listeningVerified": false,
++     "location": "",
++     "purpose": "摸黑进门（落幅段）；手指靠近开关",
++     "safeArea": true,
++     "safeAreaInsets": {
++       "bottomPercent": 12,
++       "rightRailPercent": 11,
++       "topPercent": 6,
++     },
++     "sceneId": "SC02",
++     "shotId": "SC02-S01",
++     "shotSize": "close-up",
++     "startSeconds": 10,
++     "status": "planned",
++     "subjectCount": 1,
++     "subjectIds": [
++       "chen-zhuo",
++     ],
++     "subjectLabel": "陈卓（局部入画）",
++     "warmAreaMaxRatio": 0.3333333333333333,
++   },
++   {
++     "audio": [
++       "旋钮咔响",
++       "钨丝电流",
++     ],
++     "audioAnchors": [
++       "旋钮咔响",
++       "钨丝电流",
++     ],
++     "cameraHint": "medium",
++     "cameraMovement": "locked",
++     "colorTemperature": "2700K",
++     "costumeState": "not_applicable",
++     "dialogue": "",
++     "durationSeconds": 4,
++     "endSeconds": 18,
++     "faceVisible": false,
++     "footwearState": "not_applicable",
++     "keyProps": [
++       "台灯",
++     ],
++     "lampState": "off_to_on",
++     "lighting": "台灯作唯一暖源，冷蓝环境光包围",
++     "listeningVerified": false,
++     "location": "",
++     "purpose": "拧亮旧灯（起幅段）；第一次按压失败",
++     "safeArea": true,
++     "safeAreaInsets": {
++       "bottomPercent": 12,
++       "rightRailPercent": 11,
++       "topPercent": 6,
++     },
++     "sceneId": "SC02",
++     "shotId": "SC02-S02",
++     "shotSize": "extreme-close-up",
++     "startSeconds": 14,
++     "status": "planned",
++     "subjectCount": 1,
++     "subjectIds": [
++       "chen-zhuo",
++     ],
++     "subjectLabel": "陈卓（局部入画）",
++     "warmAreaMaxRatio": 0.3333333333333333,
++   },
++   {
++     "audio": [
++       "旋钮咔响",
++       "钨丝电流",
++     ],
++     "audioAnchors": [
++       "旋钮咔响",
++       "钨丝电流",
++     ],
++     "cameraHint": "close-up",
++     "cameraMovement": "locked",
++     "colorTemperature": "2700K",
++     "costumeState": "not_applicable",
++     "dialogue": "",
++     "durationSeconds": 4,
++     "endSeconds": 22,
++     "faceVisible": false,
++     "footwearState": "not_applicable",
++     "keyProps": [
++       "台灯",
++     ],
++     "lampState": "off_to_on",
++     "lighting": "台灯作唯一暖源，冷蓝环境光包围",
++     "listeningVerified": false,
++     "location": "",
++     "purpose": "拧亮旧灯（推进段）；第二次按压成功",
++     "safeArea": true,
++     "safeAreaInsets": {
++       "bottomPercent": 12,
++       "rightRailPercent": 11,
++       "topPercent": 6,
++     },
++     "sceneId": "SC02",
++     "shotId": "SC02-S03",
++     "shotSize": "extreme-close-up",
++     "startSeconds": 18,
++     "status": "planned",
++     "subjectCount": 1,
++     "subjectIds": [
++       "chen-zhuo",
++     ],
++     "subjectLabel": "陈卓（局部入画）",
++     "warmAreaMaxRatio": 0.3333333333333333,
++   },
++   {
++     "audio": [
++       "旋钮咔响",
++       "钨丝电流",
++     ],
++     "audioAnchors": [
++       "旋钮咔响",
++       "钨丝电流",
++     ],
++     "cameraHint": "static",
++     "cameraMovement": "static",
++     "colorTemperature": "2700K",
++     "costumeState": "not_applicable",
++     "dialogue": "",
++     "durationSeconds": 4,
++     "endSeconds": 26,
++     "faceVisible": false,
++     "footwearState": "not_applicable",
++     "keyProps": [
++       "台灯",
++     ],
++     "lampState": "off_to_on",
++     "lighting": "台灯作唯一暖源，冷蓝环境光包围",
++     "listeningVerified": false,
++     "location": "",
++     "purpose": "拧亮旧灯（落幅段）；灯光铺满墙面",
++     "safeArea": true,
++     "safeAreaInsets": {
++       "bottomPercent": 12,
++       "rightRailPercent": 11,
++       "topPercent": 6,
++     },
++     "sceneId": "SC02",
++     "shotId": "SC02-S04",
++     "shotSize": "extreme-close-up",
++     "startSeconds": 22,
++     "status": "planned",
++     "subjectCount": 1,
++     "subjectIds": [
++       "chen-zhuo",
++     ],
++     "subjectLabel": "陈卓（局部入画）",
++     "warmAreaMaxRatio": 0.3333333333333333,
++   },
++   {
++     "audio": [
++       "旋钮咔响",
++       "钨丝电流",
++     ],
++     "audioAnchors": [
++       "旋钮咔响",
++       "钨丝电流",
++     ],
++     "cameraHint": "medium",
++     "cameraMovement": "locked",
++     "colorTemperature": "2700K",
++     "costumeState": "not_applicable",
++     "dialogue": "",
++     "durationSeconds": 4,
++     "endSeconds": 30,
++     "faceVisible": false,
++     "footwearState": "not_applicable",
++     "keyProps": [
++       "台灯",
++     ],
++     "lampState": "off_to_on",
++     "lighting": "台灯作唯一暖源，冷蓝环境光包围",
++     "listeningVerified": false,
++     "location": "",
++     "purpose": "拧亮旧灯（落幅段）；静物收尾",
++     "safeArea": true,
++     "safeAreaInsets": {
++       "bottomPercent": 12,
++       "rightRailPercent": 11,
++       "topPercent": 6,
++     },
++     "sceneId": "SC02",
++     "shotId": "SC02-S05",
++     "shotSize": "extreme-close-up",
++     "startSeconds": 26,
++     "status": "planned",
++     "subjectCount": 1,
++     "subjectIds": [
++       "chen-zhuo",
++     ],
++     "subjectLabel": "陈卓（局部入画）",
++     "warmAreaMaxRatio": 0.3333333333333333,
+    },
+  ]
+
+ ❯ packages/video-studio/src/vendor-compat.test.ts:832:19
+    830|     expect(String(shots[0]!.colorTemperature)).toContain("5600K");
+    831|     expect(String(shots[3]!.colorTemperature)).toContain("2700K");
+    832|     expect(shots).toEqual(expect.arrayContaining([
+       |                   ^
+    833|       expect.objectContaining({ shotSize: "medium", cameraMovement: "s…
+    834|     ]));
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  1 failed | 144 passed (145)
+   Start at  22:12:14
+   Duration  6.51s (transform 623ms, setup 0ms, import 943ms, tests 6.24s, environment 0ms)
+

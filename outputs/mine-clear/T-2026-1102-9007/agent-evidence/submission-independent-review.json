@@ -1,0 +1,324 @@
+{
+  "actor": "/root/submission_audit",
+  "task": "T-2026-1102-9007",
+  "reviewedHead": "3f3d283315b9f521871622deb18ef15bbfad6568",
+  "independentOf": [
+    "/root/general_audit",
+    "/root/marketing_audit"
+  ],
+  "notIndependentOf": [
+    "MC-008",
+    "MC-009",
+    "MC-010"
+  ],
+  "coverage": {
+    "scope": "Independent review of general and marketing fixes, adjacent tests and direct vendor implementation; not repository-wide. Own submission coverage recorded separately.",
+    "totals": {
+      "A": 16,
+      "B": 11,
+      "C": 1,
+      "D": 0,
+      "total": 28
+    },
+    "files": [
+      {
+        "path": "packages/video-studio/src/duration-projection.ts",
+        "level": "A",
+        "complete": true,
+        "lines": 431
+      },
+      {
+        "path": "packages/video-studio/src/pipeline-router.ts",
+        "level": "A",
+        "complete": true,
+        "lines": 696
+      },
+      {
+        "path": "apps/server/src/video/data-mining-executor.ts",
+        "level": "A",
+        "complete": true,
+        "lines": 835
+      },
+      {
+        "path": "apps/server/src/video/marketing-source-fetcher.ts",
+        "level": "A",
+        "complete": true,
+        "lines": 185
+      },
+      {
+        "path": "apps/server/src/video/marketing-authority.ts",
+        "level": "A",
+        "complete": true,
+        "lines": 306
+      },
+      {
+        "path": "packages/video-studio/src/marketing-price-contract.ts",
+        "level": "A",
+        "complete": true,
+        "lines": 85
+      },
+      {
+        "path": "packages/video-studio/src/index.ts",
+        "level": "A",
+        "complete": true,
+        "lines": 77
+      },
+      {
+        "path": "packages/video-studio/src/studio.ts",
+        "level": "A",
+        "complete": true,
+        "lines": 713
+      },
+      {
+        "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/product-info-collector.js",
+        "level": "A",
+        "complete": true,
+        "lines": 285
+      },
+      {
+        "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/cross-verifier.js",
+        "level": "A",
+        "complete": true,
+        "lines": 184
+      },
+      {
+        "path": "packages/video-studio/src/studio-bridge-concurrency.test.ts",
+        "level": "A",
+        "complete": true,
+        "lines": 95
+      },
+      {
+        "path": "packages/video-studio/src/narrative-source-action.test.ts",
+        "level": "A",
+        "complete": true,
+        "lines": 140
+      },
+      {
+        "path": "packages/video-studio/src/marketing-price-contract.test.ts",
+        "level": "A",
+        "complete": true,
+        "lines": 38
+      },
+      {
+        "path": "apps/server/src/video/data-mining-pacing.test.ts",
+        "level": "A",
+        "complete": true,
+        "lines": 78
+      },
+      {
+        "path": "packages/video-studio/src/narrative-no-person-source.test.ts",
+        "level": "A",
+        "complete": true,
+        "lines": 50
+      },
+      {
+        "path": "packages/video-studio/src/pipeline-route-negation.test.ts",
+        "level": "A",
+        "complete": true,
+        "lines": 47
+      },
+      {
+        "path": "packages/video-studio/src/narrative-aspect-contract.test.ts",
+        "level": "B",
+        "complete": false,
+        "method": "executed complete test suite; not claimed as full semantic reading"
+      },
+      {
+        "path": "packages/video-studio/src/narrative-speech-contract.test.ts",
+        "level": "B",
+        "complete": false,
+        "method": "executed complete test suite; not claimed as full semantic reading"
+      },
+      {
+        "path": "packages/video-studio/src/duration-voice-ceiling.test.ts",
+        "level": "B",
+        "complete": false,
+        "method": "executed complete test suite; not claimed as full semantic reading"
+      },
+      {
+        "path": "packages/video-studio/src/duration-projection.test.ts",
+        "level": "B",
+        "complete": false,
+        "method": "executed complete test suite; not claimed as full semantic reading"
+      },
+      {
+        "path": "packages/video-studio/src/duration-projection-bridge.test.ts",
+        "level": "B",
+        "complete": false,
+        "method": "executed complete test suite; not claimed as full semantic reading"
+      },
+      {
+        "path": "packages/video-studio/src/pipeline-router.test.ts",
+        "level": "B",
+        "complete": false,
+        "method": "executed complete test suite; not claimed as full semantic reading"
+      },
+      {
+        "path": "packages/video-studio/src/vendor-compat.test.ts",
+        "level": "B",
+        "complete": false,
+        "method": "executed complete test suite; not claimed as full semantic reading"
+      },
+      {
+        "path": "packages/video-studio/src/data-mining-engine.test.ts",
+        "level": "B",
+        "complete": false,
+        "method": "executed complete test suite; not claimed as full semantic reading"
+      },
+      {
+        "path": "apps/server/src/video/data-mining-executor.test.ts",
+        "level": "B",
+        "complete": false,
+        "method": "executed complete test suite; not claimed as full semantic reading"
+      },
+      {
+        "path": "apps/server/src/video/marketing-source-fetcher.test.ts",
+        "level": "B",
+        "complete": false,
+        "method": "executed complete test suite; not claimed as full semantic reading"
+      },
+      {
+        "path": "apps/server/src/video/marketing-authority.test.ts",
+        "level": "B",
+        "complete": false,
+        "method": "executed complete test suite; not claimed as full semantic reading"
+      },
+      {
+        "path": "packages/video-studio/src/vendor-compat.ts",
+        "level": "C",
+        "complete": false,
+        "method": "complete reviewed functions plus entire task diffs; huge unrelated compatibility sections not fully read",
+        "functionLevelA": [
+          "buildShotContract",
+          "reconcileShotContractExecutionCoherence",
+          "normalizeHomecomingPrdContinuity",
+          "runWithDurationProjectionPolicy",
+          "installSharedBridge",
+          "listSharedBridges",
+          "installVendorDurationProjectionBridge",
+          "applyNarrativeFinalPromptContract",
+          "deriveNarrativeShotDirection",
+          "projectNarrativeActionSequence",
+          "timelineTextForAction and adjacent emotion/pacing/brightness/depth helpers",
+          "normalizeNarrativePromptsForReview",
+          "installVendorPhase3FusionBridge"
+        ],
+        "reason": "large compatibility file; whole-repo full reading not claimed; function ranges and task diffs reviewed through final commit"
+      }
+    ]
+  },
+  "tests": [
+    {
+      "log": "work/submission-independent-final-regression.log",
+      "suites": 16,
+      "passed": 309,
+      "failed": 0,
+      "head": "3f3d283315b9f521871622deb18ef15bbfad6568",
+      "kind": "local-preview; model network stubs, real vendor methods for bridge subprocesses, local HTTP fixture for source redirect/cache; no paid media calls"
+    },
+    {
+      "log": "work/submission-independent-negation.log",
+      "suites": 1,
+      "passed": 18,
+      "failed": 0,
+      "head": "3f3d283315b9f521871622deb18ef15bbfad6568",
+      "kind": "deterministic rules plus hostile model-return stub"
+    },
+    {
+      "log": "work/submission-independent-price.log",
+      "suites": 3,
+      "passed": 30,
+      "failed": 0,
+      "kind": "adjacent historical run; overlaps final regression, not added to unique totals"
+    }
+  ],
+  "verifiedBehaviors": [
+    {
+      "card": "MC-001",
+      "evidence": "A+B",
+      "result": "16:9/1:1/9:16 declared constraint, resolution and canonical composition remain consistent"
+    },
+    {
+      "card": "MC-002",
+      "evidence": "A+B",
+      "result": "noMusic and noDialogue combinations preserve allowed independent audio channel; speech blocks stay prohibited only by speech policy"
+    },
+    {
+      "card": "MC-003",
+      "evidence": "A+B",
+      "result": "current actor, costume, scene, light, props and ordered/repeated/combined actions survive; no-person kitchen/showroom/city and dry white-dog source survive; oversized canonical prompt fails before G6 and preserves input; structured and prompt-only source environment prohibitions survive"
+    },
+    {
+      "card": "MC-004",
+      "evidence": "A+B",
+      "result": "voice minimum above model ceiling produces explicit infeasible result; no successful clipped duration claim"
+    },
+    {
+      "card": "MC-005",
+      "evidence": "A+B",
+      "result": "redirect aliases and normalized fragment cache aliases bind coherent raw/text source snapshots; adjacent SSRF and tamper cases run"
+    },
+    {
+      "card": "MC-006",
+      "evidence": "A+B",
+      "result": "same engine API/HTML queries start in paced slots; different engines retain independent queues; queued request rechecks cooldown after 429"
+    },
+    {
+      "card": "MC-007",
+      "evidence": "A+B",
+      "result": "negative route choices with complete verbs and opening quotes are excluded; explicit positive alternate wins; blocked route cannot return through strong heuristic or hostile model output"
+    },
+    {
+      "card": "MC-011",
+      "evidence": "A+B",
+      "result": "mixed-currency amounts kept in independent original-currency bands; single and all-zero finite numeric prices retain evidence provenance; null/empty do not become zero"
+    },
+    {
+      "card": "MC-012",
+      "evidence": "A+B",
+      "result": "four real prototype-bridge finish/failure interleavings retain second active run, scoped min/max/log/events, restore after last run, and allow a clean third run"
+    }
+  ],
+  "independentCounterexamples": [
+    {
+      "case": "complete verb and opening-quote negative route",
+      "authorFix": "905441da",
+      "outcome": "now green in 18-case independent route suite"
+    },
+    {
+      "case": "normalized fragment aliases use same sourceId but previously different snapshot bytes",
+      "authorFix": "2e27994c",
+      "outcome": "now green in final authority/source-fetch suites"
+    },
+    {
+      "case": "configured API branch skipped provider pacing",
+      "authorFix": "47a3da70",
+      "outcome": "API successful and 429 queue tests green"
+    },
+    {
+      "case": "canonicalize rebuilt prompt after earlier maxLength guard",
+      "authorFix": "f13c4cbe",
+      "outcome": "capacity unit and actual studio/G6 bridge tests green; no G6/render boundary"
+    },
+    {
+      "case": "prompt-only no-building/no-device source prohibitions discarded",
+      "authorFix": "3f3d2833",
+      "redLog": "work/submission-independent-prompt-only-red.log",
+      "outcome": "independently reproduced two false booleans and caught two red tests before fix; final 309-case run green"
+    }
+  ],
+  "limitations": [
+    "Environment local-preview, not a paid production run or empirical film quality rating.",
+    "No duration/time/quality percentage improvement asserted.",
+    "Vendor compatibility file is partial at file level; listed changed functions read and reviewed, no claim of whole-file semantic review.",
+    "Own submission repairs, including legacy-render duration followup5d40da57, require root independent acceptance.",
+    "MCD run-assertions receipts not yet executed by this actor; waiting for root clean-source coordination."
+  ],
+  "unresolvedConfirmedScopedDefects": [],
+  "selfCheck": {
+    "fullAssignedScope": true,
+    "noUnnecessaryUserHandoff": true,
+    "evidenceAccurate": true,
+    "seniorReviewReady": true
+  }
+}

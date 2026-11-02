@@ -1,0 +1,13 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest
+
+
+ Test Files  2 passed (2)
+      Tests  25 passed (25)
+   Start at  22:43:48
+   Duration  1.06s (transform 586ms, setup 0ms, import 766ms, tests 418ms, environment 0ms)
+
+
+
+exit_code=0 signal=none error=none
+assertion_validation={"ok":true,"errors":[]}

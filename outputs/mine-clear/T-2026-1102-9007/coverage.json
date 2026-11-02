@@ -1,0 +1,2380 @@
+{
+  "scope": "通用与营销视频意图至渲染提交前主链、已审模块的直接源码依赖及对应测试/规范。B仅引用元数据机检，不代表理解。",
+  "baseline": "5ffe5047767c3e0e41feeac865ed36a76c0f9428",
+  "summary": {
+    "total": 233,
+    "A": 117,
+    "B": 113,
+    "C": 3,
+    "D": 0
+  },
+  "exclusions": [
+    "渲染完成后的剪辑、调色、字幕、发布与广告投放不作本次业务审计；跨阶段大文件仅对应前期区段抽读。",
+    "未对全部vendor引擎/前端/数据库迁移做全仓精读；B项未逐行阅读的理由逐文件列出。",
+    "没有真实付费模型/图像/视频调用；生产成功率、墙钟和审美收益未测。"
+  ],
+  "files": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "level": "A",
+      "read": "full",
+      "lines": 115,
+      "actors": [
+        "/root"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": ".github/workflows/workloom-ui-contract.yml",
+      "level": "A",
+      "read": "full",
+      "lines": 93,
+      "actors": [
+        "/root"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "AGENTS.md",
+      "level": "A",
+      "read": "full",
+      "lines": 136,
+      "actors": [
+        "/root",
+        "/root/general_audit",
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "AGENTS.repo.md",
+      "level": "A",
+      "read": "full",
+      "lines": 58,
+      "actors": [
+        "/root",
+        "/root/general_audit",
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "WORKLOOM_PRODUCT_CONTEXT.md",
+      "level": "A",
+      "read": "full",
+      "lines": 596,
+      "actors": [
+        "/root",
+        "/root/general_audit",
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/service/access-authority.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 457,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "apps/server/src/service/llm.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 125,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "apps/server/src/trpc/context.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 197,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "apps/server/src/video/accounting.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 29,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/archive-host.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 314,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "apps/server/src/video/archive-resume.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 455,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "apps/server/src/video/auto-approval.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 141,
+      "actors": [
+        "/root"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/data-mining-executor.test.ts",
+      "level": "C",
+      "read": "sampled",
+      "lines": 252,
+      "actors": [
+        "/root/marketing_audit"
+      ],
+      "reason": "1-180；仅旧测试形状，正式回归本轮实际运行"
+    },
+    {
+      "path": "apps/server/src/video/data-mining-executor.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 835,
+      "actors": [
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/data-mining-pacing.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 78,
+      "actors": [
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/deal.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 167,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "apps/server/src/video/delivery.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 1097,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "apps/server/src/video/director-jobs.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 128,
+      "actors": [
+        "/root"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/director-router.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 173,
+      "actors": [
+        "/root"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/director-sources.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 191,
+      "actors": [
+        "/root"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/director-store.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 58,
+      "actors": [
+        "/root"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/director-worker.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 267,
+      "actors": [
+        "/root"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/explainer/db.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 260,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "apps/server/src/video/explainer/remotion-provider.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 261,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "apps/server/src/video/explainer/router.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 727,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "apps/server/src/video/explainer/runs.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 50,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "apps/server/src/video/film-router.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 87,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "apps/server/src/video/gate-ledger-bridge.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 116,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "apps/server/src/video/gate-policy.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 255,
+      "actors": [
+        "/root"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/gen/catalog.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 193,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/gen/compiled-request.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 63,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/gen/compiled-request.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 154,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/gen/cost.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 149,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/gen/db.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 33,
+      "actors": [
+        "/root/marketing_audit",
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/gen/gen.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 465,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/gen/ingest.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 274,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "apps/server/src/video/gen/params.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 27,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/gen/providers.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 311,
+      "actors": [
+        "/root/marketing_audit",
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/gen/publish.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 210,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "apps/server/src/video/gen/submission-ledger.pg.test.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 214,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "supporting tests/catalog machine-checked; not claimed as full semantic reading"
+    },
+    {
+      "path": "apps/server/src/video/gen/submission-ledger.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 231,
+      "actors": [
+        "/root/marketing_audit",
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/gen/submit.test.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 261,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "supporting tests/catalog machine-checked; not claimed as full semantic reading"
+    },
+    {
+      "path": "apps/server/src/video/gen/submit.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 295,
+      "actors": [
+        "/root",
+        "/root/marketing_audit",
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/gen/types.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 158,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/marketing-authority.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 209,
+      "actors": [
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/marketing-authority.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 306,
+      "actors": [
+        "/root",
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/marketing-facts.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 220,
+      "actors": [
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/marketing-source-fetcher.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 85,
+      "actors": [
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/marketing-source-fetcher.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 185,
+      "actors": [
+        "/root",
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/media/index.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 480,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "apps/server/src/video/media/library.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 718,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "apps/server/src/video/media/paths.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 45,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "apps/server/src/video/media/products.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 347,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "apps/server/src/video/media/register-local.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 264,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "apps/server/src/video/pipeline-control-plane.pg.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 334,
+      "actors": [
+        "/root"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/pipeline-control-plane.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 824,
+      "actors": [
+        "/root"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/platform-routing.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 62,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "apps/server/src/video/production-authority.pg.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 393,
+      "actors": [
+        "/root/marketing_audit",
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/production-authority.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 364,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/production-authority.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 469,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/production-router.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 152,
+      "actors": [
+        "/root/marketing_audit",
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/production-router.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 42,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/project-compute-budget.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 100,
+      "actors": [
+        "/root",
+        "/root/marketing_audit",
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/render-poller.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 407,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "apps/server/src/video/router.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 1583,
+      "actors": [
+        "/root/marketing_audit",
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/scene-policy-render-gate.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 179,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/scene-policy-routing.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 105,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "apps/server/src/video/studio-worker.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 1795,
+      "actors": [
+        "/root",
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "apps/server/src/video/whiteboard/engine.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 407,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "apps/server/src/video/whiteboard/provider.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 279,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "apps/server/src/video/whiteboard/router.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 1095,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "bundles/ai-video/library/director-system/core.mjs",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 425,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "bundles/ai-video/library/media-catalog/media-catalog.json",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 738,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "supporting tests/catalog machine-checked; not claimed as full semantic reading"
+    },
+    {
+      "path": "bundles/ai-video/pipelines/marketing-film.yml",
+      "level": "A",
+      "read": "full",
+      "lines": 90,
+      "actors": [
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "bundles/ai-video/skills/marketing-brief-parser/SKILL.md",
+      "level": "A",
+      "read": "full",
+      "lines": 66,
+      "actors": [
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "bundles/geo-growth/capabilities/video.mjs",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 539,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "docs/AUTOMATIC-RD-DELIVERY.md",
+      "level": "A",
+      "read": "full",
+      "lines": 19,
+      "actors": [
+        "/root",
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "docs/DEVELOPMENT-PROTOCOL.md",
+      "level": "A",
+      "read": "full",
+      "lines": 307,
+      "actors": [
+        "/root"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "docs/MINE-CLEAR-DELIVERY-SPEC.md",
+      "level": "A",
+      "read": "full",
+      "lines": 327,
+      "actors": [
+        "/root"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "docs/PIPELINE-CONTROL-PLANE.md",
+      "level": "A",
+      "read": "full",
+      "lines": 131,
+      "actors": [
+        "/root"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "docs/ai-video-workbench-guide.md",
+      "level": "A",
+      "read": "full",
+      "lines": 267,
+      "actors": [
+        "/root",
+        "/root/general_audit",
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "package.json",
+      "level": "A",
+      "read": "full",
+      "lines": 119,
+      "actors": [
+        "/root"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/base/model-router/providers.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 547,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/db/migrations/0044_generation_submissions.sql",
+      "level": "A",
+      "read": "full",
+      "lines": 84,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/db/migrations/0045_production_qualifications.sql",
+      "level": "A",
+      "read": "full",
+      "lines": 82,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/db/src/client.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 96,
+      "actors": [
+        "/root"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/db/src/index.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 6,
+      "actors": [
+        "/root"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/db/src/schema.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 368,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/shared/src/index.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 9,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/package.json",
+      "level": "A",
+      "read": "full",
+      "lines": 22,
+      "actors": [
+        "/root/general_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/ai-color-policy.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 83,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/archive/index.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 14,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/av-sync.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 306,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/beat-verify.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 146,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/character-archive.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 544,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/character-consistency.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 198,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/character-release-contract.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 382,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/character-release-source.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 321,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/cinematic-contract.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 94,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/cinematic-skill-policy.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 281,
+      "actors": [
+        "/root/general_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/confirmation.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 74,
+      "actors": [
+        "/root/general_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/continuity.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 352,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/cover-assembly.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 281,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/cover-design.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 859,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/cover-platforms.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 281,
+      "actors": [
+        "/root/general_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/deliver.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 373,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/device-policy.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 217,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/dialogue-contract.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 236,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/director-planner.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 195,
+      "actors": [
+        "/root"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/director-v2.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 24,
+      "actors": [
+        "/root"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/duration-projection-bridge.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 236,
+      "actors": [
+        "/root/general_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/duration-projection.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 181,
+      "actors": [
+        "/root/general_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/duration-projection.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 431,
+      "actors": [
+        "/root/general_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/duration-rules.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 683,
+      "actors": [
+        "/root/general_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/duration-voice-ceiling.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 44,
+      "actors": [
+        "/root/general_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/era-profile.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 69,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/film-completion.mjs",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 49,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/film-contracts.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 89,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/film-service-client.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 205,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/film-worker-channel.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 387,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/film-worker-provenance.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 213,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/film-worker-runtime.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 425,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/final-shot-character-qualification.ts",
+      "level": "C",
+      "read": "sampled",
+      "lines": 504,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "output-truncated read; no definitive defect claim from this file"
+    },
+    {
+      "path": "packages/video-studio/src/final-shot-contract.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 116,
+      "actors": [
+        "/root/general_audit",
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/first-pass.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 172,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/gate-ledger.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 286,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/gates.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 83,
+      "actors": [
+        "/root/general_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/generation-submission.d.mts",
+      "level": "A",
+      "read": "full",
+      "lines": 17,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/generation-submission.mjs",
+      "level": "A",
+      "read": "full",
+      "lines": 115,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/generation-submission.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 102,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/index.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 77,
+      "actors": [
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/library-bpm.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 205,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/likeness-policy.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 40,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/llm-adapter.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 482,
+      "actors": [
+        "/root/general_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/llm-config.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 64,
+      "actors": [
+        "/root/general_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/local-cover-render.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 480,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/marketing-price-contract.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 38,
+      "actors": [
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/marketing-price-contract.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 85,
+      "actors": [
+        "/root/general_audit",
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/material-policy.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 679,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/micromotion.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 121,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/narration.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 86,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/narrative-aspect-contract.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 17,
+      "actors": [
+        "/root/general_audit",
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/narrative-no-person-source.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 50,
+      "actors": [
+        "/root/general_audit",
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/narrative-source-action.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 140,
+      "actors": [
+        "/root/general_audit",
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/narrative-speech-contract.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 32,
+      "actors": [
+        "/root/general_audit",
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/opening-hook.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 272,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/compiler.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 460,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/contracts.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 265,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/coordinator.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 993,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/index.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 9,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/shadow.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 328,
+      "actors": [
+        "/root"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-route-negation.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 47,
+      "actors": [
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-router.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 278,
+      "actors": [
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-router.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 696,
+      "actors": [
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/plate-cache.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 98,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/plate-prompt.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 87,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/platform-intent.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 307,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/plausibility-review.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 342,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/portrait-agent.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 525,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/portrait-binding.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 172,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/portrait-decision.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 91,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/portrait-runtime.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 562,
+      "actors": [
+        "/root/general_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/post-render-acceptance.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 63,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/producer-gate.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 627,
+      "actors": [
+        "/root"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/product-archive.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 423,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/production-client.test.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 167,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "supporting tests/catalog machine-checked; not claimed as full semantic reading"
+    },
+    {
+      "path": "packages/video-studio/src/production-client.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 174,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/production-lineage.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 183,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/prompt-language.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 302,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/prompt-redlines.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 101,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/pronunciation.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 138,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/quality-evidence.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 17,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/real-person-asset-sync.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 237,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/real-person-asset.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 235,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/render-scripts.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 107,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/revise.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 227,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/revision-executor.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 75,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/rhythm-plan.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 150,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/route-preflight.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 191,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/runtime-root.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 16,
+      "actors": [
+        "/root/general_audit",
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/scene-bible.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 361,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/scene-policy.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 338,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/sfx-synth.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 271,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/shot-intent.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 17,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/shot-order.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 83,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/shot-spec.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 973,
+      "actors": [
+        "/root/general_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/stage-registry.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 373,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/standard-post-contract.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 251,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/studio-bridge-concurrency.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 95,
+      "actors": [
+        "/root/general_audit",
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/studio.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 393,
+      "actors": [
+        "/root/general_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/studio.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 713,
+      "actors": [
+        "/root/general_audit",
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/uhd-delivery.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 155,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "packages/video-studio/src/vendor-compat.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 4180,
+      "actors": [
+        "/root/general_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/src/vendor-compat.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 7867,
+      "actors": [
+        "/root/general_audit",
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "packages/video-studio/tsconfig.json",
+      "level": "A",
+      "read": "full",
+      "lines": 8,
+      "actors": [
+        "/root/general_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "scripts/tools/film-audio-policy.mjs",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 144,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "scripts/tools/film-publication-policy.mjs",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 29,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "scripts/tools/film-render-ledger.mjs",
+      "level": "A",
+      "read": "full",
+      "lines": 99,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "scripts/tools/film-render-ledger.test.mjs",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 56,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "supporting tests/catalog machine-checked; not claimed as full semantic reading"
+    },
+    {
+      "path": "scripts/tools/film-render-task.mjs",
+      "level": "A",
+      "read": "full",
+      "lines": 121,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "scripts/tools/film-render-task.test.mjs",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 198,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "supporting tests/catalog machine-checked; not claimed as full semantic reading"
+    },
+    {
+      "path": "scripts/tools/film-standard-post.mts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 835,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "scripts/tools/film-voice-artifact.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 115,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "scripts/tools/full-chain-film.mts",
+      "level": "C",
+      "read": "sampled",
+      "lines": 6846,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "focused provider submission and G7/G8/anchor fragments; 6846-line entrypoint includes out-of-scope postproduction, scope narrowing coordinated with root"
+    },
+    {
+      "path": "scripts/tools/generation-quality.mjs",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 365,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "scripts/tools/lib/ai-production-defaults.ts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 35,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "scripts/tools/render-project.mts",
+      "level": "A",
+      "read": "full",
+      "lines": 594,
+      "actors": [
+        "/root/submission_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "scripts/tools/rhythm-edit.mts",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 152,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "直接依赖的import/require引用与文件元数据已机检，未逐行理解其实现；不据此提出A结论。"
+    },
+    {
+      "path": "tsconfig.base.json",
+      "level": "A",
+      "read": "full",
+      "lines": 19,
+      "actors": [
+        "/root/general_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/competitor-scout.js",
+      "level": "A",
+      "read": "full",
+      "lines": 200,
+      "actors": [
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/cross-verifier.js",
+      "level": "A",
+      "read": "full",
+      "lines": 184,
+      "actors": [
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/dossier-binder.js",
+      "level": "A",
+      "read": "full",
+      "lines": 149,
+      "actors": [
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/product-info-collector.js",
+      "level": "A",
+      "read": "full",
+      "lines": 285,
+      "actors": [
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/review-miner.js",
+      "level": "A",
+      "read": "full",
+      "lines": 283,
+      "actors": [
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/card-consumers.js",
+      "level": "A",
+      "read": "full",
+      "lines": 133,
+      "actors": [
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/contracts/confirmation-sheet.js",
+      "level": "A",
+      "read": "full",
+      "lines": 81,
+      "actors": [
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/contracts/dossier-schema.js",
+      "level": "A",
+      "read": "full",
+      "lines": 184,
+      "actors": [
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/contracts/summary-cards.js",
+      "level": "A",
+      "read": "full",
+      "lines": 185,
+      "actors": [
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/index.js",
+      "level": "A",
+      "read": "full",
+      "lines": 280,
+      "actors": [
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/pipeline/dossier-store.js",
+      "level": "A",
+      "read": "full",
+      "lines": 137,
+      "actors": [
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/pipeline/evidence-ledger.js",
+      "level": "A",
+      "read": "full",
+      "lines": 152,
+      "actors": [
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/pipeline/handoff-validator.js",
+      "level": "A",
+      "read": "full",
+      "lines": 136,
+      "actors": [
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/pipeline/message-envelope.js",
+      "level": "A",
+      "read": "full",
+      "lines": 122,
+      "actors": [
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/production-engine/phases/phase-1-scene-design.js",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 212,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "大型vendor执行器内部未全文精读；正式桥接调用链与回归实际运行，不能替代内部全量审计。"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/production-engine/phases/phase-2-visual-audio.js",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 154,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "大型vendor执行器内部未全文精读；正式桥接调用链与回归实际运行，不能替代内部全量审计。"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/production-engine/phases/phase-3-5-field-quality.js",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 86,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "大型vendor执行器内部未全文精读；正式桥接调用链与回归实际运行，不能替代内部全量审计。"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/production-engine/phases/phase-3-prompt-fusion.js",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 316,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "大型vendor执行器内部未全文精读；正式桥接调用链与回归实际运行，不能替代内部全量审计。"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/production-engine/production-engine.js",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 1825,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "大型vendor执行器内部未全文精读；正式桥接调用链与回归实际运行，不能替代内部全量审计。"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/script-engine/core/script-generator.js",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 1378,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "大型vendor执行器内部未全文精读；正式桥接调用链与回归实际运行，不能替代内部全量审计。"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/script-engine/index.js",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 301,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "大型vendor执行器内部未全文精读；正式桥接调用链与回归实际运行，不能替代内部全量审计。"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/truth-check-bridge.js",
+      "level": "A",
+      "read": "full",
+      "lines": 202,
+      "actors": [
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/index.js",
+      "level": "B",
+      "read": "metadata-only",
+      "lines": 4124,
+      "actors": [
+        "import-index"
+      ],
+      "reason": "大型vendor执行器内部未全文精读；正式桥接调用链与回归实际运行，不能替代内部全量审计。"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/skills/marketing-brief/index.js",
+      "level": "A",
+      "read": "full",
+      "lines": 132,
+      "actors": [
+        "/root/marketing_audit"
+      ],
+      "reason": "实际全文精读；团队按文件合并，不以运行测试代替精读。"
+    }
+  ]
+}

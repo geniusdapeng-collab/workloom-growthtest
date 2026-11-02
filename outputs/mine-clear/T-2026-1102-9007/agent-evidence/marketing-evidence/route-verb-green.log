@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest
+
+
+ Test Files  2 passed (2)
+      Tests  52 passed (52)
+   Start at  22:24:50
+   Duration  208ms (transform 33ms, setup 0ms, import 50ms, tests 11ms, environment 0ms)
+

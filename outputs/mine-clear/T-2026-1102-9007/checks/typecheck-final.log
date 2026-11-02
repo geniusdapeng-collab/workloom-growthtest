@@ -1,0 +1,23 @@
+Scope: 11 of 12 workspace projects
+apps/webc typecheck$ tsc --noEmit
+packages/audit-engine typecheck$ tsc --noEmit
+packages/industry-contract typecheck$ tsc --noEmit
+packages/shared typecheck$ tsc --noEmit
+packages/industry-contract typecheck: Done
+packages/video-studio typecheck$ tsc --noEmit
+apps/webc typecheck: Done
+packages/shared typecheck: Done
+packages/audit-engine typecheck: Done
+packages/video-studio typecheck: Done
+packages/db typecheck$ tsc --noEmit
+packages/db typecheck: Done
+packages/base typecheck$ tsc --noEmit
+packages/base typecheck: Done
+packages/runtime typecheck$ tsc --noEmit
+packages/runtime typecheck: Done
+apps/server typecheck$ tsc --noEmit
+apps/server typecheck: Done
+apps/web typecheck$ tsc --noEmit
+apps/webb typecheck$ tsc --noEmit
+apps/webb typecheck: Done
+apps/web typecheck: Done

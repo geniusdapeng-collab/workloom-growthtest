@@ -1,0 +1,38 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-006-0-1793630627391",
+  "command": "node node_modules/vitest/vitest.mjs run apps/server/src/video/data-mining-pacing.test.ts --maxWorkers=2",
+  "exec": {
+    "file": "node",
+    "args": [
+      "node_modules/vitest/vitest.mjs",
+      "run",
+      "apps/server/src/video/data-mining-pacing.test.ts",
+      "--maxWorkers=2"
+    ]
+  },
+  "actor": "/root/submission_audit",
+  "role": "acceptance",
+  "subject": {
+    "card_id": "MC-006",
+    "assertion_index": 0
+  },
+  "commit": "3f3d283315b9f521871622deb18ef15bbfad6568",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-02T14:43:47.391Z",
+  "finished_at": "2026-11-02T14:43:47.752Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-006-0-1793630627391.txt",
+      "sha256": "d519ae7b7bf66a217ed7a63f94e0d30e72247fc6dae18cf725bd5f8d53454699",
+      "commit": "3f3d283315b9f521871622deb18ef15bbfad6568"
+    }
+  ]
+}

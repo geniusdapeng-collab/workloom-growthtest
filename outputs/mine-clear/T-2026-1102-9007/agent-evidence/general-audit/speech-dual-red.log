@@ -1,0 +1,53 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest
+
+ ❯ packages/video-studio/src/narrative-speech-contract.test.ts (8 tests | 2 failed) 8ms
+   × noDialogue preserves source sound when music was not prohibited, canonicalize=false 2ms
+   × noDialogue preserves source sound when music was not prohibited, canonicalize=true 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/video-studio/src/narrative-speech-contract.test.ts > noDialogue preserves source sound when music was not prohibited, canonicalize=false
+AssertionError: expected '仅有风声；无人物声、无旁白；无音乐、无配乐、无音乐节拍。' not to match /无音乐|无配乐|无节拍/
+
+- Expected:
+/无音乐|无配乐|无节拍/
+
++ Received:
+"仅有风声；无人物声、无旁白；无音乐、无配乐、无音乐节拍。"
+
+ ❯ packages/video-studio/src/narrative-speech-contract.test.ts:22:21
+     20|   const audio = String(result.prompt).match(/【音频】([^\n]*)/)?.[1] ?? '';
+     21|   expect(audio).toMatch(/无人物声|无旁白/);
+     22|   expect(audio).not.toMatch(/无音乐|无配乐|无节拍/);
+       |                     ^
+     23|   expect(audio).toContain('钢琴音乐');
+     24| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  packages/video-studio/src/narrative-speech-contract.test.ts > noDialogue preserves source sound when music was not prohibited, canonicalize=true
+AssertionError: expected '仅保留真实环境声与主体动作声；无人物声、无旁白、无音乐、无配乐、无节拍。' not to match /无音乐|无配乐|无节拍/
+
+- Expected:
+/无音乐|无配乐|无节拍/
+
++ Received:
+"仅保留真实环境声与主体动作声；无人物声、无旁白、无音乐、无配乐、无节拍。"
+
+ ❯ packages/video-studio/src/narrative-speech-contract.test.ts:22:21
+     20|   const audio = String(result.prompt).match(/【音频】([^\n]*)/)?.[1] ?? '';
+     21|   expect(audio).toMatch(/无人物声|无旁白/);
+     22|   expect(audio).not.toMatch(/无音乐|无配乐|无节拍/);
+       |                     ^
+     23|   expect(audio).toContain('钢琴音乐');
+     24| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 6 passed (8)
+   Start at  22:17:08
+   Duration  308ms (transform 191ms, setup 0ms, import 222ms, tests 8ms, environment 0ms)
+

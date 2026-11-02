@@ -1,0 +1,46 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest
+
+ ❯ apps/server/src/video/production-authority.pg.test.ts (19 tests | 1 failed | 18 skipped) 209ms
+     × 历史已落账真实任务缺少计划与实测时长时拒绝新增付费POST 197ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/server/src/video/production-authority.pg.test.ts > 正式生成资格活库契约 > 历史已落账真实任务缺少计划与实测时长时拒绝新增付费POST
+AssertionError: promise resolved "{ mock: false, …(10) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "deduped": false,
++   "degraded": [],
++   "estCny": null,
++   "estUsd": null,
++   "idempotencyKey": "render:a3ea7df14e48864ab3090e8b8f748af27fb4fde38816490ff044a91fb99a5a22",
++   "jobId": "RJ-0d422b1f",
++   "mock": false,
++   "provider": "seedance",
++   "providerModel": "doubao-seedance-2-5-260628",
++   "requestHash": "a3ea7df14e48864ab3090e8b8f748af27fb4fde38816490ff044a91fb99a5a22",
++   "taskId": "provider-b740d0999f6b-1",
+  }
+
+ ❯ apps/server/src/video/production-authority.pg.test.ts:211:78
+    209|     await owner.query(`INSERT INTO render_jobs (id,workspace_id,projec…
+    210|       VALUES ($1,$2,$3,$4,1,false)`, [`RJ-legacy-no-seconds-${suffix}-…
+    211|     await expect(submitGenJob(await input(qualification.qualificationT…
+       |                                                                              ^
+    212|     await expect(projectComputeUsed(app, scope, projectId)).rejects.to…
+    213|     expect(await projectComputeUsed(app, other, projectId)).toBe(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 18 skipped (19)
+   Start at  22:30:30
+   Duration  1.18s (transform 534ms, setup 0ms, import 908ms, tests 209ms, environment 0ms)
+

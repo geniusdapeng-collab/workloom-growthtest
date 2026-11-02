@@ -1,0 +1,378 @@
+{
+  "baseline": "5ffe5047767c3e0e41feeac865ed36a76c0f9428",
+  "scope": "General VideoStudio orchestration, complete host vendor bridge, Phase3 fusion to G6/G7, direct Studio bridge configuration dependencies and model adapter, plus all formal tests added by this subagent. Listed A entries were read as complete files. Full vendor CJS internals and real paid production calls are outside this subagent scope and are not represented as A evidence.",
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 136
+    },
+    {
+      "path": "AGENTS.repo.md",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 58
+    },
+    {
+      "path": "WORKLOOM_PRODUCT_CONTEXT.md",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 596
+    },
+    {
+      "path": "docs/ai-video-workbench-guide.md",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 267
+    },
+    {
+      "path": "packages/video-studio/package.json",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 22
+    },
+    {
+      "path": "packages/video-studio/tsconfig.json",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 8
+    },
+    {
+      "path": "packages/video-studio/src/studio.ts",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 713
+    },
+    {
+      "path": "packages/video-studio/src/vendor-compat.ts",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 7867
+    },
+    {
+      "path": "packages/video-studio/src/vendor-compat.test.ts",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 4180
+    },
+    {
+      "path": "packages/video-studio/src/gates.ts",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 83
+    },
+    {
+      "path": "packages/video-studio/src/final-shot-contract.ts",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 116
+    },
+    {
+      "path": "packages/video-studio/src/cinematic-skill-policy.ts",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 281
+    },
+    {
+      "path": "packages/video-studio/src/runtime-root.ts",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 16
+    },
+    {
+      "path": "packages/video-studio/src/llm-adapter.ts",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 482
+    },
+    {
+      "path": "packages/video-studio/src/llm-config.ts",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 64
+    },
+    {
+      "path": "packages/video-studio/src/duration-projection.ts",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 431
+    },
+    {
+      "path": "packages/video-studio/src/portrait-runtime.ts",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 562
+    },
+    {
+      "path": "packages/video-studio/src/cover-platforms.ts",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 281
+    },
+    {
+      "path": "packages/video-studio/src/narrative-aspect-contract.test.ts",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 17
+    },
+    {
+      "path": "packages/video-studio/src/narrative-speech-contract.test.ts",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 32
+    },
+    {
+      "path": "packages/video-studio/src/narrative-source-action.test.ts",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 140
+    },
+    {
+      "path": "packages/video-studio/src/studio.test.ts",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 393
+    },
+    {
+      "path": "packages/video-studio/src/confirmation.ts",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 74
+    },
+    {
+      "path": "packages/video-studio/src/duration-rules.ts",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 683
+    },
+    {
+      "path": "packages/video-studio/src/shot-spec.ts",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 973
+    },
+    {
+      "path": "packages/video-studio/src/duration-projection.test.ts",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 181
+    },
+    {
+      "path": "packages/video-studio/src/duration-projection-bridge.test.ts",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 236
+    },
+    {
+      "path": "packages/video-studio/src/duration-voice-ceiling.test.ts",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 44
+    },
+    {
+      "path": "packages/video-studio/src/studio-bridge-concurrency.test.ts",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 95
+    },
+    {
+      "path": "packages/video-studio/src/narrative-no-person-source.test.ts",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 50
+    },
+    {
+      "path": "packages/video-studio/src/marketing-price-contract.ts",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 85
+    },
+    {
+      "path": "tsconfig.base.json",
+      "evidence": "A",
+      "completeRead": true,
+      "lines": 19
+    }
+  ],
+  "notCovered": [
+    "Vendor CJS implementations were exercised by local fixtures and existing tests, but not all vendor source files were independently read. This is not a whole-vendor audit.",
+    "Server worker, provider submission, compute reservation and marketing authority were audited by other assigned agents; this manifest only represents this subagent coverage.",
+    "No paid model/video/portrait/provider request and no human visual-production review was performed by this subagent.",
+    "Long source contracts that exceed the configured prompt capacity fail explicitly; arbitrary-length source actions are not claimed to be renderable.",
+    "Source-shot proportional mapping in G7 is metadata coverage, not semantic or visual proof of the eventual video. Provider output visual fidelity remains unverified."
+  ],
+  "findings": [
+    {
+      "id": "GEN-01",
+      "parentCard": "MC001",
+      "severity": "serious",
+      "evidence": "A",
+      "status": "fixed",
+      "title": "Frozen landscape or square ratio was replaced by a 9:16 composition template",
+      "baselineLocation": "packages/video-studio/src/vendor-compat.ts:5898 applyNarrativeFinalPromptContract compositionText",
+      "tests": [
+        "packages/video-studio/src/narrative-aspect-contract.test.ts"
+      ],
+      "red": "work/general-audit/red.log",
+      "green": "work/general-audit/aspect-green.log",
+      "commits": [
+        "ca9dc847"
+      ]
+    },
+    {
+      "id": "GEN-02",
+      "parentCard": "MC002",
+      "severity": "serious",
+      "evidence": "A",
+      "status": "fixed",
+      "title": "Independent speech/music policy flags implicitly prohibited allowed speech or music",
+      "baselineLocation": "packages/video-studio/src/vendor-compat.ts:5721 and :5852 applyNarrativeFinalPromptContract audioText",
+      "tests": [
+        "packages/video-studio/src/narrative-speech-contract.test.ts"
+      ],
+      "red": [
+        "work/general-audit/red.log",
+        "work/general-audit/speech-dual-red.log"
+      ],
+      "green": [
+        "work/general-audit/speech-green.log",
+        "work/general-audit/speech-dual-green.log"
+      ],
+      "commits": [
+        "ec77c853",
+        "4fc9a171"
+      ]
+    },
+    {
+      "id": "GEN-03",
+      "parentCard": "MC003",
+      "severity": "serious",
+      "evidence": "A",
+      "status": "fixed",
+      "title": "Narrative source projection replaced source facts with sample-person/cat/nature facts or lost repeated/tail actions",
+      "baselineLocation": "packages/video-studio/src/vendor-compat.ts:3444 normalizeHomecomingPrdContinuity; :5898 applyNarrativeFinalPromptContract; :6101 deriveNarrativeShotDirection; :6232 projectNarrativeActionSequence; :6296 timelineTextForAction; :6541 costumeTextForFootwear",
+      "tests": [
+        "packages/video-studio/src/narrative-source-action.test.ts",
+        "packages/video-studio/src/narrative-no-person-source.test.ts",
+        "packages/video-studio/src/vendor-compat.test.ts"
+      ],
+      "red": [
+        "work/general-audit/source-red.log",
+        "work/general-audit/source-order-red.log",
+        "work/general-audit/no-person-red.log",
+        "work/general-audit/no-person-animal-red.log",
+        "work/general-audit/no-person-prompt-negative-red.log"
+      ],
+      "green": [
+        "work/general-audit/source-green.log",
+        "work/general-audit/source-order-green.log",
+        "work/general-audit/no-person-green.log",
+        "work/general-audit/no-person-prompt-negative-green.log"
+      ],
+      "commits": [
+        "11751dce",
+        "4f53b15f",
+        "34d66839",
+        "3f3d2833"
+      ],
+      "notes": "Source actions keep order and repetition; grouped actions retain fourth and later clauses. No-person kitchens/showrooms/city buildings retain scene/light/props/action/audio; building/device/animal prohibitions require source policy. Dry dog balcony final contract does not invent paper box or wet fur. Environment prohibitions survive both structured negative and prompt-only negative source forms."
+    },
+    {
+      "id": "GEN-04",
+      "parentCard": "MC004",
+      "severity": "serious",
+      "evidence": "A",
+      "status": "fixed",
+      "title": "Voice floors exceeding the model single-shot ceiling were silently clamped to that ceiling",
+      "baselineLocation": "packages/video-studio/src/duration-projection.ts:286 projectShotDurations floors[].lower",
+      "tests": [
+        "packages/video-studio/src/duration-voice-ceiling.test.ts",
+        "packages/video-studio/src/duration-projection.test.ts",
+        "packages/video-studio/src/duration-projection-bridge.test.ts"
+      ],
+      "red": "work/general-audit/duration-red.log",
+      "green": "work/general-audit/duration-green.log",
+      "commits": [
+        "af97adcf"
+      ],
+      "notes": "Returns voice-floor-exceeds-model-limit with source shot id; dialogue unchanged; Phase3/DCM do not retry projection by ignoring this hard voice floor."
+    },
+    {
+      "id": "GEN-05",
+      "parentCard": "MC012",
+      "severity": "serious",
+      "evidence": "A",
+      "status": "fixed",
+      "title": "Overlapping Studio runs prematurely uninstalled global bridges and retained stale wrappers/events/policy",
+      "baselineLocation": "packages/video-studio/src/studio.ts runPreproduction static installs and per-run duration event closure",
+      "tests": [
+        "packages/video-studio/src/studio-bridge-concurrency.test.ts",
+        "packages/video-studio/src/studio.test.ts"
+      ],
+      "red": "work/general-audit/concurrency-red.log",
+      "green": [
+        "work/general-audit/concurrency-green.log",
+        "work/general-audit/concurrency-broad-green.log"
+      ],
+      "commits": [
+        "a518957d"
+      ],
+      "notes": "Uses existing shared bridge reference counting, async-local log/event dispatch and existing duration scope with per-run min/max. Four true Studio/CJS overlap orders including failures, cleanup and third run; no global serialization."
+    },
+    {
+      "id": "GEN-06",
+      "parentCard": "MC003",
+      "severity": "serious",
+      "evidence": "A",
+      "status": "fixed",
+      "title": "Canonical source contract rebuilt after length enforcement could return an over-limit prompt",
+      "baselineLocation": "packages/video-studio/src/vendor-compat.ts applyNarrativeFinalPromptContract canonicalize after initial maxLength loop",
+      "tests": [
+        "packages/video-studio/src/narrative-source-action.test.ts"
+      ],
+      "red": "work/general-audit/capacity-red.log",
+      "green": "work/general-audit/capacity-green.log",
+      "commits": [
+        "f13c4cbe"
+      ],
+      "notes": "Throws FINAL_PROMPT_SOURCE_CAPACITY_EXCEEDED after canonical rebuild; preserves original source object; true Studio/G6 bridge fixture sees zero approval and zero subsequent render-boundary call."
+    }
+  ],
+  "coverage": {
+    "total": 32,
+    "A_complete_read": 32,
+    "B_machine_only": 0,
+    "C_sampled": 0,
+    "D_unread": 0
+  },
+  "frozenHead": "3f3d2833",
+  "validation": [
+    {
+      "log": "work/general-audit/no-person-prompt-negative-green.log",
+      "files": 3,
+      "passed": 134,
+      "failed": 0,
+      "scope": "Final frozen head source/no-person/capacity plus complete vendor-compat tests"
+    },
+    {
+      "log": "work/general-audit/no-person-green.log",
+      "files": 6,
+      "passed": 149,
+      "failed": 0,
+      "scope": "Latest final-contract source/no-person/audio/aspect/concurrency plus complete vendor-compat tests"
+    },
+    {
+      "log": "work/general-audit/concurrency-broad-green.log",
+      "files": 4,
+      "passed": 145,
+      "failed": 0,
+      "scope": "Concurrency bridge + vendor-compat + duration projection bridge + Studio orchestration before final no-person-only change"
+    },
+    {
+      "log": "work/general-audit/typecheck.log",
+      "command": "tsc --noEmit -p packages/video-studio/tsconfig.json",
+      "exitCode": 0
+    }
+  ]
+}

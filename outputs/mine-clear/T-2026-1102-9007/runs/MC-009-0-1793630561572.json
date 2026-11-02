@@ -1,0 +1,40 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-009-0-1793630561572",
+  "command": "node node_modules/vitest/vitest.mjs run apps/server/src/video/production-authority.pg.test.ts apps/server/src/video/gen/submission-ledger.pg.test.ts apps/server/src/video/gen/submit.test.ts --maxWorkers=2",
+  "exec": {
+    "file": "node",
+    "args": [
+      "node_modules/vitest/vitest.mjs",
+      "run",
+      "apps/server/src/video/production-authority.pg.test.ts",
+      "apps/server/src/video/gen/submission-ledger.pg.test.ts",
+      "apps/server/src/video/gen/submit.test.ts",
+      "--maxWorkers=2"
+    ]
+  },
+  "actor": "/root/submission_audit",
+  "role": "repair",
+  "subject": {
+    "card_id": "MC-009",
+    "assertion_index": 0
+  },
+  "commit": "3f3d283315b9f521871622deb18ef15bbfad6568",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-02T14:42:41.572Z",
+  "finished_at": "2026-11-02T14:42:43.681Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-009-0-1793630561572.txt",
+      "sha256": "0a4c552ed0f12edf7e07a08fa0c926d6827397895c2f0a7a9f714f09c14c5311",
+      "commit": "3f3d283315b9f521871622deb18ef15bbfad6568"
+    }
+  ]
+}

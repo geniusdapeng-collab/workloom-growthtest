@@ -1,0 +1,84 @@
+{
+  "actor": "/root/submission_audit",
+  "findings": [
+    {
+      "id": "SUBMISSION-01",
+      "severity": "P1",
+      "title": "G11 omits the current shot from its remaining-budget comparison",
+      "evidence": "A+B",
+      "baseline": "5ffe5047767c3e0e41feeac865ed36a76c0f9428",
+      "source": "apps/server/src/video/router.ts:980",
+      "trigger": "used=29s, cap=30s, qualified shot=5s: route submits before fix",
+      "fixCommit": "b287bd86",
+      "regression": "apps/server/src/video/production-router.test.ts: G11 在提交前计入本镜时长; exact budget and reconciliation cases",
+      "red": "21 cases: 1 failed (submission resolved unexpectedly), 20 passed",
+      "green": "production-router + auto-approval + duration-submit:33 passed",
+      "status": "fixed; independent verification requested from root"
+    },
+    {
+      "id": "SUBMISSION-02",
+      "severity": "P1",
+      "title": "Concurrent and accepted-but-unfinalized/unknown submissions bypass project compute budget",
+      "evidence": "A+B",
+      "baseline": "b287bd86",
+      "source": "apps/server/src/video/project-compute-budget.ts:13 and apps/server/src/video/gen/submit.ts:92",
+      "trigger": "two qualified 5s shots against 5s cap; hold first provider response; second posts and succeeds. Accepted or unknown generation_submissions with no render_jobs reads 0s",
+      "fixCommits": [
+        "c7210855",
+        "fe199ec3",
+        "5d40da57"
+      ],
+      "fix": "same existing qualification lease connection holds a project budget advisory lock through recheck/POST/finalization; count in-flight generation_submissions without a render_jobs receipt once; exclude definite rejection and mocks; missing legacy duration fails closed; accepted reconciliation has no second reservation",
+      "regression": "production-authority.pg.test.ts: real concurrent provider block, accepted, unknown, explicit rejection, scope, dedupe and legacy missing-duration cases",
+      "red": "PG15:3failed12passed before core fix",
+      "green": "7suites172passed core; later PG+providers+router subsets passed incl legacy refinement",
+      "status": "fixed; root independently reran core172 cases",
+      "legacyRenderJobFollowup": {
+        "trigger": "legacy nonmock render_jobs has NULL actual_seconds and NULL est_seconds; budget treated it as 0 seconds and submitted another paid shot",
+        "red": "real PG selected case: 1 failed because submitGenJob resolved mock:false with provider task instead of PROJECT_COMPUTE_BUDGET_UNVERIFIED",
+        "green": "3 suites75 passed: production-authority.pg (19), production-router, gen/submit; legacy no-seconds case makes 0 provider POSTs, wrong scope sees 0",
+        "logs": [
+          "work/submission-legacy-render-red.log",
+          "work/submission-legacy-render-green.log"
+        ],
+        "independentVerification": "root requested; author does not claim independent acceptance"
+      }
+    },
+    {
+      "id": "SUBMISSION-03",
+      "severity": "P1",
+      "title": "HTTP error with accepted task/output clues is incorrectly treated as definite rejection",
+      "evidence": "A+B",
+      "baseline": "c7210855",
+      "source": "apps/server/src/video/gen/providers.ts:23",
+      "trigger": "provider returns HTTP400 with id or output; previous BAD_REQUEST acceptance=not-accepted produces rejected ledger and allows fresh qualification with random script/request identity",
+      "fixCommit": "fe199ec3 plus provider-specific trace-id refinement pending",
+      "fix": "task/output clues take precedence over HTTP classification, marking unknown; same qualification/request remains in unknown ledger and no fresh POST. HF/MuAPI request_id is a task clue; Ark request_id trace is not a task clue",
+      "red": "6newcases failed across gen.test.ts and realPG; PG observed BAD_REQUEST instead of SUBMISSION_UNKNOWN",
+      "green": "5 suites, 139 passed, including provider-specific trace-id refinement",
+      "status": "fixed; final independent review pending",
+      "fixCommits": [
+        "fe199ec3",
+        "21da524f79dfb90415512ee7e5f08d03b4838d5b"
+      ]
+    }
+  ],
+  "architectureObservations": [
+    {
+      "evidence": "A structure, D runtime speed",
+      "claim": "production-client normal N-shot path invokes full sourceForShot verification 4N+1 times and one extra final-request model review per shot; each source read includes complete prompt array and marketing/scene-policy full-shot verification, producing an O(N^2) component",
+      "refs": [
+        "packages/video-studio/src/production-client.ts:109",
+        "apps/server/src/video/production-authority.ts:151",
+        "apps/server/src/video/production-authority.ts:299",
+        "apps/server/src/video/production-authority.ts:438"
+      ],
+      "proposalOnly": "freeze immutable source certificate keyed by source hashes/rule versions, reuse complete-bundle deterministic audit, validate per-shot differences and final bytes before paid submit. No implementation or performance-percent claim."
+    },
+    {
+      "evidence": "D",
+      "claim": "qualification default params may omit reviewed portrait/product references; no deterministic send-side binding found in reviewed path, but not proven a production bug because textual asset fragments and upstream pipelines need further evidence",
+      "action": "not modified; not count as confirmed defect"
+    }
+  ]
+}

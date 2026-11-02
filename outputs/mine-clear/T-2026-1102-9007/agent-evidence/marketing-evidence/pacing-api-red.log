@@ -1,0 +1,64 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest
+
+ ❯ apps/server/src/video/data-mining-pacing.test.ts (6 tests | 2 failed) 24ms
+     × 配置API检索同样遵守并发限速与排队后熔断，限流=false 3ms
+     × 配置API检索同样遵守并发限速与排队后熔断，限流=true 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/server/src/video/data-mining-pacing.test.ts > 营销来源并发检索的逐引擎限速 > 配置API检索同样遵守并发限速与排队后熔断，限流=false
+AssertionError: expected [ 10000, 10000, 10000, 10000 ] to deeply equal [ 10000, 10050, 10100, 10150 ]
+
+- Expected
++ Received
+
+  [
+    10000,
+-   10050,
+-   10100,
+-   10150,
++   10000,
++   10000,
++   10000,
+  ]
+
+ ❯ apps/server/src/video/data-mining-pacing.test.ts:76:19
+     74|     const pending = Promise.all(Array.from({ length: 4 }, (_, index) =…
+     75|     await vi.runAllTimersAsync(); await pending;
+     76|     expect(times).toEqual(blocked ? [10_000] : [10_000, 10_050, 10_100…
+       |                   ^
+     77|   });
+     78| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  apps/server/src/video/data-mining-pacing.test.ts > 营销来源并发检索的逐引擎限速 > 配置API检索同样遵守并发限速与排队后熔断，限流=true
+AssertionError: expected [ 10000, 10000, 10000, 10000 ] to deeply equal [ 10000 ]
+
+- Expected
++ Received
+
+  [
+    10000,
++   10000,
++   10000,
++   10000,
+  ]
+
+ ❯ apps/server/src/video/data-mining-pacing.test.ts:76:19
+     74|     const pending = Promise.all(Array.from({ length: 4 }, (_, index) =…
+     75|     await vi.runAllTimersAsync(); await pending;
+     76|     expect(times).toEqual(blocked ? [10_000] : [10_000, 10_050, 10_100…
+       |                   ^
+     77|   });
+     78| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 4 passed (6)
+   Start at  22:25:15
+   Duration  141ms (transform 33ms, setup 0ms, import 42ms, tests 24ms, environment 0ms)
+
