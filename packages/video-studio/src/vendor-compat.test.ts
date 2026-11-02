@@ -2426,6 +2426,10 @@ console.log("RESULT " + JSON.stringify({
       "- **场景**（1）：旧段落",
       "- **道具**（1）：动物",
       "- **动作**（1）：仅一",
+      "### 视觉锚点定义",
+      "- ①旧锚点一",
+      "### 视觉锚点定义",
+      "- ②旧锚点二",
       "- **风险结论**：待补",
     ].join("\n"), discovery, 15, upstream);
     expect(markdown).toContain("目的=");
@@ -2439,6 +2443,7 @@ console.log("RESULT " + JSON.stringify({
     expect(markdown).toContain(`${actions.length}个连续动作`);
     expect(markdown).toContain("主体动作与画外环境声");
     expect(markdown).toContain("### 视觉锚点定义");
+    expect((markdown.match(/###\s*视觉锚点定义/gu) ?? []).length).toBe(1);
     expect(markdown).toContain("片尾静止=0.5秒");
     discovery._canonicalCharacters = inferredRoles.map((role, index) => ({
       ...role,
@@ -2861,10 +2866,13 @@ console.log("RESULT " + JSON.stringify({
       sceneStructure: {
         opening: { duration: 5, purpose: "湿冷大雨压在渺小橘猫上，橘猫从纸箱探头", keyElements: ["纸箱", "橘猫"] },
         scenes: [
-          { duration: 5, purpose: "伸爪接屋檐将落未落的水滴", keyElements: ["猫爪", "水滴"] },
           { duration: 5, purpose: "缩回箱内盘成一团，耳朵最后收进去", keyElements: ["纸箱", "猫尾巴", "耳朵"] },
+          { duration: 5, purpose: "伸爪接屋檐将落未落的水滴", keyElements: ["猫爪", "水滴"] },
         ],
         ending: { duration: 0, purpose: "鼻尖抵住爪背", keyElements: ["纸箱"] },
+      },
+      audienceProfile: {
+        contentExpectations: ["配乐只做低频垫底", "保留雨滴与纸箱摩擦声"],
       },
       riskAssessment: {
         technicalRisks: [
@@ -2873,6 +2881,7 @@ console.log("RESULT " + JSON.stringify({
           { risk: "将落未落的水珠悬停时突然消失", level: "high" },
           { risk: "猫爪连续动作导致趾数与肉垫形变", level: "high" },
           { risk: "跨镜头纸箱花纹、水痕与街灯连续性漂移", level: "medium" },
+          { risk: "湿地面反光与水痕跨镜头一致性漂移", level: "medium" },
         ],
         mitigationSuggestions: [
           "固定曝光与白平衡",
@@ -2880,9 +2889,11 @@ console.log("RESULT " + JSON.stringify({
           "准备备选方案",
           "固定曝光",
           "调节色温",
+          "预留重试",
         ],
       },
     };
+    normalizeNarrativeDiscovery(discovery, 15, upstream);
     const actions = extractNarrativeActions(discovery, upstream);
     expect(actions.join("；")).toMatch(/缩回.*盘成/u);
     expect(actions.join("；")).not.toContain("贴住皮肤");
@@ -2893,6 +2904,11 @@ console.log("RESULT " + JSON.stringify({
     expect(pairs[2]).toMatch(/悬停水滴/u);
     expect(pairs[3]).toMatch(/爪部动作/u);
     expect(pairs[4]).toMatch(/纸箱参考帧/u);
+    expect(pairs[5]).toMatch(/固定主灯位/u);
+    expect(JSON.stringify(discovery.audienceProfile)).not.toContain("低频垫底");
+    const scenePurposes = (discovery.sceneStructure as any).scenes.map((item: any) => String(item.purpose));
+    expect(scenePurposes[0]).toContain("伸爪");
+    expect(scenePurposes[1]).toContain("缩回");
   });
 
   it("动作与禁止项抽取产出可执行短句，避免重复和整段原文", () => {

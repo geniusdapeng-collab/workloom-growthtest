@@ -1654,6 +1654,11 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
       && /(?:一致|连续|漂移|跳变)/u.test(text)) {
       return "锁定同一纸箱参考帧、花纹位置、水痕边界与街灯光源方向；每个切点核对待机姿态和道具相对位置，异常只重做对应镜头的遮挡层，不改动已通过的场景结构。";
     }
+    if (/(?:湿地面|水痕|反光|反射)/u.test(text)
+      && /(?:跨镜头|逐帧|连续|一致|漂移|跳变)/u.test(text)
+      && !/(?:低照度|色温|噪点|换鞋|鞋跟|脚掌|脚部|雨滴|涟漪|伞面|钥匙|锁孔|门锁|锁舌)/u.test(text)) {
+      return "固定主灯位、背景板与相机高度，逐镜锁定湿地反光方向、水痕边界和调色基准；每个切点对照同一参考帧检查高光形状与暗部层次，异常只重做反光或水痕层。";
+    }
     if (/(?:微表情|表情.*(?:僵硬|停滞)|眼神.*空洞|静坐.*(?:面部|情绪|长镜)|面部.*(?:漂移|变形))/u.test(text)
       && !/(?:台灯|旋钮|开关|钨丝|身份|定妆|角色一致)/u.test(text)) {
       return "把静止情绪拆成背影或侧影、手部自然放下与肩线下沉三个局部短镜，不要求正脸长特写；用雨声、呼吸和衣料轻响承接停顿，逐镜保持同一姿态终点。";
@@ -2123,6 +2128,18 @@ export function normalizeNarrativeRequirementMarkdown(
   if (anchorDefinitions.length > 0 && !normalized.includes("视觉锚点定义")) {
     normalized = `${normalized.trimEnd()}\n\n### 视觉锚点定义\n${anchorDefinitions.map((item) => `- ${item}`).join("\n")}\n`;
   }
+  const anchorSectionPattern = /###\s*视觉锚点定义\s*\n([\s\S]*?)(?=\n(?:###|##|---|$)|\s*$)/gu;
+  const anchorSections = [...normalized.matchAll(anchorSectionPattern)];
+  if (anchorSections.length > 1) {
+    const mergedAnchors = [...new Set(anchorSections.flatMap((match) =>
+      String(match[1] ?? "").split("\n").map((line) => line.trim()).filter((line) => /^-\s+/u.test(line))))];
+    let kept = false;
+    normalized = normalized.replace(anchorSectionPattern, () => {
+      if (kept) return "";
+      kept = true;
+      return `### 视觉锚点定义\n${mergedAnchors.join("\n")}`;
+    });
+  }
   normalized = normalized.replace(
     /(##\s*三、最终业务需求确认)/u,
     "> 设备型号、光照参数与实拍可行性未在本轮核实；相关摄影参数仅为创作参考，正式执行以结构化镜头合同为准。\n\n$1",
@@ -2305,6 +2322,7 @@ export function normalizeNarrativeDiscovery(
     upstream.special_notes,
     upstream.dialogue_requirement,
   ].map(String).join(" ");
+  const musicForbidden = /(?:无|不加|不要|禁止|不出现)[^。；\n]{0,8}(?:配乐|音乐|旋律)|(?:仅|只)保留(?:人物|主体)?(?:动作)?(?:与)?(?:画外)?(?:环境声|实拍声)/u.test(storyPolicy);
   const noAnimals = /无动物|不出现动物|无宠物/u.test(storyPolicy);
   const noPeople = /无人物|无真人|不出现人物/u.test(storyPolicy);
   const noText = /无文字|无字幕|不出现文字/u.test(storyPolicy);
@@ -2515,6 +2533,24 @@ export function normalizeNarrativeDiscovery(
     ...(Array.isArray(scene.scenes) ? scene.scenes : []),
     scene.ending,
   ].map(recordValue).filter((node) => Object.keys(node).length > 0);
+  const catSequence = sourceActionPhrases.some((item) => /探头|探出/u.test(item))
+    && sourceActionPhrases.some((item) => /伸爪|接水/u.test(item))
+    && sourceActionPhrases.some((item) => /缩回|盘成|蜷缩/u.test(item));
+  if (catSequence && Array.isArray(scene.scenes) && scene.scenes.length >= 2) {
+    const originalScenes = (scene.scenes as unknown[]).map(recordValue);
+    const rank = (node: Record<string, unknown>): number => {
+      const purpose = String(node.purpose ?? "");
+      if (/探头|探出/u.test(purpose)) return 0;
+      if (/伸爪|接水|滴水/u.test(purpose)) return 1;
+      if (/缩回|盘成|蜷缩|鼻尖|尾巴/u.test(purpose)) return 2;
+      return 1.5;
+    };
+    const ordered = [...originalScenes].sort((left, right) => rank(left) - rank(right));
+    if (ordered.some((node, index) => node !== originalScenes[index])) {
+      scene.scenes = ordered;
+      repairs.push({ code: "ANIMAL_ACTION_ORDER_REPAIRED", detail: "橘猫场景按探头→伸爪接水→缩回盘团重排" });
+    }
+  }
   const requiredActions = extractNarrativeActions(discovery, upstream);
   for (const action of requiredActions) {
     if (nodes.some((node) => String(node.purpose ?? "").includes(action))) continue;
@@ -2581,6 +2617,13 @@ export function normalizeNarrativeDiscovery(
     let text = item
       .replace(/\bundefined\b/giu, "未标注")
       .replace(/\bnull\b/giu, "未标注");
+    if (musicForbidden && MUSIC_CUE_PATTERN.test(text)) {
+      const kept = text.split(/[。；\n]+/u)
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .filter((part) => !MUSIC_CUE_PATTERN.test(part));
+      text = `${kept.length > 0 ? `${kept.join("；")}；` : ""}不使用配乐，仅保留环境声与动作声`;
+    }
     if (noLipSyncDialogue && voiceoverAllowed) {
       text = text.replace(
         /[\u4e00-\u9fff]{0,24}(?:轻声|低声|开口)?说[：:]?\s*([「“"'‘][^」”"'’]+[」”"'’])/gu,
