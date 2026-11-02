@@ -326,14 +326,17 @@ console.log("RESULT " + JSON.stringify({ beforeError, afterError, afterIssues, t
     expect(result.timelineIsArray).toBe(true);
   }, 60_000);
 
-  it("字段质检桥不重写带冻结策略的完整编号合同，并明确记录 skipped", () => {
+  it("字段质检桥不重写完整编号合同（有策略和无策略镜头都覆盖），并明确记录 skipped", () => {
     const script = `
 import { createRequire } from "node:module";
 import { installVendorFieldQualityBridge } from ${JSON.stringify(resolve(here, "vendor-compat.ts"))};
 const require = createRequire(${JSON.stringify(join(repoRoot, "package.json"))});
 const { FieldQualityPipeline } = require(${JSON.stringify(join(repoRoot, "vendor/supermickey/hyperreality-system/engines/field-quality/field-quality-pipeline.js"))});
 const prompt = Array.from({ length: 26 }, (_, index) => String(index + 1).padStart(2, "0") + ".【字段" + (index + 1) + "】" + "完整可执行内容。".repeat(8)).join("\\n");
-const shots = [{ shotId: "S1", duration: 3, prompt, _workloomPromptReviewPolicy: { noDialogue: true, noTitles: true } }];
+const shots = [
+  { shotId: "S1", duration: 3, prompt, _workloomPromptReviewPolicy: { noDialogue: true, noTitles: true } },
+  { shotId: "S2", duration: 3, prompt }
+];
 const uninstall = installVendorFieldQualityBridge({ log: () => undefined });
 const output = await new FieldQualityPipeline({ maxRounds: 2 }).runAll(shots);
 uninstall();
@@ -341,6 +344,7 @@ console.log("RESULT " + JSON.stringify({
   skipped: output.summary.skipped,
   reason: output.summary.reason,
   samePrompt: output.finalShots[0].prompt === prompt,
+  samePromptWithoutPolicy: output.finalShots[1].prompt === prompt,
   reports: output.allReports.length,
   logs: output.allLogs.length
 }));
@@ -349,6 +353,7 @@ console.log("RESULT " + JSON.stringify({
     expect(result.skipped).toBe(true);
     expect(String(result.reason)).toContain("frozen");
     expect(result.samePrompt).toBe(true);
+    expect(result.samePromptWithoutPolicy).toBe(true);
     expect(result.reports).toBe(0);
     expect(result.logs).toBe(0);
   }, 60_000);
@@ -1465,7 +1470,7 @@ console.log("RESULT " + JSON.stringify({
         "把结尾收束拆成低头、尾尖扫入遮鼻、固定中近景静止三镜",
       ],
     });
-    expect(pairs[0]).toContain("爪心空接");
+    expect(pairs[0]).toMatch(/爪心空接|爪部动作/u);
     expect(pairs[0]).not.toContain("结尾收束");
     expect(pairs[1]).toMatch(/结尾收束|蜷缩|尾巴/u);
   });
@@ -2803,9 +2808,16 @@ console.log("RESULT " + JSON.stringify({
         sceneStructure: {
           opening: { duration: 5, purpose: item.story.split("。")[0], keyElements: [] },
           scenes: [],
-          ending: { duration: 5, purpose: "保持源场景的自然变化直到收束", keyElements: [] },
+          ending: item.space === "桌面上"
+            ? { duration: 5, purpose: "低声一句“光走了，它还热着。”", keyElements: ["杯垫"] }
+            : { duration: 5, purpose: "保持源场景的自然变化直到收束", keyElements: [] },
         },
-        audienceProfile: { emotionTriggers: [], contentExpectations: ["只记录自然环境与环境声的缓慢变化"] },
+        audienceProfile: {
+          emotionTriggers: item.space === "桌面上" ? ["空桌与始终不出现的第二个人"] : [],
+          contentExpectations: item.space === "桌面上"
+            ? ["留一句可截图、可复述的固定台词“光走了，它还热着。”"]
+            : ["只记录自然环境与环境声的缓慢变化"],
+        },
         riskAssessment: { technicalRisks: [], mitigationSuggestions: [] },
       };
       normalizeNarrativeDiscovery(discovery, 10, upstream);
@@ -2821,6 +2833,15 @@ console.log("RESULT " + JSON.stringify({
       expect(markdown).toContain(item.action);
       for (const prop of item.props) expect(markdown).toContain(prop);
       for (const sound of item.sounds) expect(markdown).toContain(sound);
+      expect(markdown).toContain("- **禁止项**");
+      expect(markdown).toContain("无人物");
+      expect(markdown).toContain("无品牌");
+      if (item.space === "桌面上") {
+        expect(markdown).not.toContain("低声一句");
+        expect(markdown).not.toContain("光走了，它还热着");
+        expect(markdown).not.toContain("杯垫");
+        expect(markdown).not.toContain("第二个人");
+      }
       expect(markdown).not.toContain("- **声音锚点**（1）：雨声");
       expect(markdown).not.toMatch(/动作.*以风、雾、光线和水面变化推进/u);
     }
@@ -2834,7 +2855,7 @@ console.log("RESULT " + JSON.stringify({
     };
     const discovery: Record<string, unknown> = {
       sceneStructure: {
-        opening: { duration: 5, purpose: "橘猫从纸箱探头", keyElements: ["纸箱", "橘猫"] },
+        opening: { duration: 5, purpose: "湿冷大雨压在渺小橘猫上，橘猫从纸箱探头", keyElements: ["纸箱", "橘猫"] },
         scenes: [
           { duration: 5, purpose: "伸爪接屋檐将落未落的水滴", keyElements: ["猫爪", "水滴"] },
           { duration: 5, purpose: "缩回箱内盘成一团，耳朵最后收进去", keyElements: ["纸箱", "猫尾巴", "耳朵"] },
@@ -2846,21 +2867,28 @@ console.log("RESULT " + JSON.stringify({
           { risk: "猫耳朵收拢时折叠方向抖动", level: "high" },
           { risk: "纸箱毛边吸水后箱沿塌陷穿模", level: "high" },
           { risk: "将落未落的水珠悬停时突然消失", level: "high" },
+          { risk: "猫爪连续动作导致趾数与肉垫形变", level: "high" },
+          { risk: "跨镜头纸箱花纹、水痕与街灯连续性漂移", level: "medium" },
         ],
         mitigationSuggestions: [
           "固定曝光与白平衡",
           "预留重试时间",
           "准备备选方案",
+          "固定曝光",
+          "调节色温",
         ],
       },
     };
     const actions = extractNarrativeActions(discovery, upstream);
     expect(actions.join("；")).toMatch(/缩回.*盘成/u);
     expect(actions.join("；")).not.toContain("贴住皮肤");
+    expect(actions.join("；")).not.toContain("压在");
     const pairs = pairRiskMitigations(discovery.riskAssessment as Record<string, unknown>);
     expect(pairs[0]).toMatch(/耳朵/u);
     expect(pairs[1]).toMatch(/纸箱/u);
     expect(pairs[2]).toMatch(/悬停水滴/u);
+    expect(pairs[3]).toMatch(/爪部动作/u);
+    expect(pairs[4]).toMatch(/纸箱参考帧/u);
   });
 
   it("动作与禁止项抽取产出可执行短句，避免重复和整段原文", () => {

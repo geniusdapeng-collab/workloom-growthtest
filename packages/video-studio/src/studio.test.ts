@@ -51,6 +51,11 @@ vi.mock("./vendor-compat.js", () => {
   };
   return {
     applyDurationPolicyToManager: vi.fn(),
+    narrativeSpeechPolicy: (value: unknown) => ({
+      allSpeechForbidden: /(?:无.{0,2}台词|无对白)/u.test(String(value ?? ""))
+        && !/(?:允许|保留)[^。；\n]*(?:旁白|画外音|画外)/u.test(String(value ?? "")),
+    }),
+    runWithDurationProjectionPolicy: (_policy: { noDialogue?: boolean }, callback: () => unknown) => callback(),
     installVendorConfigIsolatorBridge: install("isolator"),
     installVendorPhaseDiagnosticsBridge: install("phase"),
     installVendorFieldQualityBridge: install("field"),

@@ -6,6 +6,7 @@ import {
   installSharedBridge,
   installVendorDurationProjectionBridge,
   listSharedBridges,
+  runWithDurationProjectionPolicy,
   type DurationProjectionEvent,
 } from "./vendor-compat.js";
 
@@ -130,6 +131,29 @@ describe("时长投影桥：vendor 侧不再产出越界/失衡时长", () => {
     expect(out.map((shot) => shot.duration)).toEqual([3, 3, 3, 2, 2, 2]);
     expect(events.filter((event) => event.kind === "infeasible")).toEqual([]);
     expect(events.some((event) => event.kind === "projected" && event.source === "production-engine.normalize")).toBe(true);
+  });
+
+  it.skipIf(!ProductionEngine)("无台词运行上下文清空模型幻觉台词，不用虚构台词下限阻断时长投影", () => {
+    const events: DurationProjectionEvent[] = [];
+    uninstall = installVendorDurationProjectionBridge({
+      log: () => undefined,
+      onEvent: (event) => events.push(event),
+      maxShotSeconds: 30,
+      minShotSeconds: 4,
+    });
+    const hallucinated = "这一段模型擅自写出的长台词必须被无台词合同清空，否则六镜会凭空产生无法分配的台词硬下限。";
+    const shots = Array.from({ length: 6 }, (_, index) => ({
+      shotId: `S${index + 1}`,
+      duration: 5,
+      timing: { start: index * 5, duration: 5, end: (index + 1) * 5 },
+      dialogue: { lines: [{ text: hallucinated }], blocks: [{ line: hallucinated }] },
+      dialogueBlocks: [{ line: hallucinated }],
+    }));
+    const out = runWithDurationProjectionPolicy({ noDialogue: true }, () =>
+      (ProductionEngine!.prototype._normalizeDurations as (s: unknown, t: unknown) => Array<Record<string, unknown>>).call({}, shots, 30));
+    expect(out.reduce((sum, shot) => sum + Number(shot.duration), 0)).toBe(30);
+    expect(out.every((shot) => !shot.dialogue && (!Array.isArray(shot.dialogueBlocks) || shot.dialogueBlocks.length === 0))).toBe(true);
+    expect(events.filter((event) => event.kind === "infeasible")).toEqual([]);
   });
 
   it.skipIf(!DurationConstraintManager)("运行期约束：权重表重分配停用（不再抹平台词适配），总时长守恒", () => {

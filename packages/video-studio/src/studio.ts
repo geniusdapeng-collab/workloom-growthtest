@@ -36,7 +36,9 @@ import {
   installVendorPromptRebuildBridge,
   installVendorNarrativePromptReviewBridge,
   installVendorPreproductionReviewBridge,
-  installSharedBridge
+  installSharedBridge,
+  narrativeSpeechPolicy,
+  runWithDurationProjectionPolicy
 } from "./vendor-compat.js";
 import { AUDIO_DISCIPLINE_CLAUSE, AUDIO_NEGATIVE_TERMS } from "./shot-spec.js";
 import { loadDurationRules } from "./duration-rules.js";
@@ -434,6 +436,10 @@ export class VideoStudio {
         const durationRules = loadDurationRules();
         const maxSingleShot = cfg.durationPolicy?.maxSingleShotSeconds ?? durationRules.modelMax;
         const minSingleShot = cfg.durationPolicy?.minSingleShotSeconds ?? durationRules.modelMin;
+        const inputSpeechPolicy = narrativeSpeechPolicy([
+          input.intent,
+          JSON.stringify(input.metadata ?? {}),
+        ].join("\n"));
         /**
          * 桥按"进程级共享 + 引用计数"安装（T-2026-0925-0001）：
          * 预生产 run 允许并发，而桥是进程全局的；若每个 run 各自装卸，
@@ -591,7 +597,10 @@ export class VideoStudio {
           const modelName = portraitCfg && portraitCfg.enabled !== false ? portraitCfg.model : "未指定模型";
           log(`[studio] 定妆照真实出图已启用（${modelName}，产物根 ${charactersDir}）`);
         }
-        const result = await system.create(effectiveIntent, metadata, createOptions);
+        const result = await runWithDurationProjectionPolicy(
+          { noDialogue: inputSpeechPolicy.allSpeechForbidden },
+          () => system.create(effectiveIntent, metadata, createOptions),
+        );
         if (portraitRuntime) {
           const index = portraitRuntime.snapshot();
           const characters = Object.keys(index.characters).length;

@@ -17,6 +17,7 @@ import { videoRuntimeRoot } from "./runtime-root.js";
  */
 import { existsSync, readFileSync, lstatSync, realpathSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { createRequire } from "node:module";
 import { dirname, isAbsolute, join, relative, sep, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -524,13 +525,11 @@ export function installVendorFieldQualityBridge(options: { log?: (line: string) 
           const row = shot as Record<string, unknown>;
           const prompt = typeof row.prompt === "string" ? row.prompt : "";
           const fieldCount = (prompt.match(/^\s*\d{2}\.【[^】]+】/gmu) ?? []).length;
-          return row._workloomPromptReviewPolicy !== null
-            && typeof row._workloomPromptReviewPolicy === "object"
-            && fieldCount >= 25
+          return fieldCount >= 25
             && prompt.length >= 1200;
         });
         if (frozenNarrativeContract) {
-          log(`[vendor-compat] 字段质检跳过无条件模型重写：${list.length} 镜已绑定冻结叙事策略和完整编号合同，继续由 G6 监制评审`);
+          log(`[vendor-compat] 字段质检跳过无条件模型重写：${list.length} 镜均为完整编号合同，继续由 G6 监制评审`);
           return {
             finalShots: list,
             allReports: [],
@@ -542,7 +541,7 @@ export function installVendorFieldQualityBridge(options: { log?: (line: string) 
               totalRounds: 0,
               totalRepairs: 0,
               skipped: true,
-              reason: "frozen-narrative-contract: host prompt contract is authoritative; destructive field repair is skipped and G6 remains mandatory",
+              reason: "frozen-narrative-contract: complete numbered host prompt contract is authoritative; destructive field repair is skipped and G6 remains mandatory",
             },
           };
         }
@@ -1206,7 +1205,7 @@ export function inferNarrativeCharacters(input: {
   return [...unique.values()];
 }
 
-function narrativeSpeechPolicy(value: unknown): {
+export function narrativeSpeechPolicy(value: unknown): {
   noLipSyncDialogue: boolean;
   voiceoverMentioned: boolean;
   voiceoverDenied: boolean;
@@ -1333,6 +1332,7 @@ export function extractNarrativeActions(
       const key = actionKey(match[0], phrase);
       const malformed = /(?:绒毛|骨上|undefined|null|未标注|关键词|标签|对象|待补|省略)/iu.test(phrase)
         || /(?:阻尼感|触感|手感|质感|音色)(?:$|[，。；、])/u.test(phrase)
+        || /^(?:压在|湿冷大雨压在|大雨压在)/u.test(phrase)
         || /^放下$/u.test(phrase)
         || /(?:仅一|离水珠|悬停瞬间|收束动作)$/u.test(phrase)
         || /(?:爪垫|尾巴).*(?:瞬间|动作)$/u.test(phrase)
@@ -1453,6 +1453,24 @@ function sceneElementsForPurpose(purpose: string, elements: string[]): string[] 
   }
   if (/^坐下.*听雨/u.test(purpose)) {
     return ["旧台灯", "窗", "坐具"];
+  }
+  if (/(?:猫|爪).*(?:探|伸|接水|滴水)|(?:探出|伸爪|接水).*(?:猫|爪)/u.test(purpose)) {
+    return unique.filter((item) => /(?:纸箱|猫|爪|水滴|水珠|屋檐)/u.test(item)).slice(0, 8);
+  }
+  if (/(?:缩回|盘成|蜷缩|鼻尖|尾巴|耳朵)/u.test(purpose)) {
+    return unique.filter((item) => /(?:纸箱|猫|尾巴|鼻尖|耳朵|毛巾)/u.test(item)).slice(0, 8);
+  }
+  if (/(?:落叶|栏杆|木栈道|光斑)/u.test(purpose)) {
+    return unique.filter((item) => /(?:落叶|栏杆|木栈道|光斑|光影|缝隙)/u.test(item)).slice(0, 8);
+  }
+  if (/(?:湖|雾|芦苇|涟漪|远山)/u.test(purpose)) {
+    return unique.filter((item) => /(?:湖|雾|远山|芦苇|水面|涟漪|露水)/u.test(item)).slice(0, 8);
+  }
+  if (/(?:茶壶|蒸汽|釉面|壶嘴|壶盖)/u.test(purpose)) {
+    return unique.filter((item) => /(?:茶壶|蒸汽|釉面|壶嘴|壶盖|水滴|桌面|窗)/u.test(item)).slice(0, 8);
+  }
+  if (/(?:水洼|信号灯|红绿灯|雨滴|城市路面)/u.test(purpose)) {
+    return unique.filter((item) => /(?:水洼|信号灯|红绿灯|雨滴|路面|积水|倒影)/u.test(item)).slice(0, 8);
   }
   return unique;
 }
@@ -1629,6 +1647,14 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
     if (/(?:悬停|将落未落|悬而未落)/u.test(text) && /(?:水珠|水滴|露水)/u.test(text)) {
       return "悬停水滴锁定单帧形态、挂点和重力方向；坠落前只做轻微鼓胀，不用长镜连续解算流体，落点用下一镜水痕与同步水滴声承接。";
     }
+    if (/爪|肉垫|多趾/u.test(text) && /(?:连续|动作|抖动|形变|穿模|数量|粘连)/u.test(text)) {
+      return "把爪部动作拆成探出、接触、缩回三个固定机位短镜，锁定同一猫爪参考帧、趾数和肉垫轮廓；接触点只做局部特写，逐镜检查爪数、关节方向与水滴穿模。";
+    }
+    if (/(?:跨镜头|逐帧)/u.test(text)
+      && /(?:纸箱|花纹)/u.test(text)
+      && /(?:一致|连续|漂移|跳变)/u.test(text)) {
+      return "锁定同一纸箱参考帧、花纹位置、水痕边界与街灯光源方向；每个切点核对待机姿态和道具相对位置，异常只重做对应镜头的遮挡层，不改动已通过的场景结构。";
+    }
     if (/(?:微表情|表情.*(?:僵硬|停滞)|眼神.*空洞|静坐.*(?:面部|情绪|长镜)|面部.*(?:漂移|变形))/u.test(text)
       && !/(?:台灯|旋钮|开关|钨丝|身份|定妆|角色一致)/u.test(text)) {
       return "把静止情绪拆成背影或侧影、手部自然放下与肩线下沉三个局部短镜，不要求正脸长特写；用雨声、呼吸和衣料轻响承接停顿，逐镜保持同一姿态终点。";
@@ -1743,11 +1769,17 @@ function narrativeNegativeConstraints(input: {
     input.upstream?.special_notes,
     input.upstream?.dialogue_requirement,
   ].map(String).join("\n");
-  return [...text.matchAll(/(?:不出现|不得|禁止|不要|不能)[^。；\n]*/gu)]
+  const explicit = [
+    /无(?:真人|人物|角色|路人和游客)/u.test(text) ? "无人物" : "",
+    /无动物|不出现动物/u.test(text) ? "无动物" : "",
+    /无品牌|不出现品牌/u.test(text) ? "无品牌" : "",
+    /无文字|无字幕|不出现文字/u.test(text) ? "无文字与字幕" : "",
+    /无旁白|不出现旁白/u.test(text) ? "无旁白" : "",
+  ].filter(Boolean);
+  const clauses = [...text.matchAll(/(?:不出现|不得|禁止|不要|不能)[^。；\n]*/gu)]
     .map((match) => match[0].trim())
-    .filter((item) => item.length >= 4)
-    .filter((item, index, list) => list.indexOf(item) === index)
-    .slice(0, 12);
+    .filter((item) => item.length >= 4);
+  return [...new Set([...explicit, ...clauses])].slice(0, 12);
 }
 
 export function normalizeNarrativeRequirementMarkdown(
@@ -2004,7 +2036,10 @@ export function normalizeNarrativeRequirementMarkdown(
       .replace(/- \*\*角色\*\*（\d+）：[^\n]*/u, "- **角色**（0）：无角色（环境/场景空镜）")
       .replace(
         /- \*\*动作\*\*（\d+）：[^\n]*/u,
-        `- **动作**（0）：无角色动作；${environmentActionPhrases.length > 0 ? environmentActionPhrases.join("；") : "以源证据中的自然物理变化推进"}`,
+        [
+          "- **动作**（0）：无角色动作",
+          `- **环境变化**（${environmentActionPhrases.length}）：${environmentActionPhrases.length > 0 ? environmentActionPhrases.join("；") : "按源证据中的自然物理变化执行"}`,
+        ].join("\n"),
       )
       .replace(/人物动作与画外环境声/gu, "画外环境声");
   }
@@ -2032,16 +2067,6 @@ export function normalizeNarrativeRequirementMarkdown(
     upstream.special_notes,
     upstream.visual_style,
     upstream.theme,
-    ...(Array.isArray(recordValue(discovery.sceneStructure).scenes)
-      ? (recordValue(discovery.sceneStructure).scenes as unknown[]).flatMap((item) =>
-        Array.isArray(recordValue(item).keyElements) ? recordValue(item).keyElements as unknown[] : [])
-      : []),
-    ...(Array.isArray(recordValue(recordValue(discovery.sceneStructure).opening).keyElements)
-      ? recordValue(recordValue(discovery.sceneStructure).opening).keyElements as unknown[]
-      : []),
-    ...(Array.isArray(recordValue(recordValue(discovery.sceneStructure).ending).keyElements)
-      ? recordValue(recordValue(discovery.sceneStructure).ending).keyElements as unknown[]
-      : []),
   ].map(String).join("\n");
   const groundedProp = (item: string): boolean => {
     if (propEvidence.includes(item)) return true;
@@ -2058,6 +2083,10 @@ export function normalizeNarrativeRequirementMarkdown(
   }).filter((item) =>
     (noCharacterContract || !["薄雾", "远山", "水面", "涟漪"].includes(item))
     && groundedProp(item));
+  if (/(?:雨|伞|湿)/u.test(propEvidence)
+    && !props.some((item) => /(?:积水|水洼|水滴|水珠|水面)/u.test(item))) {
+    props.push("积水", "水滴");
+  }
   if (actions.some((item) => /钥匙/u.test(item)) && !props.includes("钥匙")) props.push("钥匙");
   const endingRecord = recordValue(scene.ending);
   const endingElements = Array.isArray(endingRecord.keyElements)
@@ -2193,6 +2222,7 @@ export function normalizeNarrativeDiscovery(
       .replace(/[^，。；\n]{0,24}(?:轻声)?台词\s*[「“][^」”]+[」”][^。；\n]*/gu, "")
       .replace(/[^，。；\n]{0,48}(?:轻声|低声|开口)?说[：:]?\s*[「“"'‘][^」”"'’]+[」”"'’]/gu, "")
       .replace(/(?:一句|关键|钉子|片内)台词[^。；\n]*[。；]?/gu, "")
+      .replace(/[^。；\n]{0,32}(?:低声|轻声)(?:一|这)?句\s*[「“"'‘][^」”"'’]+[」”"'’][^。；\n]*[。；]?/gu, "")
       .replace(/(?:画外音?|旁白)[^。；\n]*?[：:]?\s*[「“"'‘][^」”"'’]+[」”"'’]/gu, "")
       .replace(/(?:画外音?|旁白)[：:]\s*[^。；\n]+/gu, "")
       .replace(/这(?:一)?句(?:几乎听不见的)?话/gu, "动作与环境声的停顿")
@@ -2286,10 +2316,15 @@ export function normalizeNarrativeDiscovery(
     upstream.special_notes,
     upstream.visual_style,
     upstream.theme,
-    JSON.stringify(scene),
+    scene.opening ? String(recordValue(scene.opening).purpose ?? "") : "",
+    ...(Array.isArray(scene.scenes) ? scene.scenes.map((item) => String(recordValue(item).purpose ?? "")) : []),
+    scene.ending ? String(recordValue(scene.ending).purpose ?? "") : "",
   ].map(String).join(" ");
   const hasGroundingToken = (item: string): boolean => {
     if (groundingText.includes(item)) return true;
+    if (/(?:雨|伞|湿|水)/u.test(groundingText) && /^(?:积水|水滴|水珠|水洼|涟漪)$/u.test(item)) return true;
+    if (/(?:坐下|听雨|静坐)/u.test(groundingText) && /^(?:窗|坐具|窗玻璃雨珠)$/u.test(item)) return true;
+    if (/(?:换鞋|鞋)/u.test(groundingText) && /^(?:鞋|室内拖鞋|白色湿便鞋)$/u.test(item)) return true;
     for (let index = 0; index < item.length - 2; index += 1) {
       if (groundingText.includes(item.slice(index, index + 3))) return true;
     }
@@ -2533,7 +2568,7 @@ export function normalizeNarrativeDiscovery(
       audience.contentExpectations = [...new Set((audience.contentExpectations as unknown[]).map((item) => {
         const text = String(item);
         if (speechFullyForbidden
-          && /(?:钉子台词|片内台词|关键台词|画外旁白|人声|口播)/u.test(text)) {
+          && /(?:钉子台词|钉子文案|片内台词|关键台词|关键句|画外旁白|画外人声|人声|口播|可复述|可截图|可转发|固定台词|低声一句|轻声一句)/u.test(text)) {
           repairs.push({ code: "EXTERNAL_COPY_SEPARATED", detail: "把可转发文案移出成片台词/字幕合同" });
           const quote = text.match(/[“"'「]([^”"'」]+)[”"'」]/u)?.[1]?.trim();
           return `${quote ? `站外转发文案候选：“${quote}”；` : "站外转发文案候选"}仅用于发布文案，不进入成片，不生成字幕、旁白或口播。`;
@@ -2585,7 +2620,7 @@ export function normalizeNarrativeDiscovery(
     }
   };
   const prohibitedAudiencePattern = [
-    noPeople ? /(?:手机取景框|红色录音点|按下录制|按下快门|屏息|呼吸声|耳边[^。；\n]{0,8}憋气|手伸进|手指|手掌|夜归人|路人|游客|人影|男人|女人|鞋尖|伞尖|他抬|他停|他先|她才)/u : null,
+    noPeople ? /(?:手机取景框|红色录音点|按下录制|按下快门|屏息|呼吸声|耳边[^。；\n]{0,8}憋气|手伸进|手指|手掌|夜归人|路人|游客|第二个人|空椅子|人影|男人|女人|鞋尖|伞尖|他抬|他停|他先|她才)/u : null,
     noAnimals ? /(?:黑天鹅|水鸟|飞鸟|鸟鸣|猫|狗)/u : null,
     noText ? /(?:字幕|水印|文字卡|数字|倒计时数字)/u : null,
     noVehicles ? /(?:车辆|汽车|出租车|车流|车型|车牌|车顶灯|尾灯)/u : null,
@@ -4545,6 +4580,15 @@ export interface DurationProjectionBridgeOptions {
   maxShotSeconds?: number;
 }
 
+const durationPolicyStore = new AsyncLocalStorage<{ noDialogue: boolean }>();
+
+export function runWithDurationProjectionPolicy<T>(
+  policy: { noDialogue?: boolean },
+  callback: () => T,
+): T {
+  return durationPolicyStore.run({ noDialogue: policy.noDialogue === true }, callback);
+}
+
 /** 进程级共享桥注册表：第一个安装、最后一个卸载（并发 run 安全） */
 const sharedBridges = new Map<string, { restore: () => void; refs: number }>();
 
@@ -4632,11 +4676,19 @@ export function installVendorDurationProjectionBridge(options: DurationProjectio
       });
       return false;
     }
+    const noDialogue = durationPolicyStore.getStore()?.noDialogue === true;
+    if (noDialogue) {
+      for (const record of records) {
+        record.dialogue = "";
+        record.dialogueText = "";
+        record.dialogueBlocks = [];
+      }
+    }
     const inputs = records.map((record, index) => ({
       shotId: idOf(record, `${kindLabel}-${index + 1}`),
       duration: durationOf(record),
       timing: record.timing as { start?: number; duration?: number; end?: number } | undefined,
-      dialogue: record.dialogue,
+      dialogue: noDialogue ? "" : record.dialogue,
       emotion: (record.emotion as string | undefined) ?? (record.mood as string | undefined),
       mood: record.mood as string | undefined,
       sceneType: (record.sceneType ?? record.scene_type) as string | undefined,
