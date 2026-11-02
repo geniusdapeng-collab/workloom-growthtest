@@ -3010,6 +3010,135 @@ function rebalanceSceneDurations(scenePlan: Record<string, unknown>, target: num
   return target;
 }
 
+function reconcileNarrativeScenePlan(
+  prd: Record<string, unknown>,
+  discovery: Record<string, unknown>,
+  upstream: Record<string, unknown>,
+  duration: number,
+): boolean {
+  const sourceScene = recordValue(discovery.sceneStructure);
+  const nodes = [
+    recordValue(sourceScene.opening),
+    ...(Array.isArray(sourceScene.scenes) ? sourceScene.scenes.map(recordValue) : []),
+    recordValue(sourceScene.ending),
+  ].filter((node) => Object.keys(node).length > 0);
+  if (nodes.length === 0) return false;
+  const scenePlan = recordValue(prd.scenePlan);
+  const previousScenes = Array.isArray(scenePlan.scenes) ? scenePlan.scenes.map(recordValue) : [];
+  const previousMappings = Array.isArray(scenePlan.shotMapping) ? scenePlan.shotMapping.map(recordValue) : [];
+  const previousShotCount = previousMappings.reduce((sum, mapping) =>
+    sum + Math.max(1, Math.round(Number(mapping.estimatedShots ?? 1))), 0);
+  const shotCount = Math.max(nodes.length, Math.min(previousShotCount, nodes.length * 3));
+  const shotCounts = Array.from({ length: nodes.length }, () => 1);
+  const rankedByDuration = nodes
+    .map((node, index) => ({ index, duration: Number(node.duration ?? 0) }))
+    .sort((left, right) => right.duration - left.duration);
+  let remaining = shotCount - nodes.length;
+  for (let index = 0; remaining > 0; index += 1) {
+    const targetIndex = rankedByDuration[index % rankedByDuration.length]!.index;
+    shotCounts[targetIndex] = (shotCounts[targetIndex] ?? 1) + 1;
+    remaining -= 1;
+  }
+  const originalStory = String(upstream._originalStoryText ?? "");
+  const groundEvidence = /(?:地面|路面|地砖|台阶|水洼|积水|湿沙|沙滩)/u.test(originalStory);
+  const sourceAudio = [
+    ...(Array.isArray(recordValue(prd.audioSpecification).soundEffects)
+      ? recordValue(prd.audioSpecification).soundEffects as unknown[]
+      : []),
+    String(recordValue(prd.audioSpecification).soundDesign ?? ""),
+  ].map(String).filter(Boolean);
+  const audioForPurpose = (purpose: string): string[] => {
+    const kind = animalActionKind(purpose);
+    const matched = sourceAudio.filter((item) =>
+      kind === "reach"
+        ? /(?:滴水|水滴|爪|接触|水花)/u.test(item)
+        : kind === "retreat"
+          ? /(?:纸箱|摩擦|呼吸|环境)/u.test(item)
+          : /(?:雨|屋檐|纸箱|环境|呼吸)/u.test(item));
+    if (matched.length > 0) return [...new Set(matched)].slice(0, 4);
+    if (kind === "probe") return ["纸箱摩擦声", "猫呼吸声", "雨声"];
+    if (kind === "reach") return ["屋檐滴水声", "爪垫触水轻响", "雨声"];
+    if (kind === "retreat") return ["纸箱受压摩擦声", "猫呼吸声", "雨声"];
+    return ["现场环境声", "主体动作声"];
+  };
+  const sanitizeSetting = (value: string): string => {
+    let text = value
+      .replace(/，?(?:地面|路面)[^，。；]{0,24}(?:积水|水洼)[^，。；]*/gu, "")
+      .replace(/[，,]?\s*(?:一个|一处)?(?:水桶|铁管)[^，。；]*/gu, "")
+      .replace(/[，。；]{2,}/gu, "，")
+      .replace(/[，]\s*$/u, "")
+      .trim();
+    if (!groundEvidence) {
+      text = text.replace(/[，,]?(?:地面)?积水[^，。；]*/gu, "");
+    }
+    return text || String(nodes[0]?.purpose ?? "");
+  };
+  let cursor = 0;
+  const scenes = nodes.map((node, index) => {
+    const purpose = String(node.purpose ?? "").trim() || `按源场景 ${index + 1} 执行`;
+    const nodeDuration = Math.max(0, Number(node.duration ?? 0));
+    const sceneDuration = nodeDuration > 0
+      ? nodeDuration
+      : Number((duration / nodes.length).toFixed(3));
+    const previous = previousScenes[index] ?? previousScenes[0] ?? {};
+    const keyProps = [...new Set([
+      ...inferNarrativeProps({
+        intent: purpose,
+        discovery: { sceneStructure: { opening: { purpose } } },
+        upstream,
+      }),
+      ...inferNarrativeProps({ intent: originalStory, discovery: {}, upstream }),
+      ...(Array.isArray(node.keyElements) ? node.keyElements.map(String) : []),
+    ].map((item) => item.trim()).filter((item) =>
+      item
+      && !isNarrativeAnimal(item)
+      && !/(?:探头|伸爪|缩回|盘成|蜷缩|压住|光影|蒸汽|釉面)$/u.test(item)
+      && (item !== "积水" || groundEvidence)))]
+      .slice(0, 8);
+    const setting = sanitizeSetting(String(previous.setting ?? purpose));
+    const visualRequirements = [
+      purpose,
+      ...(Array.isArray(previous.visualRequirements)
+        ? previous.visualRequirements.map(String).filter((item) =>
+          item !== purpose && !/单镜头|固定单镜|一镜到底/u.test(item))
+        : []),
+      ...(Array.isArray(node.keyElements) ? node.keyElements.map(String) : []),
+    ].filter((item, itemIndex, list) => item && list.indexOf(item) === itemIndex).slice(0, 6);
+    const sceneId = `SC${String(index + 1).padStart(2, "0")}`;
+    cursor += sceneDuration;
+    return {
+      sceneId,
+      sequence: index + 1,
+      purpose,
+      duration: Number(sceneDuration.toFixed(3)),
+      emotionalBeat: index === 0 ? "setup" : index === nodes.length - 1 ? "resolution" : "rising",
+      setting,
+      timeOfDay: String(previous.timeOfDay ?? (/(?:夜|雨)/u.test(originalStory) ? "夜晚" : "按源场景时间")),
+      keyProps,
+      visualRequirements,
+      audioRequirements: audioForPurpose(purpose),
+      dialogue: "",
+    };
+  });
+  const total = scenes.reduce((sum, scene) => sum + Number(scene.duration ?? 0), 0);
+  if (duration > 0 && Math.abs(total - duration) > 0.001) rebalanceSceneDurations({ scenes }, duration);
+  scenePlan.scenes = scenes;
+  scenePlan.shotMapping = scenes.map((scene, index) => ({
+    sceneId: scene.sceneId,
+    estimatedShots: shotCounts[index]!,
+    shotBreakdownHint: Array.from({ length: shotCounts[index]! }, (_unused, shotIndex) =>
+      shotIndex === 0 ? "establishing" : shotIndex === 1 ? "close-up" : "medium"),
+  }));
+  scenePlan.totalDuration = duration > 0 ? duration : total;
+  prd.scenePlan = scenePlan;
+  const visual = recordValue(prd.visualSpecification);
+  visual.cameraLanguage = String(visual.cameraLanguage ?? "")
+    .replace(/[^。；\n]{0,24}(?:单镜头|固定单镜|一镜到底)[^。；\n]*/gu, "按场景合同分镜，固定机位保持轴线、焦平面与光位连续")
+    .trim() || "按场景合同分镜，固定机位保持轴线、焦平面与光位连续";
+  prd.visualSpecification = visual;
+  return true;
+}
+
 function sanitizePrdText(value: unknown, duration: number, speechForbidden = false): unknown {
   if (value === null || value === undefined) return "不适用";
   if (typeof value === "number" && !Number.isFinite(value)) return "不适用";
@@ -3080,6 +3209,9 @@ function dominantColorTemperature(value: unknown, subjectLabel: string): string 
     ?? unique[0];
   if (picked) return `${picked}K`;
   const text = String(value ?? "");
+  if (/(?:冷暖|双色温)/u.test(text) && /(?:青蓝|冷)/u.test(text) && /(?:暖|钨丝)/u.test(text)) {
+    return "2700K / 5600K";
+  }
   if (/(?:冷蓝|冷光|蓝灰|雨光|月光)/u.test(text)) return "5600K";
   if (/(?:暖光|暖黄|钨丝|台灯|灯光)/u.test(text)) return "2700K";
   return "色温按已确认视觉方案执行";
@@ -3396,6 +3528,7 @@ export function normalizeNarrativePrdContract(
   const scenePlan = recordValue(prd.scenePlan);
   rebalanceSceneDurations(scenePlan, duration);
   prd.scenePlan = scenePlan;
+  reconcileNarrativeScenePlan(prd, discovery, upstream, duration);
   const dialoguePolicy = [
     upstream.dialogue_requirement,
     upstream.special_notes,
@@ -3413,7 +3546,11 @@ export function normalizeNarrativePrdContract(
     _originalStoryText: String(upstream._originalStoryText ?? upstream.description ?? ""),
   });
   if (sourceActions.length > 0) {
-    const projectedSourceActions = projectNarrativeActionSequence(sourceActions, 6);
+    const plannedShotCount = (Array.isArray(recordValue(prd.scenePlan).shotMapping)
+      ? recordValue(prd.scenePlan).shotMapping as unknown[]
+      : []).map(recordValue).reduce((sum, mapping) =>
+      sum + Math.max(1, Math.round(Number(mapping.estimatedShots ?? 1))), 0);
+    const projectedSourceActions = projectNarrativeActionSequence(sourceActions, Math.max(1, plannedShotCount));
     const creative = recordValue(prd.creativeCore);
     creative.creativeHook = `第一帧：${projectedSourceActions[0]}；动作对象、空间和声音同时成立，不使用源文本之外的悬念或隐喻`;
     creative.keyMessages = projectedSourceActions.map((action, index) =>
@@ -3654,6 +3791,9 @@ export function normalizeNarrativePrdContract(
     delivery.characterAssets = {
       required: false,
       reason: "动物角色以文字外观、动作与跨镜参考帧锁定；不要求人像定妆照",
+      humanPortrait: "not_applicable",
+      referenceStrategy: "生成前锁定文字外观锚点与固定机位；正式生产以首个通过审核的关键帧作为后续镜头参考，跨镜保持品种、体型、毛色、斑纹、眼睛颜色与湿度一致",
+      auditStatus: "not_generated_in_this_audit_only_run",
     };
   }
   prd.deliveryStandard = delivery;
@@ -3719,7 +3859,9 @@ export function normalizeNarrativePrdContract(
   const animalOnly = canonicalCharacters.length > 0
     && canonicalCharacters.every((item) => isNarrativeAnimal(item.name));
   const normalizeContractText = (text: string): string => {
-    let value = text;
+    let value = text
+      .replace(/PRD\s*生成耗时[:：]\s*未记录ms/gu, "PRD 生成耗时：见流水线 timing.prdGeneration")
+      .replace(/未记录ms/gu, "由流水线 timing 记录");
     if (animalOnly) value = value.replace(/人物动作/gu, "主体动作");
     if (noCharacters) {
       value = value

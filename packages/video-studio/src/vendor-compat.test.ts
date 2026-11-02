@@ -2970,6 +2970,67 @@ console.log("RESULT " + JSON.stringify({
     expect(JSON.stringify(prd)).toContain("不使用配乐");
   });
 
+  it("PRD 单元镜头文本被源动作实际拆成三场，并补具体色温和动物参考策略", () => {
+    const story = "雨后夜晚，一只橘猫从纸箱探头，伸爪接屋檐滴水，最后缩回纸箱盘成一团。无人物、无品牌、无字幕、无旁白，仅保留环境声。";
+    const discovery: Record<string, unknown> = {
+      upstreamFields: {
+        duration_sec: 15,
+        platform_id: "douyin",
+        aspect_ratio: "9:16",
+        dialogue_requirement: "无台词、无旁白、无字幕，仅保留环境声。",
+        _originalStoryText: story,
+      },
+      sceneStructure: {
+        opening: { duration: 5, purpose: "探头", keyElements: ["纸箱", "橘猫鼻尖"] },
+        scenes: [{ duration: 5, purpose: "伸爪接屋檐滴水", keyElements: ["屋檐", "水滴", "橘猫前爪"] }],
+        ending: { duration: 5, purpose: "缩回纸箱盘成一团", keyElements: ["纸箱", "橘猫"] },
+      },
+      _canonicalCharacters: [{ id: "char_1", name: "橘猫", role: "protagonist" }],
+    };
+    const prd = normalizeNarrativePrdContract({
+      projectDefinition: { sourceIntent: story },
+      productPositioning: { targetDuration: 15, aspectRatio: "9:16", targetPlatform: "douyin" },
+      characterSystem: { characters: [{ characterId: "char_1", name: "橘猫", appearance: "橘色虎斑，圆亮琥珀眼" }] },
+      visualSpecification: {
+        lightingDirection: "暖钨丝侧光与青蓝雨夜反光形成冷暖双色温",
+        cameraLanguage: "低机位固定单镜头持续不切",
+      },
+      scenePlan: {
+        scenes: [{
+          sceneId: "SC01",
+          purpose: "探头、伸爪接水、缩回盘成一团",
+          duration: 15,
+          setting: "深夜屋檐下，纸箱旁有雨后积水，角落放着水桶与铁管",
+          keyProps: ["纸箱", "地面雨后积水", "水桶", "铁管"],
+          visualRequirements: ["固定单镜头持续不切", "冷暖双色温交界"],
+          audioRequirements: ["屋檐滴水", "纸箱摩擦"],
+        }],
+        shotMapping: [{
+          sceneId: "SC01",
+          estimatedShots: 3,
+          shotBreakdownHint: ["establishing", "close-up", "medium"],
+        }],
+      },
+      audioSpecification: { soundDesign: "屋檐滴水、纸箱摩擦、猫呼吸", soundEffects: [] },
+      productionConstraints: { technicalConstraints: ["不使用配乐，仅保留环境声"] },
+      deliveryStandard: { deliverables: [{ item: "video_master", spec: "MP4" }], outputFormat: {} },
+      prdSummary: { note: "PRD 生成耗时：未记录ms" },
+    }, discovery);
+    const scenePlan = prd.scenePlan as any;
+    expect(scenePlan.scenes).toHaveLength(3);
+    expect(scenePlan.scenes.map((scene: any) => scene.purpose)).toEqual([
+      "探头",
+      "伸爪接屋檐滴水",
+      "缩回纸箱盘成一团",
+    ]);
+    expect((prd.shotContract as any[]).reduce((sum, shot) => sum + Number(shot.durationSeconds), 0)).toBe(15);
+    expect(String((prd.visualSpecification as any).cameraLanguage)).not.toMatch(/单镜头|一镜到底/u);
+    expect(JSON.stringify(prd.shotContract)).toContain("2700K / 5600K");
+    expect(JSON.stringify(prd.scenePlan)).not.toMatch(/水桶|铁管|积水/u);
+    expect((prd.deliveryStandard as any).characterAssets.referenceStrategy).toContain("关键帧");
+    expect(JSON.stringify(prd)).not.toContain("未记录ms");
+  });
+
   it("无角色空镜的模板场景、角色和风险缓解被源证据替换", () => {
     const discovery: Record<string, unknown> = {
       sceneStructure: {
