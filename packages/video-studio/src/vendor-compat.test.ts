@@ -1930,6 +1930,10 @@ console.log("RESULT " + JSON.stringify({
     expect(secondPrompt).toContain("鞋架");
     expect(firstPrompt).toMatch(/【情绪】[^\n]*第一只湿便鞋/u);
     expect(secondPrompt).toMatch(/【情绪】[^\n]*另一只湿便鞋/u);
+    expect(firstPrompt).toMatch(/【情绪】[^\n]*鞋跟、脚踝和支撑脚/u);
+    expect(secondPrompt).toMatch(/【情绪】[^\n]*鞋跟、脚踝和拖鞋入口/u);
+    expect(firstPrompt).not.toMatch(/【情绪】[^\n]*(?:眼睫|瞳孔)/u);
+    expect(secondPrompt).not.toMatch(/【情绪】[^\n]*(?:眼睫|瞳孔)/u);
     expect(firstPrompt).toMatch(/【转场】[^\n]*另一只鞋/u);
     expect(secondPrompt).toMatch(/【转场】[^\n]*两只室内拖鞋/u);
   });
@@ -2225,7 +2229,7 @@ console.log("RESULT " + JSON.stringify({
     const scenes = (prd.scenePlan as any).scenes as Array<Record<string, unknown>>;
     expect(String(scenes[1]!.setting)).toMatch(/门已关闭.*旧台灯保持关闭/u);
     const shots = prd.shotContract as Array<Record<string, unknown>>;
-    expect(shots).toHaveLength(6);
+    expect(shots).toHaveLength(7);
     expect(shots[0]).toMatchObject({
       faceVisible: true,
       subjectLabel: "陈卓",
@@ -2234,18 +2238,21 @@ console.log("RESULT " + JSON.stringify({
     });
     expect(shots[1]).toMatchObject({ shotSize: "medium", faceVisible: true });
     expect(shots[2]).toMatchObject({ footwearState: "both_wet_shoes", lampState: "off" });
-    expect(shots[3]).toMatchObject({ footwearState: "wet_shoes_being_changed_to_indoor_slippers", lampState: "off" });
-    expect(shots[4]).toMatchObject({ footwearState: "both_indoor_slippers", lampState: "off_to_on" });
-    expect(shots[5]).toMatchObject({ footwearState: "both_indoor_slippers", lampState: "on" });
+    expect(shots[3]).toMatchObject({ footwearState: "one_indoor_slipper_one_wet_shoe_on_support_foot", lampState: "off" });
+    expect(shots[4]).toMatchObject({ footwearState: "one_indoor_slipper_one_wet_shoe_removing_second", lampState: "off" });
+    expect(shots[5]).toMatchObject({ footwearState: "both_indoor_slippers", lampState: "off_to_on" });
+    expect(shots[6]).toMatchObject({ footwearState: "both_indoor_slippers", lampState: "on" });
+    expect(shots[3]!.keyProps).toContain("门后挂钩");
     expect(shots.map((shot) => shot.purpose)).toEqual([
       "陈卓收伞走到出租屋门前；第一帧为中近景，陈卓在楼道冷光中收伞，伞骨合拢且伞尖水珠落到楼道地砖，黑色折叠伞轮廓完整",
       "陈卓用钥匙开门并跨进玄关；陈卓手握钥匙停在门前，门框作前景遮挡，楼道冷光勾出人物轮廓，室内暗部无补光",
       "陈卓回身把门关好，确认门锁落位；先拍回身关门与门锁落位，固定机位保持门轴方向连续",
-      "陈卓在玄关弯腰脱下白色湿便鞋，换穿室内拖鞋；低机位拍白色湿便鞋蹭过地垫，随后弯腰换穿室内拖鞋，旧台灯始终关闭",
+      "陈卓在玄关弯腰脱下一只白色湿便鞋；低机位拍第一只白色湿便鞋脱下并放到鞋架旁，脚掌离开湿鞋后保持单脚支撑，旧台灯始终关闭",
+      "陈卓脱下另一只湿便鞋，换穿室内拖鞋并站稳；继续脱下另一只白色湿便鞋并换穿室内拖鞋，双脚站稳后切到开灯镜，旧台灯始终关闭",
       "陈卓伸手拧亮旧台灯；特写手指转动旧台灯旋钮，钨丝由暗转暖，暖光只覆盖桌面和人物面部暖侧",
       "陈卓在灯下坐下，抬头安静听雨；人物在灯下坐下并安静听雨，固定机位收束，窗外冷蓝只勾轮廓",
     ]);
-    expect(shots.slice(2, 4).every((shot) => /(?:关闭.*旧台灯|旧台灯.*关闭)/u.test(String(shot.lighting)))).toBe(true);
+    expect(shots.slice(2, 5).every((shot) => /(?:关闭.*旧台灯|旧台灯.*关闭)/u.test(String(shot.lighting)))).toBe(true);
     expect(JSON.stringify(prd)).not.toMatch(/"audio".*?单音/u);
     expect(String((prd.characterSystem as any).characters[0].costume)).toMatch(/白色湿便鞋.*室内拖鞋/u);
     expect(String((prd.prdSummary as any).keyHook)).not.toContain("为什么");
