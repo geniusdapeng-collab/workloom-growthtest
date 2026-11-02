@@ -190,6 +190,38 @@ describe.runIf(RUN_DB)("正式生成资格活库契约", () => {
     expect(providerCalls).toBe(2);
   });
 
+  it("历史unknown提交缺少冻结时长时预算不可核实，不按零秒放行新镜头", async () => {
+    const qualification = await issue(); env.WORKLOOM_PROJECT_COMPUTE_CAP = "30";
+    const legacyScript = `RS-legacy-${suffix}-${seq}`, submission = `GS-legacy-${suffix}-${seq}`;
+    await owner.query(`INSERT INTO render_scripts (id,workspace_id,project_id,shot_id,script_key,version,status,md,fields,created_by)
+      VALUES ($1,$2,$3,'S-legacy',$1,1,'draft','历史镜头未记录时长','{}'::jsonb,'MEM-T')`, [legacyScript, scope.workspaceId, projectId]);
+    await owner.query(`INSERT INTO generation_submissions (id,tenant_id,workspace_id,project_id,script_id,script_version,idempotency_key,request_hash,job_id)
+      VALUES ($1,$2,$3,$4,$5,1,$1,$6,$7)`, [submission, scope.tenantId, scope.workspaceId, projectId, legacyScript, "b".repeat(64), `RJ-legacy-${suffix}-${seq}`]);
+    await owner.query("UPDATE generation_submissions SET state='submitting',owner_token='legacy-owner' WHERE id=$1", [submission]);
+    await owner.query("UPDATE generation_submissions SET state='unknown' WHERE id=$1", [submission]);
+    await expect(projectComputeUsed(app, scope, projectId)).rejects.toThrow("PROJECT_COMPUTE_BUDGET_UNVERIFIED");
+    await expect(submitGenJob(await input(qualification.qualificationToken))).rejects.toThrow("PROJECT_COMPUTE_BUDGET_UNVERIFIED");
+    expect(providerCalls).toBe(0);
+  });
+
+  it("HTTP400含接受ID保留unknown，重签资格仍复用原请求而不再次付费", async () => {
+    const qualification = await issue();
+    const originalFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", vi.fn(async (url, init) => {
+      if (String(url).endsWith("/contents/generations/tasks")) {
+        providerCalls++;
+        return new Response(JSON.stringify({ id: "accepted-but-error-http", error: { code: "InvalidParameter" } }), { status: 400 });
+      }
+      return originalFetch(url, init);
+    }));
+    await expect(submitGenJob(await input(qualification.qualificationToken))).rejects.toThrow("SUBMISSION_UNKNOWN");
+    const repeated = await issue(); expect(repeated).toEqual(qualification);
+    await expect(submitGenJob(await input(repeated.qualificationToken))).rejects.toThrow("SUBMISSION_UNVERIFIED");
+    expect(providerCalls).toBe(1);
+    expect((await owner.query("SELECT state,dispatch_count FROM generation_submissions WHERE script_id=$1", [qualification.scriptId])).rows)
+      .toEqual([{ state: "unknown", dispatch_count: 1 }]);
+  });
+
   async function marketingSource() {
     const root = path.join(dir, "archive", scope.workspaceId, projectId);
     const body = "星野 F3 风扇支持 9 档风量；9 档不是能耗等级。", sourceUrl = "https://source.example.com/f3";

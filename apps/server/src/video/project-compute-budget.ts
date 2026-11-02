@@ -17,15 +17,17 @@ export async function projectComputeUsed(
   projectId: string,
   excludeRequestHash?: string,
 ): Promise<number> {
-  const rows = await scopedQuery<{ used: string | null }>(
+  const rows = await scopedQuery<{ used: string | null; unverified: string | null }>(
     app,
     scope,
-    `SELECT COALESCE(SUM(seconds), 0)::text AS used FROM (
+    `SELECT COALESCE(SUM(seconds), 0)::text AS used,
+       COUNT(*) FILTER (WHERE seconds IS NULL)::text AS unverified FROM (
        SELECT COALESCE(actual_seconds, est_seconds, 0) AS seconds
        FROM render_jobs
        WHERE workspace_id=$1 AND project_id=$2 AND mock=false
        UNION ALL
-       SELECT COALESCE((s.fields->>'durationSec')::numeric, 0) AS seconds
+       SELECT CASE WHEN (s.fields->>'durationSec')::numeric > 0
+         THEN (s.fields->>'durationSec')::numeric ELSE NULL END AS seconds
        FROM generation_submissions g
        JOIN render_scripts s ON s.id=g.script_id AND s.workspace_id=g.workspace_id
          AND s.project_id=g.project_id AND s.version=g.script_version
@@ -37,6 +39,7 @@ export async function projectComputeUsed(
      ) committed_and_pending`,
     [scope.workspaceId, projectId, scope.tenantId, excludeRequestHash ?? null],
   );
+  if (Number(rows[0]?.unverified ?? 0) > 0) throw new SubmissionError("PROJECT_COMPUTE_BUDGET_UNVERIFIED", "在途渲染缺少可核实的冻结时长，核对已有任务前不能新增渲染");
   const used = Number(rows[0]?.used ?? 0);
   if (!Number.isFinite(used) || used < 0) throw new SubmissionError("PROJECT_COMPUTE_BUDGET_UNVERIFIED", "项目算力用量不可核实，拒绝新增渲染");
   return used;

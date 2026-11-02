@@ -407,6 +407,17 @@ describe("发布链", () => {
 
 describe("供应商拒绝与未知接受结果", () => {
   it.each([
+    { id: "accepted-task", error: { code: "InvalidParameter" } },
+    { request_id: "accepted-request", error: { message: "gateway rejected" } },
+    { data: { id: "accepted-nested" }, error: { code: "InvalidParameter" } },
+    { data: [{ url: "https://cdn.example.test/accepted.png" }], error: { code: "InvalidParameter" } },
+    { content: { video_url: "https://cdn.example.test/accepted.mp4" }, error: { code: "InvalidParameter" } },
+  ])("错误HTTP仍带接受/产物线索时禁止当作明确拒收：%j", async body => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(body), { status: 400 })));
+    await expect(new ArkVideoProvider({ apiKey: "test-only" }).submit({ prompt: "glass", estimatedUnits: 5, params: { providerModel: "test-model" } }))
+      .rejects.toMatchObject({ acceptance: "unknown", fallbackAllowed: false });
+  });
+  it.each([
     [401, "AUTH", "not-accepted", true], [400, "BAD_REQUEST", "not-accepted", false],
     [404, "MODEL_UNAVAILABLE", "not-accepted", true], [429, "RETRYABLE", "not-accepted", true],
     [500, "RETRYABLE", "unknown", false], [503, "RETRYABLE", "unknown", false],
