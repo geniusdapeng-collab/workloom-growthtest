@@ -12,6 +12,7 @@ import { videoRuntimeRoot } from "./runtime-root.js";
  */
 
 import { createRequire } from "node:module";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
@@ -39,11 +40,23 @@ import {
   installVendorQualityGateBridge,
   installSharedBridge,
   narrativeSpeechPolicy,
-  runWithDurationProjectionPolicy
+  runWithDurationProjectionPolicy,
+  type DurationProjectionEvent
 } from "./vendor-compat.js";
 import { AUDIO_DISCIPLINE_CLAUSE, AUDIO_NEGATIVE_TERMS } from "./shot-spec.js";
 import { loadDurationRules } from "./duration-rules.js";
 import { installVendorMarketingPriceBridge } from "./marketing-price-contract.js";
+
+/** 全局桥只安装一次；可变的日志和事件出口属于调用它的异步运行。 */
+interface StudioBridgeScope {
+  log: (line: string) => void;
+  onDurationEvent: (event: DurationProjectionEvent) => void;
+}
+const studioBridgeScopes = new AsyncLocalStorage<StudioBridgeScope>();
+const logFromBridge = (line: string): void => { studioBridgeScopes.getStore()?.log(line); };
+const emitFromDurationBridge = (event: DurationProjectionEvent): void => {
+  studioBridgeScopes.getStore()?.onDurationEvent(event);
+};
 
 /** vendor 引擎暴露的最小结构（HyperrealitySystem 实例方法） */
 interface HyperrealitySystemLike {
@@ -385,7 +398,32 @@ export class VideoStudio {
       return verdict.approved ? { ...verdict, suggestions: [] } : verdict;
     };
 
-    return runWithConfirmationHandler(handler, async () => {
+    let lastProjectedTarget: number | null = null;
+    const bridgeScope: StudioBridgeScope = {
+      log,
+      onDurationEvent: (event) => {
+        if (typeof event.targetSeconds === "number" && event.targetSeconds > 0) {
+          lastProjectedTarget = event.targetSeconds;
+        }
+        void emit({
+          kind: `pipeline.duration.${event.kind}`,
+          projectId: input.projectId,
+          runId,
+          payload: {
+            source: event.source,
+            targetSeconds: event.targetSeconds,
+            totalSeconds: event.totalSeconds,
+            raised: event.shots.filter((shot) => shot.raised).map((shot) => shot.shotId),
+            lowered: event.shots.filter((shot) => shot.lowered).map((shot) => shot.shotId),
+            message: event.message ?? null
+          }
+        });
+        if (event.kind !== "projected") {
+          log(`[studio] 时长投影 ${event.kind}（${event.source}）：${event.message ?? ""}`);
+        }
+      }
+    };
+    return runWithConfirmationHandler(handler, () => studioBridgeScopes.run(bridgeScope, async () => {
       const disposers: Array<() => void> = [];
       const keep = (dispose: () => void): void => { disposers.push(dispose); };
       let runFailure: { error: unknown } | undefined;
@@ -396,48 +434,48 @@ export class VideoStudio {
          * 必须在本实例装配之前打上，否则注入的 LLM 引擎在隔离后变成"空心对象"，
          * 链路最开头的创意主题生成器会静默降级成规则兜底（真机 2026-09-22 事故）。
          */
-        keep(installVendorConfigIsolatorBridge());
+        keep(installSharedBridge("vendor-config-isolator", () => installVendorConfigIsolatorBridge()));
         /** 阶段异常栈诊断：Phase 3/3.5 失败时把栈写进 run 日志（vendor 只打 message，真机无法定位行号） */
-        keep(installVendorPhaseDiagnosticsBridge({ log }));
+        keep(installSharedBridge("vendor-phase-diagnostics", () => installVendorPhaseDiagnosticsBridge({ log: logFromBridge })));
         /**
          * 字段质检桥：Phase 3.5 对结构化 timeline 崩 `tl.match` / `result.reports` 缺失导致整套质检失败
          * （真机：FieldGuard 默认模板覆盖 6 镜并标记降级）。入参归一 + 结果兜底。
          */
-        keep(installVendorFieldQualityBridge({ log }));
+        keep(installSharedBridge("vendor-field-quality", () => installVendorFieldQualityBridge({ log: logFromBridge })));
         /**
          * 微动作桥：`_extractCameraDistance` 只读 `camera`（实际字段是 camera_movement）+ 模板缺 neutral
          * → 真机两次 run 均 0/6 增强（环节空转）。补齐字段映射与 neutral 模板。
          */
-        keep(installVendorMicroMotionBridge({ log }));
+        keep(installSharedBridge("vendor-micro-motion", () => installVendorMicroMotionBridge({ log: logFromBridge })));
         /**
          * 契约桥：Phase1→2/2→3/3→Output 的类型不匹配此前只告警（且 autoFix 对逐镜头字段不生效），
          * 导致对象字段以 `[object Object]` 进入提示词。这里做入参归一 + 契约账本留痕。
          */
-        keep(installVendorContractBridge({ log }));
+        keep(installSharedBridge("vendor-contract", () => installVendorContractBridge({ log: logFromBridge })));
         /**
          * 提示词重建桥：Phase 3 失败（真机 `Assignment to constant variable.`）时 6 镜 prompt 为空，
          * 最终被 PipelineGuard 严格模式拦下、整条 run 无产物。用 vendor 自己的组装器按字段重建，
          * 并标记 promptRebuilt（非静默兜底）。
          */
-        keep(installVendorPromptRebuildBridge({ log }));
+        keep(installSharedBridge("vendor-prompt-rebuild", () => installVendorPromptRebuildBridge({ log: logFromBridge })));
         /** 后续字段质检/标题/导演增强会再改 prompt；G6 前必须重新按冻结策略投影。 */
-        keep(installVendorNarrativePromptReviewBridge({ log }));
+        keep(installSharedBridge("vendor-narrative-prompt-review", () => installVendorNarrativePromptReviewBridge({ log: logFromBridge })));
         /** G7 消费完整三件套、摘要、时间轴和真实有效处理时间，不接受截断摘要。 */
-        keep(installVendorPreproductionReviewBridge({ log }));
+        keep(installSharedBridge("vendor-preproduction-review", () => installVendorPreproductionReviewBridge({ log: logFromBridge })));
         /** 非数值的 unverified 验收口径不得被算成 NaN 并让全片质检假红。 */
-        keep(installVendorQualityGateBridge());
+        keep(installSharedBridge("vendor-quality-gate", () => installVendorQualityGateBridge()));
         /** 需求洞察 _fillDefaults 修复（数组保形 + 消除 const 重赋值，静态审计发现） */
-        keep(installVendorDiscoveryFixBridge({ log }));
+        keep(installSharedBridge("vendor-discovery-fix", () => installVendorDiscoveryFixBridge({ log: logFromBridge })));
         /** 叙事/营销隔离、人物契约补全与需求洞察首个 JSON 修复 */
-        keep(installVendorDiscoveryNarrativeBridge({ log }));
+        keep(installSharedBridge("vendor-discovery-narrative", () => installVendorDiscoveryNarrativeBridge({ log: logFromBridge })));
         /** Phase 3 后融合链路深栈诊断（vendor 内部 catch 会吞掉栈帧） */
-        keep(installVendorPhaseInternalsDiagnostics({ log }));
+        keep(installSharedBridge("vendor-phase-internals-diagnostics", () => installVendorPhaseInternalsDiagnostics({ log: logFromBridge })));
         /** 镜头内音频纪律（禁止 BGM）与时长策略（模型能力 4–30s）两条产品口径 */
-        keep(installVendorAudioDisciplineBridge({
+        keep(installSharedBridge("vendor-audio-discipline", () => installVendorAudioDisciplineBridge({
           clause: AUDIO_DISCIPLINE_CLAUSE,
           negativeTerms: AUDIO_NEGATIVE_TERMS,
-          log
-        }));
+          log: logFromBridge
+        })));
         const durationRules = loadDurationRules();
         const maxSingleShot = cfg.durationPolicy?.maxSingleShotSeconds ?? durationRules.modelMax;
         const minSingleShot = cfg.durationPolicy?.minSingleShotSeconds ?? durationRules.modelMin;
@@ -449,12 +487,14 @@ export class VideoStudio {
          * 桥按"进程级共享 + 引用计数"安装（T-2026-0925-0001）：
          * 预生产 run 允许并发，而桥是进程全局的；若每个 run 各自装卸，
          * 先结束的 run 会把仍在运行的 run 的补丁一起还原（时长口径中途分裂）。
+         * 共享常量采用模型目录能力；每次运行的收紧策略由实例和异步作用域投影执行，
+         * 不把首个项目的 min/max 或事件出口捕获成进程策略。
          */
         keep(installSharedBridge("vendor-duration-policy", () =>
           installVendorDurationPolicyBridge({
-            maxSingleShotSeconds: maxSingleShot,
-            minSingleShotSeconds: minSingleShot,
-            log
+            maxSingleShotSeconds: durationRules.modelMax,
+            minSingleShotSeconds: durationRules.modelMin,
+            log: logFromBridge
           })
         ));
         /**
@@ -463,34 +503,13 @@ export class VideoStudio {
          * 全部收敛到宿主投影器；`WORKLOOM_DURATION_PROJECTION=off` 可一键回到原行为（回滚开关）。
          */
         const projectionEnabled = (process.env.WORKLOOM_DURATION_PROJECTION ?? "on") !== "off";
-        let lastProjectedTarget: number | null = null;
         keep(projectionEnabled
           ? installSharedBridge("vendor-duration-projection", () =>
               installVendorDurationProjectionBridge({
-                minShotSeconds: minSingleShot,
-                maxShotSeconds: maxSingleShot,
-                log,
-                onEvent: (event) => {
-                  if (typeof event.targetSeconds === "number" && event.targetSeconds > 0) {
-                    lastProjectedTarget = event.targetSeconds;
-                  }
-                  void emit({
-                    kind: `pipeline.duration.${event.kind}`,
-                    projectId: input.projectId,
-                    runId,
-                    payload: {
-                      source: event.source,
-                      targetSeconds: event.targetSeconds,
-                      totalSeconds: event.totalSeconds,
-                      raised: event.shots.filter((shot) => shot.raised).map((shot) => shot.shotId),
-                      lowered: event.shots.filter((shot) => shot.lowered).map((shot) => shot.shotId),
-                      message: event.message ?? null
-                    }
-                  });
-                  if (event.kind !== "projected") {
-                    log(`[studio] 时长投影 ${event.kind}（${event.source}）：${event.message ?? ""}`);
-                  }
-                }
+                minShotSeconds: durationRules.modelMin,
+                maxShotSeconds: durationRules.modelMax,
+                log: logFromBridge,
+                onEvent: emitFromDurationBridge
               })
             )
           : () => undefined);
@@ -603,7 +622,7 @@ export class VideoStudio {
           log(`[studio] 定妆照真实出图已启用（${modelName}，产物根 ${charactersDir}）`);
         }
         const result = await runWithDurationProjectionPolicy(
-          { noDialogue: inputSpeechPolicy.allSpeechForbidden },
+          { noDialogue: inputSpeechPolicy.allSpeechForbidden, minShotSeconds: minSingleShot, maxShotSeconds: maxSingleShot },
           () => system.create(effectiveIntent, metadata, createOptions),
         );
         if (portraitRuntime) {
@@ -689,6 +708,6 @@ export class VideoStudio {
           );
         }
       }
-    });
+    }));
   }
 }

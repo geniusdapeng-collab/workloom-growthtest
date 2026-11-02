@@ -4983,13 +4983,18 @@ export interface DurationProjectionBridgeOptions {
   maxShotSeconds?: number;
 }
 
-const durationPolicyStore = new AsyncLocalStorage<{ noDialogue: boolean }>();
+interface DurationProjectionPolicy {
+  noDialogue?: boolean;
+  minShotSeconds?: number;
+  maxShotSeconds?: number;
+}
+const durationPolicyStore = new AsyncLocalStorage<DurationProjectionPolicy>();
 
 export function runWithDurationProjectionPolicy<T>(
-  policy: { noDialogue?: boolean },
+  policy: DurationProjectionPolicy,
   callback: () => T,
 ): T {
-  return durationPolicyStore.run({ noDialogue: policy.noDialogue === true }, callback);
+  return durationPolicyStore.run({ ...policy, noDialogue: policy.noDialogue === true }, callback);
 }
 
 /** 进程级共享桥注册表：第一个安装、最后一个卸载（并发 run 安全） */
@@ -5032,8 +5037,6 @@ export function listSharedBridges(): Array<{ key: string; refs: number }> {
 export function installVendorDurationProjectionBridge(options: DurationProjectionBridgeOptions = {}): () => void {
   const log = options.log ?? (() => undefined);
   const emit = options.onEvent ?? (() => undefined);
-  const minShot = options.minShotSeconds ?? 4;
-  const maxShot = options.maxShotSeconds ?? 30;
   const repoRoot = videoRuntimeRoot(import.meta.url);
   let vendorRequire: NodeJS.Require;
   try {
@@ -5079,7 +5082,10 @@ export function installVendorDurationProjectionBridge(options: DurationProjectio
       });
       return false;
     }
-    const noDialogue = durationPolicyStore.getStore()?.noDialogue === true;
+    const policy = durationPolicyStore.getStore();
+    const noDialogue = policy?.noDialogue === true;
+    const minShot = policy?.minShotSeconds ?? options.minShotSeconds ?? 4;
+    const maxShot = policy?.maxShotSeconds ?? options.maxShotSeconds ?? 30;
     if (noDialogue) {
       for (const record of records) {
         record.dialogue = "";
