@@ -60,4 +60,19 @@ describe("营销来源并发检索的逐引擎限速", () => {
     expect(await pending).toEqual([[], [], [], []]);
     expect(calls).toHaveLength(1);
   });
+
+  it.each([false, true])("配置API检索同样遵守并发限速与排队后熔断，限流=%s", async blocked => {
+    const times: number[] = [];
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      times.push(Date.now());
+      return blocked ? new Response("rate limited", { status: 429 }) : new Response(JSON.stringify({
+        results: [{ title: "星野 F3", url: "https://source.example.com/f3", snippet: "星野 F3" }],
+      }));
+    }));
+    const search = createWebSearch({ providers: ["api"], paceMs: 50,
+      api: { provider: "generic", apiUrl: "https://search.example.com", apiKey: "test-only" } });
+    const pending = Promise.all(Array.from({ length: 4 }, (_, index) => search(`星野 F3 ${index}`, 1)));
+    await vi.runAllTimersAsync(); await pending;
+    expect(times).toEqual(blocked ? [10_000] : [10_000, 10_050, 10_100, 10_150]);
+  });
 });

@@ -424,6 +424,8 @@ export function createWebSearch(options: {
         if (cached) { take("api", cached); continue; }
         const until = cooldownUntil.get("api") ?? 0;
         if (Date.now() < until) { perProvider.push("api=cooldown"); continue; }
+        await pace("api");
+        if (Date.now() < (cooldownUntil.get("api") ?? 0)) { perProvider.push("api=cooldown"); continue; }
         const { hits, blocked } = await apiRunner.search(query, limit);
         if (blocked) {
           const minutes = 15;
