@@ -6650,7 +6650,10 @@ export function normalizeNarrativePromptsForReview(
       fallbackScene: rowPolicy.projectScene,
       fallbackLighting: rowPolicy.projectLighting,
       fallbackColor: rowPolicy.projectColor,
-      fallbackProps: Array.isArray(rowPolicy.projectProps) ? rowPolicy.projectProps : [],
+      fallbackProps: mergeNarrativeProps(
+        rowPolicy.projectProps,
+        Array.isArray(policy.projectProps) ? policy.projectProps : [],
+      ),
     });
     const normalizedPolicy: NarrativePromptReviewPolicy = {
       ...rowPolicy,
