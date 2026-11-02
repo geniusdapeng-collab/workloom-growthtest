@@ -1086,7 +1086,7 @@ console.log("RESULT " + JSON.stringify({
     expect(prompt).not.toMatch(/站立姿态|微微后退|3\.5秒|cinematic|photorealistic|CINEMATIC_SKILL|Camera增强|Mood增强|no background music|no bgm/iu);
   });
 
-  it("canonical 最终合同从可信字段重建固定26栏，不继承模型字段漂移", () => {
+  it("canonical 最终合同从可信字段重建固定26栏并追加逐镜验收，不继承模型字段漂移", () => {
     const shot = applyNarrativeFinalPromptContract({
       shotId: "SC-7",
       duration: 3,
@@ -1125,12 +1125,71 @@ console.log("RESULT " + JSON.stringify({
     });
     const prompt = String(shot.prompt);
     const fields = prompt.split("\n").map((line) => /^(\d{2})\.【([^】]+)】/u.exec(line)).filter(Boolean) as RegExpExecArray[];
-    expect(fields.map((field) => Number(field[1]))).toEqual(Array.from({ length: 26 }, (_, index) => index + 1));
+    expect(fields.map((field) => Number(field[1]))).toEqual(Array.from({ length: 27 }, (_, index) => index + 1));
+    expect(prompt).toContain("【本镜验收】");
     expect(prompt).toContain("【角色】陈卓入画");
     expect(prompt).toContain("【化妆】自然写实妆");
     expect(prompt).toContain("【动作】陈卓收伞、关门");
     expect(prompt).toContain("平江路讲述人-front.png");
     expect(prompt).not.toMatch(/站立姿态|地面积水反光|无关标题|弦乐|BPM|张开双臂/u);
+  });
+
+  it("动物和自然空镜逐镜保留真实动作，不再被通用环境模板覆盖", () => {
+    const animalOptions = {
+      noDialogue: true,
+      maxLength: 3000,
+      noCharacters: true,
+      noAnimals: false,
+      noMusic: true,
+      chineseOnly: true,
+      noTitles: true,
+      canonicalize: true,
+      durationSeconds: 15,
+      aspectRatio: "9:16",
+      resolution: "1080x1920",
+      characterNames: ["橘猫"],
+      projectScene: "雨后纸箱与屋檐，湿地面反光",
+      projectLighting: "冷蓝夜空与暖黄屋檐灯分区",
+      projectColor: "5600K",
+      projectProps: ["纸箱", "屋檐", "积水", "水滴"],
+      projectActions: ["探头", "伸爪接屋檐滴水", "缩回纸箱盘成一团"],
+    };
+    const animal = applyNarrativeFinalPromptContract({
+      shotId: "S-2",
+      duration: 3,
+      action: "橘猫从纸箱探出半身，伸爪接住屋檐落下的水滴",
+      shotSize: "close-up",
+      camera_movement: "固定机位",
+    }, { ...animalOptions, shotIndex: 1 });
+    const animalPrompt = String(animal.prompt);
+    expect(animalPrompt).toContain("橘猫");
+    expect(animalPrompt).toMatch(/伸爪接[^。；\n]*屋檐/u);
+    expect(animalPrompt).toContain("唯一动物主体");
+    expect(animalPrompt).not.toContain("无动物、无飞鸟");
+    expect(animalPrompt).not.toContain("风、雾、水面、光线与植物");
+
+    const empty = applyNarrativeFinalPromptContract({
+      shotId: "S-3",
+      duration: 2,
+      action: "风把落叶分层推过栏杆缝隙，光斑随树叶晃动",
+      shotSize: "close-up",
+      camera_movement: "固定机位",
+    }, {
+      ...animalOptions,
+      noAnimals: true,
+      characterNames: [],
+      projectScene: "秋日木栈道栏杆缝隙",
+      projectLighting: "秋日侧逆光穿过树叶",
+      projectProps: ["落叶", "栏杆", "木栈道"],
+      projectActions: ["风把落叶分层推过栏杆缝隙", "光斑随树叶晃动"],
+      shotIndex: 1,
+    });
+    const emptyPrompt = String(empty.prompt);
+    expect(emptyPrompt).toContain("风把落叶分层推过栏杆缝隙");
+    expect(emptyPrompt).not.toContain("风、雾、水面、光线与植物");
+    expect(emptyPrompt).not.toContain("出租屋、通勤服装与旧台灯");
+    expect(emptyPrompt.length).toBeGreaterThanOrEqual(1200);
+    expect(emptyPrompt).toContain("【本镜验收】");
   });
 
   it("叙事道具从场景证据抽取，关键道具不会因窄词表遗漏", () => {
@@ -1173,6 +1232,70 @@ console.log("RESULT " + JSON.stringify({
     expect(pairs[2]).toContain("低照度曝光");
     expect(pairs[3]).toContain("雨具");
     expect(pairs[4]).toContain("定妆照");
+  });
+
+  it("静物茶壶清除气声幻觉、错误风险配对和伪道具", () => {
+    const story = "桌面上的一把白色陶瓷茶壶，晨光从窗边斜照，蒸汽缓慢升起，镜头只观察釉面、壶嘴水滴和光影变化。无人物、无动物、无品牌、无文字、无字幕、无旁白，仅保留环境声。";
+    const riskAssessment = {
+      technicalRisks: [
+        { risk: "壶嘴水滴附着、滑落和滴落的连续物理过程不稳定", level: "high", impact: "水滴漂移或凭空消失" },
+        { risk: "蒸汽缓慢升起，体积雾循环和形态突变", level: "high", impact: "蒸汽像贴图或循环素材" },
+        { risk: "侧逆晨光扫过釉面时光源方向与色温跳变", level: "high", impact: "同一清晨的光影失去连续性" },
+        { risk: "白瓷釉面材质被生成成塑料或蜡质，壶嘴结构形变", level: "high", impact: "陶瓷质感失真" },
+      ],
+      mitigationSuggestions: [
+        "把壶嘴水滴拆成静态附着、滑落半程和滴落水痕三个短镜",
+        "蒸汽改用实拍水蒸气或低速体积雾叠层，锁定起点和散开边界",
+        "把晨光拆成同机位固定光源方向的短段，锁定色温曲线和高光滚降",
+        "锁定白瓷釉面、壶嘴和壶把结构，使用真实微距素材与焦点堆叠",
+      ],
+    };
+    const pairs = pairRiskMitigations(riskAssessment);
+    expect(pairs[1]).toMatch(/蒸汽|水蒸气|体积雾/u);
+    expect(pairs[2]).toMatch(/晨光|色温|光源/u);
+    expect(pairs[3]).toMatch(/白瓷|釉面|壶嘴/u);
+    const discovery: Record<string, unknown> = {
+      sceneStructure: {
+        opening: { duration: 7, purpose: "壶嘴悬着一颗水滴，晨光斜切过白瓷", keyElements: ["壶嘴", "水滴", "白瓷"] },
+        scenes: [
+          { duration: 13, purpose: "水滴沿壶嘴滑到一半被细蒸汽托住，釉面一明一暗", keyElements: ["壶嘴", "蒸汽", "釉面"] },
+          { duration: 4, purpose: "画面上只剩浅水痕和将散的蒸汽", keyElements: ["桌面", "蒸汽"] },
+        ],
+        ending: { duration: 6, purpose: "最后用一句极轻气声“还在”收束；观察釉面与壶嘴水滴", keyElements: ["釉面", "壶嘴", "水滴"] },
+      },
+      riskAssessment,
+      _canonicalCharacters: [],
+    };
+    const upstream = {
+      _originalStoryText: story,
+      dialogue_requirement: "无台词、无旁白、无字幕；仅保留环境声，禁止添加人声。",
+      visual_style: "侧逆晨光扫过白瓷釉面",
+    };
+    normalizeNarrativeDiscovery(discovery, 30, upstream);
+    const scene = discovery.sceneStructure as Record<string, any>;
+    expect(String(scene.ending.purpose)).not.toMatch(/气声|还在/u);
+    expect(String(scene.scenes[0].purpose)).toContain("水滴在壶嘴下端短暂悬停");
+    expect(String(scene.scenes[0].purpose)).not.toContain("被细蒸汽托住");
+    const markdown = normalizeNarrativeRequirementMarkdown([
+      "# 需求",
+      "## 四、需求契约",
+      "- **道具**（7）：窗、桌面、茶壶、蒸汽、釉面、壶嘴、水滴",
+      "- **动作**（0）：无角色动作",
+      "- **台词/字幕口径**：无台词、无旁白、无字幕；仅保留画外环境声，禁止添加人声。",
+      "- **声音锚点**（1）：蒸汽与陶瓷轻响声；全部为画内环境声或动作声，不含配乐。",
+      "### 2.3 技术难点预判",
+      "**缓解建议**",
+      "1. 旧模板",
+      "- **风险结论**：旧结论",
+    ].join("\n"), discovery, 30, upstream);
+    const propsLine = markdown.split("\n").find((line) => line.startsWith("- **道具**")) ?? "";
+    expect(propsLine).toContain("白色陶瓷茶壶");
+    expect(propsLine).toContain("壶嘴");
+    expect(propsLine).not.toMatch(/蒸汽|釉面/u);
+    expect(markdown).toContain("现场自然环境声");
+    expect(markdown).not.toContain("仅保留画外环境声");
+    expect(markdown).toMatch(/风险2[^；]*蒸汽[^；]*；缓解：[^；]*(?:蒸汽|水蒸气|体积雾)/u);
+    expect(markdown).toMatch(/风险4[^；]*；缓解：[^；]*(?:白瓷|釉面|壶嘴)/u);
   });
 
   it("G3 修复开场空间光位、截断结尾、重复动作、道具缺口和风险错配", () => {
@@ -2136,6 +2259,80 @@ console.log("RESULT " + JSON.stringify({
     expect(String(result.report)).not.toContain("| S1 | 3s | 100 |");
   }, 60_000);
 
+  it("G6 审核报告不泄漏 null 占位，也不把无定妆照标成已有", () => {
+    const script = `
+import { createRequire } from "node:module";
+import { installVendorNarrativePromptReviewBridge } from ${JSON.stringify(resolve(here, "vendor-compat.ts"))};
+const require = createRequire(${JSON.stringify(join(repoRoot, "package.json"))});
+const { HyperrealitySystem } = require(${JSON.stringify(join(repoRoot, "vendor/supermickey/hyperreality-system/index.js"))});
+const originalReport = HyperrealitySystem.prototype._generatePromptsReport;
+const uninstall = installVendorNarrativePromptReviewBridge({ log: () => undefined });
+const prompt = [
+  "01.【语言约束】全部字段使用中文。",
+  "02.【场景】雨后纸箱与屋檐。",
+  "03.【动作】橘猫从纸箱探头并伸爪接水。",
+  "04.【定妆照】不适用人像定妆照：动物主体仅用文字与跨镜参考帧锁定。",
+  "05.【本镜验收】核对探头、伸爪、接水与缩回的连续顺序。"
+].join("\\n");
+const row = { shotId: "S1", sceneType: "content", duration: 3, prompt, promptCharCount: prompt.length,
+  _workloomShotContract: { schema: "workloom.prompt-shot-contract/v1", shotId: "S1", durationSeconds: 3,
+    action: "橘猫伸爪接水", portraitAssets: [{ name: "橘猫", path: "", authorization: "not-applicable", sha256: null, bytes: null }] } };
+const instance = Object.create(HyperrealitySystem.prototype);
+const report = instance._generatePromptsReport([row]);
+uninstall();
+console.log("RESULT " + JSON.stringify({
+  report,
+  noNullPlaceholder: !/"sha256"\\s*:\\s*null|"bytes"\\s*:\\s*null/.test(report),
+  tableNoPortrait: /\\| S1 \\|[^\\n]+\\|\\s*✗\\s*\\|/.test(report),
+  detailNoPortrait: report.includes("**定妆照**: 不适用或未绑定"),
+  restored: originalReport === HyperrealitySystem.prototype._generatePromptsReport
+}));
+`;
+    const result = runInChild(script);
+    expect(result.noNullPlaceholder).toBe(true);
+    expect(result.tableNoPortrait).toBe(true);
+    expect(result.detailNoPortrait).toBe(true);
+    expect(result.restored).toBe(true);
+  }, 60_000);
+
+  it("非数值 unverified 验收口径不再把全片质量门算成 NaN 假红", () => {
+    const script = `
+import { createRequire } from "node:module";
+import { installVendorQualityGateBridge } from ${JSON.stringify(resolve(here, "vendor-compat.ts"))};
+const require = createRequire(${JSON.stringify(join(repoRoot, "package.json"))});
+const { QualityGate } = require(${JSON.stringify(join(repoRoot, "vendor/supermickey/hyperreality-system/engines/production-engine/utils/quality-gate.js"))});
+const original = QualityGate.prototype.run;
+const uninstall = installVendorQualityGateBridge();
+const gate = new QualityGate();
+const prompt = "01.【场景】秋日午后旧木栈道，枯叶卡在栏杆窄缝，侧逆光穿过叶隙形成清晰光斑，木纹与旧漆磨损可见。\\n02.【动作】风从栈道外侧穿入，把落叶分层推过栏杆缝隙，叶缘抬起后贴回木板，光斑随枝叶晃动。\\n03.【时间轴】T00:00-T00:01 起幅建立缝隙与落叶，T00:01-T00:02.4 完成叶片位移，T00:02.4-T00:03 落幅保持静止。\\n04.【音频】仅有近距离风声、落叶摩擦声与木栈道轻微受力声，无人物、无音乐。";
+const result = gate.run([{
+  shotId: "S1",
+  prompt,
+  promptCharCount: prompt.length,
+  scene: "秋日午后旧木栈道栏杆缝隙，枯叶与清晰光斑同框，木纹粗糙且旧漆剥落",
+  mood: "安静、克制、带有秋日午后缓慢流逝的时间感",
+  camera_movement: "固定机位，三脚架锁死，镜头保持稳定且不做推拉摇移",
+  lighting: "侧逆自然光穿过叶隙形成窄光斑，暗部保留木纹细节",
+  action: "风把落叶分层推过栏杆缝隙，叶缘抬起后贴回木板，光斑同步晃动",
+  timeline: "T00:00-T00:01 建立缝隙，T00:01-T00:02.4 完成位移，T00:02.4-T00:03 落定",
+  backgroundSound: "风声与落叶摩擦声"
+}], { deliveryStandard: { acceptanceCriteria: {
+  visual: "unverified：画面效果采用抽帧复核",
+  narrative: "unverified：叙事采用人工复核"
+} } });
+uninstall();
+console.log("RESULT " + JSON.stringify({
+  passed: result.passed,
+  failedFields: result.failedFields,
+  restored: original === QualityGate.prototype.run
+}));
+`;
+    const result = runInChild(script);
+    expect(result.passed).toBe(true);
+    expect(result.failedFields).toEqual([]);
+    expect(result.restored).toBe(true);
+  }, 60_000);
+
   it("PRD 把真实模型的配乐、复合光位和主观阈值收敛成可执行合同", () => {
     const discovery = {
       upstreamFields: {
@@ -2441,7 +2638,7 @@ console.log("RESULT " + JSON.stringify({
     expect(markdown).not.toContain("预留重试时间");
     expect(markdown).not.toContain("准备备选方案");
     expect(markdown).toContain(`${actions.length}个连续动作`);
-    expect(markdown).toContain("主体动作与画外环境声");
+    expect(markdown).toContain("主体动作与现场自然环境声");
     expect(markdown).toContain("### 视觉锚点定义");
     expect((markdown.match(/###\s*视觉锚点定义/gu) ?? []).length).toBe(1);
     expect(markdown).toContain("片尾静止=0.5秒");

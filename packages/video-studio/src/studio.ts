@@ -36,6 +36,7 @@ import {
   installVendorPromptRebuildBridge,
   installVendorNarrativePromptReviewBridge,
   installVendorPreproductionReviewBridge,
+  installVendorQualityGateBridge,
   installSharedBridge,
   narrativeSpeechPolicy,
   runWithDurationProjectionPolicy
@@ -421,6 +422,8 @@ export class VideoStudio {
         keep(installVendorNarrativePromptReviewBridge({ log }));
         /** G7 消费完整三件套、摘要、时间轴和真实有效处理时间，不接受截断摘要。 */
         keep(installVendorPreproductionReviewBridge({ log }));
+        /** 非数值的 unverified 验收口径不得被算成 NaN 并让全片质检假红。 */
+        keep(installVendorQualityGateBridge());
         /** 需求洞察 _fillDefaults 修复（数组保形 + 消除 const 重赋值，静态审计发现） */
         keep(installVendorDiscoveryFixBridge({ log }));
         /** 叙事/营销隔离、人物契约补全与需求洞察首个 JSON 修复 */

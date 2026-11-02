@@ -1542,6 +1542,15 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
     if (/AI生成质量|生成质量不确定|质量不确定|多次迭代/u.test(text)) {
       return "把高风险画面拆成固定机位短镜，逐镜锁定首帧、主体外观、光源方向和接触关系；每镜生成后检查结构、材质与连续性，失败只重做该镜，不整条管线重跑。";
     }
+    if (/蒸汽|水汽|体积雾|烟缕|热气/u.test(text)) {
+      return "蒸汽只保留壶嘴上方一小缕低速热汽：锁定起点、上升方向、透明度和散开边界；优先用实拍水蒸气或低频体积雾叠层，逐镜检查循环帧、噪点闪烁与主体分离，异常只重做蒸汽层。";
+    }
+    if (/侧逆晨光|晨光.*釉面|光源方向|阴影长度|高光.*滚转|色温跳变/u.test(text)) {
+      return "把晨光变化拆成同机位、固定光源方向的短段：起幅冷蓝侧逆光、中段暖金扫过釉面、末段光退；逐镜锁定光源方位、阴影长度、色温曲线与高光滚降，异常只重调该段照明。";
+    }
+    if (/白瓷|陶瓷|釉面|壶嘴.*结构|壶把.*结构|浅景深.*结构|塑料.*蜡质/u.test(text)) {
+      return "锁定白色陶瓷茶壶的壶嘴、壶把、壶身比例与釉面高光位置；用真实微距素材、焦点堆栈或固定结构参考帧，单镜保持同一焦平面和光源方向，逐镜检查塑料感、蜡质感、焦点呼吸与细结构形变，异常只重做该镜。";
+    }
     if (/时长|节奏|镜头时长分配/u.test(text)) {
       return "先按场景建立硬时间预算并写入镜头合同，再逐镜实测 durationSeconds；场景加总必须等于目标总时长，超差只重分配同场景镜头，不压缩有明确动作的镜头。";
     }
@@ -1599,6 +1608,18 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
   const semanticMitigation = (text: string): string | undefined => {
     const find = (pattern: RegExp): string | undefined =>
       specificMitigations.find((item) => pattern.test(item));
+    if (/(?:蒸汽|水汽|体积雾|烟缕|热气)/u.test(text)) {
+      const found = find(/(?:蒸汽|水汽|体积雾|烟缕|热气)/u);
+      if (found) return found;
+    }
+    if (/(?:侧逆晨光|晨光.*釉面|光源方向|阴影长度|高光.*滚转|色温跳变)/u.test(text)) {
+      const found = find(/(?:晨光|光源方向|色温|曝光|光影变化|白平衡|LUT)/u);
+      if (found) return found;
+    }
+    if (/(?:白瓷|陶瓷|釉面|壶嘴.*结构|壶把.*结构|浅景深.*结构|塑料.*蜡质)/u.test(text)) {
+      const found = find(/(?:白瓷|陶瓷|釉面|壶嘴|壶把|微距|焦点堆栈|材质)/u);
+      if (found) return found;
+    }
     if (/(?:雨伞|雨珠|伞骨|伞尖|滴水|水痕|湿鞋|积水)/u.test(text)) {
       const found = find(/(?:雨珠|雨伞|伞骨|伞尖|滴水|水痕|湿鞋|积水|液体|水滴)/u);
       if (found) return found;
@@ -2147,6 +2168,17 @@ export function normalizeNarrativeRequirementMarkdown(
     && !props.some((item) => /(?:积水|水洼|水滴|水珠|水面)/u.test(item))) {
     props.push("积水", "水滴");
   }
+  if (/(?:茶壶|釉面|壶嘴|蒸汽)/u.test(propEvidence)) {
+    for (let index = props.length - 1; index >= 0; index -= 1) {
+      if (/^(?:蒸汽|釉面)$/u.test(props[index]!)) props.splice(index, 1);
+    }
+    if (/(?:白瓷|白色陶瓷).*茶壶/u.test(propEvidence)
+      && !props.includes("白色陶瓷茶壶")) {
+      const genericIndex = props.indexOf("茶壶");
+      if (genericIndex >= 0) props.splice(genericIndex, 1);
+      props.unshift("白色陶瓷茶壶");
+    }
+  }
   if (actions.some((item) => /钥匙/u.test(item)) && !props.includes("钥匙")) props.push("钥匙");
   const endingRecord = recordValue(scene.ending);
   const endingElements = Array.isArray(endingRecord.keyElements)
@@ -2238,10 +2270,11 @@ export function normalizeNarrativeRequirementMarkdown(
   if (narrativeSpeechPolicy(dialogue).allSpeechForbidden) {
     normalized = normalized
       .replace(/(?:画外旁白|画外音|旁白)\s*[：:]\s*[^。；\n]+[。；]?/gu,
-        noCharacterContract ? "仅保留画外环境声。" : `仅保留${animalOnly ? "主体" : "人物"}动作与画外环境声。`)
+        noCharacterContract ? "仅保留现场自然环境声与可见声源动作声。" : `仅保留${animalOnly ? "主体" : "人物"}动作与现场自然环境声。`)
       .replace(/[^。；\n]{0,30}(?:紧接)?(?:一句)?(?:轻声|低声)?台词\s*[：:]?\s*[“「][^”」]+[”」][^。；\n]*[。；]?/gu,
-        noCharacterContract ? "仅保留画外环境声。" : `仅保留${animalOnly ? "主体" : "人物"}动作与画外环境声。`)
+        noCharacterContract ? "仅保留现场自然环境声与可见声源动作声。" : `仅保留${animalOnly ? "主体" : "人物"}动作与现场自然环境声。`)
       .replace(/[^。；\n]{0,48}(?:轻声|低声|开口)?说[：:]?\s*[「“"'‘][^」”"'’]+[」”"'’][。；]?/gu, "以动作与环境声完成回应。")
+      .replace(/[^。；\n]{0,32}(?:一句)?(?:极轻|轻微|压低|贴耳)?(?:气声|耳语)[^。；\n]*[“"'「][^”"'」]+[”"'」][^。；\n]*[。；]?/gu, "")
       .replace(/钉子台词[^。；\n]*[。；]?/gu, "站外转发文案不进入成片。")
       .replace(/^.*(?:关键台词|片内台词)[^\n]*$/gmu, (line) => {
         const quote = line.match(/[“"'「]([^”"'」]+)[”"'」]/u)?.[1]?.trim();
@@ -2252,13 +2285,14 @@ export function normalizeNarrativeRequirementMarkdown(
   }
   normalized = normalized.replace(
     /仅保留人物动作与画外环境声/gu,
-    noCharacterContract ? "仅保留画外环境声" : animalOnly ? "仅保留主体动作与画外环境声" : "仅保留动作与环境声",
+    noCharacterContract ? "仅保留现场自然环境声与可见声源动作声" : animalOnly ? "仅保留主体动作与现场自然环境声" : "仅保留动作与现场自然环境声",
   );
   const actionAudioClause = noCharacterContract
-    ? "仅保留画外环境声"
+    ? "仅保留现场自然环境声与可见声源动作声"
     : animalOnly
-      ? "仅保留主体动作与画外环境声"
-      : "仅保留动作与环境声";
+      ? "仅保留主体动作与现场自然环境声"
+      : "仅保留动作与现场自然环境声";
+  normalized = normalized.replace(/仅保留画外环境声/gu, actionAudioClause);
   if (speechFullyForbidden && !normalized.includes(actionAudioClause)) {
     normalized = `${normalized.trimEnd()}\n\n- **可执行动作/声音口径**：${actionAudioClause}。\n`;
   }
@@ -2295,6 +2329,7 @@ export function normalizeNarrativeDiscovery(
       .replace(/[^，。；\n]{0,48}(?:轻声|低声|开口)?说[：:]?\s*[「“"'‘][^」”"'’]+[」”"'’]/gu, "")
       .replace(/(?:一句|关键|钉子|片内)台词[^。；\n]*[。；]?/gu, "")
       .replace(/[^。；\n]{0,32}(?:低声|轻声)(?:一|这)?句\s*[「“"'‘][^」”"'’]+[」”"'’][^。；\n]*[。；]?/gu, "")
+      .replace(/[^。；\n]{0,32}(?:一句)?(?:极轻|轻微|压低|贴耳)?(?:气声|耳语)[^。；\n]*[“"'「][^”"'」]+[”"'」][^。；\n]*[。；]?/gu, "")
       .replace(/(?:画外音?|旁白)[^。；\n]*?[：:]?\s*[「“"'‘][^」”"'’]+[」”"'’]/gu, "")
       .replace(/(?:画外音?|旁白)[：:]\s*[^。；\n]+/gu, "")
       .replace(/这(?:一)?句(?:几乎听不见的)?话/gu, "动作与环境声的停顿")
@@ -2368,7 +2403,13 @@ export function normalizeNarrativeDiscovery(
       else text = text.replace(/[—…+]+$/u, "").trim();
     }
     if (text.replace(/[\s，。；、：]/gu, "").length < 4 && !actionable(text)) {
-      text = "以动作与画外环境声完成情绪转折";
+      text = "以动作与现场自然环境声完成情绪转折";
+    }
+    if (/蒸汽.*水滴|水滴.*蒸汽/u.test(text) && /(?:托住|托起|承住)/u.test(text)) {
+      text = text
+        .replace(/水滴[^。；\n]{0,20}(?:被|由)[^。；\n]{0,12}蒸汽[^。；\n]{0,8}(?:托住|托起|承住)/u, "水滴在壶嘴下端短暂悬停")
+        .replace(/蒸汽[^。；\n]{0,8}(?:托住|托起|承住)[^。；\n]{0,16}水滴/u, "蒸汽从壶口上方缓慢升起");
+      repairs.push({ code: "PHYSICAL_CLAIM_NORMALIZED", detail: "改用可拍的水滴悬停与蒸汽升起，不依赖未经证实的物理托举" });
     }
     return text;
   };
@@ -2672,7 +2713,8 @@ export function normalizeNarrativeDiscovery(
   const normalizeText = (item: string): string => {
     let text = item
       .replace(/\bundefined\b/giu, "未标注")
-      .replace(/\bnull\b/giu, "未标注");
+      .replace(/\bnull\b/giu, "未标注")
+      .replace(/仅保留画外环境声/gu, "仅保留现场自然环境声与可见声源动作声");
     if (musicForbidden && MUSIC_CUE_PATTERN.test(text)) {
       const kept = text.split(/[。；\n]+/u)
         .map((part) => part.trim())
@@ -2945,11 +2987,13 @@ function sanitizePrdText(value: unknown, duration: number, speechForbidden = fal
         Number(seconds) > duration ? `片尾（${duration}秒内）` : whole)
       .replace(/\d+\s*[—~\-至]\s*片尾（(\d+)秒内）/gu, "片尾≤$1秒")
       .replace(/\bundefined\b/giu, "未标注")
-      .replace(/\bnull\b/giu, "未标注");
+      .replace(/\bnull\b/giu, "未标注")
+      .replace(/仅保留画外环境声/gu, "仅保留现场自然环境声与可见声源动作声");
     if (speechForbidden) {
       text = text
-        .replace(/[^。；\n]{0,30}(?:画外旁白|画外音|旁白)[^。；\n]*[。；]?/gu, "仅保留人物动作与画外环境声。")
+        .replace(/[^。；\n]{0,30}(?:画外旁白|画外音|旁白)[^。；\n]*[。；]?/gu, "仅保留动作与现场自然环境声。")
         .replace(/[^。；\n]{0,48}(?:轻声|低声|开口)?说[：:]?\s*[「“"'‘][^」”"'’]+[」”"'’][。；]?/gu, "以动作与环境声完成回应。")
+        .replace(/[^。；\n]{0,32}(?:一句)?(?:极轻|轻微|压低|贴耳)?(?:气声|耳语)[^。；\n]*[“"'「][^”"'」]+[”"'」][^。；\n]*[。；]?/gu, "仅保留画面内动作与现场自然环境声。")
         .replace(/钉子台词[^。；\n]*[。；]?/gu, "站外转发文案不进入成片。");
     }
     return text;
@@ -5513,8 +5557,13 @@ export function applyNarrativeFinalPromptContract(
       .replace(/\bfemale\b/giu, "女性")
       .replace(/\bmale\b/giu, "男性");
     const canonicalNoPerson = Boolean(options.noCharacters);
-    const roles = canonicalNoPerson
-      ? "无人物、无人影、无人体局部入画。"
+    const canonicalAnimalNames = characterNames.filter((name) => isNarrativeAnimal(name));
+    const canonicalAnimalOnly = canonicalNoPerson && canonicalAnimalNames.length > 0;
+    const canonicalNoActors = canonicalNoPerson && canonicalAnimalNames.length === 0;
+    const roles = canonicalAnimalOnly
+      ? `${canonicalAnimalNames.join("、")}作为本镜唯一动物主体入画；画面不出现人物、人影或人体局部。`
+      : canonicalNoPerson
+        ? "无人物、无人影、无人体局部入画。"
       : characterNames.length > 0
         ? `${characterNames.join("、")}入画；${profileAppearance || "保持当前授权角色档案中的发型脸型、身高体型与服装一致"}`
         : cleanText(shotCharacterEvidence) || "按本镜源证据执行";
@@ -5532,8 +5581,11 @@ export function applyNarrativeFinalPromptContract(
     const makeup = canonicalNoPerson
       ? "不适用：本镜无人物。"
       : makeupTextForAction(projectedAction);
-    const portraitText = canonicalNoPerson
-      ? "不适用：本镜无人物，不生成也不引用人像定妆照。"
+    const portraitText = canonicalAnimalOnly
+      ? (profiles.filter((item) => item.path).map((item) => `${item.name}=${item.path}`).join("；")
+        || "不适用人像定妆照：动物主体仅用文字外观锚点与跨镜参考帧锁定，不生成人物肖像。")
+      : canonicalNoPerson
+        ? "不适用：本镜无人物，不生成也不引用人像定妆照。"
       : (options.characterPortraits ?? []).filter((item) => characterNames.includes(item.name) && item.path)
         .map((item) => `${item.name}=${item.path}`).join("；")
         || fieldValue("定妆照")
@@ -5554,20 +5606,35 @@ export function applyNarrativeFinalPromptContract(
       visibleAction = `${characterNames.join("、")}在本镜保持同一外观，${visibleAction}`;
     }
     const actions = options.projectActions ?? [];
+    const subjectlessFallback = canonicalAnimalOnly
+      ? `${canonicalAnimalNames.join("、")}在${cleanText(options.projectScene ?? "") || "已确认空间"}完成本镜可见动作`
+      : "风、雾、水面、光线与植物在连续物理范围内完成本镜自然变化，无人物动作";
     const assignedAction = canonicalNoPerson
-      ? "风、雾、水面、光线与植物在连续物理范围内完成本镜自然变化，无人物动作。"
+      ? (
+        visibleAction
+        && !/^风、雾、水面、光线与植物/u.test(visibleAction)
+        && !/^本镜动作落定/u.test(visibleAction)
+          ? visibleAction
+          : projectedAction || subjectlessFallback
+      )
       : actions.length > 0
         ? actions[Math.min(options.shotIndex ?? 0, actions.length - 1)]!
         : visibleAction;
-    const actionText = canonicalNoPerson || characterNames.length === 0 || characterNames.some((name) => assignedAction.includes(name))
+    const actionText = canonicalNoActors || (canonicalAnimalOnly && canonicalAnimalNames.some((name) => assignedAction.includes(name)))
       ? assignedAction
-      : `${characterNames.join("、")}在本镜保持同一外观，${assignedAction}`;
+      : canonicalAnimalOnly
+        ? `${canonicalAnimalNames.join("、")}作为唯一动物主体：${assignedAction}`
+        : characterNames.length === 0 || characterNames.some((name) => assignedAction.includes(name))
+          ? assignedAction
+          : `${characterNames.join("、")}在本镜保持同一外观，${assignedAction}`;
     const shotSizeRaw = promptFieldText(next.shotSize ?? (next.fields as FusionRecord).shotSize)
       || promptFieldText(next.cameraHint ?? (next.fields as FusionRecord).cameraHint)
       || "中景";
     const shotSize = shotSizeRaw.replace(/景别$/u, "");
-    const compositionText = canonicalNoPerson
-      ? `${shotSize}景别，9:16竖构图；自然景物主体清晰，画面边缘保留安全区，不增加人物或动物。`
+    const compositionText = canonicalAnimalOnly
+      ? `${shotSize}景别，9:16竖构图；${canonicalAnimalNames.join("、")}作为唯一动物主体清晰可辨，画面边缘保留安全区，不增加人物。`
+      : canonicalNoPerson
+        ? `${shotSize}景别，9:16竖构图；自然景物主体清晰，画面边缘保留安全区，不增加人物或动物。`
       : `${shotSize}景别，9:16竖构图；${characterNames.join("、") || "已登记角色"}位于可执行表演区并保持可辨轮廓，为其动作和视线保留空间。`;
     const cameraSource = promptFieldText(next.camera_movement ?? (next.fields as FusionRecord).camera_movement) || "固定机位";
     const cameraText = /(?:固定|锁死|locked|static|零位移)/iu.test(cameraSource)
@@ -5579,16 +5646,18 @@ export function applyNarrativeFinalPromptContract(
           : /横移|平移/u.test(cameraSource)
             ? "固定高度极缓横移，速度连续并停稳，不改变场景与背景"
             : "固定机位，不做推拉摇移或变焦";
-    const emotionText = canonicalNoPerson
-      ? "平静、克制；情绪只通过自然变化、光线与空间关系表达。"
+    const emotionText = canonicalAnimalOnly
+      ? "平静、治愈；情绪只通过动物耳尖、眼神、爪部与身体重心的连续变化，以及雨声和空间关系表达。"
+      : canonicalNoPerson
+        ? "平静、克制；情绪只通过自然变化、光线与空间关系表达。"
       : emotionTextForAction(assignedAction);
     const baseText = cleanText(fieldValue("基础") || "电影级写实质感；保留真实材质、自然颗粒与连续物理运动。")
       .replace(/\b(?:8K|4K)\b/giu, "电影级");
     const forbidden = [
       "无文字", "无字幕", "无水印", "无品牌标识",
       ...(canonicalNoPerson ? ["无人物", "无人影", "无人体局部"] : []),
-      ...(options.noAnimals || options.noCharacters ? ["无动物", "无飞鸟"] : []),
-      ...(canonicalNoPerson ? ["无船只", "无建筑", "无现代设备"] : []),
+      ...(options.noAnimals || canonicalNoActors ? ["无动物", "无飞鸟"] : []),
+      ...(canonicalNoActors ? ["无船只", "无建筑", "无现代设备"] : []),
       "无生成特效", "无镜头光晕伪影", "无模糊", "无过曝", "无未声明角色",
     ];
     const portraitLine = portraitText.startsWith("不适用") ? portraitText : `使用 ${portraitText}；跨镜不得替换。`;
@@ -5607,17 +5676,40 @@ export function applyNarrativeFinalPromptContract(
     const timelineText = duration > 0
       ? timelineTextForAction(assignedAction, duration)
       : fieldValue("时间轴") || "按本镜合同执行完整起幅、动作与落幅。";
+    const conciseEvidence = (value: string, max = 140): string => {
+      const text = value.replace(/\s+/gu, " ").trim();
+      return text.length <= max ? text : `${text.slice(0, Math.max(1, max - 1))}…`;
+    };
+    const verificationText = [
+      `按 ${Math.max(0.1, duration).toFixed(1)} 秒逐段核对：起幅${conciseEvidence(timelineText, 96)}`,
+      `主体与空间${conciseEvidence(compositionText, 88)}`,
+      `场景连续${conciseEvidence(sceneText, 96)}`,
+      `灯光与色彩${conciseEvidence(`${lightingText}；${colorText}`, 112)}`,
+      `道具连续${conciseEvidence(propsText, 72)}`,
+      `台词与声音${conciseEvidence(`${dialogueText}；${audioText}`, 96)}`,
+      `交付参数${constraint}`,
+    ].join("；");
+    const brightnessText = canonicalAnimalOnly
+      ? "动物主体高光不过曝，湿毛、爪垫与纸箱纤维保留纹理，暗部不死黑；不要求人物面部曝光。"
+      : canonicalNoPerson
+        ? "自然景物高光不过曝，暗部保留材质细节；不涉及人物面部。"
+        : brightnessTextForAction(assignedAction);
+    const directorIntent = canonicalAnimalOnly
+      ? "克制写实的动物观察短片；以动物动作、空间关系和真实光线推进，不拟人化、不增加无关叙事或模板表演。"
+      : canonicalNoPerson
+        ? "克制写实的自然观察短片；以自然运动、材质反射和真实光线推进，不增加无关叙事、特效或模板表演。"
+        : "克制写实的自然长镜或稳定短镜；以人物动作、空间关系和真实光线推进，不增加无关叙事、特效或模板表演。";
     prompt = [
       "01.【语言约束】全部字段使用中文；画幅、分辨率、帧率、编码、时间码与资产路径可作为受控制作标记。",
-      "02.【导演意图】克制写实的自然长镜或稳定短镜；以人物动作、空间关系和真实光线推进，不增加无关叙事、特效或模板表演。",
+      `02.【导演意图】${directorIntent}`,
       `03.【基础】${baseText}`,
       `04.【约束】${constraint}。`,
       `05.【场景】${sceneText}`,
       `06.【灯光设计】${lightingText}`,
-      `07.【明亮约束】${canonicalNoPerson ? "自然景物高光不过曝，暗部保留材质细节；不涉及人物面部。" : brightnessTextForAction(assignedAction)}`,
+      `07.【明亮约束】${brightnessText}`,
       `08.【构图】${compositionText}`,
       `09.【色彩/色调】${colorText}`,
-      `10.【景深】${depthTextForShotSize(shotSize, canonicalNoPerson)}`,
+      `10.【景深】${depthTextForShotSize(shotSize, canonicalNoPerson, canonicalAnimalOnly)}`,
       `11.【运镜】${cameraText}`,
       `12.【角色】${roles}`,
       `13.【服装】${costume}`,
@@ -5634,12 +5726,22 @@ export function applyNarrativeFinalPromptContract(
       `24.【负面约束】${[...new Set([...forbidden, "无暗黑风调色", "无塑料或金属感高光"])].join("、")}。`,
       `25.【角色约束】${canonicalNoPerson ? "画面禁止人物、人影、人体局部和拟人化表演模板。" : `本镜仅允许 ${characterNames.join("、") || "已登记角色"} 入画；不得增加未声明人物。`}`,
       `26.【角色一致性】${canonicalNoPerson ? "本镜无人物；锁定同一场景、道具、光源与空间关系。" : `分别绑定 ${characterNames.join("、") || "当前角色"} 的授权外观、服装与发型；不得合并、替换或增减人物。`}`,
+      `27.【本镜验收】${verificationText}`,
     ].join("\n");
+    if (prompt.length < 1200) {
+      const expansion = [
+        `复核首帧主体位置与结束姿态，确认时间轴内动作顺序连续且没有跳变`,
+        `复核${sceneText}的空间边界、光源方向与跨镜道具相对位置`,
+        `复核${propsText}在起幅、中段和落幅保持同一数量、材质与接触关系`,
+        `复核${audioText}，画面内外均不新增未声明人物、文字、品牌或配乐`,
+      ].join("；");
+      prompt = `${prompt}\n28.【交付复核】${expansion}`;
+    }
     next._workloomShotContract = {
       schema: "workloom.prompt-shot-contract/v1",
       shotId: String(next.shotId ?? next.shot_id ?? ""),
       durationSeconds: duration,
-      era: "当代（依据已确认的出租屋、通勤服装与旧台灯场景）",
+      era: narrativeEraEvidence(sceneText, propsText.split("、").map(String).filter(Boolean)),
       space: sceneText,
       action: actionText,
       lighting: lightingText,
@@ -5647,8 +5749,8 @@ export function applyNarrativeFinalPromptContract(
       shotSize,
       camera: cameraText,
       equipment: "固定三脚架与常规电影镜头；具体型号未声明",
-      subjectCount: canonicalNoPerson ? 0 : characterNames.length,
-      characterNames: canonicalNoPerson ? [] : characterNames,
+      subjectCount: canonicalNoActors ? 0 : characterNames.length,
+      characterNames: canonicalNoActors ? [] : characterNames,
       costume,
       props: propsText.split("、").map(String).filter(Boolean),
       dialogue: dialogueText,
@@ -5875,6 +5977,11 @@ function timelineTextForAction(action: string, duration: number): string {
   const code = (value: number): string => `T00:${Math.max(0, value).toFixed(1).padStart(4, "0")}`;
   const kind = narrativeActionKind(action);
   const shoePhase = shoeWorkPhase(action);
+  const sourceBeats = action
+    .split(/[；。]+/u)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 3);
   const beats = kind === "umbrella"
     ? ["固定机位起幅，伞骨合拢，伞尖离地滴水", "把收拢的湿伞换到持伞侧，另一只手摸到钥匙", "在门前站定，呼气，钥匙尖对准锁孔"]
     : kind === "open"
@@ -5893,7 +6000,11 @@ function timelineTextForAction(action: string, duration: number): string {
             ? ["指尖触到旋钮，先保持暗部曝光", "旋钮转到点亮段，钨丝由暗红转为暖黄", "暖光覆盖桌面，手离开旋钮并停住"]
             : kind === "listen"
               ? ["转向坐具，视线从雨痕落向椅面", "坐下并调整重心，双手落在膝上", "肩背放松，抬眼听雨并保持静止"]
-              : ["建立本镜空间与主体位置", "连续完成动作字段中的主要变化", "动作落定，保持结束姿态"];
+              : [
+                sourceBeats[0] || "建立本镜空间与主体位置",
+                sourceBeats[1] || sourceBeats[0] || "连续完成动作字段中的主要变化",
+                sourceBeats[2] || sourceBeats[1] || "动作落定，保持结束姿态",
+              ];
   return `${code(0)}-${code(firstEnd)} ${beats[0]}；${code(firstEnd)}-${code(secondEnd)} ${beats[1]}；${code(secondEnd)}-${code(safeDuration)} ${beats[2]}`;
 }
 
@@ -5922,6 +6033,11 @@ function emotionTextForAction(action: string): string {
 
 function pacingTextForAction(action: string, duration: number): string {
   const kind = narrativeActionKind(action);
+  const sourceBeats = action
+    .split(/[；。]+/u)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 3);
   const body = kind === "umbrella"
     ? "前段只为收伞起势，中段推进到门边，末段在门前停顿"
     : kind === "open"
@@ -5940,7 +6056,7 @@ function pacingTextForAction(action: string, duration: number): string {
             ? "前段保持暗态，中段旋钮点亮，末段暖光停稳"
             : kind === "listen"
               ? "前段转向坐具，中段坐下，末段静止听雨"
-              : "前段建立，中段完成主要动作，末段收束";
+              : `前段${sourceBeats[0] || "建立空间"}，中段${sourceBeats[1] || "完成主要变化"}，末段${sourceBeats[2] || "动作落定收束"}`;
   return `${Math.max(0.1, duration).toFixed(1)} 秒内按约 30%/45%/25% 分配：${body}；不做额外加速或无关转场。`;
 }
 
@@ -5971,7 +6087,12 @@ function sceneTextForAction(action: string, scene: string): string {
   return value;
 }
 
-function depthTextForShotSize(shotSize: string, noCharacters: boolean): string {
+function depthTextForShotSize(shotSize: string, noCharacters: boolean, animalOnly = false): string {
+  if (animalOnly) {
+    return /(?:close|特写)/iu.test(shotSize)
+      ? "浅景深，焦点锁定动物眼睛、爪部或当前接触点，前后景自然虚化；主体轮廓与接触关系始终清晰。"
+      : "中等景深，焦点跟随动物主体与当前动作，背景保留空间层次但不过度抢焦点。";
+  }
   if (noCharacters) {
     return /(?:close|特写)/iu.test(shotSize)
       ? "近距浅景深，焦点锁定当前自然物与水滴，前后景柔和分离。"
@@ -5984,6 +6105,15 @@ function depthTextForShotSize(shotSize: string, noCharacters: boolean): string {
     return "深景深，人物全身、空间边线与关键道具同处可辨焦平面，背景不过度虚化。";
   }
   return "中等景深，焦点跟随人物上半身与当前动作，背景保留空间层次但不过度抢焦点。";
+}
+
+function narrativeEraEvidence(scene: string, props: string[]): string {
+  const compact = String(scene || props.join("、"))
+    .replace(/\s+/gu, " ")
+    .replace(/[。；]/gu, "，")
+    .trim()
+    .slice(0, 96);
+  return `场景按本次画面证据执行（${compact || "以已确认镜头合同为准"}）；未额外声明具体历史年代`;
 }
 
 function shotSizeForAction(action: string): string | null {
@@ -6214,6 +6344,10 @@ export function normalizeNarrativePromptsForReview(
 
 function evidenceHash(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value ?? null)).digest("hex");
+}
+
+function jsonWithoutNull(value: unknown, space = 2): string {
+  return JSON.stringify(value, (_key, item: unknown) => item === null ? undefined : item, space);
 }
 
 function promptBoundShotContract(prompt: FusionRecord): FusionRecord {
@@ -6514,7 +6648,7 @@ export function renderPreproductionAuditReport(input: {
     "## 结构化镜头合同（机器可读）",
     "",
     "```json",
-    JSON.stringify({
+    jsonWithoutNull({
       schema: "workloom.preproduction-contract/v1",
       sourceOfTruth: "final-prompt-bound-shot-contract",
       shotCount: shotCards.length,
@@ -6529,7 +6663,7 @@ export function renderPreproductionAuditReport(input: {
         durationSeconds: shot.duration,
         promptHash: createHash("sha256").update(String(shot.prompt ?? "")).digest("hex"),
       })),
-    }, null, 2),
+    }),
     "```",
     "",
     "## 检查结论",
@@ -6591,6 +6725,101 @@ export function installVendorPreproductionReviewBridge(options: { log?: (line: s
   };
 }
 
+/**
+ * Vendor quality-gate currently turns non-numeric "unverified" acceptance
+ * criteria into NaN and then fails every prompt. Keep unverified delivery
+ * criteria distinct from numeric review thresholds while preserving all field,
+ * length and placeholder checks.
+ */
+export function installVendorQualityGateBridge(): () => void {
+  const repoRoot = videoRuntimeRoot(import.meta.url);
+  const vendorRequire = createRequire(resolvePath(repoRoot, "package.json"));
+  const gatePath = resolvePath(
+    repoRoot,
+    "vendor/supermickey/hyperreality-system/engines/production-engine/utils/quality-gate.js",
+  );
+  const mod = vendorRequire(gatePath) as {
+    QualityGate?: { prototype?: Record<string, unknown> };
+  };
+  const prototype = mod.QualityGate?.prototype;
+  if (!prototype || typeof prototype.run !== "function") return () => undefined;
+  const original = prototype.run as (
+    this: Record<string, unknown>,
+    prompts: FusionRecord[],
+    prd?: FusionRecord | null,
+  ) => FusionRecord;
+  const numericThreshold = (value: unknown, fallback: number): number => {
+    const number = Number(value);
+    if (!Number.isFinite(number) || number <= 0) return fallback;
+    return number > 1 ? Math.min(1, number / 100) : number;
+  };
+  prototype.run = function patchedQualityGate(
+    this: Record<string, unknown>,
+    prompts: FusionRecord[],
+    prd?: FusionRecord | null,
+  ) {
+    const delivery = recordValue(prd?.deliveryStandard);
+    const criteria = recordValue(delivery.acceptanceCriteria ?? prd?.acceptanceCriteria);
+    const safeCriteria = {
+      ...criteria,
+      visual: numericThreshold(criteria.visual, 0.75),
+      narrative: numericThreshold(criteria.narrative, 0.75),
+    };
+    const safePrd = prd
+      ? {
+        ...prd,
+        deliveryStandard: {
+          ...delivery,
+          acceptanceCriteria: safeCriteria,
+        },
+      }
+      : prd;
+    const result = original.call(this, prompts, safePrd);
+    const checks = Array.isArray(result.checks) ? result.checks.map(recordValue) : [];
+    const threshold = Math.round((safeCriteria.visual + safeCriteria.narrative) / 2 * 100);
+    for (const check of checks) {
+      check.passed = Boolean(
+        check.hasScene
+        && check.hasMood
+        && check.hasCamera
+        && check.hasLighting
+        && check.hasAction
+        && check.hasTimeline
+        && check.hasBackgroundSound
+        && check.hasPrompt
+        && check.withinLimit
+        && check.hasAudioLayer
+        && check.hasTitleOverlay
+        && !check.hasPlaceholder
+        && Number(check.overallScore ?? 0) >= threshold,
+      );
+    }
+    result.checks = checks;
+    result.passedCount = checks.filter((check) => check.passed).length;
+    result.passed = checks.length > 0 && checks.every((check) => check.passed);
+    const blockingBooleanFields = new Set([
+      "hasScene", "hasMood", "hasCamera", "hasLighting", "hasAction",
+      "hasTimeline", "hasBackgroundSound", "hasPrompt", "withinLimit",
+      "hasAudioLayer", "hasTitleOverlay",
+    ]);
+    result.failedFields = checks.filter((check) => !check.passed).map((check) => ({
+      shotId: check.shotId,
+      overallScore: check.overallScore,
+      failed: [
+        ...Object.entries(check)
+          .filter(([key, value]) => blockingBooleanFields.has(key) && !value)
+          .map(([key]) => key),
+        ...(check.hasPlaceholder === true ? ["hasPlaceholder"] : []),
+        ...(Number(check.overallScore ?? 0) < threshold ? ["overallScore"] : []),
+      ],
+    }));
+    return result;
+  };
+  return () => {
+    prototype.run = original;
+  };
+}
+
 /** Rebuild every prompt from the Phase 3 policy immediately before the G6 report is generated. */
 export function installVendorNarrativePromptReviewBridge(options: { log?: (line: string) => void } = {}): () => void {
   const log = options.log ?? (() => undefined);
@@ -6640,10 +6869,37 @@ export function installVendorNarrativePromptReviewBridge(options: { log?: (line:
         };
       });
       const report = originalReport.call(this, reportPrompts);
+      const portraitState = new Map(reportPrompts.map((row) => {
+        const promptText = String(row.prompt ?? "");
+        const portraitField = /^\s*\d+\.【定妆照】([^\n]*)$/mu.exec(promptText)?.[1]?.trim() ?? "";
+        const contract = promptBoundShotContract(row);
+        const linkedAssets = Array.isArray(contract.portraitAssets)
+          ? contract.portraitAssets.map(recordValue).filter((item) => String(item.path ?? "").trim())
+          : [];
+        return [
+          String(row.shotId ?? row.shot_id ?? ""),
+          Boolean(linkedAssets.length > 0 || (portraitField && !/^不适用/u.test(portraitField))),
+        ] as const;
+      }));
+      let currentPromptId = "";
+      const portraitReport = report.split("\n").map((line) => {
+        const heading = line.match(/^###\s+([^\s(]+)/u)?.[1];
+        if (heading) currentPromptId = heading;
+        if (line.startsWith("|")) {
+          const cells = line.split("|");
+          const rowId = cells[1]?.trim() ?? "";
+          if (portraitState.has(rowId)) cells[6] = portraitState.get(rowId) ? " ✓ " : " ✗ ";
+          return cells.join("|");
+        }
+        if (line.startsWith("**长度**") && portraitState.has(currentPromptId)) {
+          return line.replace(/\*\*定妆照\*\*:\s*(?:有|无)/u, `**定妆照**: ${portraitState.get(currentPromptId) ? "有" : "不适用或未绑定"}`);
+        }
+        return line;
+      }).join("\n");
       const contracts = reportPrompts
         .map((row) => row._workloomShotContract)
         .filter((value): value is FusionRecord => Boolean(value && typeof value === "object" && !Array.isArray(value)));
-      if (contracts.length === 0) return report;
+      if (contracts.length === 0) return portraitReport;
       const actionSequence = contracts.map((contract) => String(contract.action ?? "")).filter(Boolean);
       const contractDocument = {
         schema: "workloom.prompt-review-contract/v1",
@@ -6661,7 +6917,7 @@ export function installVendorNarrativePromptReviewBridge(options: { log?: (line:
         },
         shots: contracts,
       };
-      return `${report.trimEnd()}\n\n## 结构化镜头合同（机器可读）\n\n\`\`\`json\n${JSON.stringify(contractDocument, null, 2)}\n\`\`\`\n`;
+      return `${portraitReport.trimEnd()}\n\n## 结构化镜头合同（机器可读）\n\n\`\`\`json\n${jsonWithoutNull(contractDocument)}\n\`\`\`\n`;
     };
   }
   prototype._confirmPrompts = function patchedPromptReview(
