@@ -2853,7 +2853,13 @@ function buildShotContract(
         fallbackColor: String(recordValue(visual.colorPalette).dominant ?? ""),
         fallbackProps: Array.isArray(scene.keyProps) ? scene.keyProps.map(String) : [],
       });
-      const localBodyOrProp = /(?:只拍|第一帧只|局部|不露脸|人未入画|伞尖|鞋底|湿印|手部特写|脚部特写|肩背特写|背影特写)/u.test(purpose);
+      const localDetail = /(?:只拍|第一帧只|局部|不露脸|人未入画|伞尖|鞋底|湿印|手部特写|脚部特写|肩背特写|背影特写)/u.test(purpose);
+      const namedCharacter = canonicalCharacters
+        .map((item) => String(item.name ?? "").trim())
+        .find((name) => name && purpose.includes(name));
+      const subjectFaceVisible = Boolean(namedCharacter)
+        && !/(?:不露脸|背影|手部特写|脚部特写|局部人体)/u.test(purpose);
+      const localBodyOrProp = localDetail && !namedCharacter;
       const subjectIds = localBodyOrProp
         ? []
         : canonicalCharacters.map((item) => String(item.id ?? item.characterId ?? "")).filter(Boolean);
@@ -2861,7 +2867,7 @@ function buildShotContract(
         ? "环境/道具主体；无人物"
         : localBodyOrProp
           ? "道具/局部人体（不露脸）"
-          : canonicalCharacters.map((item) => String(item.name ?? item.id ?? "角色")).join("、");
+          : `${canonicalCharacters.map((item) => String(item.name ?? item.id ?? "角色")).join("、")}${!subjectFaceVisible ? "（局部入画）" : ""}`;
       const rawShotLighting = visualRequirements[index] || "";
       const hasShotLighting = /(?:光|灯|钨丝|明亮|暗部|过曝|逆光|侧光|主光|补光|色温)/u.test(rawShotLighting);
       const shotLightingText = direction.lighting
@@ -2874,6 +2880,25 @@ function buildShotContract(
         : (shotColorTemperature === "色温按已确认视觉方案执行"
           ? dominantColorTemperature(`${sceneLightingText} ${globalLighting}`, subjectLabel)
           : shotColorTemperature);
+      const firstShoeIndex = globalActions.findIndex((value) => /(?:换鞋|脱下[^。；\n]*鞋|换穿[^。；\n]*拖鞋)/u.test(value));
+      const shoePhase = shoeWorkPhase(action);
+      const footwearState = shoePhase === "second"
+        ? "one_indoor_slipper_one_wet_shoe_removing_second"
+        : shoePhase === "first"
+          ? "one_indoor_slipper_one_wet_shoe_on_support_foot"
+          : shoePhase === "combined"
+            ? "wet_shoes_being_changed_to_indoor_slippers"
+            : firstShoeIndex >= 0 && rowIndex < firstShoeIndex
+              ? "both_wet_shoes"
+              : firstShoeIndex >= 0
+                ? "both_indoor_slippers"
+                : "not_applicable";
+      const lampState = narrativeActionKind(action) === "lamp"
+        ? "off_to_on"
+        : narrativeActionKind(action) === "listen"
+          ? "on"
+          : "off";
+      const shotSize = shotSizeForAction(action) || (hint === "static" ? "medium" : hint);
       rows.push({
         shotId: `${sceneId || "SC"}-S${String(index + 1).padStart(2, "0")}`,
         sceneId: sceneId || null,
@@ -2881,7 +2906,7 @@ function buildShotContract(
         startSeconds: start,
         endSeconds: end,
         durationSeconds: Number((end - start).toFixed(2)),
-        shotSize: hint === "static" ? "medium" : hint,
+        shotSize,
         cameraMovement: movement,
         cameraHint: hint,
         purpose,
@@ -2892,6 +2917,10 @@ function buildShotContract(
         subjectIds,
         subjectLabel,
         subjectCount: canonicalCharacters.length,
+        faceVisible: subjectFaceVisible,
+        costumeState: footwearState,
+        footwearState,
+        lampState,
         keyProps: direction.props.length > 0
           ? direction.props
           : (Array.isArray(scene.keyProps) ? scene.keyProps : []),
@@ -2930,7 +2959,8 @@ export function normalizeHomecomingPrdContinuity(prd: Record<string, unknown>, m
     .replace(/沾泥皮鞋|旧帆布鞋|小白鞋|白色便鞋/gu, "白色湿便鞋")
     .replace(/结尾单音极轻进入/gu, "伞面余滴落在门槛")
     .replace(/未开门悬念|悬念/gu, "归家停顿")
-    .replace(/鞋底(?:泥水|泥污)/gu, "鞋底水迹");
+    .replace(/鞋底(?:泥水|泥污)/gu, "鞋底水迹")
+    .replace(/3000K/giu, "2700K");
   const setScene = (
     number: number,
     values: {
@@ -2962,7 +2992,7 @@ export function normalizeHomecomingPrdContinuity(prd: Record<string, unknown>, m
     setting: "老旧居民楼楼道门口，雨天傍晚，门外潮湿昏暗，门内旧台灯未开启。",
     keyProps: ["黑色折叠伞", "旧防盗门", "钥匙", "地垫", "地砖"],
     visualRequirements: [
-      "第一帧为伞骨合拢与伞尖水珠落到楼道地砖的近景，黑色折叠伞轮廓完整",
+      "第一帧为中近景，陈卓在楼道冷光中收伞，伞骨合拢且伞尖水珠落到楼道地砖，黑色折叠伞轮廓完整",
       "陈卓手握钥匙停在门前，门框作前景遮挡，楼道冷光勾出人物轮廓，室内暗部无补光",
     ],
     audioRequirements: ["雨打窗棚与楼道滴水先行", "伞骨收拢和衣料摩擦声", "钥匙未插入前的短暂停顿"],
@@ -3004,8 +3034,18 @@ export function normalizeHomecomingPrdContinuity(prd: Record<string, unknown>, m
     prd.characterSystem = characterSystem;
   }
   const visual = recordValue(prd.visualSpecification);
+  const colorPalette = recordValue(visual.colorPalette);
+  if (colorPalette.accent) colorPalette.accent = replaceTerms(colorPalette.accent).replace(/3000K/giu, "2700K");
+  visual.colorPalette = colorPalette;
   visual.lightingDirection = "楼道与玄关段关闭旧台灯，仅用楼道冷光和窗外冷光；到达台灯镜后点亮2700K钨丝主光，暖光只覆盖桌面和人物暖侧，窗外冷蓝只作轮廓勾边。";
+  if (Array.isArray(visual.specialVisualEffects)) {
+    visual.specialVisualEffects = visual.specialVisualEffects.map((item) => replaceTerms(item));
+  }
   prd.visualSpecification = visual;
+  const referenceCases = recordValue(prd.referenceCases);
+  if (Array.isArray(referenceCases.styleReferences)) {
+    referenceCases.styleReferences = referenceCases.styleReferences.map((item) => replaceTerms(item));
+  }
   const summary = recordValue(prd.prdSummary);
   summary.keyHook = "第一帧：伞尖水珠落在楼道地砖上，陈卓手握钥匙停在门前；随后开门、关门、换鞋、拧亮台灯并坐下听雨。";
   prd.prdSummary = summary;
@@ -5701,7 +5741,7 @@ function depthTextForShotSize(shotSize: string, noCharacters: boolean): string {
 function shotSizeForAction(action: string): string | null {
   switch (narrativeActionKind(action)) {
     case "umbrella": return "medium";
-    case "open": return "close-up";
+    case "open": return "medium";
     case "close": return "close-up";
     case "shoes": return "extreme-close-up";
     case "lamp": return "extreme-close-up";

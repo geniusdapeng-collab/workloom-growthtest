@@ -2207,7 +2207,7 @@ console.log("RESULT " + JSON.stringify({
       }],
     });
     const serialized = JSON.stringify(prd);
-    expect(serialized).not.toMatch(/黑色长柄伞|沾泥皮鞋|旧帆布鞋|小白鞋|未开门悬念|结尾单音/u);
+    expect(serialized).not.toMatch(/黑色长柄伞|沾泥皮鞋|旧帆布鞋|小白鞋|未开门悬念|结尾单音|3000K/u);
     expect(serialized).toContain("黑色折叠伞");
     expect(serialized).toContain("白色湿便鞋");
     expect(serialized).toContain("室内拖鞋");
@@ -2216,8 +2216,19 @@ console.log("RESULT " + JSON.stringify({
     expect(String(scenes[1]!.setting)).toMatch(/门已关闭.*旧台灯保持关闭/u);
     const shots = prd.shotContract as Array<Record<string, unknown>>;
     expect(shots).toHaveLength(6);
+    expect(shots[0]).toMatchObject({
+      faceVisible: true,
+      subjectLabel: "陈卓",
+      footwearState: "both_wet_shoes",
+      lampState: "off",
+    });
+    expect(shots[1]).toMatchObject({ shotSize: "medium", faceVisible: true });
+    expect(shots[2]).toMatchObject({ footwearState: "both_wet_shoes", lampState: "off" });
+    expect(shots[3]).toMatchObject({ footwearState: "wet_shoes_being_changed_to_indoor_slippers", lampState: "off" });
+    expect(shots[4]).toMatchObject({ footwearState: "both_indoor_slippers", lampState: "off_to_on" });
+    expect(shots[5]).toMatchObject({ footwearState: "both_indoor_slippers", lampState: "on" });
     expect(shots.map((shot) => shot.purpose)).toEqual([
-      "陈卓收伞走到出租屋门前；第一帧为伞骨合拢与伞尖水珠落到楼道地砖的近景，黑色折叠伞轮廓完整",
+      "陈卓收伞走到出租屋门前；第一帧为中近景，陈卓在楼道冷光中收伞，伞骨合拢且伞尖水珠落到楼道地砖，黑色折叠伞轮廓完整",
       "陈卓用钥匙开门并跨进玄关；陈卓手握钥匙停在门前，门框作前景遮挡，楼道冷光勾出人物轮廓，室内暗部无补光",
       "陈卓回身把门关好，确认门锁落位；先拍回身关门与门锁落位，固定机位保持门轴方向连续",
       "陈卓在玄关弯腰脱下白色湿便鞋，换穿室内拖鞋；低机位拍白色湿便鞋蹭过地垫，随后弯腰换穿室内拖鞋，旧台灯始终关闭",
