@@ -5409,6 +5409,8 @@ export interface NarrativePromptReviewPolicy {
   projectColor?: string;
   projectProps: string[];
   projectActions: string[];
+  /** Final prompt-bound contract persisted through vendor prompt/shot synchronization. */
+  shotContract?: FusionRecord;
 }
 
 export interface NarrativeShotDirection {
@@ -5692,7 +5694,8 @@ function transitionTextForAction(action: string, isLastShot: boolean): string {
 function costumeTextForFootwear(base: string, action: string, shotIndex: number, shoeIndex: number): string {
   if (shoeIndex < 0) return base;
   const upper = base
-    .replace(/[，,；;]?(?:脚穿|配)?(?:小白鞋|白色便鞋|旧帆布鞋|湿鞋|拖鞋).*$/u, "")
+    .replace(/[，,；;]\s*(?:脚穿|配|穿).*$/u, "")
+    .replace(/[，,；;]?\s*(?:小白鞋|白色便鞋|白色湿便鞋|旧帆布鞋|湿鞋|拖鞋).*$/u, "")
     .trim();
   if (shotIndex < shoeIndex) return `${upper}；脚穿白色便鞋，鞋面与裤脚被雨水打湿，开衫袖口湿润。`;
   if (shotIndex === shoeIndex) return `${upper}；脚穿白色湿便鞋，正脱在鞋架旁并换入室内拖鞋。`;
@@ -5701,11 +5704,17 @@ function costumeTextForFootwear(base: string, action: string, shotIndex: number,
 
 function normalizeFootwearProps(props: string[], action: string, shotIndex: number, shoeIndex: number): string[] {
   const footwear = /(?:鞋|拖鞋|帆布鞋|便鞋)/u;
-  const cleaned = props.map(String).map((item) => item.trim()).filter((item) => item && !footwear.test(item));
-  if (shoeIndex < 0) return [...new Set([...props.map(String).filter((item) => item.trim()), ...cleaned])];
-  if (shotIndex < shoeIndex) return [...new Set([...cleaned, "白色湿便鞋"])];
-  if (shotIndex === shoeIndex) return [...new Set([...cleaned, "白色湿便鞋", "室内拖鞋"])];
-  return [...new Set([...cleaned, "室内拖鞋"])];
+  const base = props.map(String).map((item) => item.trim()).filter((item) => item && !footwear.test(item));
+  const withoutSynonyms = (values: string[]): string[] => {
+    const set = new Set(values);
+    if (set.has("黑色折叠伞")) set.delete("雨伞");
+    if (set.has("旧台灯")) set.delete("台灯");
+    return [...set];
+  };
+  if (shoeIndex < 0) return withoutSynonyms(props.map(String).map((item) => item.trim()).filter(Boolean));
+  if (shotIndex < shoeIndex) return withoutSynonyms([...base, "白色湿便鞋"]);
+  if (shotIndex === shoeIndex) return withoutSynonyms([...base, "白色湿便鞋", "室内拖鞋"]);
+  return withoutSynonyms([...base, "室内拖鞋"]);
 }
 
 /**
@@ -5776,11 +5785,20 @@ export function normalizeNarrativePromptsForReview(
       ? { ...normalized.fields as FusionRecord }
       : {};
     if (normalizedPolicy.noTitles) for (const key of titleFields) delete fields[key];
+    const boundContract = normalized._workloomShotContract && typeof normalized._workloomShotContract === "object"
+      ? normalized._workloomShotContract as FusionRecord
+      : undefined;
+    if (boundContract) fields._workloomShotContract = boundContract;
+    const persistedPolicy: NarrativePromptReviewPolicy = {
+      ...normalizedPolicy,
+      ...(boundContract ? { shotContract: boundContract } : {}),
+    };
     const result: FusionRecord = {
       ...normalized,
       fields,
       promptCharCount: String(normalized.prompt ?? "").length,
-      _workloomPromptReviewPolicy: normalizedPolicy,
+      ...(boundContract ? { _workloomShotContract: boundContract } : {}),
+      _workloomPromptReviewPolicy: persistedPolicy,
       _workloomPromptReview: {
         schemaVersion: "workloom.prompt-review/v1",
         sourcePromptHash: createHash("sha256").update(String(shot.prompt ?? "")).digest("hex"),
@@ -5794,6 +5812,54 @@ export function normalizeNarrativePromptsForReview(
 
 function evidenceHash(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value ?? null)).digest("hex");
+}
+
+function promptBoundShotContract(prompt: FusionRecord): FusionRecord {
+  const direct = prompt._workloomShotContract;
+  if (direct && typeof direct === "object" && !Array.isArray(direct)) return direct as FusionRecord;
+  const fields = prompt.fields && typeof prompt.fields === "object" && !Array.isArray(prompt.fields)
+    ? prompt.fields as FusionRecord
+    : {};
+  const fromFields = fields._workloomShotContract;
+  if (fromFields && typeof fromFields === "object" && !Array.isArray(fromFields)) return fromFields as FusionRecord;
+  const policy = prompt._workloomPromptReviewPolicy && typeof prompt._workloomPromptReviewPolicy === "object"
+    ? prompt._workloomPromptReviewPolicy as FusionRecord
+    : {};
+  const fromPolicy = policy.shotContract;
+  return fromPolicy && typeof fromPolicy === "object" && !Array.isArray(fromPolicy)
+    ? fromPolicy as FusionRecord
+    : {};
+}
+
+function promptReviewField(prompt: FusionRecord, label: string): string {
+  const text = String(prompt.prompt ?? "");
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  return new RegExp(`^\\s*\\d+\\.【${escaped}】([^\\n]*)$`, "mu").exec(text)?.[1]?.trim() ?? "";
+}
+
+function promptDerivedShotContract(prompt: FusionRecord, fallbackId: string): FusionRecord {
+  const shotId = String(prompt.shotId ?? prompt.shot_id ?? fallbackId);
+  const durationSeconds = Number(prompt.duration ?? recordValue(prompt.timing).duration ?? 0);
+  const composition = promptReviewField(prompt, "构图");
+  const propsText = promptReviewField(prompt, "道具");
+  return {
+    schema: "workloom.prompt-shot-contract/parsed-v1",
+    source: "parsed-final-prompt",
+    shotId,
+    durationSeconds,
+    space: promptReviewField(prompt, "场景"),
+    action: promptReviewField(prompt, "动作"),
+    lighting: promptReviewField(prompt, "灯光设计"),
+    color: promptReviewField(prompt, "色彩/色调"),
+    shotSize: composition.match(/^(.+?)景别/u)?.[1]?.trim() ?? "",
+    camera: promptReviewField(prompt, "运镜"),
+    costume: promptReviewField(prompt, "服装"),
+    props: propsText.split(/[、；]/u).map(String).map((item) => item.trim()).filter(Boolean),
+    dialogue: promptReviewField(prompt, "台词"),
+    timeline: promptReviewField(prompt, "时间轴"),
+    emotion: promptReviewField(prompt, "情绪"),
+    portraitAssets: [],
+  };
 }
 
 /**
@@ -5814,6 +5880,31 @@ export function renderPreproductionAuditReport(input: {
   const prompts: FusionRecord[] = Array.isArray(input.productionResult.prompts)
     ? input.productionResult.prompts.map((value, index) => fusionRecord(value, `prompt[${index}]`))
     : [];
+  const rawShots: FusionRecord[] = shots;
+  const promptById = new Map(prompts.map((prompt) => [String(prompt.shotId ?? prompt.shot_id ?? ""), prompt]));
+  const shotCards: FusionRecord[] = prompts.map((prompt, index) => {
+    const id = String(prompt.shotId ?? prompt.shot_id ?? rawShots[index]?.shotId ?? `S-${index + 1}`);
+    const raw = rawShots.find((shot) => String(shot.shotId ?? shot.shot_id ?? "") === id) ?? rawShots[index] ?? {};
+    const boundContract = promptBoundShotContract(prompt);
+    const contract = Object.keys(boundContract).length > 0
+      ? boundContract
+      : promptDerivedShotContract(prompt, id);
+    return {
+      ...raw,
+      shotId: id,
+      duration: Number(contract.durationSeconds ?? prompt.duration ?? raw.duration ?? recordValue(raw.timing).duration ?? 0),
+      sceneType: String(raw.sceneType ?? raw.type ?? "content"),
+      scene: String(contract.space ?? promptFieldText(raw.scene ?? raw.sceneDescription)),
+      action: String(contract.action ?? promptFieldText(raw.action)),
+      lighting: String(contract.lighting ?? promptFieldText(raw.lighting)),
+      color: String(contract.color ?? ""),
+      shotSize: String(contract.shotSize ?? raw.shotSize ?? ""),
+      camera: String(contract.camera ?? ""),
+      props: Array.isArray(contract.props) ? contract.props : [],
+      prompt: String(prompt.prompt ?? ""),
+      promptContract: contract,
+    };
+  });
   const blueprint = recordValue(input.scriptResult.blueprint);
   const characterSystem = recordValue(blueprint.character_system);
   const characters = Array.isArray(characterSystem.characters)
@@ -5823,42 +5914,93 @@ export function renderPreproductionAuditReport(input: {
   const scenes: FusionRecord[] = Array.isArray(structure.scenes)
     ? structure.scenes.map((value) => recordValue(value))
     : [];
-  const promptById = new Map(prompts.map((prompt) => [String(prompt.shotId ?? prompt.shot_id ?? ""), prompt]));
-  const shotIds = shots.map((shot) => String(shot.shotId ?? shot.shot_id ?? ""));
+  const shotIds = shotCards.map((shot) => String(shot.shotId ?? ""));
   const promptIds = prompts.map((prompt) => String(prompt.shotId ?? prompt.shot_id ?? ""));
   const idsMatch = shotIds.length === promptIds.length
     && shotIds.every((id, index) => id.length > 0 && id === promptIds[index]);
-  const totalSeconds = shots.reduce((sum, shot) => sum + Number(shot.duration ?? recordValue(shot.timing).duration ?? 0), 0);
+  const totalSeconds = shotCards.reduce((sum, shot) => sum + Number(shot.duration ?? recordValue(shot.timing).duration ?? 0), 0);
   const portraitConfirmation = recordValue(input.confirmations.portraitGeneration);
   const portraitReason = String(portraitConfirmation.reason ?? portraitConfirmation.status ?? "");
   const portraitsNotApplicable = /not[-_ ]?applicable|审计|audit-portrait/i.test(portraitReason);
+  const scriptPortraitAssets = characters.map((character) => {
+    const evidence = recordValue(character.portraitEvidence);
+    return {
+      name: character.name ?? character.characterId ?? null,
+      path: character.portraitPath ?? character.portraitRef ?? evidence.path ?? null,
+      authorization: character.authorization ?? null,
+      sha256: evidence.sha256 ?? null,
+    };
+  }).filter((item) => item.path);
+  const repoRoot = videoRuntimeRoot(import.meta.url);
+  const promptPortraitAssets = prompts.map((prompt) => {
+    const portraitField = promptReviewField(prompt, "定妆照");
+    const match = portraitField.match(/(?:^|使用\s+)([^=；\s]+)=([^；\n]+)/u);
+    const roleText = promptReviewField(prompt, "角色");
+    const authorization = roleText.match(/授权=([^；\n\s]+)/u)?.[1] ?? null;
+    const path = match?.[2]?.trim() ?? null;
+    const absolute = path ? resolvePath(repoRoot, path) : "";
+    const sha256 = path && existsSync(absolute)
+      ? createHash("sha256").update(readFileSync(absolute)).digest("hex")
+      : null;
+    return { name: match?.[1]?.trim() ?? null, path, authorization, sha256 };
+  }).filter((item) => item.path);
+  const portraitAssets = [...new Set(shotCards.flatMap((shot) => {
+    const prompt = promptById.get(String(shot.shotId ?? ""));
+    const bound = prompt ? promptBoundShotContract(prompt) : {};
+    const contract = Object.keys(bound).length > 0 ? bound : recordValue(shot.promptContract);
+    const fromContract = Array.isArray(contract.portraitAssets) ? contract.portraitAssets : [];
+    return [...fromContract, ...scriptPortraitAssets, ...promptPortraitAssets];
+  }).map(recordValue).map((item) => JSON.stringify({
+    name: item.name ?? null,
+    path: item.path ?? null,
+    authorization: item.authorization ?? null,
+    sha256: item.sha256 ?? null,
+  })))].map((item) => JSON.parse(item) as FusionRecord);
+  const portraitAssetsVerified = portraitAssets.length > 0 && portraitAssets.every((item) =>
+    typeof item.path === "string" && item.path.length > 0
+    && typeof item.sha256 === "string" && /^[a-f0-9]{64}$/u.test(item.sha256)
+    && !/^(?:unknown|unverified|空)?$/iu.test(String(item.authorization ?? "")));
   const elapsedMs = Math.max(0, Number(input.effectiveMs) || 0);
   const artifacts = {
     script: evidenceHash(input.scriptResult),
-    shots: evidenceHash(shots),
+    shots: evidenceHash(shotCards),
     prompts: evidenceHash(prompts),
     portraits: evidenceHash(portraitConfirmation),
   };
+  const semanticHash = evidenceHash(shotCards.map((shot) => ({
+    shotId: shot.shotId,
+    duration: shot.duration,
+    scene: shot.scene,
+    action: shot.action,
+    lighting: shot.lighting,
+    color: shot.color,
+    shotSize: shot.shotSize,
+    camera: shot.camera,
+    props: shot.props,
+  })));
   const lines = [
     "# 预生产交付收口（G7）",
     "",
     "## 机器可核验摘要",
     "",
-    `- 镜头卡：${shots.length} 镜，sha256=${artifacts.shots}`,
+    `- 镜头卡：${shotCards.length} 镜，sha256=${artifacts.shots}`,
     `- 提示词正文：${prompts.length} 条，sha256=${artifacts.prompts}`,
     `- 剧本：${scenes.length} 场，sha256=${artifacts.script}`,
     `- 总时长：${Number(totalSeconds.toFixed(3))}s`,
     `- 有效处理时间：${elapsedMs}ms（${(elapsedMs / 60_000).toFixed(1)}分钟）`,
     `- 镜头 ID 与提示词 ID 一一对应：${idsMatch ? "是" : "否"}`,
+    `- 镜头语义合同：最终提示词绑定的结构化镜头卡，语义摘要 sha256=${semanticHash}`,
     `- 渲染提交：否；G8 预算、资格与质量提交闸未触发`,
     "",
     "## 三件套状态",
     "",
-    `- 镜头卡：已内联，共 ${shots.length} 镜；全部场景与字段见下表`,
+    `- 镜头卡：已内联，共 ${shotCards.length} 镜；全部场景与字段见下表，来源为最终提示词绑定合同`,
     `- 提示词：已内联，共 ${prompts.length} 条；正文见下方完整字段块`,
     portraitsNotApplicable
-      ? "- 定妆照：not_applicable；本轮审计显式关闭定妆照生成，无图片或 pending 规格包被当作真实交付"
+      ? `- 定妆照生成：not_applicable（本轮审计显式关闭新图生成）；角色引用资产：${portraitAssetsVerified ? `verified，${portraitAssets.length} 个已登记源定妆照` : "unverified"}`
       : `- 定妆照：状态=${portraitReason || "unverified"}；未声明为已完成，除非另有真实图片回执`,
+    ...portraitAssets.map((item) =>
+      `- 源定妆照 ${String(item.name ?? "未命名")}：path=${String(item.path ?? "未指定")}；授权=${String(item.authorization ?? "unknown")}；sha256=${String(item.sha256 ?? "未核验")}`),
     "",
     "## 脚本证据",
     "",
@@ -5872,8 +6014,8 @@ export function renderPreproductionAuditReport(input: {
     "",
     "| 镜头 | 时长 | 类型 | 完整场景 | 动作 | 灯光 | 提示词 SHA-256 |",
     "|---|---:|---|---|---|---|---|",
-    ...shots.map((shot, index) => {
-      const id = String(shot.shotId ?? shot.shot_id ?? `S-${index + 1}`);
+    ...shotCards.map((shot, index) => {
+      const id = String(shot.shotId ?? `S-${index + 1}`);
       const prompt = String(promptById.get(id)?.prompt ?? "");
       return `| ${id} | ${String(shot.duration ?? recordValue(shot.timing).duration ?? "?")}s | ${String(shot.sceneType ?? shot.type ?? "content")} | ${promptFieldText(shot.scene ?? shot.sceneDescription).replace(/\|/gu, "／")} | ${promptFieldText(shot.action).replace(/\|/gu, "／")} | ${promptFieldText(shot.lighting).replace(/\|/gu, "／")} | ${createHash("sha256").update(prompt).digest("hex")} |`;
     }),
@@ -5884,11 +6026,11 @@ export function renderPreproductionAuditReport(input: {
     "|---|---:|---:|---:|",
     ...(() => {
       let cursor = 0;
-      return shots.map((shot, index) => {
+      return shotCards.map((shot, index) => {
         const seconds = Number(shot.duration ?? recordValue(shot.timing).duration ?? 0);
         const start = cursor;
         cursor += seconds;
-        return `| ${String(shot.shotId ?? shot.shot_id ?? `S-${index + 1}`)} | ${start.toFixed(2)}s | ${seconds.toFixed(2)}s | ${cursor.toFixed(2)}s |`;
+        return `| ${String(shot.shotId ?? `S-${index + 1}`)} | ${start.toFixed(2)}s | ${seconds.toFixed(2)}s | ${cursor.toFixed(2)}s |`;
       });
     })(),
     "",
@@ -5905,11 +6047,33 @@ export function renderPreproductionAuditReport(input: {
         "",
       ];
     }),
+    "## 结构化镜头合同（机器可读）",
+    "",
+    "```json",
+    JSON.stringify({
+      schema: "workloom.preproduction-contract/v1",
+      sourceOfTruth: "final-prompt-bound-shot-contract",
+      shotCount: shotCards.length,
+      totalDurationSeconds: Number(totalSeconds.toFixed(3)),
+      semanticHash,
+      shotIds,
+      portraitAssets,
+      portraitAssetsVerified,
+      shots: shotCards.map((shot) => ({
+        ...recordValue(shot.promptContract),
+        shotId: shot.shotId,
+        durationSeconds: shot.duration,
+        promptHash: createHash("sha256").update(String(shot.prompt ?? "")).digest("hex"),
+      })),
+    }, null, 2),
+    "```",
+    "",
     "## 检查结论",
     "",
     `- 镜头/提示词 ID 与数量：${idsMatch ? "通过" : "失败"}`,
-    `- 场景正文截断：${shots.some((shot) => /(?:\.\.\.|…)$/u.test(promptFieldText(shot.scene ?? shot.sceneDescription).trim())) ? "失败" : "通过"}`,
-    `- 定妆照审计状态：${portraitsNotApplicable ? "not_applicable（不是通过）" : "unverified"}`,
+    `- 场景正文截断：${shotCards.some((shot) => /(?:\.\.\.|…)$/u.test(promptFieldText(shot.scene).trim())) ? "失败" : "通过"}`,
+    `- 镜头卡与提示词语义绑定：${shotCards.every((shot) => recordValue(shot.promptContract).shotId === shot.shotId) ? "通过" : "失败"}`,
+    `- 定妆照生成：${portraitsNotApplicable ? "not_applicable" : "unverified"}；源角色资产：${portraitAssetsVerified ? "verified" : "unverified"}`,
     "- 渲染/G8：未提交，故预算、资格与质量提交闸为 not_run；本报告不把预生产通过写成可渲染或可发布",
     "",
     "本报告为机器证据包，不要求人工口头确认；由外部门禁回调直接审核。",

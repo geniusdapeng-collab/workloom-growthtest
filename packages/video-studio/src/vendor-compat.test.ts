@@ -1854,6 +1854,8 @@ console.log("RESULT " + JSON.stringify({
     );
     const contracts = prompts.map((row) => row._workloomShotContract as Record<string, unknown>);
     expect(contracts.map((contract) => contract.action)).toEqual(actions);
+    expect(((prompts[0]!.fields as Record<string, unknown>)._workloomShotContract as Record<string, unknown>).shotId).toBe("S1");
+    expect(((prompts[0]!._workloomPromptReviewPolicy as Record<string, unknown>).shotContract as Record<string, unknown>).shotId).toBe("S1");
     expect(String(contracts[2]!.space)).toContain("门扇正从开启位置合拢");
     expect(String(contracts[0]!.costume)).toMatch(/白色便鞋.*雨水打湿/u);
     expect(String(contracts[3]!.costume)).toMatch(/正脱.*换入室内拖鞋/u);
@@ -1872,18 +1874,44 @@ console.log("RESULT " + JSON.stringify({
 
   it("G7 收口报告内联完整三件套、哈希、时间轴与未提交的 G8 边界", () => {
     const fullScene = "雨夜出租屋玄关：门已经关上，湿伞靠墙，鞋架、地垫、门后挂钩与旧台灯处在同一可见空间，人物正从门外进入。";
+    const portraitPath = "bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png";
+    const portraitSha = "3d177401ed014376992489da04d2e35977ca282c205edc43bc8f6dca2f9a8184";
     const prompt = "01.【语言约束】全部字段使用中文。\n02.【场景】" + fullScene + "\n03.【动作】陈卓收伞后开门。\n04.【灯光设计】旧台灯关闭。";
+    const promptContract = {
+      schema: "workloom.prompt-shot-contract/v1",
+      shotId: "S-1",
+      durationSeconds: 3,
+      space: fullScene,
+      action: "陈卓收伞后开门",
+      lighting: "旧台灯关闭；门外冷光进入",
+      color: "冷蓝灰",
+      shotSize: "medium",
+      camera: "固定机位",
+      props: ["黑色折叠伞", "旧防盗门", "钥匙"],
+      portraitAssets: [{
+        name: "陈卓",
+        path: portraitPath,
+        authorization: "real-authorized",
+        sha256: portraitSha,
+      }],
+    };
     const report = renderPreproductionAuditReport({
       productionResult: {
         shots: [{
           shotId: "S-1",
           duration: 3,
           sceneType: "opening",
-          scene: fullScene,
-          action: "陈卓收伞后开门",
-          lighting: "旧台灯关闭；门外冷光进入",
+          scene: "错误：黎明山谷雾景",
+          action: "错误：画面内没有人物动作",
+          lighting: "错误：4200K山谷天光",
         }],
-        prompts: [{ shotId: "S-1", prompt }],
+        prompts: [{
+          shotId: "S-1",
+          duration: 3,
+          prompt,
+          fields: { _workloomShotContract: promptContract },
+          _workloomPromptReviewPolicy: { shotContract: promptContract },
+        }],
       },
       scriptResult: {
         blueprint: {
@@ -1900,9 +1928,15 @@ console.log("RESULT " + JSON.stringify({
     expect(report).toContain(fullScene);
     expect(report).toContain("陈卓收伞后开门");
     expect(report).toContain(prompt);
+    expect(report).not.toContain("错误：黎明山谷雾景");
+    expect(report).not.toContain("错误：画面内没有人物动作");
     expect(report).toContain("镜头 ID 与提示词 ID 一一对应：是");
     expect(report).toContain("有效处理时间：126000ms（2.1分钟）");
-    expect(report).toContain("定妆照：not_applicable");
+    expect(report).toContain("定妆照生成：not_applicable");
+    expect(report).toContain("源角色资产：verified");
+    expect(report).toContain(portraitSha);
+    expect(report).toContain("workloom.preproduction-contract/v1");
+    expect(report).toContain("镜头卡与提示词语义绑定：通过");
     expect(report).toContain("G8");
     expect(report).toContain("渲染提交：否");
     expect(report).toMatch(/镜头卡：1 镜，sha256=[a-f0-9]{64}/u);
