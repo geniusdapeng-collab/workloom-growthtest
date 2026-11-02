@@ -1601,6 +1601,9 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
       && !/(?:微表情|静坐|手部|手指|旋钮|开关|指纹|磨白|发黄|塑料)/u.test(text)) {
       return "固定低照度曝光、青灰白平衡、主辅光比与LUT，分别锁定室内外冷暖光源；逐镜检查暗部噪点、色温漂移、雨丝连续性及高光滚降，不使用跨场景复用的雨幕参数。";
     }
+    if (/(?:风.*涟漪|涟漪.*(?:方向|频率)|无风自动|波纹.*重复)/u.test(text)) {
+      return "把风源与水面运动绑定：芦苇摆动方向决定涟漪扩散方向，每段只允许一个持续风源；目标帧核对涟漪频率、方向与芦苇摆动一致，无风段落必须保持静水，失败只重做该段。";
+    }
     if (/(?:雨滴|雨珠|雨丝|涟漪|水渍).*(?:涟漪|反射|连续|方向|密度|因果|穿帮)|(?:雨落无涟漪|反光方向)/u.test(text)) {
       return "雨珠、雨滴、伞面和地面积水分别锁定同一声画时钟：单条雨丝方向保持一致，落点与涟漪中心逐帧对应；水渍反光固定同一光源方向，异常只重做对应雨层或水层。";
     }
@@ -4721,15 +4724,23 @@ export interface Phase3RepairInput {
   rows: unknown[];
   expectedIds: string[];
   repair: (shotId: string, index: number) => Promise<unknown>;
+  /**
+   * Last-resort recovery from the already validated Phase2 shot contract. This is
+   * intentionally separate from an LLM retry so a provider returning empty fields
+   * cannot erase the source contract or turn a rule fallback into a successful run.
+   */
+  recover?: (shotId: string, index: number) => Promise<unknown>;
 }
 
 export async function repairPhase3FusionRows(input: Phase3RepairInput): Promise<{
   rows: FusionRecord[];
   repaired: string[];
+  recovered: string[];
 }> {
   const rows = [...input.rows];
   const seen = new Set<string>();
   const repaired: string[] = [];
+  const recovered: string[] = [];
   const valid = (row: unknown, expectedId: string): row is FusionRecord => {
     if (!row || typeof row !== "object" || Array.isArray(row)) return false;
     const record = row as FusionRecord;
@@ -4741,8 +4752,20 @@ export async function repairPhase3FusionRows(input: Phase3RepairInput): Promise<
     const expectedId = input.expectedIds[index]!;
     let row = rows[index];
     if (!valid(row, expectedId)) {
-      row = await input.repair(expectedId, index);
+      let repairError: unknown;
+      try {
+        row = await input.repair(expectedId, index);
+      } catch (error) {
+        repairError = error;
+      }
+      if (!valid(row, expectedId) && input.recover) {
+        row = await input.recover(expectedId, index);
+        if (valid(row, expectedId)) recovered.push(expectedId);
+      }
       if (!valid(row, expectedId)) {
+        if (repairError instanceof Error) {
+          throw new Error(`PHASE3_FUSION_RETRY_UNVERIFIED：镜头 ${expectedId} 重试后仍未通过（${repairError.message}）`);
+        }
         throw new Error(`PHASE3_FUSION_RETRY_UNVERIFIED：镜头 ${expectedId} 重试后仍未通过（ID、prompt 或 degraded 状态无效）`);
       }
       rows[index] = row;
@@ -4750,7 +4773,65 @@ export async function repairPhase3FusionRows(input: Phase3RepairInput): Promise<
     }
     seen.add(expectedId);
   }
-  return { rows: rows.slice(0, input.expectedIds.length) as FusionRecord[], repaired };
+  return { rows: rows.slice(0, input.expectedIds.length) as FusionRecord[], repaired, recovered };
+}
+
+function recoverPhase3RowFromSource(shot: FusionRecord): FusionRecord {
+  const fields = shot.fields && typeof shot.fields === "object" && !Array.isArray(shot.fields)
+    ? shot.fields as FusionRecord
+    : {};
+  const text = (...values: unknown[]): string => {
+    for (const value of values) {
+      if (typeof value === "string" && value.trim()) return value.trim();
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        const record = value as FusionRecord;
+        const joined = Object.values(record)
+          .filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
+          .map((item) => item.trim())
+          .join("；");
+        if (joined) return joined;
+      }
+    }
+    return "";
+  };
+  const scene = text(shot.scene, fields.scene, shot.promptBase, shot.sceneFunction);
+  const action = text(shot.action, fields.action, shot.sceneFunction);
+  const lighting = text(shot.lightingString, shot.lighting, fields.lighting);
+  const camera = text(shot.cameraString, shot.camera_movement, shot.cameraMovement, fields.camera_movement);
+  const audio = text(shot.backgroundSoundString, shot.backgroundSound, shot.audio, fields.audio);
+  if (!scene && !action) return shot;
+  const duration = Number(shot.duration ?? recordValue(shot.timing).duration ?? 0);
+  const prompt = [
+    "01.【基础】按已通过的 Phase2 镜头合同执行，保留源场景、主体动作、空间关系和已确认约束。",
+    `02.【场景】${scene || action}`,
+    `03.【动作】${action || scene}`,
+    `04.【灯光设计】${lighting || "沿用已通过的上游灯光合同"}`,
+    `05.【运镜】${camera || "固定机位，连续稳定"}`,
+    `06.【台词】${text(shot.dialogueText, shot.dialogue) || "不适用。"}`,
+    `07.【时间轴】T00:00-T00:${duration.toFixed(1).padStart(4, "0")} 在单镜内完成起幅、连续动作与落幅。`,
+    `08.【音频】${audio || "沿用已通过的上游环境声与主体动作声。"}`,
+  ].join("\n");
+  return {
+    ...shot,
+    fields: {
+      ...fields,
+      scene: scene || action,
+      action: action || scene,
+      lighting: lighting || fields.lighting,
+      camera_movement: camera || fields.camera_movement,
+      audio: audio || fields.audio,
+    },
+    prompt,
+    promptCharCount: prompt.length,
+    degraded: false,
+    degradeReason: null,
+    _workloomLocalRecovery: {
+      schemaVersion: "workloom.phase3-source-recovery/v1",
+      mode: "contract-source-reprojection",
+      sourcePromptBase: text(shot.promptBase),
+      requiresFinalReviewProjection: true,
+    },
+  };
 }
 
 export function applyNarrativeFinalPromptContract(
@@ -5738,10 +5819,22 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
             );
             return retry;
           },
+          recover: async (shotId, index) => {
+            const source = shots.find((shot) => String(shot.shotId ?? shot.shot_id) === shotId) ?? shots[index];
+            if (!source) throw new CinematicSkillError("PHASE3_SHOTS_MISSING", `无法定位合同恢复镜头 ${shotId}`);
+            return recoverPhase3RowFromSource(this.cloneShots([source])[0]!);
+          },
         });
         updated = repairResult.rows;
         if (repairResult.repaired.length > 0) {
           stages.phase3Retry = { repaired: repairResult.repaired, mode: "single-shot-llm-retry" };
+        }
+        if (repairResult.recovered.length > 0) {
+          stages.phase3Recovery = {
+            recovered: repairResult.recovered,
+            mode: "contract-source-reprojection",
+            requiresFinalReviewProjection: true,
+          };
         }
         const policyMeta = blueprint.meta && typeof blueprint.meta === "object"
           ? (blueprint.meta as FusionRecord)._metadata as FusionRecord | undefined

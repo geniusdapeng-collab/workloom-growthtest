@@ -912,6 +912,35 @@ console.log("RESULT " + JSON.stringify({
     })).rejects.toThrow(/重试后仍未通过/);
   });
 
+  it("Phase3 单镜重试仍返回降级时，从已审核源镜头合同重建提示词并保留恢复证据", async () => {
+    const sourceShot = {
+      shotId: "S1",
+      duration: 3,
+      promptBase: "出租屋门外楼道，雨夜，陈卓收伞",
+      action: "陈卓在门外收伞，伞骨滴水",
+      lightingString: "楼道冷光，旧台灯尚未点亮",
+    };
+    const recovered = await repairPhase3FusionRows({
+      rows: [{ shotId: "S1", prompt: "", degraded: true }],
+      expectedIds: ["S1"],
+      repair: async () => ({ shotId: "S1", prompt: "", degraded: true }),
+      recover: async () => ({
+        ...sourceShot,
+        prompt: "01.【场景】出租屋门外楼道\n02.【动作】陈卓在门外收伞，伞骨滴水",
+        degraded: false,
+        _workloomLocalRecovery: { mode: "contract-source-reprojection" },
+      }),
+    });
+    expect(recovered.repaired).toEqual(["S1"]);
+    expect(recovered.recovered).toEqual(["S1"]);
+    expect(recovered.rows[0]).toMatchObject({
+      shotId: "S1",
+      degraded: false,
+      _workloomLocalRecovery: { mode: "contract-source-reprojection" },
+    });
+    expect(String(recovered.rows[0]!.prompt)).toContain("陈卓在门外收伞");
+  });
+
   it("无台词最终镜头清除台词字段，并把超长 prompt 收敛到硬上限", () => {
     const longField = "完整画面描述。".repeat(700);
     const shot = applyNarrativeFinalPromptContract({
@@ -3001,6 +3030,46 @@ console.log("RESULT " + JSON.stringify({ success: output.success, calls, retryPr
     expect(result.counters).toEqual(expect.objectContaining({ checkpoints: 1, timing: 1 }));
   }, 90_000);
 
+  it("Phase3 单镜重试仍降级时用源合同恢复，并在最终评审投影后继续推进", () => {
+    const result = runInChild(phase3Fixture(`
+const uninstall = installVendorPhase3FusionBridge();
+const state = makeState({
+ scene: "出租屋门外楼道，雨夜，湿伞靠在门边",
+ action: "陈卓在门外收伞，随后用钥匙开门",
+ lightingString: "楼道冷光，室内旧台灯尚未点亮",
+ camera_movement: "固定机位稳定拍摄"
+});
+const phase = makePhase({
+ process: async shots => ({
+  shots: shots.map(s => ({ ...s, prompt: "", fields: {}, degraded: true, degradeReason: "provider-empty-fields" })),
+  degraded: true,
+  stats: { failed: shots.length, total: shots.length }
+ })
+});
+const output = await phase.execute(state);
+uninstall();
+console.log("RESULT " + JSON.stringify({
+ success: output.success,
+ degraded: output.shots[0].degraded,
+ recovery: output.result.stages.phase3Recovery,
+ retry: output.result.stages.phase3Retry,
+ prompt: output.shots[0].prompt,
+ policy: output.shots[0]._workloomPromptReviewPolicy
+}));
+`));
+    expect(result.success).toBe(true);
+    expect(result.degraded).toBe(false);
+    expect(result.recovery).toMatchObject({
+      recovered: ["SC-01"],
+      mode: "contract-source-reprojection",
+      requiresFinalReviewProjection: true,
+    });
+    expect(result.retry).toMatchObject({ repaired: ["SC-01"] });
+    expect(String(result.prompt)).toContain("出租屋门外楼道");
+    expect(String(result.prompt)).toContain("陈卓在门外收伞");
+    expect(result.policy).toMatchObject({ aspectRatio: expect.any(String), maxLength: expect.any(Number) });
+  }, 90_000);
+
   it("预算拒绝或未知预算在任何路由模型/融合调用之前停止", () => {
     const result = runInChild(phase3Fixture(`
 const uninstall = installVendorPhase3FusionBridge();
@@ -3101,29 +3170,37 @@ console.log("RESULT " + JSON.stringify({ mainCalls, altCalls, errors, checkpoint
     expect(result).toEqual({ mainCalls: 2, altCalls: 0, errors: ["PHASE3_BUDGET_EXHAUSTED", "PHASE3_BUDGET_EXHAUSTED"], checkpoints: 0 });
   }, 90_000);
 
-  it("融合异常/降级/空 prompt/错 id/checkpoint 失败都不能成功返回", () => {
+  it("无源合同的融合异常仍失败关闭，空 prompt 和错 id 只能通过源合同恢复", () => {
     const result = runInChild(phase3Fixture(`
 const uninstall = installVendorPhase3FusionBridge();
 const failures = [];
+const recoveries = [];
 const cases = [
- { process: async () => { throw new Error("provider unavailable"); } },
- { process: async shots => ({ shots: shots.map(s => ({ ...s, prompt: "规则兜底" })), degraded: true }) },
- { process: async shots => ({ shots: shots.map(s => ({ ...s, prompt: "" })) }) },
- { process: async shots => ({ shots: shots.map(s => ({ ...s, shotId: "other", prompt: "内容" })) }) },
+ { name: "provider", process: async () => { throw new Error("provider unavailable"); } },
+ { name: "without-source", state: makeState({ scene: "", action: "", promptBase: "", sceneFunction: "" }),
+   process: async shots => ({ shots: shots.map(s => ({ ...s, prompt: "规则兜底" })), degraded: true }) },
+ { name: "empty", process: async shots => ({ shots: shots.map(s => ({ ...s, prompt: "" })) }) },
+ { name: "wrong-id", process: async shots => ({ shots: shots.map(s => ({ ...s, shotId: "other", prompt: "内容" })) }) },
 ];
 for (const candidate of cases) {
- const state = makeState();
- try { await makePhase(candidate).execute(state); } catch (e) { failures.push({ code: e.code, status: state.result.stages.phase3Fusion.status }); }
+ const state = candidate.state || makeState();
+ try {
+  const output = await makePhase(candidate).execute(state);
+  recoveries.push({ name: candidate.name, degraded: output.shots[0].degraded, recovery: output.result.stages.phase3Recovery });
+ } catch (e) { failures.push({ name: candidate.name, code: e.code, status: state.result.stages.phase3Fusion.status }); }
 }
 const state = makeState();
 try { await makePhase({}, { saveCheckpoint: async () => { throw new Error("disk unavailable"); } }).execute(state); }
-catch (e) { failures.push({ code: e.code, status: state.result.stages.phase3Fusion.status }); }
+catch (e) { failures.push({ name: "checkpoint", code: e.code, status: state.result.stages.phase3Fusion.status }); }
 uninstall();
-console.log("RESULT " + JSON.stringify({ failures, counters }));
+console.log("RESULT " + JSON.stringify({ failures, recoveries, counters }));
 `));
-    expect(result.failures).toHaveLength(5);
+    expect((result.failures as Array<{ name: string }>).map((item) => item.name)).toEqual(["provider", "without-source", "checkpoint"]);
     for (const failure of result.failures as Array<{ status: string }>) expect(failure.status).toBe("unverified");
-    expect((result.counters as Record<string, unknown>).checkpoints).toBe(0);
+    expect(result.recoveries).toEqual([
+      { name: "empty", degraded: false, recovery: { recovered: ["SC-01"], mode: "contract-source-reprojection", requiresFinalReviewProjection: true } },
+      { name: "wrong-id", degraded: false, recovery: { recovered: ["SC-01"], mode: "contract-source-reprojection", requiresFinalReviewProjection: true } },
+    ]);
   }, 90_000);
 
   it("同一进程重复安装采用引用计数，最后卸载精确复原", () => {
