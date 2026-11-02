@@ -13,7 +13,7 @@ const scope = { tenantId: "tenant-a", workspaceId: "ws-a", projectId: "P1", runI
 const env = { LLM_BASE_URL: "https://api.deepseek.com", LLM_API_KEY: "test-only", LLM_MODEL: "deepseek-flash" };
 const sourceUrl = "https://source.example.com/f3";
 const sourceText = "星野 F3 是一款风扇，风量 9 档。尾部注意：9 档是风量档位，不是能耗等级；不得声称静音或市场第一。";
-const currencyText = `${sourceText} 海外规格价格99美元；海外另一规格109美元；国内规格699元；国内另一规格799元。`;
+const currencyText = `${sourceText} 海外规格价格99美元；海外另一规格109美元；国内规格699元；国内另一规格799元；免费试用规格0美元。`;
 let server: Server, origin: string, root: string, modelCalls: any[], rejectJudge: boolean, extractionCalls: string[];
 beforeAll(async () => {
   server = createServer((req, res) => {
@@ -62,6 +62,7 @@ async function prepare(options: {
   searchCacheFile?: string;
   redirectAliases?: boolean;
   mixedCurrencies?: boolean;
+  zeroPrice?: boolean;
 } = {}): Promise<PreparedMarketingFacts> {
   let searches = 0;
   return prepareMarketingFacts({ scope: { ...scope, attempt: options.attempt ?? 1 }, root, intent: "做一条风扇介绍", metadata: { brief: { product: "星野 F3", brand: "星野" } }, env: { ...env, ...(options.mode ? { VM_DATA_MINING_MODE: options.mode } : {}) },
@@ -69,7 +70,9 @@ async function prepare(options: {
       extractionCalls.push(prompt); if (options.modelFailure) return { success: false, error: "LLM unavailable" };
       const match = /当前阶段：(A[123])\n(.*)$/s.exec(prompt)!; const source = JSON.parse(match[2]!).sources[0];
       if (match[1] !== "A1") return { success: true, data: { payload: match[1] === "A2" ? { reviews: [] } : { competitors: [] }, citations: [], noEvidenceReason: "页面仅商品规格，无可核实评价或竞品" } };
-      const prices = options.mixedCurrencies ? [
+      const prices = options.zeroPrice ? [
+        { amount: 0, currency: "USD", source_url: sourceUrl }, { amount: 699, currency: "CNY", source_url: sourceUrl },
+      ] : options.mixedCurrencies ? [
         { amount: 99, currency: "USD", source_url: sourceUrl }, { amount: 109, currency: "USD", source_url: sourceUrl },
         { amount: 699, currency: "CNY", source_url: sourceUrl }, { amount: 799, currency: "CNY", source_url: sourceUrl },
       ] : undefined;
@@ -92,15 +95,16 @@ async function prepare(options: {
 }
 const shots = [{ shotId: "S1", prompt: "窗边展示星野 F3 风扇，字幕说明风量 9 档。", fields: { 场景: "窗边", 产品: "星野 F3", 规格: "9 档" } }];
 describe("营销事实宿主完整执行", () => {
-  it("混币报价从来源提取、G1档案到最终镜头复核始终逐币种表达，保留原始claims", async () => {
-    const prepared = await prepare({ mixedCurrencies: true });
-    expect((prepared.bundle.dossier.identity as Record<string, unknown>).price_band).toBe("USD 99-109；CNY 699-799");
-    expect(prepared.g1Content).toContain("USD 99-109；CNY 699-799");
+  it.each([false, true])("混币报价从来源提取、G1档案到最终镜头复核始终逐币种表达，零价=%s", async zeroPrice => {
+    const expectedBand = zeroPrice ? "USD 0；CNY 699" : "USD 99-109；CNY 699-799";
+    const prepared = await prepare({ mixedCurrencies: true, zeroPrice });
+    expect((prepared.bundle.dossier.identity as Record<string, unknown>).price_band).toBe(expectedBand);
+    expect(prepared.g1Content).toContain(expectedBand);
     expect(prepared.g1Content).not.toContain("USD 99-799");
-    expect((prepared.bundle.cards.insight_card as { market_position: { price_band: string } }).market_position.price_band).toBe("USD 99-109；CNY 699-799");
-    expect(JSON.stringify(prepared.bundle.cards.prd_card)).toContain("USD 99-109；CNY 699-799");
+    expect((prepared.bundle.cards.insight_card as { market_position: { price_band: string } }).market_position.price_band).toBe(expectedBand);
+    expect(JSON.stringify(prepared.bundle.cards.prd_card)).toContain(expectedBand);
     const a1 = prepared.bundle.stages[0]!.facts;
-    expect(a1.claims.filter(claim => claim.pointer.endsWith("/currency")).map(claim => claim.value)).toEqual(["USD", "USD", "CNY", "CNY"]);
+    expect(a1.claims.filter(claim => claim.pointer.endsWith("/currency")).map(claim => claim.value)).toEqual(zeroPrice ? ["USD", "CNY"] : ["USD", "USD", "CNY", "CNY"]);
     expect(prepared.bundle.rawSha256).toBe(renderSha256(canonicalRenderJson(prepared.raw)));
     const g1File = path.join(root, "g1-facts.json"); await writeFile(g1File, prepared.g1Content);
     const verdict = await reviewStage({ stage: "script", projectId: scope.projectId, env,
@@ -110,11 +114,12 @@ describe("营销事实宿主完整执行", () => {
       rubric: ["报价必须保留原币种，不能将美元与人民币数值合成同一价格区间"],
     });
     expect(verdict.status).toBe("passed");
-    const saved = await finalizeMarketingFacts(prepared, [{ ...shots[0]!, prompt: "按来源分别展示价格区间：USD 99-109；CNY 699-799。" }], env);
-    const checked = await verifyMarketingFacts({ root, ...saved, scope, shots: [{ ...shots[0]!, prompt: "按来源分别展示价格区间：USD 99-109；CNY 699-799。" }] });
-    expect((checked.dossier.identity as Record<string, unknown>).price_band).toBe("USD 99-109；CNY 699-799");
+    const outputShots = [{ ...shots[0]!, prompt: `按来源分别展示价格区间：${expectedBand}。` }];
+    const saved = await finalizeMarketingFacts(prepared, outputShots, env);
+    const checked = await verifyMarketingFacts({ root, ...saved, scope, shots: outputShots });
+    expect((checked.dossier.identity as Record<string, unknown>).price_band).toBe(expectedBand);
     const persisted = JSON.parse(await readFile(path.join(prepared.storeRoot, String(prepared.bundle.dossier.product_id), "dossier.json"), "utf8"));
-    expect(persisted.identity.price_band).toBe("USD 99-109；CNY 699-799");
+    expect(persisted.identity.price_band).toBe(expectedBand);
   });
   it("不同检索跳转指向同一正文时，逐站来源审核仍绑定其实际抓取快照", async () => {
     const prepared = await prepare({ redirectAliases: true });

@@ -16,9 +16,9 @@ function mixedCurrencyBands(prices: unknown): string | null {
   if (!Array.isArray(prices)) return null;
   const groups = new Map<string, number[]>();
   for (const item of prices) {
-    const price = record(item), amount = Number(price.amount);
+    const price = record(item), amount = price.amount;
     const currency = typeof price.currency === "string" ? price.currency.trim().toUpperCase() : "";
-    if (!currency || !Number.isFinite(amount) || amount <= 0) continue;
+    if (!currency || typeof amount !== "number" || !Number.isFinite(amount) || amount < 0) continue;
     const values = groups.get(currency) ?? [];
     values.push(amount); groups.set(currency, values);
   }
