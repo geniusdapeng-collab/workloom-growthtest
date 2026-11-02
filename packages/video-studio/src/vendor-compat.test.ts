@@ -1890,6 +1890,50 @@ console.log("RESULT " + JSON.stringify({
     expect(String(prompts[5]!.prompt)).toContain("脚穿室内拖鞋");
   });
 
+  it("七镜归家合同把两只湿便鞋拆成不同时间轴、情绪和鞋态", () => {
+    const actions = projectNarrativeActionSequence(["收伞回到出租屋", "开门", "换鞋", "拧亮旧台灯", "坐下听雨"], 7);
+    const options = {
+      noDialogue: true,
+      maxLength: 3000,
+      noCharacters: false,
+      noAnimals: false,
+      noMusic: true,
+      chineseOnly: true,
+      canonicalize: true,
+      noTitles: true,
+      durationSeconds: 2,
+      aspectRatio: "9:16",
+      resolution: "1080x1920",
+      characterNames: ["陈卓"],
+      characterPortraits: [{
+        name: "陈卓",
+        path: "bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png",
+        costume: "米白针织开衫、深色直筒长裤，配小白鞋",
+        authorization: "real-authorized",
+      }],
+      projectScene: "出租屋玄关内侧，门已关上，旧台灯关闭",
+      projectLighting: "旧台灯关闭，仅窗外与门缝冷光",
+      projectColor: "冷蓝灰环境色",
+      projectProps: ["黑色折叠伞", "鞋架", "地垫", "白色湿便鞋", "室内拖鞋"],
+      projectActions: actions,
+    };
+    const first = applyNarrativeFinalPromptContract({ shotId: "SC-4", duration: 2 }, { ...options, shotIndex: 3 });
+    const second = applyNarrativeFinalPromptContract({ shotId: "SC-5", duration: 2 }, { ...options, shotIndex: 4 });
+    const firstPrompt = String(first.prompt);
+    const secondPrompt = String(second.prompt);
+    expect(firstPrompt).toContain("第一只鞋跟松脱");
+    expect(secondPrompt).toContain("第二只鞋跟松脱");
+    expect(firstPrompt).not.toBe(secondPrompt);
+    expect(firstPrompt).toMatch(/另一只脚仍穿(?:白色)?湿便鞋/u);
+    expect(secondPrompt).toMatch(/另一脚仍穿白色湿便鞋/u);
+    expect(secondPrompt).toContain("白色湿便鞋");
+    expect(secondPrompt).toContain("鞋架");
+    expect(firstPrompt).toMatch(/【情绪】[^\n]*第一只湿便鞋/u);
+    expect(secondPrompt).toMatch(/【情绪】[^\n]*另一只湿便鞋/u);
+    expect(firstPrompt).toMatch(/【转场】[^\n]*另一只鞋/u);
+    expect(secondPrompt).toMatch(/【转场】[^\n]*两只室内拖鞋/u);
+  });
+
   it("G7 收口报告内联完整三件套、哈希、时间轴与未提交的 G8 边界", () => {
     const fullScene = "雨夜出租屋玄关：门已经关上，湿伞靠墙，鞋架、地垫、门后挂钩与旧台灯处在同一可见空间，人物正从门外进入。";
     const portraitPath = "bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png";

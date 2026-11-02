@@ -5459,19 +5459,19 @@ export function deriveNarrativeShotDirection(input: {
   if (/(?:关门|门关好|门锁落位|回身.*门)/u.test(action)) {
     return {
       action,
-      scene: "出租屋玄关内侧：门扇正从开启位置合拢，门框、门锁、鞋架与地垫在同一空间",
+      scene: "出租屋玄关内侧：门扇正从开启位置合拢，门框、门锁、鞋架与地垫在同一空间；陈卓手中的黑色折叠伞已收拢，仍握在持伞侧",
       lighting: "旧台灯仍关闭；门缝冷光随门扇合拢变窄，室内保留冷蓝暗部",
       color: "冷蓝灰环境色（旧台灯未点亮）",
-      props: ["旧防盗门", "门", "门把手", "门锁", "玄关", "鞋架", "地垫"],
+      props: ["黑色折叠伞", "旧防盗门", "门", "门把手", "门锁", "玄关", "鞋架", "地垫"],
     };
   }
   if (/(?:换鞋|脱鞋|穿鞋|脱下[^。；\n]*鞋|换穿[^。；\n]*拖鞋)/u.test(action)) {
     return {
       action,
-      scene: "出租屋玄关内侧：鞋架、地垫与门后挂钩在同一空间，门已关上",
+      scene: "出租屋玄关内侧：鞋架、地垫与门后挂钩在同一空间，门已关上；收拢的黑色折叠伞已靠在门边",
       lighting: "旧台灯仍关闭；室内只有窗外或门缝渗入的冷光",
       color: "冷蓝灰环境色（旧台灯未点亮）",
-      props: ["白色湿便鞋", "室内拖鞋", "鞋架", "地垫", "门", "旧台灯（未亮）"],
+      props: ["黑色折叠伞", "白色湿便鞋", "室内拖鞋", "鞋架", "地垫", "门", "旧台灯（未亮）"],
     };
   }
   if (/(?:拧亮|拧开|打开|按下|按动).*(?:台灯|灯)|(?:台灯|灯).*(?:拧亮|拧开|打开|开关|旋钮)/u.test(action)) {
@@ -5509,6 +5509,13 @@ function narrativeActionKind(action: string): "umbrella" | "open" | "close" | "s
   if (/(?:拧亮|拧开|开灯|点亮).*(?:灯)|(?:灯|旋钮).*(?:亮|开|转)/u.test(action)) return "lamp";
   if (/(?:坐下|坐回|听雨|坐到|落座)/u.test(action)) return "listen";
   return "other";
+}
+
+function shoeWorkPhase(action: string): "first" | "second" | "combined" | "none" {
+  if (/另一只/u.test(action)) return "second";
+  if (/一只/u.test(action)) return "first";
+  if (/(?:换鞋|脱下[^。；\n]*鞋|换穿[^。；\n]*拖鞋)/u.test(action)) return "combined";
+  return "none";
 }
 
 function sceneMatchesAction(action: string, scene: string | undefined): boolean {
@@ -5585,14 +5592,19 @@ function timelineTextForAction(action: string, duration: number): string {
   const secondEnd = Math.max(firstEnd, Math.min(safeDuration, safeDuration * 0.75));
   const code = (value: number): string => `T00:${Math.max(0, value).toFixed(1).padStart(4, "0")}`;
   const kind = narrativeActionKind(action);
+  const shoePhase = shoeWorkPhase(action);
   const beats = kind === "umbrella"
-    ? ["低机位起幅，伞骨合拢，伞尖离地滴水", "提伞走向门边，视线确认门锁", "在门前站定，呼气，手落到门把上"]
+    ? ["低机位起幅，伞骨合拢，伞尖离地滴水", "把收拢的湿伞换到持伞侧，另一只手摸到钥匙", "在门前站定，呼气，钥匙尖对准锁孔"]
     : kind === "open"
       ? ["钥匙尖对准锁孔，手指稳定握住钥匙", "钥匙转动并推开门，门轴缓慢张开", "跨入门槛，确认门扇仍在身后"]
       : kind === "close"
         ? ["回身握住门把，视线检查门框", "带门合拢，门扇减速贴入门框", "门锁落位，肩线下沉并转向鞋架"]
         : kind === "shoes"
-          ? ["重心移到鞋架旁，视线看向脚边湿鞋", "鞋跟松脱，脚掌离开湿鞋并保持平衡", "脚掌穿入室内拖鞋并落地，身体站直"]
+          ? shoePhase === "second"
+            ? ["重心移到另一只脚，视线落向剩余湿便鞋", "第二只鞋跟松脱，脚掌离开湿便鞋", "第二只脚穿入室内拖鞋并落地，双脚站稳"]
+            : shoePhase === "first"
+              ? ["重心移到鞋架旁，视线看向第一只湿便鞋", "第一只鞋跟松脱，脚掌离开湿便鞋", "第一只脚穿入室内拖鞋，另一只脚仍穿湿便鞋"]
+              : ["重心移到鞋架旁，视线看向脚边湿鞋", "鞋跟松脱，脚掌离开湿鞋并保持平衡", "脚掌穿入室内拖鞋并落地，身体站直"]
           : kind === "lamp"
             ? ["指尖触到旋钮，先保持暗部曝光", "旋钮转到点亮段，钨丝由暗红转为暖黄", "暖光覆盖桌面，手离开旋钮并停住"]
             : kind === "listen"
@@ -5610,7 +5622,9 @@ function emotionTextForAction(action: string): string {
     case "close":
       return "回身时视线落在门缝与门锁，眼睑略垂，鼻翼随呼气放松，嘴唇轻抿，肩背在门锁落位后下沉。";
     case "shoes":
-      return "视线看向脚边湿鞋，眉心放松，眼睛随解鞋动作下垂，缓慢眨眼一次，嘴角保持中性，重心下沉。";
+      return shoeWorkPhase(action) === "second"
+        ? "视线从已经换好的一只拖鞋移到另一只湿便鞋，眉心保持放松，眼睫随第二次解鞋动作轻垂，双脚站稳后肩线明显下沉，嘴唇闭合。"
+        : "视线看向第一只湿便鞋，眉心放松，眼睛随解鞋动作下垂，缓慢眨眼一次，嘴角保持中性，另一只脚保持支撑，重心下沉。";
     case "lamp":
       return "视线先锁定旋钮，指尖转动后抬眼看向灯罩，瞳孔随暖光收窄，嘴角轻微松开，呼吸放缓。";
     case "listen":
@@ -5629,7 +5643,11 @@ function pacingTextForAction(action: string, duration: number): string {
       : kind === "close"
         ? "前段回身抓握，中段一次合门，末段门锁落定"
         : kind === "shoes"
-          ? "前段找重心，中段完成脱鞋与换穿，末段站稳"
+          ? shoeWorkPhase(action) === "second"
+            ? "前段把重心移到另一只脚，中段完成第二只鞋脱换，末段双脚站稳"
+            : shoeWorkPhase(action) === "first"
+              ? "前段找稳支撑脚，中段脱第一只鞋并穿拖鞋，末段保持单脚支撑"
+              : "前段找重心，中段完成脱鞋与换穿，末段站稳"
           : kind === "lamp"
             ? "前段保持暗态，中段旋钮点亮，末段暖光停稳"
             : kind === "listen"
@@ -5709,10 +5727,13 @@ function makeupTextForAction(action: string): string {
 function transitionTextForAction(action: string, isLastShot: boolean): string {
   if (isLastShot) return "本镜为全片最后一镜；动作落定后保持静止，再由输出合同决定是否硬切黑，不追加超出镜长的特效。";
   switch (narrativeActionKind(action)) {
-    case "umbrella": return "门把接触动作完成后硬切到开门镜，不使用叠化。";
+    case "umbrella": return "钥匙对准锁孔的动作完成后硬切到开门镜，不使用叠化。";
     case "open": return "门开到位后硬切到回身关门镜，保持门轴方向连续。";
     case "close": return "门锁落位后硬切到换鞋镜，门保持关闭状态。";
-    case "shoes": return "双脚站稳后硬切到台灯镜，拖鞋状态延续。";
+    case "shoes":
+      return shoeWorkPhase(action) === "second"
+        ? "第二只鞋换好、双脚站稳后硬切到台灯镜，两只室内拖鞋状态延续。"
+        : "第一只脚换入拖鞋后硬切到另一只鞋的换鞋镜，已换好的拖鞋状态延续。";
     case "lamp": return "暖光稳定后硬切到坐下听雨镜，灯保持点亮。";
     default: return "本镜动作落定后硬切至下一镜，不使用叠化、黑场或其他特效。";
   }
@@ -5724,8 +5745,12 @@ function costumeTextForFootwear(base: string, action: string, shotIndex: number,
     .replace(/[，,；;]\s*(?:脚穿|配|穿).*$/u, "")
     .replace(/[，,；;]?\s*(?:小白鞋|白色便鞋|白色湿便鞋|旧帆布鞋|湿鞋|拖鞋).*$/u, "")
     .trim();
+  const shoePhase = shoeWorkPhase(action);
   if (shotIndex < shoeIndex) return `${upper}；脚穿白色便鞋，鞋面与裤脚被雨水打湿，开衫袖口湿润。`;
-  if (shotIndex === shoeIndex) return `${upper}；脚穿白色湿便鞋，正脱在鞋架旁并换入室内拖鞋。`;
+  if (shoePhase === "second") return `${upper}；第一只白色湿便鞋已放在鞋架旁，一脚已穿室内拖鞋，另一脚仍穿白色湿便鞋并正在脱换。`;
+  if (shoePhase === "first" || shoePhase === "combined") {
+    return `${upper}；第一只白色湿便鞋正脱在鞋架旁，一脚换入室内拖鞋，另一脚仍穿白色湿便鞋。`;
+  }
   return `${upper}；脚穿室内拖鞋，湿便鞋放在鞋架旁。`;
 }
 
@@ -5739,8 +5764,11 @@ function normalizeFootwearProps(props: string[], action: string, shotIndex: numb
     return [...set];
   };
   if (shoeIndex < 0) return withoutSynonyms(props.map(String).map((item) => item.trim()).filter(Boolean));
+  const shoePhase = shoeWorkPhase(action);
   if (shotIndex < shoeIndex) return withoutSynonyms([...base, "白色湿便鞋"]);
-  if (shotIndex === shoeIndex) return withoutSynonyms([...base, "白色湿便鞋", "室内拖鞋"]);
+  if (shoePhase === "first" || shoePhase === "second" || shoePhase === "combined") {
+    return withoutSynonyms([...base, "白色湿便鞋", "室内拖鞋"]);
+  }
   return withoutSynonyms([...base, "室内拖鞋"]);
 }
 
