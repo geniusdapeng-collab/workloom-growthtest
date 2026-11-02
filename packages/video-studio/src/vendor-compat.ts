@@ -5643,6 +5643,8 @@ function timelineTextForAction(action: string, duration: number): string {
         : kind === "shoes"
           ? shoePhase === "second"
             ? ["重心移到另一只脚，视线落向剩余湿便鞋", "第二只鞋跟松脱，脚掌离开湿便鞋", "第二只脚穿入室内拖鞋并落地，双脚站稳"]
+            : shoePhase === "combined"
+              ? ["重心移到鞋架旁，先解开第一只湿便鞋的鞋跟", "第一只脚离开湿鞋并穿入室内拖鞋，另一只脚仍穿湿便鞋", "第二只鞋跟松脱，脚掌离鞋并穿入另一只室内拖鞋，双脚站稳"]
             : shoePhase === "first"
               ? ["重心移到鞋架旁，视线看向第一只湿便鞋", "第一只鞋跟松脱，脚掌离开湿便鞋", "第一只脚穿入室内拖鞋，另一只脚仍穿湿便鞋"]
               : ["重心移到鞋架旁，视线看向脚边湿鞋", "鞋跟松脱，脚掌离开湿鞋并保持平衡", "脚掌穿入室内拖鞋并落地，身体站直"]
@@ -5665,7 +5667,9 @@ function emotionTextForAction(action: string): string {
     case "shoes":
       return shoeWorkPhase(action) === "second"
         ? "焦点落在另一只湿便鞋的鞋跟、脚踝和拖鞋入口；脚踝随第二次解鞋动作轻转，脚掌离开湿鞋后穿入拖鞋，双脚站稳时腿部与肩线明显下沉。"
-        : "焦点落在第一只湿便鞋的鞋跟、脚踝和支撑脚；手指解开鞋跟后，脚掌离鞋、保持单脚稳定，再穿入室内拖鞋，重心缓慢落回前脚掌。";
+        : shoeWorkPhase(action) === "combined"
+          ? "焦点依次落在两只湿便鞋的鞋跟、脚踝和拖鞋入口；第一只脚离鞋后保持单脚稳定，第二只脚完成脱换，末段双脚落地且腿部与肩线放松。"
+          : "焦点落在第一只湿便鞋的鞋跟、脚踝和支撑脚；手指解开鞋跟后，脚掌离鞋、保持单脚稳定，再穿入室内拖鞋，重心缓慢落回前脚掌。";
     case "lamp":
       return "视线先锁定旋钮，指尖转动后抬眼看向灯罩，瞳孔随暖光收窄，嘴角轻微松开，呼吸放缓。";
     case "listen":
@@ -5686,6 +5690,8 @@ function pacingTextForAction(action: string, duration: number): string {
         : kind === "shoes"
           ? shoeWorkPhase(action) === "second"
             ? "前段把重心移到另一只脚，中段完成第二只鞋脱换，末段双脚站稳"
+            : shoeWorkPhase(action) === "combined"
+              ? "前段脱下第一只湿鞋并穿入拖鞋，中段保持单脚支撑脱下第二只湿鞋，末段穿好第二只拖鞋并双脚站稳"
             : shoeWorkPhase(action) === "first"
               ? "前段找稳支撑脚，中段脱第一只鞋并穿拖鞋，末段保持单脚支撑"
               : "前段找重心，中段完成脱鞋与换穿，末段站稳"
@@ -5774,7 +5780,9 @@ function transitionTextForAction(action: string, isLastShot: boolean): string {
     case "shoes":
       return shoeWorkPhase(action) === "second"
         ? "第二只鞋换好、双脚站稳后硬切到台灯镜，两只室内拖鞋状态延续。"
-        : "第一只脚换入拖鞋后硬切到另一只鞋的换鞋镜，已换好的拖鞋状态延续。";
+        : shoeWorkPhase(action) === "combined"
+          ? "两只鞋都换好、双脚站稳后硬切到开灯镜，两只室内拖鞋状态延续。"
+          : "第一只脚换入拖鞋后硬切到另一只鞋的换鞋镜，已换好的拖鞋状态延续。";
     case "lamp": return "暖光稳定后硬切到坐下听雨镜，灯保持点亮。";
     default: return "本镜动作落定后硬切至下一镜，不使用叠化、黑场或其他特效。";
   }
@@ -5789,7 +5797,10 @@ function costumeTextForFootwear(base: string, action: string, shotIndex: number,
   const shoePhase = shoeWorkPhase(action);
   if (shotIndex < shoeIndex) return `${upper}；脚穿白色便鞋，鞋面与裤脚被雨水打湿，开衫袖口湿润。`;
   if (shoePhase === "second") return `${upper}；第一只白色湿便鞋已放在鞋架旁，一脚已穿室内拖鞋，另一脚仍穿白色湿便鞋并正在脱换。`;
-  if (shoePhase === "first" || shoePhase === "combined") {
+  if (shoePhase === "combined") {
+    return `${upper}；第一只白色湿便鞋已脱在鞋架旁，一脚穿室内拖鞋，另一脚仍穿白色湿便鞋；本镜末段第二只鞋脱换完成，双脚都穿室内拖鞋。`;
+  }
+  if (shoePhase === "first") {
     return `${upper}；第一只白色湿便鞋正脱在鞋架旁，一脚换入室内拖鞋，另一脚仍穿白色湿便鞋。`;
   }
   return `${upper}；脚穿室内拖鞋，湿便鞋放在鞋架旁。`;
@@ -5813,6 +5824,51 @@ function normalizeFootwearProps(props: string[], action: string, shotIndex: numb
   return withoutSynonyms([...base, "室内拖鞋"]);
 }
 
+function normalizeCombinedShoeReviewDuration(
+  prompts: FusionRecord[],
+  policy: NarrativePromptReviewPolicy,
+): FusionRecord[] {
+  if (prompts.length !== 6) return prompts;
+  const rowActions = prompts.map((shot) => {
+    const rowPolicy = shot._workloomPromptReviewPolicy
+      && typeof shot._workloomPromptReviewPolicy === "object"
+      ? shot._workloomPromptReviewPolicy as NarrativePromptReviewPolicy
+      : policy;
+    return Array.isArray(rowPolicy.projectActions) ? rowPolicy.projectActions : [];
+  });
+  const actions = rowActions.find((items) => items.length === prompts.length)
+    ?? (Array.isArray(policy.projectActions) ? policy.projectActions : []);
+  if (actions.length !== prompts.length) return prompts;
+  const shoeIndex = actions.findIndex((value) => shoeWorkPhase(String(value)) === "combined");
+  if (shoeIndex < 0) return prompts;
+  const durations = prompts.map((shot) => Math.max(0, Number(shot.duration ?? recordValue(shot.timing).duration ?? 0)));
+  const total = Number(durations.reduce((sum, value) => sum + value, 0).toFixed(3));
+  const target = Number(policy.durationSeconds);
+  if (!Number.isFinite(total) || !Number.isFinite(target) || Math.abs(total - target) > 0.05) return prompts;
+  if (durations[shoeIndex]! >= 4) return prompts;
+  let deficit = 4 - durations[shoeIndex]!;
+  for (let index = durations.length - 1; index >= 0 && deficit > 0.001; index -= 1) {
+    if (index === shoeIndex || durations[index]! <= 2) continue;
+    const transfer = Math.min(deficit, durations[index]! - 2);
+    durations[index] = Number((durations[index]! - transfer).toFixed(3));
+    deficit = Number((deficit - transfer).toFixed(3));
+  }
+  if (deficit > 0.001) return prompts;
+  durations[shoeIndex] = 4;
+  let cursor = 0;
+  return prompts.map((shot, index) => {
+    const duration = durations[index]!;
+    const timing = {
+      ...recordValue(shot.timing),
+      start: Number(cursor.toFixed(3)),
+      duration,
+      end: Number((cursor + duration).toFixed(3)),
+    };
+    cursor += duration;
+    return { ...shot, duration, timing };
+  });
+}
+
 /**
  * Final review projection. The vendor runs several post-fusion quality agents that can
  * append title fields or rewrite framing/audio after the Phase 3 contract. Re-project
@@ -5823,7 +5879,8 @@ export function normalizeNarrativePromptsForReview(
   prompts: FusionRecord[],
   policy: NarrativePromptReviewPolicy,
 ): FusionRecord[] {
-  return prompts.map((shot, shotIndex) => {
+  const normalizedPrompts = normalizeCombinedShoeReviewDuration(prompts, policy);
+  return normalizedPrompts.map((shot, shotIndex) => {
     const rowPolicy = shot._workloomPromptReviewPolicy
       && typeof shot._workloomPromptReviewPolicy === "object"
       ? shot._workloomPromptReviewPolicy as NarrativePromptReviewPolicy
@@ -5864,7 +5921,7 @@ export function normalizeNarrativePromptsForReview(
       aspectRatio: normalizedPolicy.aspectRatio,
       resolution: normalizedPolicy.resolution,
       colorTemperature: normalizedPolicy.colorTemperature,
-      isLastShot: shotIndex === prompts.length - 1,
+      isLastShot: shotIndex === normalizedPrompts.length - 1,
       characterNames: normalizedPolicy.characterNames,
       noTitles: normalizedPolicy.noTitles,
       canonicalize: true,

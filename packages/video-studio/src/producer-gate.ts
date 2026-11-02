@@ -525,13 +525,22 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
         "结构化原镜头合同优先于通用rubric；只对实际适用项目评审，不得把合同当产物质量证明。", contractText,
         '只输出 JSON: {"approved":true|false,"score":0-100,"issues":[],"suggestions":[],"reason":"结论"}'
       ].join("\n") }, ...textContent, ...encoded.slice(batch * batchSize, Math.min(artifactImages, (batch + 1) * batchSize)).flat(), ...encoded.slice(artifactImages).flat()];
-      let result: ChatResult = await provider.chat([{ role: "user", content }], {
+      const requestReview = () => provider.chat([{ role: "user", content }], {
         scene: "video.quality.producer-review",
         timeoutMs: 600_000,
         temperature: 0.2,
         retries: 0,
         responseFormat: { type: "json_object" },
       });
+      let result: ChatResult;
+      try {
+        result = await requestReview();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!/(?:content\s*为空|empty\s+content)/iu.test(message)) throw error;
+        log(`[producer][${stage}] 评审模型首次返回空正文，按相同证据与 rubric 重试一次`);
+        result = await requestReview();
+      }
       receipts.push({
         modelId: result.modelId,
         inputTokens: result.promptTokens,

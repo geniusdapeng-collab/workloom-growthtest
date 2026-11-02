@@ -1858,7 +1858,7 @@ console.log("RESULT " + JSON.stringify({
       projectProps: ["旧台灯", "旧帆布鞋", "湿鞋"],
       projectActions: actions,
     };
-    const durations = [3, 2, 2, 4, 2, 2];
+    const durations = [3, 2, 2, 3, 3, 2];
     const shotSizes = ["extreme-close-up", "medium", "medium", "medium", "close-up", "close-up"];
     const prompts = normalizeNarrativePromptsForReview(
       durations.map((duration, index) => ({
@@ -1876,8 +1876,11 @@ console.log("RESULT " + JSON.stringify({
     expect(((prompts[0]!._workloomPromptReviewPolicy as Record<string, unknown>).shotContract as Record<string, unknown>).shotId).toBe("S1");
     expect(String(contracts[2]!.space)).toContain("门扇正从开启位置合拢");
     expect(String(contracts[0]!.costume)).toMatch(/白色便鞋.*雨水打湿/u);
-    expect(String(contracts[3]!.costume)).toMatch(/正脱.*换入室内拖鞋/u);
+    expect(String(contracts[3]!.costume)).toMatch(/第一只.*另一脚.*末段.*双脚/u);
     expect(String(contracts[5]!.costume)).toContain("室内拖鞋");
+    expect(prompts.map((prompt) => prompt.duration)).toEqual([3, 2, 2, 4, 2, 2]);
+    expect(String(contracts[3]!.timeline)).toMatch(/第一只脚离开湿鞋.*第二只鞋跟松脱.*双脚站稳/u);
+    expect(String(prompts[3]!.prompt)).toContain("两只鞋都换好、双脚站稳后硬切到开灯镜");
     expect(new Set(contracts.map((contract) => String(contract.emotion))).size).toBe(6);
     for (const contract of contracts) {
       expect(String(contract.timeline)).toMatch(/T00:00.*T00:.*T00:/u);

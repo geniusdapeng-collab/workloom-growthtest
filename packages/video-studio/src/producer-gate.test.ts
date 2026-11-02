@@ -165,6 +165,28 @@ describe("AI producer evidence gate", () => {
     expect(verdict.receipts).toHaveLength(2);
   });
 
+  it("retries an empty producer response once with identical evidence and rubric", async () => {
+    const bodies: string[] = [];
+    let call = 0;
+    const fetchImpl = (async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+      bodies.push(String(init?.body));
+      call += 1;
+      return new Response(JSON.stringify({
+        id: `empty-retry-${call}`,
+        model: "deepseek-flash",
+        choices: [{
+          finish_reason: "stop",
+          message: { content: call === 1 ? "" : JSON.stringify(good) },
+        }],
+        usage: { prompt_tokens: 100, completion_tokens: call === 1 ? 0 : 30, total_tokens: 130 },
+      }));
+    }) as typeof fetch;
+    const verdict = await reviewStage(textOptions({ fetchImpl }));
+    expect(verdict).toMatchObject({ approved: true, status: "passed", score: 85 });
+    expect(bodies).toHaveLength(2);
+    expect(bodies[1]).toBe(bodies[0]);
+  });
+
   it("wrong model, truncation, empty content and non-JSON fail closed", async () => {
     const payloads = [
       {
