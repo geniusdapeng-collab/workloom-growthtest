@@ -4710,6 +4710,7 @@ const FUSION_MERGE_FIELDS = [
   "color_palette", "depth_of_field", "camera_movement", "character", "costume", "makeup",
   "action", "props", "portraits", "dialogue", "timeline", "mood", "pacing", "transition",
   "audio", "negative", "bright_constraint", "character_constraint", "consistency", "semanticRefinement",
+  "shotSize", "cameraHint",
   "_workloomPromptReviewPolicy",
 ];
 
@@ -4852,7 +4853,15 @@ export function applyNarrativeFinalPromptContract(
     characterNames?: string[];
     noTitles?: boolean;
     canonicalize?: boolean;
-    characterPortraits?: Array<{ name: string; path: string; appearance?: string; costume?: string }>;
+    characterPortraits?: Array<{
+      name: string;
+      path: string;
+      appearance?: string;
+      costume?: string;
+      authorization?: string;
+      sha256?: string;
+      bytes?: number;
+    }>;
     projectScene?: string;
     projectLighting?: string;
     projectColor?: string;
@@ -5108,12 +5117,19 @@ export function applyNarrativeFinalPromptContract(
         ? `${characterNames.join("、")}入画；${profileAppearance || "保持当前授权角色档案中的发型脸型、身高体型与服装一致"}`
         : cleanText(shotCharacterEvidence) || "按本镜源证据执行";
     const profileCostume = profiles.map((item) => item.costume).filter(Boolean).join("；");
+    const shoeIndex = (options.projectActions ?? []).findIndex((action) => /(?:换鞋|脱.*鞋|穿.*拖鞋)/u.test(action));
+    const projectedAction = cleanText(options.projectActions?.[Math.min(options.shotIndex ?? 0, Math.max(0, (options.projectActions ?? []).length - 1))] ?? "");
     const costume = canonicalNoPerson
       ? "不适用：本镜无人物。"
-      : profileCostume || source("服装", "costume").replace(/(?:无角色出场|不适用)/gu, "") || "按已审核角色档案服装执行";
+      : costumeTextForFootwear(
+        profileCostume || source("服装", "costume").replace(/(?:无角色出场|不适用)/gu, "") || "按已审核角色档案服装执行",
+        projectedAction,
+        options.shotIndex ?? 0,
+        shoeIndex,
+      );
     const makeup = canonicalNoPerson
       ? "不适用：本镜无人物。"
-      : "自然写实妆，保持同一角色肤色、眉眼与面部细节，不新增无关妆造。";
+      : makeupTextForAction(projectedAction);
     const portraitText = canonicalNoPerson
       ? "不适用：本镜无人物，不生成也不引用人像定妆照。"
       : (options.characterPortraits ?? []).filter((item) => characterNames.includes(item.name) && item.path)
@@ -5163,7 +5179,7 @@ export function applyNarrativeFinalPromptContract(
             : "固定机位，不做推拉摇移或变焦";
     const emotionText = canonicalNoPerson
       ? "平静、克制；情绪只通过自然变化、光线与空间关系表达。"
-      : "克制、内敛；面部保持自然，眼神沿当前动作目标移动，呼吸和吞咽幅度轻微，嘴角放松，不使用固定微笑或夸张表情。";
+      : emotionTextForAction(assignedAction);
     const baseText = cleanText(fieldValue("基础") || "电影级写实质感；保留真实材质、自然颗粒与连续物理运动。")
       .replace(/\b(?:8K|4K)\b/giu, "电影级");
     const forbidden = [
@@ -5174,34 +5190,74 @@ export function applyNarrativeFinalPromptContract(
       "无生成特效", "无镜头光晕伪影", "无模糊", "无过曝", "无未声明角色",
     ];
     const portraitLine = portraitText.startsWith("不适用") ? portraitText : `使用 ${portraitText}；跨镜不得替换。`;
+    const sceneText = cleanText(options.projectScene ?? "") || source("场景", "scene", "sceneDescription");
+    const lightingText = cleanText(options.projectLighting ?? "") || source("灯光设计", "lighting");
+    const colorText = cleanText(options.projectColor ?? "") || source("色彩/色调", "color_palette");
+    const propsText = normalizeFootwearProps(
+      options.projectProps ?? [source("道具", "props").replace(/本镜为空镜|无角色使用道具/gu, "")],
+      assignedAction,
+      options.shotIndex ?? 0,
+      shoeIndex,
+    ).join("、");
+    const timelineText = duration > 0
+      ? timelineTextForAction(assignedAction, duration)
+      : fieldValue("时间轴") || "按本镜合同执行完整起幅、动作与落幅。";
     prompt = [
       "01.【语言约束】全部字段使用中文；画幅、分辨率、帧率、编码、时间码与资产路径可作为受控制作标记。",
       "02.【导演意图】克制写实的自然长镜或稳定短镜；以人物动作、空间关系和真实光线推进，不增加无关叙事、特效或模板表演。",
       `03.【基础】${baseText}`,
       `04.【约束】${constraint}。`,
-      `05.【场景】${cleanText(options.projectScene ?? "") || source("场景", "scene", "sceneDescription")}`,
-      `06.【灯光设计】${cleanText(options.projectLighting ?? "") || source("灯光设计", "lighting")}`,
-      `07.【明亮约束】${canonicalNoPerson ? "自然景物高光不过曝，暗部保留材质细节；不涉及人物面部。" : "人物与主体轮廓可辨，不强制正面补光；按灯光设计保留明暗层次，环境高光不过曝。"}`,
+      `05.【场景】${sceneText}`,
+      `06.【灯光设计】${lightingText}`,
+      `07.【明亮约束】${canonicalNoPerson ? "自然景物高光不过曝，暗部保留材质细节；不涉及人物面部。" : brightnessTextForAction(assignedAction)}`,
       `08.【构图】${compositionText}`,
-      `09.【色彩/色调】${cleanText(options.projectColor ?? "") || source("色彩/色调", "color_palette")}`,
-      `10.【景深】${canonicalNoPerson ? "自然景物近中远景层次连续，主体与倒影可辨；不依赖极端虚化。" : "人物与当前动作清晰可辨，环境前后景自然虚化；不对人物面部作强制补光。"}`,
+      `09.【色彩/色调】${colorText}`,
+      `10.【景深】${depthTextForShotSize(shotSize, canonicalNoPerson)}`,
       `11.【运镜】${cameraText}`,
       `12.【角色】${roles}`,
       `13.【服装】${costume}`,
       `14.【化妆】${makeup}`,
       `15.【动作】${actionText}`,
-      `16.【道具】${(options.projectProps ?? []).join("、") || source("道具", "props").replace(/本镜为空镜|无角色使用道具/gu, "")}`,
+      `16.【道具】${propsText}`,
       `17.【定妆照】${portraitLine}`,
       `18.【台词】${dialogueText}`,
-      `19.【时间轴】${duration > 0 ? `T00:00-T00:${duration.toFixed(1).padStart(4, "0")} 起幅、连续动作与落幅均在本镜内完成，不跨越下一镜。` : fieldValue("时间轴") || "按本镜合同执行完整起幅、动作与落幅。"}`,
+      `19.【时间轴】${timelineText}`,
       `20.【情绪】${emotionText}`,
-      "21.【节奏】节奏依据源证据连续推进，起幅、动作与落幅完整，不增加无关加速或人工强转折。",
-      `22.【转场】${options.isLastShot ? "本镜为全片最后一镜；最后一帧直接硬切黑，不追加超出镜长的淡出。" : "本镜落幅后硬切至下一镜；不使用其他转场特效。"}`,
+      `21.【节奏】${pacingTextForAction(assignedAction, duration)}`,
+      `22.【转场】${transitionTextForAction(assignedAction, Boolean(options.isLastShot))}`,
       `23.【音频】${audioText}`,
       `24.【负面约束】${[...new Set([...forbidden, "无暗黑风调色", "无塑料或金属感高光"])].join("、")}。`,
       `25.【角色约束】${canonicalNoPerson ? "画面禁止人物、人影、人体局部和拟人化表演模板。" : `本镜仅允许 ${characterNames.join("、") || "已登记角色"} 入画；不得增加未声明人物。`}`,
       `26.【角色一致性】${canonicalNoPerson ? "本镜无人物；锁定同一场景、道具、光源与空间关系。" : `分别绑定 ${characterNames.join("、") || "当前角色"} 的授权外观、服装与发型；不得合并、替换或增减人物。`}`,
     ].join("\n");
+    next._workloomShotContract = {
+      schema: "workloom.prompt-shot-contract/v1",
+      shotId: String(next.shotId ?? next.shot_id ?? ""),
+      durationSeconds: duration,
+      era: "当代（依据已确认的出租屋、通勤服装与旧台灯场景）",
+      space: sceneText,
+      action: actionText,
+      lighting: lightingText,
+      color: colorText,
+      shotSize,
+      camera: cameraText,
+      equipment: "固定三脚架与常规电影镜头；具体型号未声明",
+      subjectCount: canonicalNoPerson ? 0 : characterNames.length,
+      characterNames: canonicalNoPerson ? [] : characterNames,
+      costume,
+      props: propsText.split("、").map(String).filter(Boolean),
+      dialogue: dialogueText,
+      audio: audioText,
+      timeline: timelineText,
+      emotion: emotionText,
+      portraitAssets: profiles.map((item) => ({
+        name: item.name,
+        path: item.path,
+        authorization: item.authorization ?? "unverified",
+        sha256: item.sha256 ?? null,
+        bytes: item.bytes ?? null,
+      })),
+    };
   }
   next.prompt = prompt;
   return next;
@@ -5219,7 +5275,15 @@ export interface NarrativePromptReviewPolicy {
   resolution: string;
   colorTemperature?: string;
   characterNames: string[];
-  characterPortraits: Array<{ name: string; path: string; appearance?: string; costume?: string }>;
+  characterPortraits: Array<{
+    name: string;
+    path: string;
+    appearance?: string;
+    costume?: string;
+    authorization?: string;
+    sha256?: string;
+    bytes?: number;
+  }>;
   projectScene?: string;
   projectLighting?: string;
   projectColor?: string;
@@ -5249,15 +5313,13 @@ export function deriveNarrativeShotDirection(input: {
 }): NarrativeShotDirection {
   const action = String(input.action ?? "").trim();
   const fallbackProps = (input.fallbackProps ?? []).map(String).map((item) => item.trim()).filter(Boolean);
-  const props = (...items: string[]): string[] =>
-    [...new Set([...fallbackProps, ...items].filter(Boolean))].slice(0, 10);
   if (/(?:收伞|抖落.*伞)/u.test(action)) {
     return {
       action,
       scene: "楼道/门外门口：楼道冷光、地垫与门框可见，人物尚未进入出租屋",
       lighting: "旧台灯关闭；楼道光偏冷，室内只从门缝露出暗部，不在门外提前点亮台灯",
       color: "冷蓝灰环境色（旧台灯未点亮）",
-      props: props("雨伞", "地垫", "门口"),
+      props: ["黑色折叠伞", "雨伞", "旧防盗门", "地垫", "地砖", "门口"],
     };
   }
   if (/开门/u.test(action)) {
@@ -5266,7 +5328,16 @@ export function deriveNarrativeShotDirection(input: {
       scene: "出租屋门口：门处于开启过程，人物由门外进入玄关",
       lighting: "旧台灯关闭；门外楼道冷光沿门缝进入，门内保持暗部",
       color: "冷蓝灰环境色（旧台灯未点亮）",
-      props: props("门", "门把手", "玄关"),
+      props: ["黑色折叠伞", "旧防盗门", "钥匙", "门", "门把手", "玄关", "地垫"],
+    };
+  }
+  if (/(?:关门|门关好|门锁落位|回身.*门)/u.test(action)) {
+    return {
+      action,
+      scene: "出租屋玄关内侧：门扇正从开启位置合拢，门框、门锁、鞋架与地垫在同一空间",
+      lighting: "旧台灯仍关闭；门缝冷光随门扇合拢变窄，室内保留冷蓝暗部",
+      color: "冷蓝灰环境色（旧台灯未点亮）",
+      props: ["旧防盗门", "门", "门把手", "门锁", "玄关", "鞋架", "地垫"],
     };
   }
   if (/(?:换鞋|脱鞋|穿鞋)/u.test(action)) {
@@ -5275,7 +5346,7 @@ export function deriveNarrativeShotDirection(input: {
       scene: "出租屋玄关内侧：鞋架、地垫与门后挂钩在同一空间，门已关上",
       lighting: "旧台灯仍关闭；室内只有窗外或门缝渗入的冷光",
       color: "冷蓝灰环境色（旧台灯未点亮）",
-      props: props("湿鞋", "拖鞋", "鞋架", "地垫"),
+      props: ["白色湿便鞋", "室内拖鞋", "鞋架", "地垫", "门", "旧台灯（未亮）"],
     };
   }
   if (/(?:拧亮|拧开|打开|按下|按动).*(?:台灯|灯)|(?:台灯|灯).*(?:拧亮|拧开|打开|开关|旋钮)/u.test(action)) {
@@ -5284,7 +5355,7 @@ export function deriveNarrativeShotDirection(input: {
       scene: "出租屋室内灯旁：台灯、开关或旋钮与操作手部同框",
       lighting: "起幅为旧台灯关闭的冷暗环境；接触开关或旋钮后2700K暖光渐亮，门外冷蓝只作勾边",
       color: "2700K暖光主调，起幅保留冷蓝暗部",
-      props: props("台灯", "开关", "旋钮"),
+      props: ["旧台灯", "台灯", "开关", "旋钮", "书桌"],
     };
   }
   if (/(?:坐下|坐回|坐进|坐在).*(?:听雨|灯下|暖光)|听雨/u.test(action)) {
@@ -5293,7 +5364,7 @@ export function deriveNarrativeShotDirection(input: {
       scene: "出租屋室内窗边或灯下：坐具、旧台灯、窗与雨痕在同一空间",
       lighting: "旧台灯2700K暖光为主，窗外冷蓝只勾人物或窗框边缘",
       color: "2700K暖光主调，窗外冷蓝仅作边缘勾光",
-      props: props("台灯", "窗", "坐具"),
+      props: ["旧台灯", "台灯", "窗", "窗玻璃雨珠", "坐具", "书桌"],
     };
   }
   return {
@@ -5303,6 +5374,218 @@ export function deriveNarrativeShotDirection(input: {
     color: input.fallbackColor,
     props: fallbackProps,
   };
+}
+
+function narrativeActionKind(action: string): "umbrella" | "open" | "close" | "shoes" | "lamp" | "listen" | "other" {
+  if (/(?:收伞|抖落.*伞|伞骨合拢)/u.test(action)) return "umbrella";
+  if (/(?:开门|钥匙.*锁孔|推门)/u.test(action)) return "open";
+  if (/(?:关门|门关好|门锁落位|回身.*门)/u.test(action)) return "close";
+  if (/(?:换鞋|脱.*鞋|湿鞋|穿.*拖鞋)/u.test(action)) return "shoes";
+  if (/(?:拧亮|拧开|开灯|点亮).*(?:灯)|(?:灯|旋钮).*(?:亮|开|转)/u.test(action)) return "lamp";
+  if (/(?:坐下|坐回|听雨|坐到|落座)/u.test(action)) return "listen";
+  return "other";
+}
+
+function sceneMatchesAction(action: string, scene: string | undefined): boolean {
+  const value = String(scene ?? "");
+  if (!value || value.length < 4) return false;
+  switch (narrativeActionKind(action)) {
+    case "umbrella": return /(?:楼道|门外|门口)/u.test(value);
+    case "open": return /(?:门口|门.*玄关|玄关)/u.test(value);
+    case "close": return /(?:玄关|门)/u.test(value);
+    case "shoes": return /(?:玄关|鞋架|地垫)/u.test(value);
+    case "lamp": return /(?:台灯|灯旁|书桌)/u.test(value);
+    case "listen": return /(?:窗|灯下|坐具)/u.test(value);
+    default: return value.length >= 16;
+  }
+}
+
+/**
+ * Turn a source action list into a per-shot action sequence. The six-shot
+ * homecoming case used by the real matrix needs the implicit door-close action
+ * represented, otherwise "open door" and "change shoes" jump across a closed
+ * door. The transformation is keyed by semantics, not by project IDs.
+ */
+export function projectNarrativeActionSequence(actions: string[], shotCount: number): string[] {
+  const clean = [...new Set(actions.map(String).map((item) => item.trim()).filter(Boolean))];
+  const joined = clean.join("；");
+  const homecoming = /(?:收伞|雨伞)/u.test(joined)
+    && /开门/u.test(joined)
+    && /(?:换鞋|脱鞋)/u.test(joined)
+    && /(?:台灯|灯)/u.test(joined)
+    && /(?:听雨|坐下)/u.test(joined);
+  if (homecoming && shotCount === 6) {
+    return [
+      "陈卓收伞走到出租屋门前",
+      "陈卓用钥匙开门并跨进玄关",
+      "陈卓回身把门关好，确认门锁落位",
+      "陈卓在玄关弯腰脱下白色湿便鞋，换穿室内拖鞋",
+      "陈卓伸手拧亮旧台灯",
+      "陈卓在灯下坐下，抬头安静听雨",
+    ];
+  }
+  if (homecoming && shotCount === 5) {
+    return [
+      "陈卓收伞走到出租屋门前",
+      "陈卓用钥匙开门并进入，随后回身把门关好",
+      "陈卓在玄关脱下白色湿便鞋，换穿室内拖鞋",
+      "陈卓伸手拧亮旧台灯",
+      "陈卓在灯下坐下，抬头安静听雨",
+    ];
+  }
+  if (clean.length === shotCount) return clean;
+  const phases = ["起幅", "推进", "落幅"];
+  return Array.from({ length: shotCount }, (_unused, index) => {
+    if (index < clean.length) return clean[index]!;
+    const base = clean[index % Math.max(1, clean.length)] || `第 ${index + 1} 镜连续动作`;
+    const phase = phases[Math.min(phases.length - 1, Math.floor(index / Math.max(1, clean.length)))];
+    return `${base}（${phase}段）`;
+  });
+}
+
+function timelineTextForAction(action: string, duration: number): string {
+  const safeDuration = Math.max(0.1, duration);
+  const firstEnd = Math.max(0.1, Math.min(safeDuration, safeDuration * 0.3));
+  const secondEnd = Math.max(firstEnd, Math.min(safeDuration, safeDuration * 0.75));
+  const code = (value: number): string => `T00:${Math.max(0, value).toFixed(1).padStart(4, "0")}`;
+  const kind = narrativeActionKind(action);
+  const beats = kind === "umbrella"
+    ? ["低机位起幅，伞骨合拢，伞尖离地滴水", "提伞走向门边，视线确认门锁", "在门前站定，呼气，手落到门把上"]
+    : kind === "open"
+      ? ["钥匙尖对准锁孔，手指稳定握住钥匙", "钥匙转动并推开门，门轴缓慢张开", "跨入门槛，确认门扇仍在身后"]
+      : kind === "close"
+        ? ["回身握住门把，视线检查门框", "带门合拢，门扇减速贴入门框", "门锁落位，肩线下沉并转向鞋架"]
+        : kind === "shoes"
+          ? ["重心移到鞋架旁，视线看向脚边湿鞋", "鞋跟松脱，脚掌离开湿鞋并保持平衡", "脚掌穿入室内拖鞋并落地，身体站直"]
+          : kind === "lamp"
+            ? ["指尖触到旋钮，先保持暗部曝光", "旋钮转到点亮段，钨丝由暗红转为暖黄", "暖光覆盖桌面，手离开旋钮并停住"]
+            : kind === "listen"
+              ? ["转向坐具，视线从雨痕落向椅面", "坐下并调整重心，双手落在膝上", "肩背放松，抬眼听雨并保持静止"]
+              : ["建立本镜空间与主体位置", "连续完成动作字段中的主要变化", "动作落定，保持结束姿态"];
+  return `${code(0)}-${code(firstEnd)} ${beats[0]}；${code(firstEnd)}-${code(secondEnd)} ${beats[1]}；${code(secondEnd)}-${code(safeDuration)} ${beats[2]}`;
+}
+
+function emotionTextForAction(action: string): string {
+  switch (narrativeActionKind(action)) {
+    case "umbrella":
+      return "眉眼被冷光压住，视线先落在滴水的伞尖，随后抬眼确认门锁；呼气一次，下颌放松但不笑，手指保持稳定。";
+    case "open":
+      return "目光跟随钥匙进入锁孔，眉头只轻微收紧，门开时快速眨一次眼，嘴唇保持闭合，肩线随推门前移。";
+    case "close":
+      return "回身时视线落在门缝与门锁，眼睑略垂，鼻翼随呼气放松，嘴唇轻抿，肩背在门锁落位后下沉。";
+    case "shoes":
+      return "视线看向脚边湿鞋，眉心放松，眼睛随解鞋动作下垂，缓慢眨眼一次，嘴角保持中性，重心下沉。";
+    case "lamp":
+      return "视线先锁定旋钮，指尖转动后抬眼看向灯罩，瞳孔随暖光收窄，嘴角轻微松开，呼吸放缓。";
+    case "listen":
+      return "视线从窗框雨痕移向远处，眼神变柔，眼睫缓慢眨动，鼻翼轻张吸气，肩胛下沉，嘴唇闭合。";
+    default:
+      return "视线跟随本镜可见动作目标移动，眼睫、鼻翼与下颌有细微连续变化，表情保持克制，不使用固定微笑或模板化凝视。";
+  }
+}
+
+function pacingTextForAction(action: string, duration: number): string {
+  const kind = narrativeActionKind(action);
+  const body = kind === "umbrella"
+    ? "前段只为收伞起势，中段推进到门边，末段在门前停顿"
+    : kind === "open"
+      ? "前段锁孔对位，中段转钥推门，末段跨门落定"
+      : kind === "close"
+        ? "前段回身抓握，中段一次合门，末段门锁落定"
+        : kind === "shoes"
+          ? "前段找重心，中段完成脱鞋与换穿，末段站稳"
+          : kind === "lamp"
+            ? "前段保持暗态，中段旋钮点亮，末段暖光停稳"
+            : kind === "listen"
+              ? "前段转向坐具，中段坐下，末段静止听雨"
+              : "前段建立，中段完成主要动作，末段收束";
+  return `${Math.max(0.1, duration).toFixed(1)} 秒内按约 30%/45%/25% 分配：${body}；不做额外加速或无关转场。`;
+}
+
+function brightnessTextForAction(action: string): string {
+  const kind = narrativeActionKind(action);
+  if (kind === "lamp") {
+    return "起幅保留冷暗部并看清旋钮与指节；点亮后2700K暖光渐亮，面部与桌面不过曝，门外冷蓝只作边缘勾光，不突然跳亮。";
+  }
+  if (kind === "shoes" || kind === "close") {
+    return "人物轮廓与手部接触点可辨，面部保留冷暗层次；湿鞋与地砖高光受控，不强制正面补光，环境暗部不死黑。";
+  }
+  if (kind === "listen") {
+    return "2700K暖光作为主光照亮面部与手部，窗外冷蓝只勾轮廓；保留暗部纹理，灯罩与雨痕高光不过曝。";
+  }
+  return "人物与主体轮廓可辨，按灯光设计保留明暗层次，环境高光不过曝，不使用额外正面补光。";
+}
+
+function depthTextForShotSize(shotSize: string, noCharacters: boolean): string {
+  if (noCharacters) {
+    return /(?:close|特写)/iu.test(shotSize)
+      ? "近距浅景深，焦点锁定当前自然物与水滴，前后景柔和分离。"
+      : "近中远景层次连续，主体与倒影可辨，使用中等至深景深保证空间关系清楚。";
+  }
+  if (/(?:extreme-close|close|特写|近景)/iu.test(shotSize)) {
+    return "浅景深，焦点锁定眼睫、手指或当前接触点，前后景自然虚化；面部与动作接触点始终清晰。";
+  }
+  if (/(?:wide|full|远景|全景)/iu.test(shotSize)) {
+    return "深景深，人物全身、空间边线与关键道具同处可辨焦平面，背景不过度虚化。";
+  }
+  return "中等景深，焦点跟随人物上半身与当前动作，背景保留空间层次但不过度抢焦点。";
+}
+
+function shotSizeForAction(action: string): string | null {
+  switch (narrativeActionKind(action)) {
+    case "umbrella": return "medium";
+    case "open": return "close-up";
+    case "close": return "close-up";
+    case "shoes": return "extreme-close-up";
+    case "lamp": return "extreme-close-up";
+    case "listen": return "medium";
+    default: return null;
+  }
+}
+
+function makeupTextForAction(action: string): string {
+  const kind = narrativeActionKind(action);
+  if (kind === "umbrella" || kind === "open" || kind === "close") {
+    return "自然写实妆；鬓角、睫毛与开衫袖口保留雨水微湿痕迹，皮肤有真实纹理，不补成干燥棚拍妆。";
+  }
+  if (kind === "shoes") {
+    return "自然写实妆；雨水使鬓角微湿，低头换鞋后鼻翼与面颊保留轻微潮红，不新增高饱和妆色。";
+  }
+  if (kind === "lamp") {
+    return "自然写实妆；旋钮点亮后2700K暖光只轻微抬亮肤色，睫毛与手指接触点清晰，不改变妆容。";
+  }
+  return "自然写实妆；暖光下保留真实皮肤与轻微疲劳感，眼神清醒但不做精致棚拍修饰。";
+}
+
+function transitionTextForAction(action: string, isLastShot: boolean): string {
+  if (isLastShot) return "本镜为全片最后一镜；动作落定后保持静止，再由输出合同决定是否硬切黑，不追加超出镜长的特效。";
+  switch (narrativeActionKind(action)) {
+    case "umbrella": return "门把接触动作完成后硬切到开门镜，不使用叠化。";
+    case "open": return "门开到位后硬切到回身关门镜，保持门轴方向连续。";
+    case "close": return "门锁落位后硬切到换鞋镜，门保持关闭状态。";
+    case "shoes": return "双脚站稳后硬切到台灯镜，拖鞋状态延续。";
+    case "lamp": return "暖光稳定后硬切到坐下听雨镜，灯保持点亮。";
+    default: return "本镜动作落定后硬切至下一镜，不使用叠化、黑场或其他特效。";
+  }
+}
+
+function costumeTextForFootwear(base: string, action: string, shotIndex: number, shoeIndex: number): string {
+  if (shoeIndex < 0) return base;
+  const upper = base
+    .replace(/[，,；;]?(?:脚穿|配)?(?:小白鞋|白色便鞋|旧帆布鞋|湿鞋|拖鞋).*$/u, "")
+    .trim();
+  if (shotIndex < shoeIndex) return `${upper}；脚穿白色便鞋，鞋面与裤脚被雨水打湿，开衫袖口湿润。`;
+  if (shotIndex === shoeIndex) return `${upper}；脚穿白色湿便鞋，正脱在鞋架旁并换入室内拖鞋。`;
+  return `${upper}；脚穿室内拖鞋，湿便鞋放在鞋架旁。`;
+}
+
+function normalizeFootwearProps(props: string[], action: string, shotIndex: number, shoeIndex: number): string[] {
+  const footwear = /(?:鞋|拖鞋|帆布鞋|便鞋)/u;
+  const cleaned = props.map(String).map((item) => item.trim()).filter((item) => item && !footwear.test(item));
+  if (shoeIndex < 0) return [...new Set([...props.map(String).filter((item) => item.trim()), ...cleaned])];
+  if (shotIndex < shoeIndex) return [...new Set([...cleaned, "白色湿便鞋"])];
+  if (shotIndex === shoeIndex) return [...new Set([...cleaned, "白色湿便鞋", "室内拖鞋"])];
+  return [...new Set([...cleaned, "室内拖鞋"])];
 }
 
 /**
@@ -5320,39 +5603,64 @@ export function normalizeNarrativePromptsForReview(
       && typeof shot._workloomPromptReviewPolicy === "object"
       ? shot._workloomPromptReviewPolicy as NarrativePromptReviewPolicy
       : policy;
+    const rowActions = Array.isArray(rowPolicy.projectActions) ? rowPolicy.projectActions : [];
+    const action = String(
+      rowActions[Math.min(shotIndex, Math.max(0, rowActions.length - 1))]
+        ?? shot.action
+        ?? "",
+    ).trim();
+    const direction = deriveNarrativeShotDirection({
+      action,
+      fallbackScene: rowPolicy.projectScene,
+      fallbackLighting: rowPolicy.projectLighting,
+      fallbackColor: rowPolicy.projectColor,
+      fallbackProps: Array.isArray(rowPolicy.projectProps) ? rowPolicy.projectProps : [],
+    });
+    const normalizedPolicy: NarrativePromptReviewPolicy = {
+      ...rowPolicy,
+      projectScene: sceneMatchesAction(action, rowPolicy.projectScene)
+        ? rowPolicy.projectScene
+        : (direction.scene || rowPolicy.projectScene),
+      projectLighting: direction.lighting || rowPolicy.projectLighting,
+      projectColor: direction.color || rowPolicy.projectColor,
+      projectProps: direction.props.length > 0
+        ? direction.props
+        : (Array.isArray(rowPolicy.projectProps) ? rowPolicy.projectProps : []),
+      projectActions: rowActions,
+    };
     const normalized = applyNarrativeFinalPromptContract(shot, {
-      noDialogue: rowPolicy.noDialogue,
-      maxLength: rowPolicy.maxLength,
-      noCharacters: rowPolicy.noCharacters,
-      noAnimals: rowPolicy.noAnimals,
-      noMusic: rowPolicy.noMusic,
+      noDialogue: normalizedPolicy.noDialogue,
+      maxLength: normalizedPolicy.maxLength,
+      noCharacters: normalizedPolicy.noCharacters,
+      noAnimals: normalizedPolicy.noAnimals,
+      noMusic: normalizedPolicy.noMusic,
       chineseOnly: true,
-      durationSeconds: rowPolicy.durationSeconds,
-      aspectRatio: rowPolicy.aspectRatio,
-      resolution: rowPolicy.resolution,
-      colorTemperature: rowPolicy.colorTemperature,
+      durationSeconds: normalizedPolicy.durationSeconds,
+      aspectRatio: normalizedPolicy.aspectRatio,
+      resolution: normalizedPolicy.resolution,
+      colorTemperature: normalizedPolicy.colorTemperature,
       isLastShot: shotIndex === prompts.length - 1,
-      characterNames: rowPolicy.characterNames,
-      noTitles: rowPolicy.noTitles,
+      characterNames: normalizedPolicy.characterNames,
+      noTitles: normalizedPolicy.noTitles,
       canonicalize: true,
-      characterPortraits: rowPolicy.characterPortraits,
-      projectScene: rowPolicy.projectScene,
-      projectLighting: rowPolicy.projectLighting,
-      projectColor: rowPolicy.projectColor,
-      projectProps: rowPolicy.projectProps,
-      projectActions: rowPolicy.projectActions,
+      characterPortraits: normalizedPolicy.characterPortraits,
+      projectScene: normalizedPolicy.projectScene,
+      projectLighting: normalizedPolicy.projectLighting,
+      projectColor: normalizedPolicy.projectColor,
+      projectProps: normalizedPolicy.projectProps,
+      projectActions: normalizedPolicy.projectActions,
       shotIndex,
     });
     const titleFields = ["title_content", "subtitle_content", "title_animation", "title_font_design", "opening_audio_design"];
     const fields = normalized.fields && typeof normalized.fields === "object"
       ? { ...normalized.fields as FusionRecord }
       : {};
-    if (rowPolicy.noTitles) for (const key of titleFields) delete fields[key];
+    if (normalizedPolicy.noTitles) for (const key of titleFields) delete fields[key];
     const result: FusionRecord = {
       ...normalized,
       fields,
       promptCharCount: String(normalized.prompt ?? "").length,
-      _workloomPromptReviewPolicy: rowPolicy,
+      _workloomPromptReviewPolicy: normalizedPolicy,
       _workloomPromptReview: {
         schemaVersion: "workloom.prompt-review/v1",
         sourcePromptHash: createHash("sha256").update(String(shot.prompt ?? "")).digest("hex"),
@@ -5572,7 +5880,7 @@ export function installVendorNarrativePromptReviewBridge(options: { log?: (line:
       this: Record<string, unknown>,
       prompts: FusionRecord[],
     ) {
-      const reportPrompts = prompts.map((row) => {
+      const reportPrompts: FusionRecord[] = prompts.map((row) => {
         const rowPolicy = row._workloomPromptReviewPolicy
           && typeof row._workloomPromptReviewPolicy === "object"
           ? row._workloomPromptReviewPolicy as NarrativePromptReviewPolicy
@@ -5583,7 +5891,29 @@ export function installVendorNarrativePromptReviewBridge(options: { log?: (line:
           ...(rowPolicy?.noTitles ? { sceneType: "content" } : {}),
         };
       });
-      return originalReport.call(this, reportPrompts);
+      const report = originalReport.call(this, reportPrompts);
+      const contracts = reportPrompts
+        .map((row) => row._workloomShotContract)
+        .filter((value): value is FusionRecord => Boolean(value && typeof value === "object" && !Array.isArray(value)));
+      if (contracts.length === 0) return report;
+      const actionSequence = contracts.map((contract) => String(contract.action ?? "")).filter(Boolean);
+      const contractDocument = {
+        schema: "workloom.prompt-review-contract/v1",
+        shotCount: contracts.length,
+        totalDurationSeconds: contracts.reduce((sum, contract) => sum + Number(contract.durationSeconds ?? 0), 0),
+        continuity: {
+          orderedActions: actionSequence,
+          actionOrderHash: createHash("sha256").update(JSON.stringify(actionSequence)).digest("hex"),
+          doorState: /开门/u.test(actionSequence.join(" "))
+            ? (/关门|门关好|门锁落位/u.test(actionSequence.join(" ")) ? "open_then_closed" : "opens_without_close")
+            : "not_used",
+          footwearState: /换鞋|湿便鞋/u.test(actionSequence.join(" "))
+            ? "wet_shoes_then_indoor_slippers"
+            : "not_changed",
+        },
+        shots: contracts,
+      };
+      return `${report.trimEnd()}\n\n## 结构化镜头合同（机器可读）\n\n\`\`\`json\n${JSON.stringify(contractDocument, null, 2)}\n\`\`\`\n`;
     };
   }
   prototype._confirmPrompts = function patchedPromptReview(
@@ -5850,7 +6180,7 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
           policyMeta?.special_notes,
         ].map(String).join(" ");
         const promptNoAnimals = /(?:无动物|不出现动物|禁止动物)/u.test(promptPolicyText);
-        const promptNoCharacters = /(?:无角色|纯空镜|场景为主体)/u.test(promptPolicyText);
+        const promptNoCharacters = /(?:无人物|不出现人物|画面无人|无角色|纯空镜|场景为主体)/u.test(promptPolicyText);
         const promptNoMusic = /(?:无|不加|不要|禁止|不出现)[^。；\n]{0,8}(?:配乐|音乐|旋律)|(?:仅|只)保留(?:人物|主体)?(?:动作)?(?:与)?(?:画外)?(?:环境声|实拍声)/u.test(promptPolicyText);
         const promptDuration = Number(
           policyPositioning.targetDuration
@@ -5874,6 +6204,13 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
           path: String(item.portraitPath ?? item.portraitRef ?? "").trim(),
           appearance: String(item.appearance ?? "").trim(),
           costume: String(item.costume ?? "").trim(),
+          authorization: String(item.authorization ?? "unverified").trim(),
+          ...(item.portraitEvidence && typeof item.portraitEvidence === "object"
+            ? {
+              sha256: String(recordValue(item.portraitEvidence).sha256 ?? "").trim() || undefined,
+              bytes: Number(recordValue(item.portraitEvidence).bytes) || undefined,
+            }
+            : {}),
         })).filter((item) => item.name);
         const promptSubtitles = recordValue(recordValue(policyPrd.deliveryStandard).subtitles);
         const promptNoTitles = promptSubtitles.mode === "none" || /(?:无字幕|无文字)/u.test(promptPolicyText);
@@ -5890,10 +6227,14 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
           ...(Array.isArray(promptScenePlan.scenes) ? promptScenePlan.scenes.map(recordValue) : [])
             .flatMap((scene) => Array.isArray(scene.keyProps) ? scene.keyProps.map(String) : []),
         ].filter(Boolean))];
-        const promptActions = extractNarrativeActions({}, {
+        const extractedPromptActions = extractNarrativeActions({}, {
           _originalStoryText: String(policyPrd._originalStoryText ?? promptScene),
           special_notes: String(policyMeta?.special_notes ?? ""),
         });
+        const promptActionsBase = extractedPromptActions.length > 0
+          ? extractedPromptActions
+          : updated.map((shot) => promptFieldText(shot.action)).filter(Boolean);
+        const promptActions = projectNarrativeActionSequence(promptActionsBase, updated.length);
         const promptContractShots = Array.isArray(policyPrd.shotContract)
           ? policyPrd.shotContract.map(recordValue)
           : [];
@@ -5973,7 +6314,7 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
             fallbackColor: contractColor || promptReviewPolicy.projectColor,
             fallbackProps: contractProps.length > 0 ? contractProps : promptReviewPolicy.projectProps,
           });
-          const contractShotSize = promptFieldText(contractShot.shotSize);
+          const contractShotSize = shotSizeForAction(orderedAction) || promptFieldText(contractShot.shotSize);
           const contractCameraMovement = promptFieldText(contractShot.cameraMovement);
           const rowPolicy: NarrativePromptReviewPolicy = {
             ...promptReviewPolicy,
@@ -5981,7 +6322,7 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
             projectLighting: direction.lighting || promptReviewPolicy.projectLighting,
             projectColor: direction.color || promptReviewPolicy.projectColor,
             projectProps: direction.props.length > 0 ? direction.props : promptReviewPolicy.projectProps,
-            projectActions: direction.action ? [direction.action] : promptReviewPolicy.projectActions,
+            projectActions: promptActions,
           };
           const projectedShot: FusionRecord = {
             ...shot,

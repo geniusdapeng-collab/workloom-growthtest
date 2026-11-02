@@ -18,6 +18,7 @@ import {
   renderPrdContractMarkdown,
   applyNarrativeFinalPromptContract,
   normalizeNarrativePromptsForReview,
+  projectNarrativeActionSequence,
   renderPreproductionAuditReport,
   promptFieldText,
   rebuildPromptsFromFields,
@@ -1781,7 +1782,7 @@ console.log("RESULT " + JSON.stringify({
     });
     expect(deriveNarrativeShotDirection({ action: "换鞋" })).toMatchObject({
       scene: expect.stringContaining("玄关内侧"),
-      props: expect.arrayContaining(["湿鞋", "拖鞋"]),
+      props: expect.arrayContaining(["白色湿便鞋", "室内拖鞋"]),
     });
     expect(deriveNarrativeShotDirection({ action: "拧亮旧台灯" })).toMatchObject({
       scene: expect.stringContaining("台灯"),
@@ -1795,6 +1796,78 @@ console.log("RESULT " + JSON.stringify({
       color: expect.stringContaining("2700K"),
       props: expect.arrayContaining(["台灯", "窗", "坐具"]),
     });
+  });
+
+  it("六镜归家合同补齐关门状态，并逐镜区分鞋态、情绪、时间轴和场景", () => {
+    const actions = projectNarrativeActionSequence([
+      "收伞回到出租屋",
+      "开门",
+      "换鞋",
+      "拧亮旧台灯",
+      "坐下听雨",
+    ], 6);
+    expect(actions).toEqual([
+      "陈卓收伞走到出租屋门前",
+      "陈卓用钥匙开门并跨进玄关",
+      "陈卓回身把门关好，确认门锁落位",
+      "陈卓在玄关弯腰脱下白色湿便鞋，换穿室内拖鞋",
+      "陈卓伸手拧亮旧台灯",
+      "陈卓在灯下坐下，抬头安静听雨",
+    ]);
+    const policy = {
+      noDialogue: true,
+      maxLength: 3000,
+      noCharacters: false,
+      noAnimals: false,
+      noMusic: true,
+      noTitles: true,
+      durationSeconds: 15,
+      aspectRatio: "9:16",
+      resolution: "1080x1920",
+      characterNames: ["陈卓"],
+      characterPortraits: [{
+        name: "陈卓",
+        path: "bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png",
+        appearance: "东亚女性，深栗棕发，自然通勤外观",
+        costume: "米白针织开衫、深色直筒长裤，配小白鞋",
+        authorization: "real-authorized",
+        sha256: "3d177401ed014376992489da04d2e35977ca282c205edc43bc8f6dca2f9a8184",
+        bytes: 190978,
+      }],
+      projectScene: "雨夜出租屋",
+      projectLighting: "台灯冷暖分区",
+      projectColor: "冷蓝与暖黄",
+      projectProps: ["旧台灯", "旧帆布鞋", "湿鞋"],
+      projectActions: actions,
+    };
+    const durations = [3, 2, 2, 4, 2, 2];
+    const shotSizes = ["extreme-close-up", "medium", "medium", "medium", "close-up", "close-up"];
+    const prompts = normalizeNarrativePromptsForReview(
+      durations.map((duration, index) => ({
+        shotId: `S${index + 1}`,
+        duration,
+        shotSize: shotSizes[index],
+        prompt: "01.【场景】错误模板",
+        fields: {},
+      })),
+      policy,
+    );
+    const contracts = prompts.map((row) => row._workloomShotContract as Record<string, unknown>);
+    expect(contracts.map((contract) => contract.action)).toEqual(actions);
+    expect(String(contracts[2]!.space)).toContain("门扇正从开启位置合拢");
+    expect(String(contracts[0]!.costume)).toMatch(/白色便鞋.*雨水打湿/u);
+    expect(String(contracts[3]!.costume)).toMatch(/正脱.*换入室内拖鞋/u);
+    expect(String(contracts[5]!.costume)).toContain("室内拖鞋");
+    expect(new Set(contracts.map((contract) => String(contract.emotion))).size).toBe(6);
+    for (const contract of contracts) {
+      expect(String(contract.timeline)).toMatch(/T00:00.*T00:.*T00:/u);
+      expect((contract.portraitAssets as Array<Record<string, unknown>>)[0]).toMatchObject({
+        authorization: "real-authorized",
+        sha256: "3d177401ed014376992489da04d2e35977ca282c205edc43bc8f6dca2f9a8184",
+      });
+    }
+    expect(String(prompts[0]!.prompt)).not.toMatch(/旧帆布鞋|湿鞋、拖鞋/u);
+    expect(String(prompts[5]!.prompt)).toContain("脚穿室内拖鞋");
   });
 
   it("G7 收口报告内联完整三件套、哈希、时间轴与未提交的 G8 边界", () => {
@@ -1855,7 +1928,10 @@ const prompt = [
 ].join("\\n");
 const row = { shotId: "S1", sceneType: "opening", duration: 3, prompt, promptCharCount: 100,
   title_content: "错误标题", title_animation: "4秒越界", opening_audio_design: "大提琴长音",
-  _workloomPromptReviewPolicy: { noTitles: true } };
+  _workloomPromptReviewPolicy: { noTitles: true },
+  _workloomShotContract: { schema: "workloom.prompt-shot-contract/v1", shotId: "S1", durationSeconds: 3,
+    space: "雨夜楼道门外", action: "陈卓收伞走到门前", era: "当代", equipment: "固定三脚架",
+    portraitAssets: [{ name: "陈卓", path: "portrait.jpg", authorization: "real-authorized", sha256: "abc" }] } };
 const instance = Object.create(HyperrealitySystem.prototype);
 const report = instance._generatePromptsReport([row]);
 uninstall();
@@ -1865,6 +1941,9 @@ console.log("RESULT " + JSON.stringify({
   hasStaleLength: report.includes("S1 | 3s | 100"),
   hasTitle: report.includes("主标题内容") || report.includes("大提琴"),
   hasBareNumber: /^\\d{2}\\.$/mu.test(report),
+  hasStructuredContract: report.includes("workloom.prompt-review-contract/v1")
+    && report.includes("open_then_closed") === false
+    && report.includes("real-authorized"),
   restored: originalFormat === HyperrealitySystem.prototype._formatPromptWithSequenceNumbers
     && originalReport === HyperrealitySystem.prototype._generatePromptsReport
 }));
@@ -1874,6 +1953,7 @@ console.log("RESULT " + JSON.stringify({
     expect(result.hasStaleLength).toBe(false);
     expect(result.hasTitle).toBe(false);
     expect(result.hasBareNumber).toBe(false);
+    expect(result.hasStructuredContract).toBe(true);
     expect(result.restored).toBe(true);
     expect(String(result.report)).toMatch(/\| S1 \| 3s \| \d+ \| ❌ 4\/25 \|/u);
     expect(String(result.report)).not.toContain("| S1 | 3s | 100 |");
@@ -3065,7 +3145,7 @@ console.log("RESULT " + JSON.stringify({
       requiresFinalReviewProjection: true,
     });
     expect(result.retry).toMatchObject({ repaired: ["SC-01"] });
-    expect(String(result.prompt)).toContain("出租屋门外楼道");
+    expect(String(result.prompt)).toContain("楼道/门外门口");
     expect(String(result.prompt)).toContain("陈卓在门外收伞");
     expect(result.policy).toMatchObject({ aspectRatio: expect.any(String), maxLength: expect.any(Number) });
   }, 90_000);
