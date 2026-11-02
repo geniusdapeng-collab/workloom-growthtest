@@ -15,11 +15,16 @@ describe("视频路由保留用户明确的否定选择", () => {
     ["不要营销片，走口播片", "explainer"],
     ["走叙事片，不要用口播管线", "narrative"],
     ["不要营销片，后来改为走营销片，商品名：星野风扇", "marketing"],
+    ["不要使用营销管线，做一条风景短片", "clarify"],
+    ["不要采用营销管线，走叙事片", "narrative"],
+    ["不要使用“营销管线”，走叙事片", "narrative"],
+    ["不采用「叙事管线」，走营销片，商品名：星野风扇", "marketing"],
   ])("%s → %s", async (text, route) => {
     const llmCall = vi.fn();
     const decision = await routeVideoPipeline({ text }, { llmCall });
     expect(decision.route).toBe(route);
-    expect(llmCall).not.toHaveBeenCalled();
+    if (route === "clarify") expect(decision.clarify?.missing).toEqual(["route"]);
+    if (route !== "clarify") expect(llmCall).not.toHaveBeenCalled();
   });
 
   it("只有否定而没有正向选择时，不借商品锚点重新选择已禁止的营销线", async () => {

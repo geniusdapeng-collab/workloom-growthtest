@@ -121,9 +121,9 @@ const EXPLAINER_TERMS: Array<{ re: RegExp; label: string }> = [
 ];
 
 /** 显式声明（最高优先级）：用户自己说了走哪条管线 */
-const EXPLICIT_MARKETING = /(走|用|按|跑)?\s*(营销片|营销线|营销管线|带货管线|商品管线)/;
-const EXPLICIT_NARRATIVE = /(走|用|按|跑)?\s*(叙事片|叙事线|叙事管线|通用管线|普通管线|故事管线)/;
-const EXPLICIT_EXPLAINER = /(走|用|按|跑)?\s*(口播片|口播管线|口播解说|解说片|解说管线|讲解片|科普片)/;
+const EXPLICIT_MARKETING = /(使用|采用|选择|走|用|按|跑)?\s*(营销片|营销线|营销管线|带货管线|商品管线)/;
+const EXPLICIT_NARRATIVE = /(使用|采用|选择|走|用|按|跑)?\s*(叙事片|叙事线|叙事管线|通用管线|普通管线|故事管线)/;
+const EXPLICIT_EXPLAINER = /(使用|采用|选择|走|用|按|跑)?\s*(口播片|口播管线|口播解说|解说片|解说管线|讲解片|科普片)/;
 
 /** 商品名显式声明（高精度模式；只认"商品名是/叫…"这类明说，不猜） */
 const PRODUCT_DECLARATIONS: RegExp[] = [
@@ -240,7 +240,7 @@ function explicitRouteSignals(text: string): { explicit?: VideoPipelineKind; exc
     for (const match of text.matchAll(new RegExp(pattern.source, "gu"))) {
       const index = match.index ?? 0;
       const before = text.slice(0, index);
-      if (/(?:不要|别|无需|不必|不想|不需要|不用|不能|而非|不是|不|非)\s*(?:再|去)?\s*(?:做|制作|拍|走|用|按|跑|要|选择)?\s*$/u.test(before)) {
+      if (/(?:不要|别|无需|不必|不想|不需要|不用|不能|而非|不是|不|非)\s*(?:再|去)?\s*(?:做|制作|拍|走|用|按|跑|要|选择|使用|采用)?\s*[「『"'“‘]?\s*$/u.test(before)) {
         negative.add(kind);
       } else positive.push({ kind, index });
     }
