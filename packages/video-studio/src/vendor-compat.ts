@@ -6063,6 +6063,12 @@ export function applyNarrativeFinalPromptContract(
       } : {}),
     };
   }
+  // canonicalize 会从源合同重建字段；不得绕过前面的长度检查，也不得静默截掉源动作。
+  if (prompt.length > options.maxLength) {
+    throw new Error(
+      `FINAL_PROMPT_SOURCE_CAPACITY_EXCEEDED: ${String(next.shotId ?? next.shot_id ?? "未编号镜头")} 重建后 ${prompt.length} 字符，超过 ${options.maxLength}；保留源合同并停止本次预生产`,
+    );
+  }
   next.prompt = prompt;
   return next;
 }

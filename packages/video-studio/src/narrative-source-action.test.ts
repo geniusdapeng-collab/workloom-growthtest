@@ -81,3 +81,60 @@ it('combined shot timelines retain the fourth and later source actions', () => {
     expect(pacing).toContain(sourceAction);
   }
 });
+
+it('rejects source actions exceeding the final prompt capacity instead of emitting an overlong successful prompt', () => {
+  const action = Array.from({ length: 60 }, (_, index) => `林悦按顺序检查编号${index + 1}的红色盒子并合上盖子`).join('；');
+  expect(() => applyNarrativeFinalPromptContract({ shotId: 'S-long', duration: 12, action }, {
+    noDialogue: true, maxLength: 3000, canonicalize: true, projectActions: [action], characterNames: ['林悦'],
+  })).toThrow(/FINAL_PROMPT_SOURCE_CAPACITY_EXCEEDED.*S-long.*3000/u);
+});
+
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+it('capacity failure before G6 leaves the original action intact and never reaches a render boundary', () => {
+  const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+  const directory = mkdtempSync(join(tmpdir(), 'wl-source-capacity-'));
+  const file = join(directory, 'capacity.mts');
+  writeFileSync(file, `
+import { createRequire } from 'node:module';
+import { VideoStudio } from ${JSON.stringify(resolve(root, 'packages/video-studio/src/studio.ts'))};
+import { listSharedBridges } from ${JSON.stringify(resolve(root, 'packages/video-studio/src/vendor-compat.ts'))};
+const require = createRequire(${JSON.stringify(resolve(root, 'package.json'))});
+const entry = require('./vendor/supermickey/hyperreality-system/index.js');
+const Original = entry.HyperrealitySystem;
+let approvals = 0, renderCalls = 0;
+const events = [];
+const action = Array.from({ length: 60 }, (_, index) => '林悦按顺序检查编号'+(index+1)+'的红色盒子并合上盖子').join('；');
+const source = { shotId: 'S-long', duration: 12, action, fields: { action }, prompt: '01.【动作】按源动作执行。', _workloomPromptReviewPolicy: { noDialogue: true, maxLength: 3000, noCharacters: false, noAnimals: true, noMusic: true, noTitles: true, aspectRatio: '9:16', resolution: '1080x1920', characterNames: ['林悦'], characterPortraits: [], projectProps: [], projectActions: [action] } };
+const before = JSON.stringify(source);
+function OfflineSystem() {}
+OfflineSystem.prototype = Object.create(Original.prototype);
+OfflineSystem.prototype.constructor = OfflineSystem;
+OfflineSystem.prototype._confirmPrompts = async function() { approvals++; return { approved: true }; };
+OfflineSystem.prototype.create = async function() { await this._confirmPrompts([source]); renderCalls++; return { success: true, stages: {} }; };
+entry.HyperrealitySystem = OfflineSystem;
+try {
+ let error = null;
+ const studio = new VideoStudio({ llm: { model: 'offline', fastModel: 'offline' }, workDir: ${JSON.stringify(join(directory, 'work'))}, onApproval: async () => ({ approved: true }), log: () => {}, onEvent: event => events.push(event), portraits: { enabled: false } });
+ try { await studio.runPreproduction({ projectId: 'capacity', intent: 'source capacity' }); } catch (failure) { error = failure.message; }
+ console.log('RESULT '+JSON.stringify({ error, approvals, renderCalls, sourceUnchanged: before === JSON.stringify(source), events, bridges: listSharedBridges() }));
+} finally { entry.HyperrealitySystem = Original; }
+`);
+  try {
+    const output = execFileSync(process.execPath, [resolve(root, 'node_modules/tsx/dist/cli.mjs'), file], { cwd: root, encoding: 'utf8', timeout: 90_000, maxBuffer: 5_000_000 });
+    const line = output.split('\n').find(value => value.startsWith('RESULT '));
+    expect(line).toBeDefined();
+    const result = JSON.parse(line!.slice(7));
+    expect(result.error).toMatch(/FINAL_PROMPT_SOURCE_CAPACITY_EXCEEDED.*S-long.*3000/u);
+    expect(result.approvals).toBe(0);
+    expect(result.renderCalls).toBe(0);
+    expect(result.sourceUnchanged).toBe(true);
+    expect(result.bridges).toEqual([]);
+    expect(result.events.some((event: { kind: string }) => event.kind === 'pipeline.failed')).toBe(true);
+    expect(result.events.some((event: { kind: string }) => event.kind === 'pipeline.finished')).toBe(false);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+}, 100_000);
