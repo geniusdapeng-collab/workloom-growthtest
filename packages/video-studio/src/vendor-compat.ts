@@ -1233,6 +1233,29 @@ function narrativeSpeechPolicy(value: unknown): {
   };
 }
 
+/** ScriptEngine 在不同阶段把同一合同放在 metadata、metadata._metadata 或 PRD 内。 */
+function scriptIntentSpeechRequirement(userIntent: Record<string, unknown>): string {
+  const metadata = recordValue(userIntent.metadata);
+  const metaFields = recordValue(metadata._metadata);
+  const prd = recordValue(metaFields._prd ?? metadata._prd);
+  const project = recordValue(prd.projectDefinition);
+  const creativeTheme = recordValue(metadata._creativeTheme);
+  return [
+    metaFields.dialogueRequirement,
+    metaFields.dialogue_requirement,
+    metadata.dialogueRequirement,
+    metadata.dialogue_requirement,
+    creativeTheme.dialogue_requirement,
+    project._originalStoryText,
+    project.sourceIntent,
+    metadata._originalStoryText,
+    metadata.original_story_text,
+  ]
+    .map(String)
+    .filter(Boolean)
+    .join("\n");
+}
+
 const NARRATIVE_ACTION_PATTERN = /(摸索|摸向|摸到|碰到|触碰|擦过|擦拭|打滑|扫过|滑落|对准|插入|拧亮|被拧|拧动|拧|旋动|按压|按下|按动|压(?=开关|按钮|下|住|向|在)|磕出|贴上|贴在|推开|开门|打开|关闭|换鞋|走到|走进|拿起|放下|放到|举起|抬起|塌下|看向|抚摸|收伞|抖落|摸黑|贴住|探头|伸出|伸爪|接水|缩回|蜷缩|盘成|坐回|坐下|坐在|舔|蹭|跃过|跑过|回头|抬头|低头|奔跑|慢跑|沿河|停下|转身|跳到|钻回|探出)/gu;
 
 export function extractNarrativeActions(
@@ -3532,10 +3555,13 @@ export function installVendorDiscoveryNarrativeBridge(options: { log?: (line: st
           userIntent: Record<string, unknown>,
         ) {
           const original = originalPolicy.call(this, userIntent);
-          const requirement = String(original.dialogueRequirement ?? "");
+          const requirement = scriptIntentSpeechRequirement(userIntent)
+            || String(original.dialogueRequirement ?? "");
           const speech = narrativeSpeechPolicy(requirement);
           const policy = {
             ...original,
+            allowed: speech.voiceoverAllowed,
+            dialogueRequirement: requirement || String(original.dialogueRequirement ?? ""),
             dialogueAllowed: speech.dialogueAllowed,
             voiceoverAllowed: speech.voiceoverAllowed,
             allSpeechForbidden: speech.allSpeechForbidden,
@@ -3544,6 +3570,55 @@ export function installVendorDiscoveryNarrativeBridge(options: { log?: (line: st
           return policy;
         };
         restores.push(() => { generatorPrototype._resolveVoiceoverPolicy = originalPolicy; });
+      }
+      if (generatorPrototype && typeof generatorPrototype._buildGenerationPrompt === "function") {
+        const originalBuildPrompt = generatorPrototype._buildGenerationPrompt as (
+          this: Record<string, unknown>,
+          userIntent: Record<string, unknown>,
+          template: Record<string, unknown>,
+        ) => string;
+        generatorPrototype._buildGenerationPrompt = function patchedNoDialoguePrompt(
+          this: Record<string, unknown>,
+          userIntent: Record<string, unknown>,
+          template: Record<string, unknown>,
+        ) {
+          const prompt = originalBuildPrompt.call(this, userIntent, template);
+          const policy = recordValue(this._workloomNarrativePolicy);
+          if (policy.allSpeechForbidden !== true || typeof prompt !== "string") return prompt;
+          const systemStart = prompt.indexOf("## 系统约束（不可违反）");
+          const systemEnd = prompt.indexOf("## 剧本结构模板", systemStart + 1);
+          let normalized = prompt;
+          if (systemStart >= 0 && systemEnd > systemStart) {
+            normalized = `${normalized.slice(0, systemStart)}${[
+              "## 系统约束（不可违反）",
+              "1. 本片禁止所有台词、对白、旁白、画外音和口播；仅用可见动作、环境声和动作声叙事",
+              "2. 每个场景的 dialogue 必须是 {\"has_dialogue\":false,\"lines\":[],\"blocks\":[]}",
+              "3. 不得把台词写到 dialogue、narration、voice_over、voiceover 或其他游离字段",
+              "4. 场景时长分配只依据动作、空间变化与视觉复杂度，不依据台词长度",
+              `5. 总时长必须严格等于 ${Number(recordValue(userIntent.metadata).target_duration ?? 0) || "目标"} 秒`,
+              "6. 角色视觉锚点必须保持一致，且不得为了制造冲突而新增台词",
+              "",
+            ].join("\n")}${normalized.slice(systemEnd)}`;
+          }
+          normalized = normalized.replace(
+            /dialogue 对象的标准结构（必须严格遵守）：[\s\S]*?(?=\n##\s)/u,
+            [
+              "dialogue 对象的标准结构（必须严格遵守）：",
+              "```json",
+              '{"has_dialogue":false,"lines":[],"blocks":[]}',
+              "```",
+              "",
+              "本片禁止旁白，因此不得输出旁白写法或 speaker=\"旁白\" 的块。",
+              "",
+            ].join("\n"),
+          );
+          normalized = normalized
+            .replace(/4\. 每个场景的台词必须包含在场景中（不能旁白）/gu, "4. 每个场景不得生成台词；dialogue 三要素必须为空")
+            .replace(/□ 每句台词是否都能用动作演出来而不是说出来？/gu, "□ 是否为所有场景保持 dialogue 为空，并用可见动作替代表达？")
+            .replace(/□ 原文的钉子台词与特写细节是否原样保留？/gu, "□ 原文的钉子动作、动作声与特写细节是否原样保留？");
+          return `${normalized.trimEnd()}\n\n## 台词合同（最高优先级）\n- 本片明确无台词、无旁白；任何模型回包中的 dialogue.lines、dialogue.blocks、narration、voice_over 或 voiceover 都必须在落盘前清空。\n- 不得沿用模板中的强制台词规则生成任何人物声；动作与环境声承担全部叙事。\n`;
+        };
+        restores.push(() => { generatorPrototype._buildGenerationPrompt = originalBuildPrompt; });
       }
       if (generatorPrototype && typeof generatorPrototype._normalizeScenesDialogue === "function") {
         const originalNormalize = generatorPrototype._normalizeScenesDialogue as (
@@ -5384,6 +5459,9 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
         const promptContractShots = Array.isArray(policyPrd.shotContract)
           ? policyPrd.shotContract.map(recordValue)
           : [];
+        const promptSceneRecords = Array.isArray(promptScenePlan.scenes)
+          ? promptScenePlan.scenes.map(recordValue)
+          : [];
         const promptLimit = Number(
           (vendorRequire(resolvePath(
             repoRoot,
@@ -5422,17 +5500,51 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
           const contractProps = Array.isArray(contractShot.keyProps)
             ? contractShot.keyProps.map(String).filter(Boolean)
             : [];
-          const contractAction = promptFieldText(contractShot.purpose);
+          const contractShotPurpose = promptFieldText(contractShot.purpose);
+          const contractSceneId = promptFieldText(contractShot.sceneId);
+          const scenePurpose = promptFieldText(
+            promptSceneRecords.find((scene) => promptFieldText(scene.sceneId) === contractSceneId)?.purpose,
+          );
+          const shotActions = extractNarrativeActions({}, { _originalStoryText: contractShotPurpose });
+          const sceneActions = extractNarrativeActions({}, { _originalStoryText: scenePurpose });
+          const sceneShotIds = promptContractShots
+            .filter((candidate) => promptFieldText(candidate.sceneId) === contractSceneId)
+            .map((candidate) => promptFieldText(candidate.shotId));
+          const sceneShotIndex = Math.max(0, sceneShotIds.indexOf(promptFieldText(contractShot.shotId)));
+          const contractAction = shotActions.length > 0
+            ? contractShotPurpose
+            : (sceneActions[Math.min(sceneActions.length - 1, sceneShotIndex)]
+              || promptActions[Math.min(
+                promptActions.length - 1,
+                Math.floor((shotIndex + 0.5) * promptActions.length / Math.max(1, allShots.length)),
+              )]);
+          const orderedAction = String(promptActions[Math.min(
+            promptActions.length - 1,
+            Math.floor((shotIndex + 0.5) * promptActions.length / Math.max(1, allShots.length)),
+          )] || contractAction || "");
+          const beforeLampOn = /(?:收伞|开门|换鞋)/u.test(orderedAction)
+            && !/(?:拧亮|坐下|灯下|听雨)/u.test(orderedAction);
+          const contractShotSize = promptFieldText(contractShot.shotSize);
+          const contractCameraMovement = promptFieldText(contractShot.cameraMovement);
           const rowPolicy: NarrativePromptReviewPolicy = {
             ...promptReviewPolicy,
             projectScene: contractScene || promptReviewPolicy.projectScene,
-            projectLighting: contractLighting || promptReviewPolicy.projectLighting,
-            projectColor: contractColor || promptReviewPolicy.projectColor,
+            projectLighting: beforeLampOn
+              ? (/^收伞/u.test(orderedAction)
+                ? "楼道冷光；室内旧台灯关闭"
+                : "室内未开灯；门外楼道冷光从门缝进入，旧台灯关闭")
+              : (contractLighting || promptReviewPolicy.projectLighting),
+            projectColor: beforeLampOn ? "冷蓝灰（旧台灯未开）" : (contractColor || promptReviewPolicy.projectColor),
             projectProps: contractProps.length > 0 ? contractProps : promptReviewPolicy.projectProps,
-            projectActions: contractAction ? [contractAction] : promptReviewPolicy.projectActions,
+            projectActions: orderedAction ? [orderedAction] : promptReviewPolicy.projectActions,
+          };
+          const projectedShot: FusionRecord = {
+            ...shot,
+            ...(contractShotSize ? { shotSize: contractShotSize, cameraHint: contractShotSize } : {}),
+            ...(contractCameraMovement ? { camera_movement: contractCameraMovement, cameraMovement: contractCameraMovement } : {}),
           };
           return {
-            ...applyNarrativeFinalPromptContract(shot, {
+            ...applyNarrativeFinalPromptContract(projectedShot, {
             noDialogue: speechFullyForbidden,
             maxLength: promptLimit,
             noCharacters: promptNoCharacters,

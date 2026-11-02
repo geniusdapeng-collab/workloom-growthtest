@@ -2432,6 +2432,69 @@ console.log("RESULT " + JSON.stringify({
     expect(result.contractDialogueAccepted).toBe(true);
     expect(result.contractDialogueErrors).toEqual([]);
   }, 60_000);
+
+  it("嵌套无台词合同同时约束脚本提示、落盘字段与元数据，不再强制每场写台词", () => {
+    const script = `
+import { createRequire } from "node:module";
+import { installVendorDiscoveryNarrativeBridge } from ${JSON.stringify(resolve(here, "vendor-compat.ts"))};
+const require = createRequire(${JSON.stringify(join(repoRoot, "package.json"))});
+const generatorMod = require(${JSON.stringify(join(repoRoot, "vendor/supermickey/hyperreality-system/engines/script-engine/core/script-generator.js"))});
+const requirement = "全片无台词、无旁白、无字幕，仅保留动作与环境声。";
+const userIntent = {
+  metadata: {
+    title: "无台词回归",
+    target_duration: 15,
+    _metadata: { dialogueRequirement: requirement },
+    _originalStoryText: "雨夜收伞回到出租屋。全片无台词、无旁白、无字幕，仅保留动作与环境声。",
+  },
+  constraints: {},
+  parsed: { primary_mode: "dramatic", hybrid_config: null, secondary_modes: [] },
+};
+const generator = new generatorMod.ScriptGenerator({ llmEngine: null });
+const before = generator._resolveVoiceoverPolicy(userIntent);
+const uninstall = installVendorDiscoveryNarrativeBridge({ log: () => undefined });
+const after = generator._resolveVoiceoverPolicy(userIntent);
+const prompt = generator._buildGenerationPrompt(userIntent, { structure: { acts: [] } });
+const parsed = {
+  meta: { target_duration: 15 },
+  structure: {
+    scenes: [{
+      dialogue: {
+        has_dialogue: true,
+        lines: [{ speaker: "陈卓", text: "我回来了" }],
+        blocks: [{ speaker: "陈卓", line: "我回来了" }],
+      },
+      narration: "画外旁白：“雨停了。”",
+    }],
+  },
+};
+generator._normalizeScenesDialogue(parsed, true);
+uninstall();
+console.log("RESULT " + JSON.stringify({
+  beforeAllowed: before.allowed,
+  beforeAllSpeechForbidden: before.allSpeechForbidden,
+  afterAllowed: after.allowed,
+  afterAllSpeechForbidden: after.allSpeechForbidden,
+  dialogueRequirement: after.dialogueRequirement,
+  promptStillRequiresDialogue: /^2\\. 每个场景必须有台词/mu.test(prompt),
+  promptStillAllowsVoiceover: /本片允许旁白/u.test(prompt),
+  promptHasOverride: /本片禁止所有台词、对白、旁白/u.test(prompt),
+  dialogue: parsed.structure.scenes[0].dialogue,
+  narration: parsed.structure.scenes[0].narration ?? null,
+}));
+`;
+    const result = runInChild(script);
+    expect(result.beforeAllowed).toBe(false);
+    expect(result.beforeAllSpeechForbidden).toBeUndefined();
+    expect(result.afterAllowed).toBe(false);
+    expect(result.afterAllSpeechForbidden).toBe(true);
+    expect(String(result.dialogueRequirement)).toContain("全片无台词、无旁白");
+    expect(result.promptStillRequiresDialogue).toBe(false);
+    expect(result.promptStillAllowsVoiceover).toBe(false);
+    expect(result.promptHasOverride).toBe(true);
+    expect(result.dialogue).toEqual({ has_dialogue: false, lines: [], blocks: [] });
+    expect(result.narration).toBeNull();
+  }, 60_000);
 });
 
 /**

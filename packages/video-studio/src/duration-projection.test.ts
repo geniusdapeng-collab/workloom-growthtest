@@ -119,6 +119,17 @@ describe("守恒投影（性质测试）", () => {
     expect(result.suggestions.join(" ")).toContain("精简台词");
   });
 
+  it("无台词但镜数×模型下限超过目标 → 报排程下限问题，不误报台词超长", () => {
+    const shots = Array.from({ length: 5 }, (_, index) => shot(`S${index + 1}`, 3));
+    const result = projectShotDurations(shots, { targetSeconds: 15, minSeconds: 4, maxSeconds: 30 });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("应当 INFEASIBLE");
+    expect(result.reason).toBe("min-duration-exceeds-target");
+    expect(result.suggestions.join(" ")).toContain("镜头排程下限合计 20s");
+    expect(result.suggestions.join(" ")).toContain("本片无台词下限超载");
+    expect(result.suggestions.join(" ")).not.toContain("精简台词");
+  });
+
   it("镜头数 × 上限 < 目标 → INFEASIBLE（并给出加镜建议）", () => {
     const shots = [shot("S1", 10), shot("S2", 10)];
     const result = projectShotDurations(shots, { targetSeconds: 90, minSeconds: 4, maxSeconds: 30 });
