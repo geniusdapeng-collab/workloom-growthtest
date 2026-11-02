@@ -408,7 +408,6 @@ describe("发布链", () => {
 describe("供应商拒绝与未知接受结果", () => {
   it.each([
     { id: "accepted-task", error: { code: "InvalidParameter" } },
-    { request_id: "accepted-request", error: { message: "gateway rejected" } },
     { data: { id: "accepted-nested" }, error: { code: "InvalidParameter" } },
     { data: [{ url: "https://cdn.example.test/accepted.png" }], error: { code: "InvalidParameter" } },
     { content: { video_url: "https://cdn.example.test/accepted.mp4" }, error: { code: "InvalidParameter" } },
@@ -416,6 +415,19 @@ describe("供应商拒绝与未知接受结果", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(body), { status: 400 })));
     await expect(new ArkVideoProvider({ apiKey: "test-only" }).submit({ prompt: "glass", estimatedUnits: 5, params: { providerModel: "test-model" } }))
       .rejects.toMatchObject({ acceptance: "unknown", fallbackAllowed: false });
+  });
+  it.each([
+    new HiggsfieldProvider({ keyId: "test-only", keySecret: "test-only" }),
+    new MuapiProvider({ apiKey: "test-only" }),
+  ])("request_id在使用它作为接受ID的供应商中仍禁止盲重试：%s", async provider => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ request_id: "accepted-request", error: { message: "gateway rejected" } }), { status: 400 })));
+    await expect(provider.submit({ prompt: "glass", estimatedUnits: 5, params: { providerModel: "test-model" } }))
+      .rejects.toMatchObject({ acceptance: "unknown", fallbackAllowed: false });
+  });
+  it("Ark错误中的request_id追踪号不冒充任务ID，明确参数拒收保留原分类", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ request_id: "trace-only", error: { code: "InvalidParameter" } }), { status: 400 })));
+    await expect(new ArkVideoProvider({ apiKey: "test-only" }).submit({ prompt: "glass", estimatedUnits: 5, params: { providerModel: "test-model" } }))
+      .rejects.toMatchObject({ kind: "BAD_REQUEST", acceptance: "not-accepted", fallbackAllowed: false });
   });
   it.each([
     [401, "AUTH", "not-accepted", true], [400, "BAD_REQUEST", "not-accepted", false],
