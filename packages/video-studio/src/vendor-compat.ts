@@ -1112,6 +1112,14 @@ function normalizePostRainWording(value: string): string {
     .replace(/暴雨/gu, "雨后");
 }
 
+function mergeNarrativeProps(...groups: Array<unknown[] | undefined>): string[] {
+  return [...new Set(groups.flatMap((group) => group ?? [])
+    .map(String)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .filter((item) => !/^(?:爪子?|猫爪|身体|尾巴).*(?:缩回|退回|退入|盘成|贴住)/u.test(item)))];
+}
+
 function canonicalCharacterFromEvidence(upstream: Record<string, unknown>): Array<Record<string, unknown>> {
   const explicit = upstream?.character && typeof upstream.character === "object"
     ? upstream.character as Record<string, unknown>
@@ -5941,18 +5949,12 @@ export function applyNarrativeFinalPromptContract(
     const timelineText = options.sourceFirstFrame
       ? `首帧约束：${options.sourceFirstFrame.replace(/^第一帧[:：]?/u, "")}；${actionTimelineText}`
       : actionTimelineText;
-    const conciseEvidence = (value: string, max = 140): string => {
-      const text = value.replace(/\s+/gu, " ").trim();
-      return text.length <= max ? text : `${text.slice(0, Math.max(1, max - 1))}…`;
-    };
     const verificationText = [
-      `按 ${Math.max(0.1, duration).toFixed(1)} 秒逐段核对：起幅${timelineText}`,
-      `主体与空间${conciseEvidence(compositionText, 88)}`,
-      `场景连续${conciseEvidence(sceneText, 96)}`,
-      `灯光与色彩${conciseEvidence(`${lightingText}；${colorText}`, 112)}`,
-      `道具连续${conciseEvidence(propsText, 72)}`,
-      `台词与声音${conciseEvidence(`${dialogueText}；${audioText}`, 96)}`,
-      `交付参数${constraint}`,
+      `逐段核对起点、中段与落幅的目标帧，主体、动作方向、接触点和结束姿态必须与本镜编号字段一致`,
+      `检查${shotSize}构图的安全区、焦平面、主体占比与背景层次`,
+      `核对主辅光方向、白平衡、材质高光、暗部纹理与冷暖边界`,
+      `核对道具数量、位置、湿度状态和跨镜连续性`,
+      `核对声音事件与画面动作同帧，且不新增合同外人物、文字、品牌、字幕或配乐`,
     ].join("；");
     const brightnessText = canonicalAnimalOnly
       ? "动物主体高光不过曝，湿毛、爪垫与纸箱纤维保留纹理，暗部不死黑；不要求人物面部曝光。"
@@ -6315,13 +6317,13 @@ function timelineTextForAction(action: string, duration: number): string {
     : animalKind === "reach"
       ? ["前爪从胸口抬起，爪尖靠近屋檐滴水线", "前腿继续伸向箱口外，掌面缓慢翻开去迎水滴", "爪尖停在滴水线下方，身体重心仍留在箱内"]
       : animalKind === "contact"
-        ? ["前爪已停在滴水线下方，肉垫朝上并保持趾数稳定", "水滴落在爪背或肉垫上，趾节轻颤并溅起细小水花", "前爪短暂停住，视线仍锁定水滴，不提前回缩"]
+        ? ["前爪已停在滴水线下方，爪垫朝上并保持趾数稳定", "水滴落在爪垫上，趾节轻颤并溅起细小水花", "前爪短暂停住，视线仍锁定水滴，不提前回缩"]
       : animalKind === "withdraw"
         ? ["前爪从滴水线下方收回，爪背带起细小水珠", "前腿撤回箱沿内侧，身体重心向纸箱暗部后移", "前爪收到胸前，头部仍朝外观察"]
       : animalKind === "retreat"
         ? ["耳朵后压，头部开始缩回纸箱阴影", "肩背和身体重心继续退入纸箱暗部", "前爪收到胸前，箱口只剩模糊暖橘轮廓"]
         : animalKind === "curl"
-          ? ["肩背先向内收，尾巴从身侧扫过箱底", "身体盘紧成团，尾尖贴住口鼻", "眼皮缓慢合拢，只留一小团呼吸起伏"]
+          ? ["起幅承接箱口模糊暖橘轮廓，暗部内肩背继续内收", "身体盘紧成团，尾尖贴住口鼻", "眼皮缓慢合拢，只留一小团呼吸起伏"]
         : kind === "umbrella"
     ? ["固定机位起幅，伞骨合拢，伞尖离地滴水", "把收拢的湿伞换到持伞侧，另一只手摸到钥匙", "在门前站定，呼气，钥匙尖对准锁孔"]
     : kind === "open"
@@ -6379,13 +6381,13 @@ function emotionTextForAnimalAction(action: string, names: string[]): string {
     case "reach":
       return `${subject}视线锁定下落水滴，前爪从胸口抬起、缓慢伸向滴水线，爪尖保持趾数稳定，身体重心仍留在纸箱内。`;
     case "contact":
-      return `${subject}视线锁定已到爪前的单颗水滴，爪垫保持朝上，水珠接触爪背或肉垫时趾节轻颤并溅起细小水花；本镜不提前回缩。`;
+      return `${subject}视线锁定已到爪前的单颗水滴，爪垫保持朝上，水珠接触爪垫时趾节轻颤并溅起细小水花；本镜不提前回缩。`;
     case "withdraw":
       return `${subject}耳尖向后轻压，视线仍追着水滴，前爪从接触点迅速收回胸前，肩背内收但头部保持朝外观察。`;
     case "retreat":
       return `${subject}耳朵后压，头部先缩回纸箱阴影，肩背与身体重心继续退入暗部，末段前爪收到胸前，呼吸仍保持警觉。`;
     case "curl":
-      return `${subject}肩背向内收，尾巴逐圈贴近身体，尾尖最后盖住口鼻，眼皮缓慢合拢，呼吸幅度变小；情绪由警觉转为安定。`;
+      return `${subject}在上一镜留下的箱内暗部轮廓中继续收紧，尾巴逐圈贴近身体，尾尖最后盖住口鼻，眼皮缓慢合拢，呼吸幅度变小；情绪由警觉转为安定。`;
     default:
       return `${subject}眼神跟随本镜可见目标，耳尖、鼻翼、爪部和身体重心做小幅连续变化，不拟人化表演。`;
   }
@@ -6410,7 +6412,7 @@ function pacingTextForAction(action: string, duration: number): string {
         : animalKind === "retreat"
           ? "前段头部缩回，中段肩背退入纸箱暗部，末段前爪收到胸前"
           : animalKind === "curl"
-            ? "前段肩背内收，中段尾巴贴住口鼻，末段闭眼并保持呼吸起伏"
+            ? "前段承接箱内暗部轮廓，中段尾巴贴住口鼻，末段闭眼并保持呼吸起伏"
           : kind === "umbrella"
     ? "前段只为收伞起势，中段推进到门边，末段在门前停顿"
     : kind === "open"
@@ -6659,15 +6661,20 @@ export function normalizeNarrativePromptsForReview(
         : (direction.scene || rowPolicy.projectScene),
       projectLighting: direction.lighting || rowPolicy.projectLighting,
       projectColor: direction.color || rowPolicy.projectColor,
-      projectProps: direction.props.length > 0
-        ? direction.props
-        : (Array.isArray(rowPolicy.projectProps) ? rowPolicy.projectProps : []),
+      projectProps: mergeNarrativeProps(
+        direction.props,
+        Array.isArray(rowPolicy.projectProps) ? rowPolicy.projectProps : [],
+      ),
       projectActions: rowActions,
     };
     const enforcedShotSize = shotSizeForAction(action);
     const shotForReview = enforcedShotSize
       ? { ...shot, shotSize: enforcedShotSize, cameraHint: enforcedShotSize }
       : shot;
+    const sourceFirstFrame = normalizedPolicy.sourceFirstFrame
+      && !["contact", "withdraw", "retreat", "curl"].includes(animalActionKind(action))
+      ? normalizedPolicy.sourceFirstFrame
+      : undefined;
     const normalized = applyNarrativeFinalPromptContract(shotForReview, {
       noDialogue: normalizedPolicy.noDialogue,
       maxLength: normalizedPolicy.maxLength,
@@ -6685,7 +6692,7 @@ export function normalizeNarrativePromptsForReview(
       canonicalize: true,
       characterPortraits: normalizedPolicy.characterPortraits,
       postRainOnly: normalizedPolicy.postRainOnly,
-      sourceFirstFrame: normalizedPolicy.sourceFirstFrame,
+      sourceFirstFrame,
       projectScene: normalizedPolicy.projectScene,
       projectLighting: normalizedPolicy.projectLighting,
       projectColor: normalizedPolicy.projectColor,
@@ -7937,9 +7944,6 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
             : [];
           const contractShotPurpose = promptFieldText(contractShot.purpose);
           const sourceFirstFrameMatch = contractShotPurpose.match(/(?:^|[；;])\s*第一帧[:：]?\s*([^；;。]+)/u);
-          const sourceFirstFrame = sourceFirstFrameMatch
-            ? `第一帧${sourceFirstFrameMatch[1]!.trim()}`
-            : undefined;
           const contractSceneId = promptFieldText(contractShot.sceneId);
           const scenePurpose = promptFieldText(
             promptSceneRecords.find((scene) => promptFieldText(scene.sceneId) === contractSceneId)?.purpose,
@@ -7967,6 +7971,10 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
             || contractAction
             || "",
           );
+          const sourceFirstFrame = sourceFirstFrameMatch
+            && !["contact", "withdraw", "retreat", "curl"].includes(animalActionKind(orderedAction))
+            ? `第一帧${sourceFirstFrameMatch[1]!.trim()}`
+            : undefined;
           const direction = deriveNarrativeShotDirection({
             action: orderedAction,
             fallbackScene: contractScene || promptReviewPolicy.projectScene,
@@ -7981,7 +7989,7 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
             projectScene: direction.scene || promptReviewPolicy.projectScene,
             projectLighting: direction.lighting || promptReviewPolicy.projectLighting,
             projectColor: direction.color || promptReviewPolicy.projectColor,
-            projectProps: direction.props.length > 0 ? direction.props : promptReviewPolicy.projectProps,
+            projectProps: mergeNarrativeProps(direction.props, promptReviewPolicy.projectProps),
             projectActions: promptActions,
             sourceFirstFrame,
           };

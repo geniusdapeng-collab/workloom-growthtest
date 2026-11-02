@@ -1326,7 +1326,7 @@ console.log("RESULT " + JSON.stringify({
         cameraHint: "establishing",
         prompt: "01.【场景】错误模板",
         fields: {},
-        ...(index === 1
+        ...(index === 1 || index === 2
           ? {
             _workloomPromptReviewPolicy: {
               ...policy,
@@ -1349,12 +1349,15 @@ console.log("RESULT " + JSON.stringify({
     expect(field(prompts[1]!, "情绪")).not.toMatch(/接触水面|趾节轻颤/u);
     expect(field(prompts[1]!, "节奏")).not.toMatch(/接触|水花/u);
     expect(field(prompts[1]!, "时间轴")).toContain("半只橘猫耳朵与一截胡须探出箱口");
+    expect(field(prompts[2]!, "时间轴")).not.toContain("半只橘猫耳朵与一截胡须探出箱口");
     expect(field(prompts[2]!, "情绪")).toMatch(/接触|趾节轻颤/u);
     expect(field(prompts[2]!, "节奏")).toMatch(/接触|水花/u);
+    expect(field(prompts[2]!, "动作") + field(prompts[2]!, "时间轴") + field(prompts[2]!, "情绪")).not.toContain("爪背");
     expect(field(prompts[3]!, "情绪")).not.toMatch(/尾尖|贴住口鼻|闭眼/u);
     expect(field(prompts[3]!, "节奏")).not.toMatch(/盘紧|闭眼/u);
     expect(field(prompts[4]!, "情绪")).toMatch(/尾尖|口鼻|闭眼/u);
     expect(field(prompts[4]!, "节奏")).toMatch(/盘紧|闭眼/u);
+    expect(field(prompts[4]!, "时间轴")).toContain("承接箱口模糊暖橘轮廓");
     for (const shot of prompts) {
       const prompt = String(shot.prompt);
       const contract = shot._workloomShotContract as Record<string, unknown>;
@@ -1370,6 +1373,9 @@ console.log("RESULT " + JSON.stringify({
         visualVerification: "not-performed",
         sha256: expect.stringMatching(/^[a-f0-9]{64}$/u),
       });
+      expect(field(shot, "道具")).toContain("屋檐");
+      expect(field(shot, "道具")).not.toContain("爪子缩回纸箱");
+      expect(field(shot, "本镜验收")).not.toContain(String(contract.space));
     }
     const sourceBlueprint = {
       _metadata: {
