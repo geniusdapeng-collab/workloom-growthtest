@@ -1100,6 +1100,18 @@ function cleanNarrativeAnimalAppearance(value: unknown): string {
     .trim();
 }
 
+function normalizePostRainWording(value: string): string {
+  return String(value ?? "")
+    .replace(/暴雨夜窄巷/gu, "雨后夜晚的窄巷")
+    .replace(/雨夜/gu, "雨后夜晚")
+    .replace(/冷蓝雨幕/gu, "冷蓝湿气与檐口残水")
+    .replace(/雨幕/gu, "潮湿空气")
+    .replace(/雨丝/gu, "檐口余滴")
+    .replace(/雨打纸箱/gu, "檐口余滴落在纸箱")
+    .replace(/持续降雨/gu, "降雨已经停止")
+    .replace(/暴雨/gu, "雨后");
+}
+
 function canonicalCharacterFromEvidence(upstream: Record<string, unknown>): Array<Record<string, unknown>> {
   const explicit = upstream?.character && typeof upstream.character === "object"
     ? upstream.character as Record<string, unknown>
@@ -5518,6 +5530,7 @@ export function applyNarrativeFinalPromptContract(
     projectProps?: string[];
     projectActions?: string[];
     shotIndex?: number;
+    postRainOnly?: boolean;
   },
 ): FusionRecord {
   const next: FusionRecord = {
@@ -5872,18 +5885,21 @@ export function applyNarrativeFinalPromptContract(
       "无生成特效", "无镜头光晕伪影", "无模糊", "无过曝", "无未声明角色",
     ];
     const portraitLine = portraitText.startsWith("不适用") ? portraitText : `使用 ${portraitText}；跨镜不得替换。`;
-    const sceneText = sceneTextForAction(
+    const rawSceneText = sceneTextForAction(
       assignedAction,
       cleanText(options.projectScene ?? "") || source("场景", "scene", "sceneDescription"),
     );
-    const lightingText = cleanText(options.projectLighting ?? "") || source("灯光设计", "lighting");
+    const sceneText = options.postRainOnly ? normalizePostRainWording(rawSceneText) : rawSceneText;
+    const rawLightingText = cleanText(options.projectLighting ?? "") || source("灯光设计", "lighting");
+    const lightingText = options.postRainOnly ? normalizePostRainWording(rawLightingText) : rawLightingText;
     const colorText = cleanText(options.projectColor ?? "") || source("色彩/色调", "color_palette");
-    const propsText = normalizeFootwearProps(
+    const normalizedProps = normalizeFootwearProps(
       options.projectProps ?? [source("道具", "props").replace(/本镜为空镜|无角色使用道具/gu, "")],
       assignedAction,
       options.shotIndex ?? 0,
       shoeIndex,
-    ).join("、");
+    ).map((item) => options.postRainOnly ? normalizePostRainWording(item) : item);
+    const propsText = normalizedProps.join("、");
     const timelineText = duration > 0
       ? timelineTextForAction(assignedAction, duration)
       : fieldValue("时间轴") || "按本镜合同执行完整起幅、动作与落幅。";
@@ -6017,6 +6033,7 @@ export interface NarrativePromptReviewPolicy {
     sha256?: string;
     bytes?: number;
   }>;
+  postRainOnly?: boolean;
   projectScene?: string;
   projectLighting?: string;
   projectColor?: string;
@@ -6595,6 +6612,7 @@ export function normalizeNarrativePromptsForReview(
     });
     const normalizedPolicy: NarrativePromptReviewPolicy = {
       ...rowPolicy,
+      postRainOnly: rowPolicy.postRainOnly ?? policy.postRainOnly,
       projectScene: sceneMatchesAction(action, rowPolicy.projectScene)
         ? rowPolicy.projectScene
         : (direction.scene || rowPolicy.projectScene),
@@ -6625,6 +6643,7 @@ export function normalizeNarrativePromptsForReview(
       noTitles: normalizedPolicy.noTitles,
       canonicalize: true,
       characterPortraits: normalizedPolicy.characterPortraits,
+      postRainOnly: normalizedPolicy.postRainOnly,
       projectScene: normalizedPolicy.projectScene,
       projectLighting: normalizedPolicy.projectLighting,
       projectColor: normalizedPolicy.projectColor,
@@ -6809,6 +6828,57 @@ export function renderPreproductionAuditReport(input: {
   const sourceShotContracts = Array.isArray(sourcePrd.shotContract)
     ? sourcePrd.shotContract.map(recordValue)
     : [];
+  const sourceShotRows = sourceShotContracts.filter((shot) =>
+    String(shot.shotId ?? shot.shot_id ?? "").trim().length > 0);
+  const hanBigrams = (value: unknown): Set<string> =>
+    new Set(String(value ?? "").match(/[\p{Script=Han}]{2}/gu) ?? []);
+  let lastMappedSourceIndex = 0;
+  const sourceShotMapping = shotCards.map((shot, finalIndex) => {
+    const finalText = `${String(shot.action ?? "")} ${String(shot.scene ?? "")}`;
+    const finalGrams = hanBigrams(finalText);
+    let bestSourceIndex = -1;
+    let bestScore = -1;
+    for (let sourceIndex = lastMappedSourceIndex; sourceIndex < sourceShotRows.length; sourceIndex += 1) {
+      const source = sourceShotRows[sourceIndex]!;
+      const sourceGrams = hanBigrams([
+        source.purpose,
+        source.action,
+        source.location,
+        source.scene,
+      ].join(" "));
+      const score = [...finalGrams].filter((gram) => sourceGrams.has(gram)).length;
+      if (score > bestScore) {
+        bestScore = score;
+        bestSourceIndex = sourceIndex;
+      }
+    }
+    if (bestSourceIndex < 0) {
+      bestSourceIndex = Math.min(
+        Math.max(0, sourceShotRows.length - 1),
+        Math.floor(finalIndex * sourceShotRows.length / Math.max(1, shotCards.length)),
+      );
+      bestScore = 0;
+    }
+    lastMappedSourceIndex = Math.max(lastMappedSourceIndex, bestSourceIndex);
+    const source = sourceShotRows[bestSourceIndex] ?? {};
+    return {
+      finalShotId: String(shot.shotId ?? `S-${finalIndex + 1}`),
+      sourceShotId: String(source.shotId ?? source.shot_id ?? "未提供"),
+      sourceOrder: bestSourceIndex + 1,
+      finalOrder: finalIndex + 1,
+      relation: sourceShotRows.length === shotCards.length
+        ? "one-to-one"
+        : sourceShotRows.length > 0 && shotCards.length > sourceShotRows.length
+          ? "source-shot-decomposed"
+          : sourceShotRows.length > shotCards.length
+            ? "source-shots-consolidated"
+            : "unmapped",
+      actionSimilarityBigrams: bestScore,
+      sourceDurationSeconds: Number(source.durationSeconds ?? source.duration ?? 0),
+      finalDurationSeconds: Number(shot.duration ?? 0),
+    };
+  });
+  const sourceShotMappingSha256 = sourceShotMapping.length ? evidenceHash(sourceShotMapping) : null;
   const shotIds = shotCards.map((shot) => String(shot.shotId ?? ""));
   const promptIds = prompts.map((prompt) => String(prompt.shotId ?? prompt.shot_id ?? ""));
   const idsMatch = shotIds.length === promptIds.length
@@ -6817,6 +6887,17 @@ export function renderPreproductionAuditReport(input: {
   const portraitConfirmation = recordValue(input.confirmations.portraitGeneration);
   const portraitReason = String(portraitConfirmation.reason ?? portraitConfirmation.status ?? "");
   const portraitsNotApplicable = /not[-_ ]?applicable|审计|audit-portrait/i.test(portraitReason);
+  const portraitRule = recordValue(portraitConfirmation.notApplicable);
+  const portraitPolicy = {
+    status: portraitsNotApplicable ? "not_applicable" : "reviewed",
+    policy: String(portraitRule.policy ?? (portraitsNotApplicable ? "audit-only-no-portrait-generation" : "standard-portrait-review")),
+    scope: String(portraitRule.scope ?? "preproduction-only"),
+    gate: String(portraitRule.gate ?? "G5_PORTRAIT"),
+    runnerFlags: Array.isArray(portraitRule.runnerFlags) ? portraitRule.runnerFlags.map(String) : [],
+    humanPortraitRequired: portraitRule.humanPortraitRequired !== false,
+    visualIdentityVerification: String(portraitRule.visualIdentityVerification ?? "not-performed-in-this-audit"),
+    downstreamBoundary: String(portraitRule.downstreamBoundary ?? "G8 and rendering remain blocked until visual identity and release checks pass"),
+  };
   const scriptPortraitAssets = rawScriptCharacters.map((character) => {
     const evidence = recordValue(character.portraitEvidence);
     return {
@@ -6953,6 +7034,10 @@ export function renderPreproductionAuditReport(input: {
     sourceShotContractSha256: sourceShotContracts.length
       ? evidenceHash(sourceShotContracts)
       : null,
+    sourceShotMapping,
+    sourceShotMappingSha256,
+    sourceShotCount: sourceShotRows.length,
+    finalShotCount: shotCards.length,
   };
   const semanticHash = evidenceHash(shotCards.map((shot) => ({
     shotId: shot.shotId,
@@ -6978,6 +7063,7 @@ export function renderPreproductionAuditReport(input: {
     `- 镜头 ID 与提示词 ID 一一对应：${idsMatch ? "是" : "否"}`,
     `- 镜头语义合同：最终提示词绑定的结构化镜头卡，语义摘要 sha256=${semanticHash}`,
     `- 原始源证据：${sourceOriginal && sourceShotContracts.length > 0 ? "原始需求与源镜头合同正文已内联，可逐镜对照" : "未提供独立原文，禁止声称已核实对源 brief 的忠实度"}`,
+    `- 源镜头映射：${sourceShotRows.length} 源镜 → ${shotCards.length} 最终镜，映射 sha256=${sourceShotMappingSha256 ?? "未提供"}`,
     `- 渲染提交：否；G8 预算、资格与质量提交闸未触发`,
     "",
     "## 三件套状态",
@@ -6986,7 +7072,7 @@ export function renderPreproductionAuditReport(input: {
     `- 提示词：已内联，共 ${prompts.length} 条；正文见下方完整字段块`,
     portraitsNotApplicable
       ? animalIdentityOnly
-        ? "- 定妆照生成：not_applicable（动物角色不要求人像定妆照）；角色身份证据：text-anchor（文字锚点可复核，跨镜视觉一致性未验证）"
+        ? `- 定妆照生成：not_applicable（动物角色不要求人像定妆照）；项目规则=${portraitPolicy.policy}；角色身份证据：text-anchor（文字锚点可复核，跨镜视觉一致性未验证）`
         : `- 定妆照生成：not_applicable（本轮未生成新定妆照，仅复用已登记源资产）；角色引用资产：${portraitAssetsVerified ? `verified，${portraitAssets.length} 个已登记源定妆照` : "unverified"}`
       : `- 定妆照：状态=${portraitReason || "unverified"}；未声明为已完成，除非另有真实图片回执`,
     ...portraitAssets.map((item) =>
@@ -7017,6 +7103,15 @@ export function renderPreproductionAuditReport(input: {
       })
       : ["- 源镜头合同逐镜正文：未提供"]),
     "",
+    "### 源镜头与最终镜头映射",
+    "",
+    `映射关系：${sourceShotRows.length === shotCards.length ? "一对一" : sourceShotRows.length < shotCards.length ? "源镜头拆分" : "源镜头合并"}；映射摘要 sha256=${sourceShotMappingSha256 ?? "未提供"}。`,
+    "",
+    "| 最终镜头 | 源镜头 | 关系 | 最终时长 | 源时长 | 动作词元匹配数 |",
+    "|---|---|---|---:|---:|---:|",
+    ...sourceShotMapping.map((mapping) =>
+      `| ${String(mapping.finalShotId)} | ${String(mapping.sourceShotId)} | ${String(mapping.relation)} | ${String(mapping.finalDurationSeconds)}s | ${String(mapping.sourceDurationSeconds)}s | ${String(mapping.actionSimilarityBigrams)} |`),
+    "",
     "## 源定妆照证据链",
     "",
     `- 新增定妆照生成：${portraitsNotApplicable ? "not_applicable（审计关闭）" : "unverified"}`,
@@ -7032,6 +7127,8 @@ export function renderPreproductionAuditReport(input: {
         `- 文字锚点跨镜比对：${identityAnchorReferences.filter((item) => /^[a-f0-9]{64}$/u.test(item.sha256)).length}/${shotCards.length} 镜可复算；唯一哈希数=${identityAnchorHashes.size}；结论=${identityAnchorConsistent ? "consistent（仅文字锚点一致，未做图像视觉验证）" : "failed（文字锚点不一致）"}`,
       ]
       : []),
+    `- 项目级不适用规则：policy=${portraitPolicy.policy}；scope=${portraitPolicy.scope}；gate=${portraitPolicy.gate}；runnerFlags=${portraitPolicy.runnerFlags.join(",") || "由执行确认记录指定"}；humanPortraitRequired=${portraitPolicy.humanPortraitRequired}；视觉身份验证=${portraitPolicy.visualIdentityVerification}`,
+    `- 下游释放边界：${portraitPolicy.downstreamBoundary}`,
     "- 审批边界：源资产授权只证明可复用已登记身份参考；本轮未声称生成新定妆照，也未将其作为渲染或发布许可。",
     "",
     "## 镜头卡与提示词交叉引用",
@@ -7087,6 +7184,7 @@ export function renderPreproductionAuditReport(input: {
       portraitAssetsVerified,
       identityEvidenceStatus,
       identityAnchors,
+      portraitPolicy,
       identityAnchorConsistency: {
         applicable: animalIdentityOnly,
         scope: "text-only",
@@ -7637,6 +7735,7 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
         const promptNoAnimals = /(?:无动物|不出现动物|禁止动物)/u.test(promptPolicyText);
         const promptNoCharacters = /(?:无人物|不出现人物|画面无人|无角色|纯空镜|场景为主体)/u.test(promptPolicyText);
         const promptNoMusic = /(?:无|不加|不要|禁止|不出现)[^。；\n]{0,8}(?:配乐|音乐|旋律)|(?:仅|只)保留(?:人物|主体)?(?:动作)?(?:与)?(?:画外)?(?:环境声|实拍声)/u.test(promptPolicyText);
+        const postRainOnly = /(?:雨后|雨停后|雨停了)/u.test(promptPolicyText);
         const promptDuration = Number(
           policyPositioning.targetDuration
           ?? recordValue(blueprint.config).target_duration
@@ -7720,6 +7819,7 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
           colorTemperature: promptColorTemperature,
           characterNames: promptCharacters,
           characterPortraits: promptCharacterPortraits,
+          postRainOnly,
           projectScene: promptScene,
           projectLighting: promptLighting,
           projectColor: promptProjectColor,
@@ -7803,6 +7903,7 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
             colorTemperature: promptColorTemperature,
             isLastShot: shotIndex === allShots.length - 1,
             characterNames: promptCharacters,
+            postRainOnly,
             noTitles: promptNoTitles,
             canonicalize: true,
             characterPortraits: promptCharacterPortraits,

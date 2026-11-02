@@ -1303,6 +1303,7 @@ console.log("RESULT " + JSON.stringify({
       aspectRatio: "9:16",
       resolution: "1080x1920",
       colorTemperature: "5600K",
+      postRainOnly: true,
       characterNames: ["猫"],
       characterPortraits: [{
         name: "猫",
@@ -1348,6 +1349,8 @@ console.log("RESULT " + JSON.stringify({
     for (const shot of prompts) {
       const prompt = String(shot.prompt);
       const contract = shot._workloomShotContract as Record<string, unknown>;
+      expect(field(shot, "场景")).toContain("雨后");
+      expect(field(shot, "场景")).not.toMatch(/雨夜|雨幕|暴雨|雨打纸箱/u);
       expect(prompt).not.toMatch(/站立姿态|张开双臂|自然下垂|缓慢走动|跨镜参考帧锁定/u);
       expect(prompt).toContain("文字外观锚点");
       expect(contract.portraitAssets).toEqual([]);
@@ -1365,10 +1368,11 @@ console.log("RESULT " + JSON.stringify({
         _prd: {
           projectDefinition: { sourceIntent: story, _originalStoryText: story },
           characterSystem: { characters: [{ characterId: "char_1", name: "猫", authorization: "not-applicable" }] },
-          shotContract: actions.map((action, index) => ({
-            shotId: `SC-0${index + 1}`,
+          shotContract: [actions[0]!, actions[2]!, actions[4]!].map((action, index) => ({
+            shotId: `SC0${index + 1}-S01`,
             purpose: action,
             action,
+            durationSeconds: 5,
           })),
         },
       },
@@ -1385,14 +1389,29 @@ console.log("RESULT " + JSON.stringify({
       },
       timing: {},
       confirmations: {
-        portraitGeneration: { approved: true, reason: "audit-portrait-gate-not-applicable" },
+        portraitGeneration: {
+          approved: true,
+          reason: "audit-portrait-gate-not-applicable",
+          notApplicable: {
+            policy: "audit-only-no-portrait-generation",
+            scope: "preproduction-only",
+            gate: "G5_PORTRAIT",
+            runnerFlags: ["--no-portraits", "--audit-skip-portrait-gate"],
+            humanPortraitRequired: false,
+            visualIdentityVerification: "not-performed-in-this-audit",
+          },
+        },
       },
       effectiveMs: 60_000,
     });
     expect(report).toContain(story);
     expect(report).toContain("文字外观锚点");
     expect(report).toContain("结论=consistent（仅文字锚点一致，未做图像视觉验证）");
+    expect(report).toContain("源镜头与最终镜头映射");
+    expect(report).toContain("source-shot-decomposed");
     expect(report).toContain("源角色资产：not_applicable");
+    expect(report).toContain("项目级不适用规则：policy=audit-only-no-portrait-generation");
+    expect(report).toContain("runnerFlags=--no-portraits,--audit-skip-portrait-gate");
     expect(report).toContain("授权=not-applicable");
     expect(report).not.toContain("授权=unknown");
     expect(report).not.toContain("跨镜参考帧锁定");

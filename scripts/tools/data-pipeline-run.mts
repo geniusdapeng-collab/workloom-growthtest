@@ -283,6 +283,17 @@ const onApproval: ApprovalCallback = async (req) => {
       ? "audit-portrait-gate-not-applicable"
       : verdict ? `${approved ? "producer-approved" : "producer-rejected"}(${gate} · score=${verdict.score})` : `auto(${gate})`,
     ...(verdict?.suggestions?.length ? { suggestions: verdict.suggestions } : {}),
+    ...(portraitGateSkipped ? {
+      notApplicable: {
+        policy: "audit-only-no-portrait-generation",
+        scope: "preproduction-only",
+        gate: "G5_PORTRAIT",
+        runnerFlags: ["--no-portraits", "--audit-skip-portrait-gate"],
+        humanPortraitRequired: false,
+        visualIdentityVerification: "not-performed-in-this-audit",
+        downstreamBoundary: "G8 and rendering remain blocked; visual identity must be checked on generated keyframes before release",
+      },
+    } : {}),
     ...(approved ? {} : { fatal: "producer_rejected" }),
   };
 };
