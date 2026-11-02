@@ -72,7 +72,8 @@ const caseCommand = (item) => {
     "--platform", item.platform,
     "--route", item.route,
     "--producer", "review",
-    "--producer-retry", "1",
+    // A rejected attempt already fails the evidence contract; do not hide it behind a full rerun.
+    "--producer-retry", "0",
     "--project", item.project,
     "--work-dir", workDir,
     "--out", outDir,
