@@ -65,3 +65,19 @@ it('keeps every source action in order when fewer shots combine actions', () => 
     if (index) expect(joined.indexOf(actions[index]!)).toBeGreaterThan(joined.indexOf(actions[index - 1]!));
   }
 });
+
+it('preserves repeated source actions in their original temporal positions', () => {
+  const actions = ['林悦开门', '林悦关门', '林悦开门'];
+  expect(projectNarrativeActionSequence(actions, 3)).toEqual(actions);
+});
+
+it('combined shot timelines retain the fourth and later source actions', () => {
+  const action = '林悦开门；林悦放下包；林悦关门；林悦按下台灯开关；林悦坐下';
+  const result = applyNarrativeFinalPromptContract({ shotId: 'S1', duration: 12, action }, { noDialogue: true, maxLength: 3000, canonicalize: true, projectActions: [action], characterNames: ['林悦'] });
+  const timeline = String(result.prompt).match(/【时间轴】([^\n]*)/)?.[1] ?? '';
+  const pacing = String(result.prompt).match(/【节奏】([^\n]*)/)?.[1] ?? '';
+  for (const sourceAction of action.split('；')) {
+    expect(timeline).toContain(sourceAction);
+    expect(pacing).toContain(sourceAction);
+  }
+});

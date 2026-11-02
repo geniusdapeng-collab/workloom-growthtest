@@ -6185,7 +6185,7 @@ function sceneMatchesAction(action: string, scene: string | undefined): boolean 
  */
 export function projectNarrativeActionSequence(actions: string[], shotCount: number): string[] {
   if (!Number.isInteger(shotCount) || shotCount < 1) return [];
-  const clean = [...new Set(actions.map(String).map((item) => item.trim()).filter(Boolean))];
+  const clean = actions.map(String).map((item) => item.trim()).filter(Boolean);
   if (clean.length === 0) return Array.from({ length: shotCount }, (_unused, index) => `第 ${index + 1} 镜连续动作`);
   // Partition consecutive source actions rather than dropping actions or cycling
   // back to an earlier story state after the closing action.
@@ -6211,11 +6211,11 @@ function timelineTextForAction(action: string, duration: number): string {
   const firstEnd = Math.max(0.1, Math.min(safeDuration, safeDuration * 0.3));
   const secondEnd = Math.max(firstEnd, Math.min(safeDuration, safeDuration * 0.75));
   const code = (value: number): string => `T00:${Math.max(0, value).toFixed(1).padStart(4, "0")}`;
-  const sourceBeats = action.split(/[；。]+/u).map((item) => item.trim()).filter(Boolean).slice(0, 3);
+  const sourceBeats = action.split(/[；。]+/u).map((item) => item.trim()).filter(Boolean);
   const beats = [
     sourceBeats[0] || "建立本镜空间与主体位置",
     sourceBeats[1] || sourceBeats[0] || "连续完成动作字段中的主要变化",
-    sourceBeats[2] || sourceBeats[1] || "动作落定，保持结束姿态",
+    sourceBeats.slice(2).join("；") || sourceBeats[1] || "动作落定，保持结束姿态",
   ];
   return `${code(0)}-${code(firstEnd)} ${beats[0]}；${code(firstEnd)}-${code(secondEnd)} ${beats[1]}；${code(secondEnd)}-${code(safeDuration)} ${beats[2]}`;
 }
@@ -6230,8 +6230,8 @@ function emotionTextForAnimalAction(action: string, names: string[]): string {
 }
 
 function pacingTextForAction(action: string, duration: number): string {
-  const sourceBeats = action.split(/[；。]+/u).map((item) => item.trim()).filter(Boolean).slice(0, 3);
-  const body = `前段${sourceBeats[0] || "建立空间"}，中段${sourceBeats[1] || "完成主要变化"}，末段${sourceBeats[2] || "动作落定收束"}`;
+  const sourceBeats = action.split(/[；。]+/u).map((item) => item.trim()).filter(Boolean);
+  const body = `前段${sourceBeats[0] || "建立空间"}，中段${sourceBeats[1] || "完成主要变化"}，末段${sourceBeats.slice(2).join("；") || "动作落定收束"}`;
   return `${Math.max(0.1, duration).toFixed(1)} 秒内按约 30%/45%/25% 分配：${body}；不做额外加速或无关转场。`;
 }
 
