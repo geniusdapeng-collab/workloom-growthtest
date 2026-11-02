@@ -1084,7 +1084,7 @@ const NARRATIVE_ROLE_TERMS: Array<{
 ];
 
 function isNarrativeAnimal(name: unknown): boolean {
-  return /(?:橘猫|猫咪|猫|小狗|狗狗|狗|小鸟|鸟儿|鸟|马|羊|牛|鹿|兔|鱼)/u.test(String(name ?? ""));
+  return /(?:橘猫|猫咪|猫|小狗|狗狗|狗|小鸟|鸟儿|鸟|马|羊|牛|鹿|兔|鱼|虎|豹|狮子|熊|鸡|鸭|鹅)/u.test(String(name ?? ""));
 }
 
 function canonicalCharacterFromEvidence(upstream: Record<string, unknown>): Array<Record<string, unknown>> {
@@ -5558,10 +5558,12 @@ export function applyNarrativeFinalPromptContract(
       .replace(/\bmale\b/giu, "男性");
     const canonicalNoPerson = Boolean(options.noCharacters);
     const canonicalAnimalNames = characterNames.filter((name) => isNarrativeAnimal(name));
-    const canonicalAnimalOnly = canonicalNoPerson && canonicalAnimalNames.length > 0;
+    const canonicalAnimalOnly = canonicalNoPerson
+      && canonicalAnimalNames.length > 0
+      && canonicalAnimalNames.length === characterNames.length;
     const canonicalNoActors = canonicalNoPerson && canonicalAnimalNames.length === 0;
     const roles = canonicalAnimalOnly
-      ? `${canonicalAnimalNames.join("、")}作为本镜唯一动物主体入画；画面不出现人物、人影或人体局部。`
+      ? `${canonicalAnimalNames.join("、")}作为本镜唯一动物主体入画；外观锚点=${profileAppearance || "沿用当前授权动物参考帧中的品种、体型、毛色、斑纹、眼睛颜色与湿度"}；画面不出现人物、人影或人体局部。`
       : canonicalNoPerson
         ? "无人物、无人影、无人体局部入画。"
       : characterNames.length > 0
@@ -5609,14 +5611,22 @@ export function applyNarrativeFinalPromptContract(
     const subjectlessFallback = canonicalAnimalOnly
       ? `${canonicalAnimalNames.join("、")}在${cleanText(options.projectScene ?? "") || "已确认空间"}完成本镜可见动作`
       : "风、雾、水面、光线与植物在连续物理范围内完成本镜自然变化，无人物动作";
-    const assignedAction = canonicalNoPerson
-      ? (
-        visibleAction
-        && !/^风、雾、水面、光线与植物/u.test(visibleAction)
-        && !/^本镜动作落定/u.test(visibleAction)
-          ? visibleAction
-          : projectedAction || subjectlessFallback
-      )
+    const animalConflict = canonicalAnimalOnly
+      && /(?:没有|无|不出现|不得出现)[^。；\n]{0,8}(?:动物|猫|狗|鸟)/u.test(visibleAction);
+    const animalActionEvidence = canonicalAnimalOnly
+      && !animalConflict
+      && (canonicalAnimalNames.some((name) => visibleAction.includes(name))
+        || /(?:爪|耳尖|耳朵|尾巴|胡须|肉垫|毛发|探头|盘成|蜷缩)/u.test(visibleAction));
+    const assignedAction = canonicalAnimalOnly
+      ? (animalActionEvidence ? visibleAction : projectedAction || subjectlessFallback)
+      : canonicalNoPerson
+        ? (
+          visibleAction
+          && !/^风、雾、水面、光线与植物/u.test(visibleAction)
+          && !/^本镜动作落定/u.test(visibleAction)
+            ? visibleAction
+            : projectedAction || subjectlessFallback
+        )
       : actions.length > 0
         ? actions[Math.min(options.shotIndex ?? 0, actions.length - 1)]!
         : visibleAction;
@@ -5647,7 +5657,7 @@ export function applyNarrativeFinalPromptContract(
             ? "固定高度极缓横移，速度连续并停稳，不改变场景与背景"
             : "固定机位，不做推拉摇移或变焦";
     const emotionText = canonicalAnimalOnly
-      ? "平静、治愈；情绪只通过动物耳尖、眼神、爪部与身体重心的连续变化，以及雨声和空间关系表达。"
+      ? emotionTextForAnimalAction(assignedAction, canonicalAnimalNames)
       : canonicalNoPerson
         ? "平静、克制；情绪只通过自然变化、光线与空间关系表达。"
       : emotionTextForAction(assignedAction);
@@ -5895,6 +5905,13 @@ function narrativeActionKind(action: string): "umbrella" | "open" | "close" | "s
   return "other";
 }
 
+function animalActionKind(action: string): "probe" | "reach" | "retreat" | "none" {
+  if (/(?:探头|探出|耳朵.*转|鼻尖.*探)/u.test(action)) return "probe";
+  if (/(?:伸爪|抬爪|接水|接住.*水滴|爪垫.*水|爪尖.*水)/u.test(action)) return "reach";
+  if (/(?:缩回|盘成|蜷缩|尾巴.*收|贴住鼻|盘紧)/u.test(action)) return "retreat";
+  return "none";
+}
+
 function shoeWorkPhase(action: string): "first" | "second" | "combined" | "none" {
   if (/另一只/u.test(action)) return "second";
   if (/一只/u.test(action)) return "first";
@@ -5976,13 +5993,20 @@ function timelineTextForAction(action: string, duration: number): string {
   const secondEnd = Math.max(firstEnd, Math.min(safeDuration, safeDuration * 0.75));
   const code = (value: number): string => `T00:${Math.max(0, value).toFixed(1).padStart(4, "0")}`;
   const kind = narrativeActionKind(action);
+  const animalKind = animalActionKind(action);
   const shoePhase = shoeWorkPhase(action);
   const sourceBeats = action
     .split(/[；。]+/u)
     .map((item) => item.trim())
     .filter(Boolean)
     .slice(0, 3);
-  const beats = kind === "umbrella"
+  const beats = animalKind === "probe"
+    ? ["猫耳先向滴水声转动，眼睛从纸箱暗部露出", "鼻尖探出箱沿，胡须擦过潮湿纸板，头部只出半截", "视线锁住屋檐水线，身体仍低伏在箱内"]
+    : animalKind === "reach"
+      ? ["前爪从胸口抬起，爪尖靠近屋檐滴水线", "水滴落在爪背或肉垫上，趾节轻颤，胡须随动作微动", "前爪短暂停住后向内回收，身体重心仍留在箱内"]
+      : animalKind === "retreat"
+        ? ["耳朵后压，头部开始缩回纸箱阴影", "肩背内收，尾巴从箱底扫入并贴近身体", "身体盘紧，尾尖盖住鼻尖，只留一小团呼吸起伏"]
+        : kind === "umbrella"
     ? ["固定机位起幅，伞骨合拢，伞尖离地滴水", "把收拢的湿伞换到持伞侧，另一只手摸到钥匙", "在门前站定，呼气，钥匙尖对准锁孔"]
     : kind === "open"
       ? ["钥匙尖对准锁孔，手指稳定握住钥匙", "钥匙转动并推开门，门轴缓慢张开", "跨入门槛，确认门扇仍在身后"]
@@ -6028,6 +6052,20 @@ function emotionTextForAction(action: string): string {
       return "视线从窗框雨痕移向远处，眼神变柔，眼睫缓慢眨动，鼻翼轻张吸气，肩胛下沉，嘴唇闭合。";
     default:
       return "视线跟随本镜可见动作目标移动，眼睫、鼻翼与下颌有细微连续变化，表情保持克制，不使用固定微笑或模板化凝视。";
+  }
+}
+
+function emotionTextForAnimalAction(action: string, names: string[]): string {
+  const subject = names.join("、") || "动物主体";
+  switch (animalActionKind(action)) {
+    case "probe":
+      return `${subject}耳尖先转向滴水声，眼睛从纸箱暗部缓慢露出，鼻尖轻颤，头部只探出半截，颈部保持低伏；不拟人化微笑或夸张凝视。`;
+    case "reach":
+      return `${subject}视线锁定下落水滴，前爪抬起并保持趾数稳定，爪垫接触水面时趾节轻颤，耳朵略向前，身体重心仍留在纸箱内。`;
+    case "retreat":
+      return `${subject}耳朵后压，眼睛半合，肩背向内收，尾巴逐圈贴近身体，最后鼻尖靠向爪垫；呼吸幅度变小，情绪由警觉转为安定。`;
+    default:
+      return `${subject}眼神跟随本镜可见目标，耳尖、鼻翼、爪部和身体重心做小幅连续变化，不拟人化表演。`;
   }
 }
 

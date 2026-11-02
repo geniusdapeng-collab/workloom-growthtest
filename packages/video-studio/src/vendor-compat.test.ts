@@ -1148,6 +1148,12 @@ console.log("RESULT " + JSON.stringify({
       aspectRatio: "9:16",
       resolution: "1080x1920",
       characterNames: ["橘猫"],
+      characterPortraits: [{
+        name: "橘猫",
+        path: "",
+        appearance: "橘色虎斑短毛，胸腹浅白，圆亮琥珀色眼睛，体型偏小，毛尖带雨水",
+        authorization: "not-applicable",
+      }],
       projectScene: "雨后纸箱与屋檐，湿地面反光",
       projectLighting: "冷蓝夜空与暖黄屋檐灯分区",
       projectColor: "5600K",
@@ -1165,8 +1171,22 @@ console.log("RESULT " + JSON.stringify({
     expect(animalPrompt).toContain("橘猫");
     expect(animalPrompt).toMatch(/伸爪接[^。；\n]*屋檐/u);
     expect(animalPrompt).toContain("唯一动物主体");
+    expect(animalPrompt).toContain("橘色虎斑短毛");
     expect(animalPrompt).not.toContain("无动物、无飞鸟");
     expect(animalPrompt).not.toContain("风、雾、水面、光线与植物");
+    expect(animalPrompt).toMatch(/耳尖先转向滴水声|视线锁定下落水滴/u);
+
+    const contradictory = applyNarrativeFinalPromptContract({
+      shotId: "S-6",
+      duration: 2,
+      action: "画面内无人无动物，只有水滴和纸箱运动",
+      shotSize: "medium",
+      camera_movement: "固定机位",
+    }, { ...animalOptions, shotIndex: 0 });
+    const contradictoryPrompt = String(contradictory.prompt);
+    expect(contradictoryPrompt).not.toContain("画面内无人无动物");
+    expect(contradictoryPrompt).toContain("探头");
+    expect(contradictoryPrompt).toContain("猫耳先向滴水声转动");
 
     const empty = applyNarrativeFinalPromptContract({
       shotId: "S-3",
