@@ -112,6 +112,26 @@ describe("时长投影桥：vendor 侧不再产出越界/失衡时长", () => {
     }
   });
 
+  it.skipIf(!ProductionEngine)("制作引擎规划回退：六镜 15 秒按剪辑时间线守恒，不把 2.5 秒四舍五入后判死", () => {
+    const events: DurationProjectionEvent[] = [];
+    uninstall = installVendorDurationProjectionBridge({
+      log: () => undefined,
+      onEvent: (event) => events.push(event),
+      maxShotSeconds: 30,
+      minShotSeconds: 4,
+    });
+    const shots = Array.from({ length: 6 }, (_, index) => ({
+      shotId: `S${index + 1}`,
+      duration: 2.5,
+      timing: { start: index * 2.5, duration: 2.5, end: (index + 1) * 2.5 },
+    }));
+    const out = (ProductionEngine!.prototype._normalizeDurations as (s: unknown, t: unknown) => Array<{ duration: number }>).call({}, shots, 15);
+    expect(out.reduce((sum, shot) => sum + shot.duration, 0)).toBe(15);
+    expect(out.map((shot) => shot.duration)).toEqual([3, 3, 3, 2, 2, 2]);
+    expect(events.filter((event) => event.kind === "infeasible")).toEqual([]);
+    expect(events.some((event) => event.kind === "projected" && event.source === "production-engine.normalize")).toBe(true);
+  });
+
   it.skipIf(!DurationConstraintManager)("运行期约束：权重表重分配停用（不再抹平台词适配），总时长守恒", () => {
     const events: DurationProjectionEvent[] = [];
     uninstall = installVendorDurationProjectionBridge({ log: () => undefined, onEvent: (e) => events.push(e) });

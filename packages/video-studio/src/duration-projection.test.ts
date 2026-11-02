@@ -130,6 +130,20 @@ describe("守恒投影（性质测试）", () => {
     expect(result.suggestions.join(" ")).not.toContain("精简台词");
   });
 
+  it("规划模式不把四舍五入后的计划秒数当硬下限，六镜十五秒仍可守恒", () => {
+    const shots = Array.from({ length: 6 }, (_, index) => shot(`S${index + 1}`, 2.5));
+    const result = projectShotDurations(shots, {
+      targetSeconds: 15,
+      minSeconds: 2,
+      maxSeconds: 30,
+      enforceVoiceFloor: false,
+    });
+    if (!result.ok) throw new Error(`不应 INFEASIBLE：${JSON.stringify(result)}`);
+    expect(result.totalSeconds).toBe(15);
+    expect(result.entries.every((entry) => entry.seconds >= 2 && entry.seconds <= 30)).toBe(true);
+    expect(result.entries.map((entry) => entry.seconds)).toEqual([3, 3, 3, 2, 2, 2]);
+  });
+
   it("镜头数 × 上限 < 目标 → INFEASIBLE（并给出加镜建议）", () => {
     const shots = [shot("S1", 10), shot("S2", 10)];
     const result = projectShotDurations(shots, { targetSeconds: 90, minSeconds: 4, maxSeconds: 30 });

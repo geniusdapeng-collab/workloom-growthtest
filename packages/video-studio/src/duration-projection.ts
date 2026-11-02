@@ -278,7 +278,12 @@ export function projectShotDurations(shots: ProjectionShotInput[], options: Proj
   const floors = shots.map((shot) => {
     const floor = computeVoiceFloor(shot, shot.emotion ?? shot.mood);
     const plan = Math.round(Number(shot.duration ?? shot.timing?.duration ?? floor.seconds) || 0);
-    const bound = options.enforceVoiceFloor === false ? Math.max(plan, 0) : floor.seconds;
+    /**
+     * 规划模式只暂时不锁“台词硬下限”，但计划秒数也不是下限：
+     * 15s 六镜常被模型写成 2.5s/镜，四舍五入后会变成 18s；
+     * 此时必须在 [min,max] 内重新守恒分配，最终台词下限由 Phase3 再强制。
+     */
+    const bound = options.enforceVoiceFloor === false ? 0 : floor.seconds;
     return { shot, floor, lower: Math.max(min, Math.min(max, Math.max(bound, min))) };
   });
   const lowerSum = floors.reduce((sum, f) => sum + f.lower, 0);
