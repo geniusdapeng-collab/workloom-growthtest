@@ -6,7 +6,7 @@ import { constants } from "node:fs";
 import { mkdir, open, realpath, writeFile } from "node:fs/promises";
 import { installVendorMarketingPriceBridge, reviewStage, type ProducerVerdict } from "@hyperreality/video-studio";
 import { createDataMiningExecutor, type DataMiningStagePlan, type ExecutorLlm, type IntelStage, type SearchFn, type SearchHit } from "./data-mining-executor.js";
-import { fetchMarketingSource, type SourceSnapshot } from "./marketing-source-fetcher.js";
+import { fetchMarketingSource, sourceUrl, type SourceSnapshot } from "./marketing-source-fetcher.js";
 import { assertMarketingFactsFresh, validateStageFacts, revalidateStageFacts, type ValidatedStageFacts } from "./marketing-facts.js";
 import { canonicalRenderJson, renderSha256 } from "./gen/compiled-request.js";
 import { SubmissionError } from "./gen/submission-ledger.js";
@@ -132,10 +132,13 @@ export async function prepareMarketingFacts(input: {
       for (const hit of candidates.slice(0, 6)) {
         if (pages.length === 3) break;
         attempted++;
-        let snapshot = cache.get(hit.url);
+        let cacheKey: string;
+        try { cacheKey = sourceUrl(hit.url).href; }
+        catch (error) { failures.push({ url: hit.url, reason: error instanceof Error ? error.message : String(error) }); continue; }
+        let snapshot = cache.get(cacheKey);
         if (!snapshot) {
           let result: Awaited<ReturnType<typeof fetchMarketingSource>>;
-          try { result = await sourceFetch(hit.url); }
+          try { result = await sourceFetch(cacheKey); }
           catch (error) { failures.push({ url: hit.url, reason: error instanceof Error ? error.message : String(error) }); continue; }
           snapshot = result.snapshot;
           // 网络不可用可换候选；证据写盘失败必须终止，不能伪装成来源不可用继续。
@@ -145,7 +148,7 @@ export async function prepareMarketingFacts(input: {
             const { text: _text, ...stored } = snapshot;
             sources.push({ ...stored, rawRef: raw.ref, textRef: text.ref });
           }
-          cache.set(hit.url, snapshot);
+          cache.set(cacheKey, snapshot);
         }
         if (!pages.some(page => page.sourceId === snapshot!.sourceId)) pages.push(snapshot);
       }

@@ -63,6 +63,7 @@ async function prepare(options: {
   redirectAliases?: boolean;
   mixedCurrencies?: boolean;
   zeroPrice?: boolean;
+  fragmentAliases?: boolean;
 } = {}): Promise<PreparedMarketingFacts> {
   let searches = 0;
   return prepareMarketingFacts({ scope: { ...scope, attempt: options.attempt ?? 1 }, root, intent: "做一条风扇介绍", metadata: { brief: { product: "星野 F3", brand: "星野" } }, env: { ...env, ...(options.mode ? { VM_DATA_MINING_MODE: options.mode } : {}) },
@@ -86,15 +87,27 @@ async function prepare(options: {
         : {
             search: async () => (++searches, options.noSearch || options.noAux && searches > 20
               ? []
-              : [{ title: "星野规格", url: options.redirectAliases
+              : [{ title: "星野规格", url: options.fragmentAliases
+                ? `${sourceUrl}#${searches <= 8 ? "specs" : "reviews"}`
+                : options.redirectAliases
                 ? `https://source.example.com/${searches <= 8 ? "redirect-a" : "redirect-b"}`
                 : sourceUrl, snippet: "故意错误摘要999档，不能当事实" }]),
           }),
-      fetchSource: async url => fetchMarketingSource(url, { resolver: async () => [{ address: "93.184.216.34", family: 4 }], transport: async (requested, _address, signal) => requestSource(new URL(options.mixedCurrencies ? "/currencies" : requested.pathname, origin), { address: "127.0.0.1", family: 4 }, signal) }),
+      fetchSource: async url => {
+        if (options.fragmentAliases) await new Promise(resolve => setTimeout(resolve, 5));
+        return fetchMarketingSource(url, { resolver: async () => [{ address: "93.184.216.34", family: 4 }], transport: async (requested, _address, signal) => requestSource(new URL(options.mixedCurrencies ? "/currencies" : requested.pathname, origin), { address: "127.0.0.1", family: 4 }, signal) });
+      },
     } });
 }
 const shots = [{ shotId: "S1", prompt: "窗边展示星野 F3 风扇，字幕说明风量 9 档。", fields: { 场景: "窗边", 产品: "星野 F3", 规格: "9 档" } }];
 describe("营销事实宿主完整执行", () => {
+  it("跨站不同fragment指向同一规范来源时复用同次抓取快照，不因抓取时间不同破坏审核绑定", async () => {
+    const prepared = await prepare({ fragmentAliases: true });
+    const saved = await finalizeMarketingFacts(prepared, shots, env);
+    const checked = await verifyMarketingFacts({ root, ...saved, scope, shots });
+    expect(checked.sources).toHaveLength(1);
+    expect(checked.sources[0]!.requestedUrl).toBe(sourceUrl);
+  });
   it.each([false, true])("混币报价从来源提取、G1档案到最终镜头复核始终逐币种表达，零价=%s", async zeroPrice => {
     const expectedBand = zeroPrice ? "USD 0；CNY 699" : "USD 99-109；CNY 699-799";
     const prepared = await prepare({ mixedCurrencies: true, zeroPrice });
