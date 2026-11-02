@@ -2040,6 +2040,98 @@ console.log("RESULT " + JSON.stringify({
     expect(markdown).toContain("道具/局部人体");
   });
 
+  it("PRD 三场归家合同统一伞鞋灯态，补齐关门并删除单音和未开门悬念", () => {
+    const story = "雨夜，一个年轻人收伞回到出租屋，开门、换鞋、拧亮旧台灯，随后坐在灯下安静地听雨。全片无台词、无旁白、无字幕，仅保留动作与环境声。";
+    const prd = normalizeNarrativePrdContract({
+      projectDefinition: { sourceIntent: story },
+      productPositioning: { targetDuration: 15, aspectRatio: "9:16", targetPlatform: "douyin" },
+      creativeCore: {
+        creativeHook: "门前悬念",
+        keyMessages: [],
+        twistPoint: "突然出现反转",
+        emotionalArc: "setup→rising→climax→resolution",
+      },
+      characterSystem: { characters: [{ name: "陈卓", role: "protagonist", costume: "米白开衫，配小白鞋" }] },
+      visualSpecification: { lightingDirection: "旧台灯2700K暖光与窗外6500K冷蓝雨光分区" },
+      audioSpecification: { musicStyle: "结尾单音极轻进入", soundDesign: "雨声、门锁声、换鞋声、台灯开关声" },
+      scenePlan: {
+        scenes: [
+          {
+            sceneId: "SC01", sequence: 1, duration: 5,
+            purpose: "用伞尖滴水与门前停顿建立未开门悬念",
+            setting: "楼道门口，门内未亮灯",
+            keyProps: ["黑色长柄伞", "滴水伞尖", "防盗门", "钥匙"],
+            visualRequirements: ["第一帧为伞尖水珠砸地", "门框前景遮挡，陈卓不掏钥匙"],
+            audioRequirements: ["雨打窗棚与楼道滴水先行", "钥匙未插入前的短暂静默"],
+            dialogue: "",
+          },
+          {
+            sceneId: "SC02", sequence: 2, duration: 5,
+            purpose: "通过换鞋把泥污留在门外",
+            setting: "狭小玄关，门已半开，室内仅远处台灯余光",
+            keyProps: ["沾泥皮鞋", "鞋柜", "地垫"],
+            visualRequirements: ["低机位拍鞋底泥水蹭过地垫", "暖光只擦到玄关边缘"],
+            audioRequirements: ["鞋底摩擦地垫声", "门锁转动声"],
+            dialogue: "",
+          },
+          {
+            sceneId: "SC03", sequence: 3, duration: 5,
+            purpose: "拧亮旧台灯并坐下听雨",
+            setting: "书桌一角，窗外冷蓝，旧台灯渐亮",
+            keyProps: ["旧台灯", "旋钮开关", "书桌", "窗棂"],
+            visualRequirements: ["特写手指拧动旋钮，暖光渐亮", "人物在灯下坐下听雨"],
+            audioRequirements: ["台灯开关咔哒与电流微响", "结尾单音极轻进入"],
+            dialogue: "",
+          },
+        ],
+        shotMapping: [
+          { sceneId: "SC01", estimatedShots: 3, shotBreakdownHint: ["extreme-close-up", "medium", "close-up"] },
+          { sceneId: "SC02", estimatedShots: 2, shotBreakdownHint: ["close-up", "medium"] },
+          { sceneId: "SC03", estimatedShots: 3, shotBreakdownHint: ["extreme-close-up", "medium", "static"] },
+        ],
+      },
+      productionConstraints: { technicalConstraints: ["不使用配乐，仅保留动作与环境声"] },
+      deliveryStandard: { deliverables: [{ item: "video_master", spec: "MP4" }], outputFormat: {} },
+    }, {
+      upstreamFields: {
+        duration_sec: 15,
+        platform_id: "douyin",
+        aspect_ratio: "9:16",
+        dialogue_requirement: "全片无台词、无旁白、无字幕，仅保留动作与环境声。",
+        _originalStoryText: story,
+      },
+      _canonicalCharacters: [{
+        id: "chen-zhuo",
+        name: "陈卓",
+        role: "protagonist",
+        portraitRef: "bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png",
+        authorization: "real-authorized",
+      }],
+    });
+    const serialized = JSON.stringify(prd);
+    expect(serialized).not.toMatch(/黑色长柄伞|沾泥皮鞋|旧帆布鞋|小白鞋|未开门悬念|结尾单音/u);
+    expect(serialized).toContain("黑色折叠伞");
+    expect(serialized).toContain("白色湿便鞋");
+    expect(serialized).toContain("室内拖鞋");
+    expect((prd.creativeCore as any).emotionalArc).toBe("setup→rising→resolution");
+    const scenes = (prd.scenePlan as any).scenes as Array<Record<string, unknown>>;
+    expect(String(scenes[1]!.setting)).toMatch(/门已关闭.*旧台灯保持关闭/u);
+    const shots = prd.shotContract as Array<Record<string, unknown>>;
+    expect(shots).toHaveLength(6);
+    expect(shots.map((shot) => shot.purpose)).toEqual([
+      "陈卓收伞走到出租屋门前；第一帧为伞骨合拢与伞尖水珠落到楼道地砖的近景，黑色折叠伞轮廓完整",
+      "陈卓用钥匙开门并跨进玄关；陈卓手握钥匙停在门前，门框作前景遮挡，楼道冷光勾出人物轮廓，室内暗部无补光",
+      "陈卓回身把门关好，确认门锁落位；先拍回身关门与门锁落位，固定机位保持门轴方向连续",
+      "陈卓在玄关弯腰脱下白色湿便鞋，换穿室内拖鞋；低机位拍白色湿便鞋蹭过地垫，随后弯腰换穿室内拖鞋，旧台灯始终关闭",
+      "陈卓伸手拧亮旧台灯；特写手指转动旧台灯旋钮，钨丝由暗转暖，暖光只覆盖桌面和人物面部暖侧",
+      "陈卓在灯下坐下，抬头安静听雨；人物在灯下坐下并安静听雨，固定机位收束，窗外冷蓝只勾轮廓",
+    ]);
+    expect(shots.slice(2, 4).every((shot) => /(?:关闭.*旧台灯|旧台灯.*关闭)/u.test(String(shot.lighting)))).toBe(true);
+    expect(JSON.stringify(prd)).not.toMatch(/"audio".*?单音/u);
+    expect(String((prd.characterSystem as any).characters[0].costume)).toMatch(/白色湿便鞋.*室内拖鞋/u);
+    expect(String((prd.prdSummary as any).keyHook)).not.toContain("为什么");
+  });
+
   it("动物是角色而非道具；探头、伸爪、缩回等动作进入可执行契约", () => {
     const discovery: Record<string, unknown> = {
       sceneStructure: {

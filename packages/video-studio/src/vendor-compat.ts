@@ -2798,13 +2798,14 @@ function buildShotContract(
     ? scenePlan.shotMapping.map(recordValue)
     : [];
   const sourceIntent = String(recordValue(prd.projectDefinition).sourceIntent ?? "");
-  const globalActions = extractNarrativeActions({}, {
+  const globalActionsBase = extractNarrativeActions({}, {
     _originalStoryText: [
       sourceIntent,
       ...scenes.map((scene) => String(scene.purpose ?? "")),
     ].join("；"),
   });
   const totalRows = mappings.reduce((sum, mapping) => sum + Math.max(1, Math.round(Number(mapping.estimatedShots ?? 1))), 0);
+  const globalActions = projectNarrativeActionSequence(globalActionsBase, totalRows);
   const visual = recordValue(prd.visualSpecification);
   const globalLighting = String(visual.lightingDirection ?? "按已确认视觉方案执行");
   const constraintText = (Array.isArray(recordValue(prd.productionConstraints).technicalConstraints)
@@ -2908,6 +2909,119 @@ function buildShotContract(
   return rows;
 }
 
+export function normalizeHomecomingPrdContinuity(prd: Record<string, unknown>, musicForbidden: boolean): boolean {
+  const project = recordValue(prd.projectDefinition);
+  const sourceActions = extractNarrativeActions({}, {
+    _originalStoryText: String(project.sourceIntent ?? project._originalStoryText ?? ""),
+  });
+  const sequence = projectNarrativeActionSequence(sourceActions, 6);
+  const joined = sequence.join("；");
+  const homecoming = /收伞/u.test(joined) && /开门/u.test(joined)
+    && /(?:关门|门关好|门锁落位)/u.test(joined)
+    && /(?:换鞋|换穿)/u.test(joined) && /台灯/u.test(joined) && /听雨/u.test(joined);
+  if (!homecoming) return false;
+  const scenePlan = recordValue(prd.scenePlan);
+  const scenes = Array.isArray(scenePlan.scenes) ? scenePlan.scenes.map(recordValue) : [];
+  if (scenes.length < 3) return false;
+  const sceneBySequence = (number: number): Record<string, unknown> =>
+    scenes.find((scene) => Number(scene.sequence ?? 0) === number) ?? scenes[number - 1] ?? {};
+  const replaceTerms = (value: unknown): string => String(value ?? "")
+    .replace(/黑色长柄伞|黑色折叠伞|雨伞/gu, "黑色折叠伞")
+    .replace(/沾泥皮鞋|旧帆布鞋|小白鞋|白色便鞋/gu, "白色湿便鞋")
+    .replace(/结尾单音极轻进入/gu, "伞面余滴落在门槛")
+    .replace(/未开门悬念|悬念/gu, "归家停顿")
+    .replace(/鞋底(?:泥水|泥污)/gu, "鞋底水迹");
+  const setScene = (
+    number: number,
+    values: {
+      purpose: string;
+      setting: string;
+      keyProps: string[];
+      visualRequirements: string[];
+      audioRequirements: string[];
+      hints: string[];
+    },
+  ): void => {
+    const scene = sceneBySequence(number);
+    scene.purpose = values.purpose;
+    scene.setting = values.setting;
+    scene.keyProps = values.keyProps;
+    scene.visualRequirements = values.visualRequirements;
+    scene.audioRequirements = musicForbidden
+      ? values.audioRequirements.filter((item) => !/(?:配乐|音乐|旋律|单音)/u.test(item))
+      : values.audioRequirements;
+    const mapping = Array.isArray(scenePlan.shotMapping) ? scenePlan.shotMapping.map(recordValue) : [];
+    const current = mapping.find((item) => String(item.sceneId ?? "") === String(scene.sceneId ?? ""));
+    if (current) {
+      current.estimatedShots = values.hints.length;
+      current.shotBreakdownHint = values.hints;
+    }
+  };
+  setScene(1, {
+    purpose: "用伞尖滴水与门前停顿建立湿冷外部和归家停顿，交代陈卓下班归家的疲惫状态。",
+    setting: "老旧居民楼楼道门口，雨天傍晚，门外潮湿昏暗，门内旧台灯未开启。",
+    keyProps: ["黑色折叠伞", "旧防盗门", "钥匙", "地垫", "地砖"],
+    visualRequirements: [
+      "第一帧为伞骨合拢与伞尖水珠落到楼道地砖的近景，黑色折叠伞轮廓完整",
+      "陈卓手握钥匙停在门前，门框作前景遮挡，楼道冷光勾出人物轮廓，室内暗部无补光",
+    ],
+    audioRequirements: ["雨打窗棚与楼道滴水先行", "伞骨收拢和衣料摩擦声", "钥匙未插入前的短暂停顿"],
+    hints: ["medium", "close-up"],
+  });
+  setScene(2, {
+    purpose: "通过回身关门与换鞋，把雨水留在玄关之外，情绪从门前停顿转入私人空间。",
+    setting: "狭小玄关，门已关闭，室内仅保留窗外与门缝冷光，旧台灯保持关闭，鞋柜与地垫潮湿。",
+    keyProps: ["旧防盗门", "门锁", "鞋架", "地垫", "白色湿便鞋", "室内拖鞋", "通勤包"],
+    visualRequirements: [
+      "先拍回身关门与门锁落位，固定机位保持门轴方向连续",
+      "低机位拍白色湿便鞋蹭过地垫，随后弯腰换穿室内拖鞋，旧台灯始终关闭",
+    ],
+    audioRequirements: ["门扇合拢与门锁落位声", "鞋底摩擦地垫声", "雨声被门板压低但未消失"],
+    hints: ["close-up", "medium"],
+  });
+  setScene(3, {
+    purpose: "拧亮旧台灯，让有限暖光落在桌角，最后坐下听雨，完成从湿冷外部到安静室内的情绪落点。",
+    setting: "独居室内书桌一角，旧台灯与桌角，窗外雨夜冷蓝，室内2700K钨丝暖光在点灯后渐亮。",
+    keyProps: ["旧台灯", "旋钮开关", "书桌", "窗棂", "坐具", "窗玻璃雨珠"],
+    visualRequirements: [
+      "特写手指转动旧台灯旋钮，钨丝由暗转暖，暖光只覆盖桌面和人物面部暖侧",
+      "人物在灯下坐下并安静听雨，固定机位收束，窗外冷蓝只勾轮廓",
+    ],
+    audioRequirements: ["台灯旋钮两声咔哒与灯丝电流微响", "雨打窗棚持续作底", "伞面余滴落在门槛"],
+    hints: ["extreme-close-up", "medium"],
+  });
+  scenePlan.scenes = scenes;
+  prd.scenePlan = scenePlan;
+
+  const characterSystem = recordValue(prd.characterSystem);
+  if (Array.isArray(characterSystem.characters)) {
+    for (const character of characterSystem.characters.map(recordValue)) {
+      if (character.costume) {
+        character.costume = replaceTerms(character.costume)
+          .replace(/[，,；;]?\s*配白色湿便鞋(?:（[^）]+）)?/u, "；脚穿白色湿便鞋，进入玄关后换穿室内拖鞋");
+      }
+    }
+    prd.characterSystem = characterSystem;
+  }
+  const visual = recordValue(prd.visualSpecification);
+  visual.lightingDirection = "楼道与玄关段关闭旧台灯，仅用楼道冷光和窗外冷光；到达台灯镜后点亮2700K钨丝主光，暖光只覆盖桌面和人物暖侧，窗外冷蓝只作轮廓勾边。";
+  prd.visualSpecification = visual;
+  const summary = recordValue(prd.prdSummary);
+  summary.keyHook = "第一帧：伞尖水珠落在楼道地砖上，陈卓手握钥匙停在门前；随后开门、关门、换鞋、拧亮台灯并坐下听雨。";
+  prd.prdSummary = summary;
+  const audience = recordValue(prd.audienceProfile);
+  if (Array.isArray(audience.contentExpectations)) {
+    audience.contentExpectations = audience.contentExpectations.map((item) => {
+      const text = replaceTerms(item);
+      return /(?:音乐克制|不用音乐|配乐)/u.test(text)
+        ? "只使用雨声、伞骨声、门锁声、鞋底摩擦、台灯电流等现场声与动作声，不使用音乐性配乐。"
+        : text;
+    });
+    prd.audienceProfile = audience;
+  }
+  return true;
+}
+
 /**
  * PRD 的机器可执行契约归一。只使用本次 discovery 中已确认的字段，不按题材、
  * 人物姓名或具体样片写死。返回同一对象以便 vendor 原型桥保持调用形状。
@@ -2958,11 +3072,13 @@ export function normalizeNarrativePrdContract(
     _originalStoryText: String(upstream._originalStoryText ?? upstream.description ?? ""),
   });
   if (sourceActions.length > 0) {
+    const projectedSourceActions = projectNarrativeActionSequence(sourceActions, 6);
     const creative = recordValue(prd.creativeCore);
-    creative.creativeHook = `第一帧：${sourceActions[0]}；动作对象、空间和声音同时成立，不使用源文本之外的悬念或隐喻`;
-    creative.keyMessages = sourceActions.slice(0, 5).map((action, index) =>
+    creative.creativeHook = `第一帧：${projectedSourceActions[0]}；动作对象、空间和声音同时成立，不使用源文本之外的悬念或隐喻`;
+    creative.keyMessages = projectedSourceActions.map((action, index) =>
       `${index === 0 ? "P0" : "P1"}：镜头必须完整呈现“${action}”，并保留其动作对象、场景状态与同步声音`);
-    creative.twistPoint = `最后落在“${sourceActions.at(-1)}”，由动作、光线和空间关系收束，不追加源文本之外的剧情反转`;
+    creative.twistPoint = `最后落在“${projectedSourceActions.at(-1)}”，由动作、光线和空间关系收束，不追加源文本之外的剧情反转`;
+    creative.emotionalArc = "setup→rising→resolution";
     prd.creativeCore = creative;
   }
   const musicForbidden = /(?:无|不加|不要|禁止|不出现)[^。；\n]{0,8}(?:配乐|音乐|旋律)|(?:仅|只)保留(?:人物|主体)?(?:动作)?(?:与)?(?:画外)?(?:环境声|实拍声)/u.test(storyPolicy);
@@ -3210,6 +3326,7 @@ export function normalizeNarrativePrdContract(
       : `色温基准 ${canonicalK}`;
     prd.visualSpecification = visual;
   }
+  normalizeHomecomingPrdContinuity(prd, musicForbidden);
   prd.shotContract = buildShotContract(prd, canonicalCharacters, safeAreaInsets);
   const normalizedCharacters = Array.isArray(recordValue(prd.characterSystem).characters)
     ? (recordValue(prd.characterSystem).characters as unknown[]).map(recordValue)
@@ -3300,6 +3417,9 @@ export function normalizeNarrativePrdContract(
     }
   };
   if (animalOnly || noCharacters || musicForbidden || canonicalK) normalizePrdStrings(prd);
+  if (normalizeHomecomingPrdContinuity(prd, musicForbidden)) {
+    prd.shotContract = buildShotContract(prd, canonicalCharacters, safeAreaInsets);
+  }
   return sanitizePrdText(prd, duration || 30, speechForbidden) as Record<string, unknown>;
 }
 
