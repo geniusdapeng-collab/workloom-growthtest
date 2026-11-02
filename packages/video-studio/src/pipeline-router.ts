@@ -226,6 +226,27 @@ export interface RuleVerdict {
   narrativeSignals: string[];
   explainerSignals: string[];
   explicit?: VideoPipelineKind;
+  /** 仅有否定声明且没有同类正向选择的管线，后续规则和模型也不得重新选中。 */
+  excluded: VideoPipelineKind[];
+}
+
+function explicitRouteSignals(text: string): { explicit?: VideoPipelineKind; excluded: VideoPipelineKind[] } {
+  const positive: Array<{ kind: VideoPipelineKind; index: number }> = [];
+  const negative = new Set<VideoPipelineKind>();
+  const patterns: Array<[VideoPipelineKind, RegExp]> = [
+    ["marketing", EXPLICIT_MARKETING], ["narrative", EXPLICIT_NARRATIVE], ["explainer", EXPLICIT_EXPLAINER],
+  ];
+  for (const [kind, pattern] of patterns) {
+    for (const match of text.matchAll(new RegExp(pattern.source, "gu"))) {
+      const index = match.index ?? 0;
+      const before = text.slice(0, index);
+      if (/(?:不要|别|无需|不必|不想|不需要|不用|不能|而非|不是|不|非)\s*(?:再|去)?\s*(?:做|制作|拍|走|用|按|跑|要|选择)?\s*$/u.test(before)) {
+        negative.add(kind);
+      } else positive.push({ kind, index });
+    }
+  }
+  positive.sort((left, right) => left.index - right.index);
+  return { explicit: positive[0]?.kind, excluded: [...negative].filter(kind => !positive.some(item => item.kind === kind)) };
 }
 
 /** 规则打分（确定性、可单测）：显式声明 > 关键词矩阵；同分视为判不准 */
@@ -233,20 +254,8 @@ export function scoreRoute(text: string): RuleVerdict {
   const marketingSignals: string[] = [];
   const narrativeSignals: string[] = [];
   const explainerSignals: string[] = [];
-  // 显式声明按「谁先出现」判定，避免用户说"不要营销片，走叙事片"时两边都命中
-  const explicitMarketing = text.match(EXPLICIT_MARKETING);
-  const explicitNarrative = text.match(EXPLICIT_NARRATIVE);
-  const explicitExplainer = text.match(EXPLICIT_EXPLAINER);
-  let explicit: VideoPipelineKind | undefined;
-  if (explicitExplainer && (!explicitMarketing || (explicitExplainer.index ?? 0) < (explicitMarketing.index ?? 0))) {
-    explicit = "explainer";
-  } else if (explicitMarketing && explicitNarrative) {
-    explicit = (explicitMarketing.index ?? 0) >= (explicitNarrative.index ?? 0) ? "narrative" : "marketing";
-  } else if (explicitMarketing) {
-    explicit = "marketing";
-  } else if (explicitNarrative) {
-    explicit = "narrative";
-  }
+  // 先区分肯定与否定，再按正向声明出现顺序判定；否定词不是管线选择。
+  const { explicit, excluded } = explicitRouteSignals(text);
 
   let marketingScore = 0;
   let narrativeScore = 0;
@@ -274,7 +283,7 @@ export function scoreRoute(text: string): RuleVerdict {
     marketingScore = Math.max(0, marketingScore - 1);
     marketingSignals.push("否定营销表述");
   }
-  return { marketingScore, narrativeScore, explainerScore, marketingSignals, narrativeSignals, explainerSignals, explicit };
+  return { marketingScore, narrativeScore, explainerScore, marketingSignals, narrativeSignals, explainerSignals, explicit, excluded };
 }
 
 /* ================= 澄清话术 ================= */
@@ -399,6 +408,7 @@ export async function routeVideoPipeline(input: RouteInput, options: RouteOption
    *   需求才该走这条线；摇摆就进 LLM 仲裁，仍不确定就澄清，不替用户选管线。
    */
   const explainerLeads = verdict.explainerScore >= DECISIVE_MIN_SCORE
+    && !verdict.excluded.includes("explainer")
     && verdict.explainerScore > verdict.marketingScore
     && verdict.explainerScore > verdict.narrativeScore;
   if (explainerLeads) {
@@ -416,7 +426,7 @@ export async function routeVideoPipeline(input: RouteInput, options: RouteOption
   const margin = Math.abs(verdict.marketingScore - verdict.narrativeScore);
   const decisive = top >= DECISIVE_MIN_SCORE && margin >= DECISIVE_MARGIN;
 
-  if (decisive) {
+  if (decisive && !verdict.excluded.includes(verdict.marketingScore > verdict.narrativeScore ? "marketing" : "narrative")) {
     const kind: VideoPipelineKind = verdict.marketingScore > verdict.narrativeScore ? "marketing" : "narrative";
     const rationale = kind === "marketing"
       ? `营销线索 ${verdict.marketingScore} 条（${verdict.marketingSignals.join("、")}）明显强于叙事线索 ${verdict.narrativeScore} 条`
@@ -425,7 +435,7 @@ export async function routeVideoPipeline(input: RouteInput, options: RouteOption
   }
 
   // ③ 规则判不准：有商品锚点则营销（"要卖东西"这件事本身是硬信号）
-  if (product) {
+  if (product && !verdict.excluded.includes("marketing")) {
     return finish(
       "marketing",
       0.8,
@@ -445,7 +455,7 @@ export async function routeVideoPipeline(input: RouteInput, options: RouteOption
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error("route-llm-timeout")), timeoutMs)),
       ]);
       const parsed = parseLlmRoute(String(raw));
-      if (parsed && parsed.route !== "clarify" && parsed.confidence >= 0.7) {
+      if (parsed && parsed.route !== "clarify" && !verdict.excluded.includes(parsed.route) && parsed.confidence >= 0.7) {
         const kind = parsed.route;
         if (kind === "marketing") signals.marketing.push("模型仲裁");
         else signals.narrative.push("模型仲裁");
