@@ -7521,6 +7521,11 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
         const promptSceneRecords = Array.isArray(promptScenePlan.scenes)
           ? promptScenePlan.scenes.map(recordValue)
           : [];
+        const promptLighting = promptFieldText(promptVisual.lightingDirection);
+        const promptColor = promptFieldText(promptVisual.colorPalette ?? promptVisual.colorGrading);
+        const promptProjectColor = promptColor && promptColor !== "色温按已确认视觉方案执行"
+          ? promptColor
+          : ((colorTemperatureFromText(promptVisual) ?? promptColor) || "色温按已确认视觉方案执行");
         const promptLimit = Number(
           (vendorRequire(resolvePath(
             repoRoot,
@@ -7541,8 +7546,8 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
           characterNames: promptCharacters,
           characterPortraits: promptCharacterPortraits,
           projectScene: promptScene,
-          projectLighting: promptFieldText(promptVisual.lightingDirection),
-          projectColor: promptFieldText(promptVisual.colorPalette ?? promptVisual.colorGrading),
+          projectLighting: promptLighting,
+          projectColor: promptProjectColor,
           projectProps: promptProps,
           projectActions: promptActions,
         };
