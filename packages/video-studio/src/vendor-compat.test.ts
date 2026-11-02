@@ -1298,6 +1298,27 @@ console.log("RESULT " + JSON.stringify({
     expect(pairs[1]).not.toMatch(/台灯开关拆成|曝光|白平衡/u);
   });
 
+  it("真实换鞋接触、钨丝灯噪点和雨滴涟漪风险各自使用专属缓解", () => {
+    const pairs = pairRiskMitigations({
+      technicalRisks: [
+        { risk: "换鞋动作中的鞋带/鞋口与脚部交互，以及湿鞋在地面留下的水渍反光，脚-鞋-地面接触不一致", level: "high" },
+        { risk: "低照度钨丝暖光作为唯一主光源下的皮肤与金属材质表现，模型易产生噪点堆积、色温漂移、台灯钨丝高光溢出", level: "high" },
+        { risk: "雨滴与伞面、地面水渍的物理反射连续性，雨丝密度与落地涟漪的因果匹配失效", level: "medium" },
+      ],
+      mitigationSuggestions: [
+        "把微质感锚点拆成固定机位微距短镜头",
+        "把窗外雨幕设为独立背景板，锁定雨线方向与反射",
+        "静坐结尾拆为手部、肩颈、侧脸剪影与灯下影子四个短镜",
+      ],
+    });
+    expect(pairs[0]).toMatch(/鞋跟|脚掌|脚踝/u);
+    expect(pairs[0]).not.toMatch(/雨珠|微距/u);
+    expect(pairs[1]).toMatch(/低照度曝光|白平衡|噪点|色温/u);
+    expect(pairs[1]).not.toMatch(/微质感|鞋跟/u);
+    expect(pairs[2]).toMatch(/雨滴|雨丝|涟漪|水层/u);
+    expect(pairs[2]).not.toMatch(/芦苇|水面参考帧/u);
+  });
+
   it("G3 清除评审指令、拆分过载主体场景、去重内容期望并过滤空动作", () => {
     const discovery: Record<string, unknown> = {
       audienceProfile: {
