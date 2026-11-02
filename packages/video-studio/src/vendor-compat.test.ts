@@ -1188,6 +1188,28 @@ console.log("RESULT " + JSON.stringify({
     expect(contradictoryPrompt).toContain("探头");
     expect(contradictoryPrompt).toContain("猫耳先向滴水声转动");
 
+    const animalActions = projectNarrativeActionSequence(["探头", "伸爪接屋檐滴水", "缩回纸箱盘成一团"], 6);
+    const sixShots = animalActions.map((action, shotIndex) =>
+      applyNarrativeFinalPromptContract({ shotId: `S-${shotIndex + 1}`, duration: 2.5 }, {
+        ...animalOptions,
+        projectActions: animalActions,
+        shotIndex,
+      }));
+    const reviewField = (shot: Record<string, unknown>, label: string): string =>
+      new RegExp(`^\\s*\\d+\\.【${label}】([^\\n]*)$`, "mu").exec(String(shot.prompt ?? ""))?.[1]?.trim() ?? "";
+    const timelines = sixShots.map((shot) => reviewField(shot, "时间轴"));
+    expect(new Set(timelines).size).toBe(6);
+    expect(timelines.every((timeline) => !timeline.includes("…"))).toBe(true);
+    expect(sixShots.map((shot) => reviewField(shot, "动作"))).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("抬起前爪"),
+        expect.stringContaining("水滴落在"),
+        expect.stringContaining("缩回前爪"),
+        expect.stringContaining("退入纸箱暗部"),
+        expect.stringContaining("盘成一团"),
+      ]),
+    );
+
     const empty = applyNarrativeFinalPromptContract({
       shotId: "S-3",
       duration: 2,

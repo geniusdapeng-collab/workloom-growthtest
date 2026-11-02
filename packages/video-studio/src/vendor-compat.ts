@@ -3065,6 +3065,7 @@ function reconcileNarrativeScenePlan(
     let text = value
       .replace(/，?(?:地面|路面)[^，。；]{0,24}(?:积水|水洼)[^，。；]*/gu, "")
       .replace(/[，,]?\s*(?:一个|一处)?(?:水桶|铁管)[^，。；]*/gu, "")
+      .replace(/与[，,]/gu, "与屋檐，")
       .replace(/[，。；]{2,}/gu, "，")
       .replace(/[，]\s*$/u, "")
       .trim();
@@ -3240,6 +3241,11 @@ function buildShotContract(
   const globalActions = projectNarrativeActionSequence(globalActionsBase, totalRows);
   const visual = recordValue(prd.visualSpecification);
   const globalLighting = String(visual.lightingDirection ?? "按已确认视觉方案执行");
+  const globalColorText = [
+    String(recordValue(visual.colorPalette).dominant ?? ""),
+    String(recordValue(visual.colorPalette).accent ?? ""),
+    String(recordValue(visual.colorPalette).mood ?? ""),
+  ].filter(Boolean).join("；");
   const constraintText = (Array.isArray(recordValue(prd.productionConstraints).technicalConstraints)
     ? recordValue(prd.productionConstraints).technicalConstraints as unknown[]
     : []).map(String).join(" ");
@@ -3306,11 +3312,14 @@ function buildShotContract(
         || (hasShotLighting
           ? rawShotLighting
           : (globalLighting || sceneLightingText || "按已确认视觉方案执行"));
-      const shotColorTemperature = dominantColorTemperature(shotLightingText, subjectLabel);
+      const shotColorTemperature = dominantColorTemperature(
+        `${shotLightingText}；${globalColorText}`,
+        subjectLabel,
+      );
       const colorTemperature = direction.action
-        ? dominantColorTemperature(direction.color || shotLightingText, subjectLabel)
+        ? dominantColorTemperature(`${direction.color || shotLightingText}；${globalColorText}`, subjectLabel)
         : (shotColorTemperature === "色温按已确认视觉方案执行"
-          ? dominantColorTemperature(`${sceneLightingText} ${globalLighting}`, subjectLabel)
+          ? dominantColorTemperature(`${sceneLightingText} ${globalLighting} ${globalColorText}`, subjectLabel)
           : shotColorTemperature);
       const firstShoeIndex = globalActions.findIndex((value) => /(?:换鞋|脱下[^。；\n]*鞋|换穿[^。；\n]*拖鞋)/u.test(value));
       const shoePhase = shoeWorkPhase(action);
@@ -5859,7 +5868,7 @@ export function applyNarrativeFinalPromptContract(
       return text.length <= max ? text : `${text.slice(0, Math.max(1, max - 1))}…`;
     };
     const verificationText = [
-      `按 ${Math.max(0.1, duration).toFixed(1)} 秒逐段核对：起幅${conciseEvidence(timelineText, 96)}`,
+      `按 ${Math.max(0.1, duration).toFixed(1)} 秒逐段核对：起幅${timelineText}`,
       `主体与空间${conciseEvidence(compositionText, 88)}`,
       `场景连续${conciseEvidence(sceneText, 96)}`,
       `灯光与色彩${conciseEvidence(`${lightingText}；${colorText}`, 112)}`,
@@ -6074,9 +6083,9 @@ function narrativeActionKind(action: string): "umbrella" | "open" | "close" | "s
 }
 
 function animalActionKind(action: string): "probe" | "reach" | "withdraw" | "retreat" | "none" {
-  if (/(?:缩爪|收回前爪|前爪.*回收|前腿.*回收)/u.test(action)) return "withdraw";
-  if (/(?:伸爪|抬爪|接水|接住.*水滴|爪垫.*水|爪尖.*水|水滴.*爪)/u.test(action)) return "reach";
-  if (/(?:缩回|盘成|蜷缩|蜷紧|收拢|合拢|尾巴.*收|尾尖.*贴|贴住(?:口鼻|鼻)|盘紧|闭眼)/u.test(action)) return "retreat";
+  if (/(?:缩爪|缩回前爪|收回前爪|前爪.*回收|前腿.*回收)/u.test(action)) return "withdraw";
+  if (/(?:伸爪|伸出前爪|抬起前爪|抬爪|前爪.*伸向|接水|接住.*水滴|爪垫.*水|爪尖.*水|水滴.*爪)/u.test(action)) return "reach";
+  if (/(?:缩回|退入|退回箱|盘成|蜷缩|蜷紧|收拢|合拢|尾巴.*收|尾尖.*贴|贴住(?:口鼻|鼻)|盘紧|闭眼)/u.test(action)) return "retreat";
   if (/(?:探头|探出|耳朵.*转|鼻尖.*探|抬眼观察)/u.test(action)) return "probe";
   return "none";
 }
@@ -6204,11 +6213,15 @@ function timelineTextForAction(action: string, duration: number): string {
   const beats = animalKind === "probe"
     ? ["猫耳先向滴水声转动，眼睛从纸箱暗部露出", "鼻尖探出箱沿，胡须擦过潮湿纸板，头部只出半截", "视线锁住屋檐水线，身体仍低伏在箱内"]
     : animalKind === "reach"
-      ? ["前爪从胸口抬起，爪尖靠近屋檐滴水线", "水滴落在爪背或肉垫上，趾节轻颤，胡须随动作微动", "前爪短暂停住后向内回收，身体重心仍留在箱内"]
+      ? /(?:水滴.*爪|接触|落在.*爪)/u.test(action)
+        ? ["前爪停在滴水线下方，肉垫朝上并保持趾数稳定", "水滴落在爪背或肉垫上，趾节轻颤并溅起细小水花", "前爪短暂停住，视线仍锁定水滴"]
+        : ["前爪从胸口抬起，爪尖靠近屋檐滴水线", "前腿继续伸向箱口外，掌面缓慢翻开去迎水滴", "爪尖停在滴水线下方，身体重心仍留在箱内"]
       : animalKind === "withdraw"
         ? ["前爪从滴水线下方收回，爪背带起细小水珠", "前腿撤回箱沿内侧，身体重心向纸箱暗部后移", "前爪收到胸前，头部仍朝外观察"]
       : animalKind === "retreat"
-        ? ["耳朵后压，头部开始缩回纸箱阴影", "肩背内收，尾巴从箱底扫入并贴近身体", "身体盘紧，尾尖盖住鼻尖，只留一小团呼吸起伏"]
+        ? /(?:盘成|蜷|尾尖|闭眼)/u.test(action)
+          ? ["肩背先向内收，尾巴从身侧扫过箱底", "身体盘紧成团，尾尖贴住口鼻", "眼皮缓慢合拢，只留一小团呼吸起伏"]
+          : ["耳朵后压，头部开始缩回纸箱阴影", "肩背和身体重心继续退入纸箱暗部", "前爪收到胸前，箱口只剩模糊暖橘轮廓"]
         : kind === "umbrella"
     ? ["固定机位起幅，伞骨合拢，伞尖离地滴水", "把收拢的湿伞换到持伞侧，另一只手摸到钥匙", "在门前站定，呼气，钥匙尖对准锁孔"]
     : kind === "open"
