@@ -177,6 +177,49 @@ export function sanitizeGateContent(gate: string, content: string): string {
     .trim();
 }
 
+/** Resolve the same platform profile used to plan the work, instead of silently falling back to cinematic 16:9. */
+export function packageAuditOptions(
+  metadata: Record<string, unknown>,
+  targetDuration: number | null,
+): { targetDuration?: number; platform?: string } {
+  const selection = metadata.platformSelection && typeof metadata.platformSelection === "object"
+    ? metadata.platformSelection as Record<string, unknown>
+    : {};
+  const brief = metadata.brief && typeof metadata.brief === "object"
+    ? metadata.brief as Record<string, unknown>
+    : {};
+  const prd = metadata._prd && typeof metadata._prd === "object"
+    ? metadata._prd as Record<string, unknown>
+    : {};
+  const positioning = prd.productPositioning && typeof prd.productPositioning === "object"
+    ? prd.productPositioning as Record<string, unknown>
+    : {};
+  const raw = String(
+    metadata.platform
+    ?? selection.id
+    ?? brief.platform
+    ?? positioning.targetPlatform
+    ?? "",
+  ).trim();
+  const aliases: Record<string, string> = {
+    "抖音": "douyin",
+    "快手": "kuaishou",
+    "小红书": "xiaohongshu",
+    "视频号": "wechat-channels",
+    "微信视频号": "wechat-channels",
+    "哔哩哔哩": "bilibili",
+    "B站": "bilibili",
+    "tiktok": "tiktok",
+  };
+  const platform = aliases[raw] ?? (raw ? raw.toLowerCase().replace(/\s+/gu, "-") : "");
+  return {
+    ...(Number.isFinite(Number(targetDuration)) && Number(targetDuration) > 0
+      ? { targetDuration: Number(targetDuration) }
+      : {}),
+    ...(platform ? { platform } : {}),
+  };
+}
+
 export function attachDefaultCharacterAnchor(
   intent: string,
   metadata: Record<string, unknown>,
@@ -568,9 +611,10 @@ export class VideoStudio {
                 "vendor/supermickey/hyperreality-system/engines/production-engine/agents/prompt-delivery-guard.js"
               )
             ) as { PromptDeliveryGuard: new () => { verifyPackage: (list: unknown[], options?: Record<string, unknown>) => { pass: boolean; issues: string[] } } };
-            const check = new guardMod.PromptDeliveryGuard().verifyPackage(shots, {
-              targetDuration: lastProjectedTarget ?? undefined
-            });
+            const check = new guardMod.PromptDeliveryGuard().verifyPackage(
+              shots,
+              packageAuditOptions(metadata, lastProjectedTarget),
+            );
             await emit({
               kind: "pipeline.duration.package_check",
               projectId: input.projectId,

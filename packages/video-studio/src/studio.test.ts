@@ -6,7 +6,7 @@ import { resolveGate } from "./gates.js";
 import { autoApproveHandler, runWithConfirmationHandler } from "./confirmation.js";
 import { WorkloomLLMEngine } from "./llm-adapter.js";
 import { buildRenderScript, loadPromptLengthSpec } from "./render-scripts.js";
-import { VideoStudio, attachDefaultCharacterAnchor, sanitizeGateContent, type ApprovalCallback, type EventSink } from "./studio.js";
+import { VideoStudio, attachDefaultCharacterAnchor, packageAuditOptions, sanitizeGateContent, type ApprovalCallback, type EventSink } from "./studio.js";
 
 const repoRoot = resolve(import.meta.dirname, "../../..");
 const studioMocks = vi.hoisted(() => ({
@@ -136,6 +136,13 @@ describe("gates 映射", () => {
     expect(sanitized).not.toContain("ized");
     expect(sanitized).not.toContain("请确认以上创意主题");
     expect(sanitized).not.toContain('回复 "确认"');
+  });
+
+  it("作品级时长检查继承实际平台档，不把抖音片误判成默认电影档", () => {
+    expect(packageAuditOptions({ platform: "douyin" }, 15)).toEqual({ targetDuration: 15, platform: "douyin" });
+    expect(packageAuditOptions({ platformSelection: { id: "抖音" } }, 30)).toEqual({ targetDuration: 30, platform: "douyin" });
+    expect(packageAuditOptions({ brief: { platform: "小红书" } }, null)).toEqual({ platform: "xiaohongshu" });
+     expect(packageAuditOptions({}, 0)).toEqual({});
   });
 });
 
