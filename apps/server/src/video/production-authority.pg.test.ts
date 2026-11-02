@@ -11,6 +11,7 @@ import { prepareMarketingFacts, finalizeMarketingFacts } from "./marketing-autho
 import { renderSha256 } from "./gen/compiled-request.js";
 import { submitGenJob } from "./gen/submit.js";
 import { projectRunLockKey } from "./archive-host.js";
+import { projectComputeUsed } from "./project-compute-budget.js";
 
 const RUN_DB = process.env.RUN_DB_TESTS === "1" && Boolean(process.env.DATABASE_APP_URL);
 describe.runIf(RUN_DB)("正式生成资格活库契约", () => {
@@ -114,6 +115,80 @@ describe.runIf(RUN_DB)("正式生成资格活库契约", () => {
       release: (discard?: boolean) => client.release(discard),
     }; } } as unknown as pg.Pool;
   }
+
+  async function secondShot() {
+    const root = path.join(dir, "archive", scope.workspaceId, projectId);
+    const promptsFile = path.join(root, "stages/preproduction/attempt-1.prompts.json");
+    const outputFile = path.join(root, "stages/preproduction/attempt-1.output.json");
+    const prompts = JSON.parse(await readFile(promptsFile, "utf8"));
+    prompts.shots.push({ ...prompts.shots[0], shotId: "S2" });
+    const bytes = JSON.stringify(prompts); await writeFile(promptsFile, bytes);
+    const output = JSON.parse(await readFile(outputFile, "utf8")); output.promptsSha256 = renderSha256(bytes);
+    const outBytes = JSON.stringify(output); await writeFile(outputFile, outBytes);
+    await owner.query("UPDATE production_stage_runs SET output_sha256=$2 WHERE id=$1", [sourceId, renderSha256(outBytes)]);
+    const first = await issue();
+    const second = await qualifyProductionShot({ app, scope, actor: "MEM-ORIGINAL", projectId, shotId: "S2",
+      modelId: "doubao-seedance-2-5", params: { aspectRatio: "16:9" }, mode: "manual", env });
+    return { first, second };
+  }
+
+  it("项目算力预算在真实并发POST前互斥；后一镜不能花掉已被前镜占用的余额", async () => {
+    const { first, second } = await secondShot(); env.WORKLOOM_PROJECT_COMPUTE_CAP = "5";
+    const originalFetch = globalThis.fetch;
+    let release!: () => void, entered!: () => void;
+    const blocked = new Promise<void>(resolve => { release = resolve; });
+    const dispatched = new Promise<void>(resolve => { entered = resolve; });
+    let firstCall = true;
+    vi.stubGlobal("fetch", vi.fn(async (url, init) => {
+      if (String(url).endsWith("/contents/generations/tasks") && firstCall) {
+        firstCall = false; entered(); await blocked;
+      }
+      return originalFetch(url, init);
+    }));
+    const pending = submitGenJob(await input(first.qualificationToken));
+    try {
+      await dispatched;
+      await expect(submitGenJob(await input(second.qualificationToken))).rejects.toThrow(/SUBMISSION_IN_PROGRESS/);
+    } finally { release(); await pending; }
+    await expect(submitGenJob(await input(second.qualificationToken))).rejects.toThrow("PROJECT_COMPUTE_BUDGET_EXCEEDED");
+    expect(providerCalls).toBe(1);
+    expect(await projectComputeUsed(app, scope, projectId)).toBe(5);
+  });
+
+  it.each(["accepted", "unknown"])("%s在途接受占用预算，不能因render_jobs未落账再烧一镜", async state => {
+    const { first, second } = await secondShot(); env.WORKLOOM_PROJECT_COMPUTE_CAP = "5";
+    if (state === "unknown") vi.stubGlobal("fetch", vi.fn(async () => { providerCalls++; throw new Error("response lost after dispatch"); }));
+    await expect(submitGenJob(await input(first.qualificationToken, state === "accepted" ? faultPool("INSERT INTO render_jobs") : app)))
+      .rejects.toThrow(state === "accepted" ? "SUBMISSION_FINALIZATION_PENDING" : "SUBMISSION_UNKNOWN");
+    expect(await projectComputeUsed(app, scope, projectId)).toBe(5);
+    await expect(submitGenJob(await input(second.qualificationToken))).rejects.toThrow("PROJECT_COMPUTE_BUDGET_EXCEEDED");
+    expect(providerCalls).toBe(1);
+    if (state === "accepted") {
+      const recovered = await submitGenJob(await input(first.qualificationToken));
+      expect(recovered.deduped).toBe(true);
+      expect(await projectComputeUsed(app, scope, projectId)).toBe(5);
+      expect(providerCalls).toBe(1);
+    }
+  });
+
+  it("明确拒收释放本镜预算；另一scope不能看到在途消耗", async () => {
+    const { first, second } = await secondShot(); env.WORKLOOM_PROJECT_COMPUTE_CAP = "5";
+    const originalFetch = globalThis.fetch;
+    let reject = true;
+    vi.stubGlobal("fetch", vi.fn(async (url, init) => {
+      if (reject && String(url).endsWith("/contents/generations/tasks")) {
+        reject = false; providerCalls++;
+        return new Response(JSON.stringify({ error: { code: "InvalidParameter", message: "explicit parameter rejection" } }), { status: 400 });
+      }
+      return originalFetch(url, init);
+    }));
+    await expect(submitGenJob(await input(first.qualificationToken))).rejects.toThrow("参数被拒");
+    expect(await projectComputeUsed(app, scope, projectId)).toBe(0);
+    await submitGenJob(await input(second.qualificationToken));
+    expect(await projectComputeUsed(app, scope, projectId)).toBe(5);
+    expect(await projectComputeUsed(app, other, projectId)).toBe(0);
+    expect(providerCalls).toBe(2);
+  });
 
   async function marketingSource() {
     const root = path.join(dir, "archive", scope.workspaceId, projectId);

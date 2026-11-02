@@ -15,6 +15,7 @@ import type { Scope } from "./db.js";
 import { SubmissionError, SubmissionLedger, submissionRequestHash, type SubmissionReceipt, type SubmissionRow } from "./submission-ledger.js";
 import { buildRenderPrompt } from "./compiled-request.js";
 import { authorizeRenderSubmission } from "../production-authority.js";
+import { withProjectComputeBudget } from "../project-compute-budget.js";
 
 export interface RenderScriptLike {
   id: string;
@@ -96,7 +97,13 @@ export async function submitGenJob(input: SubmitGenJobInput): Promise<SubmitGenJ
   // 本地白板/解说有独立的结构化制作链，资格由对应管线后续接入，不能套用远端提示词证明。
   if (model && !["whiteboard-local", "remotion-local"].includes(model.provider)) {
     const authorization = await authorizeRenderSubmission(snapshot);
-    try { return await submitWithLedger({ ...snapshot, app: authorization.leasedApp ?? snapshot.app }, authorization); }
+    try {
+      const leasedApp = authorization.leasedApp ?? snapshot.app;
+      return await withProjectComputeBudget({ app: leasedApp, scope: snapshot.scope, projectId: snapshot.script.project_id,
+        requestHash: authorization.requestHash, durationSec: snapshot.params.durationSec!,
+        reconciliationOnly: authorization.reconciliationOnly, env: snapshot.env },
+      () => submitWithLedger({ ...snapshot, app: leasedApp }, authorization));
+    }
     finally { await authorization.release(); }
   }
   return submitWithLedger(snapshot, null);
