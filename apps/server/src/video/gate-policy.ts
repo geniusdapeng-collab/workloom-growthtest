@@ -72,6 +72,18 @@ export const GATE_RUBRIC: Partial<Record<GateKey, string[]>> = {
   G7_FINAL: ["预生产收口：镜头卡/定妆照/提示词三件套齐备且互相引用一致", "渲染提交前仍须通过 G8 预算、资格和质量围栏；人类审批等待已取消"]
 };
 
+/** Audit-only policy: a disabled portrait stage is explicitly not applicable, never a fake pass case. */
+export function auditPortraitGateNotApplicable(
+  gate: GateKey,
+  input: { portraitsEnabled: boolean; allowNotApplicable: boolean },
+): boolean {
+  if (!input.allowNotApplicable) return false;
+  if (input.portraitsEnabled) {
+    throw new Error("AUDIT_PORTRAIT_GATE_CONFLICT: 真实定妆照已启用时禁止将 G5 标为不适用");
+  }
+  return gate === "G5_PORTRAIT";
+}
+
 /**
  * 门内容的确定性检查（零 token 先判）：
  * 空内容 / 占位符 / 声称完成但没有产物 —— 一律硬失败，不浪费模型额度。

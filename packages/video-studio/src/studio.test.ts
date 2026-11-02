@@ -57,6 +57,7 @@ vi.mock("./vendor-compat.js", () => {
     installVendorMicroMotionBridge: install("micro"),
     installVendorContractBridge: install("contract"),
     installVendorPromptRebuildBridge: install("prompt"),
+    installVendorNarrativePromptReviewBridge: install("prompt-review"),
     installVendorDiscoveryFixBridge: install("discovery"),
     installVendorDiscoveryNarrativeBridge: install("discovery-narrative"),
     installVendorPhaseInternalsDiagnostics: install("inner"),
@@ -117,13 +118,24 @@ describe("gates 映射", () => {
       "║ id=chen-zhuo;name=陈卓;portraitRef=bun  ║",
       "║ -01-chen-zhuo/portraits/v3/平江路讲述   ║",
       "║ 人-front.png;authorization=real-author  ║",
+      "同一输入在下文被重复展示：",
+      "║ id=chen-zhuo;name=陈卓;portraitRef=bun  ║",
+      "║ -01-chen-zhuo/portraits/v3/平江路讲述   ║",
+      "║ 人-front.png;authorization=real-author  ║",
+      "请确认以上创意主题是否符合您的预期：",
+      '• 回复 "确认" 或 "OK" → 进入视频生成链路',
     ].join("\n");
     const sanitized = sanitizeGateContent("G2_THEME", content);
-    expect(sanitized).toContain("授权角色：陈卓");
-    expect(sanitized).toContain("系统内部绑定");
+    expect(sanitized).toContain("雨夜归家的都市故事");
+    expect(sanitized).not.toContain("陈卓");
+    expect(sanitized).not.toContain("授权角色");
+    expect(sanitized).not.toContain("系统内部绑定");
     expect(sanitized).not.toContain("平江路讲述人");
     expect(sanitized).not.toContain("portraitRef=");
     expect(sanitized).not.toContain("authorization=");
+    expect(sanitized).not.toContain("ized");
+    expect(sanitized).not.toContain("请确认以上创意主题");
+    expect(sanitized).not.toContain('回复 "确认"');
   });
 });
 

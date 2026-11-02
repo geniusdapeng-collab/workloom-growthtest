@@ -14,10 +14,13 @@ import {
   normalizeNarrativeRequirementMarkdown,
   normalizeNarrativeDiscovery,
   repairPhase3FusionRows,
+  renderPrdContractMarkdown,
   applyNarrativeFinalPromptContract,
+  normalizeNarrativePromptsForReview,
   promptFieldText,
   rebuildPromptsFromFields,
 } from "./vendor-compat.js";
+import { inspectFinalShotContract } from "./final-shot-contract.js";
 
 /**
  * 定妆照绑定桥的端到端断言必须在**真实 node 进程**里跑：
@@ -318,6 +321,33 @@ console.log("RESULT " + JSON.stringify({ beforeError, afterError, afterIssues, t
     expect(result.beforeError).toContain("match is not a function");
     expect(result.afterError).toBeNull();
     expect(result.timelineIsArray).toBe(true);
+  }, 60_000);
+
+  it("字段质检桥不重写带冻结策略的完整编号合同，并明确记录 skipped", () => {
+    const script = `
+import { createRequire } from "node:module";
+import { installVendorFieldQualityBridge } from ${JSON.stringify(resolve(here, "vendor-compat.ts"))};
+const require = createRequire(${JSON.stringify(join(repoRoot, "package.json"))});
+const { FieldQualityPipeline } = require(${JSON.stringify(join(repoRoot, "vendor/supermickey/hyperreality-system/engines/field-quality/field-quality-pipeline.js"))});
+const prompt = Array.from({ length: 26 }, (_, index) => String(index + 1).padStart(2, "0") + ".【字段" + (index + 1) + "】" + "完整可执行内容。".repeat(8)).join("\\n");
+const shots = [{ shotId: "S1", duration: 3, prompt, _workloomPromptReviewPolicy: { noDialogue: true, noTitles: true } }];
+const uninstall = installVendorFieldQualityBridge({ log: () => undefined });
+const output = await new FieldQualityPipeline({ maxRounds: 2 }).runAll(shots);
+uninstall();
+console.log("RESULT " + JSON.stringify({
+  skipped: output.summary.skipped,
+  reason: output.summary.reason,
+  samePrompt: output.finalShots[0].prompt === prompt,
+  reports: output.allReports.length,
+  logs: output.allLogs.length
+}));
+`;
+    const result = runInChild(script);
+    expect(result.skipped).toBe(true);
+    expect(String(result.reason)).toContain("frozen");
+    expect(result.samePrompt).toBe(true);
+    expect(result.reports).toBe(0);
+    expect(result.logs).toBe(0);
   }, 60_000);
 
   /**
@@ -1044,6 +1074,202 @@ console.log("RESULT " + JSON.stringify({
     expect(pairs[4]).toContain("定妆照");
   });
 
+  it("G3 修复开场空间光位、截断结尾、重复动作、道具缺口和风险错配", () => {
+    const upstream = {
+      _originalStoryText: "雨夜，一个年轻人收伞回到出租屋，开门、换鞋、拧亮旧台灯，随后坐在灯下安静地听雨。全片无台词、无旁白、无字幕，仅保留动作与环境声。",
+      dialogue_requirement: "全片无台词、无旁白、无字幕，仅保留动作与环境声。",
+      visual_style: "雨夜外景冷蓝，室内旧台灯钨丝暖黄，固定机位与手部/侧脸特写交替",
+      special_notes: "视觉锚点：雨夜收伞滴水、出租屋门锁与门缝光、换鞋旧鞋与地面水痕、拧亮旧台灯的旋钮与钨丝暖光、灯下静坐听雨侧脸。",
+    };
+    const discovery: Record<string, unknown> = {
+      sceneStructure: {
+        opening: {
+          duration: 3,
+          purpose: "黑伞在冷白路灯下收拢，水珠砸进积水；陈卓半张脸被伞影压暗；收伞回到出租屋；开门；坐下听雨；拧亮旧台灯",
+          keyElements: ["钥匙", "雨伞", "积水", "水滴"],
+        },
+        scenes: [
+          { duration: 3, purpose: "镜头从伞骨滴水下摇到湿鞋踩过门槛", keyElements: ["门", "雨伞", "鞋", "台灯"] },
+          { duration: 4.5, purpose: "门咔哒合上后，他拧亮台灯；换鞋旧鞋与地面水痕", keyElements: ["台灯", "门", "桌面", "雨伞"] },
+        ],
+        ending: {
+          duration: 4.5,
+          purpose: "”——冷湿被留门外，疲惫有地方落下，这口气让",
+          keyElements: ["门", "台灯", "雨伞", "鞋"],
+        },
+      },
+      riskAssessment: {
+        technicalRisks: [
+          { risk: "旧台灯旋钮拧亮时手指穿模", level: "high" },
+          { risk: "雨夜收伞滴水与换鞋水痕不连续", level: "high" },
+          { risk: "钥匙插入锁孔时金属反光漂移", level: "medium" },
+          { risk: "同一角色跨镜头侧脸一致性不足", level: "medium" },
+          { risk: "固定长镜头出现纹理蠕动和雨丝不连贯", level: "low" },
+        ],
+        mitigationSuggestions: [
+          "把拧台灯拆成三个连续手部特写",
+          "锁定同一角色参考帧、服装与场景平面图",
+          "门锁镜头降级为声音与局部剪影",
+          "侧脸一致性采用参考立绘、半脸浅景深和同批次首帧图生视频",
+          "长镜头控制单镜时长并硬切拼接，逐镜检查噪点与雨丝连续性",
+        ],
+      },
+    };
+    normalizeNarrativeDiscovery(discovery, 15, upstream);
+    const scene = discovery.sceneStructure as any;
+    expect(String(scene.ending.purpose)).toContain("坐下听雨");
+    expect(String(scene.ending.purpose)).not.toMatch(/”——|这口气让/u);
+    const actions = extractNarrativeActions(discovery, upstream);
+    expect(actions).toEqual(expect.arrayContaining(["收伞回到出租屋", "换鞋", "拧亮旧台灯", "坐下听雨"]));
+    expect(actions).not.toContain("拧亮旧台灯的旋钮与钨丝暖光");
+    expect(actions).not.toContain("换鞋旧鞋与地面水痕");
+    const pairs = pairRiskMitigations(discovery.riskAssessment as Record<string, unknown>);
+    expect(pairs[1]).toMatch(/雨珠|雨伞|伞骨|伞尖|水痕/u);
+    expect(pairs[2]).toMatch(/钥匙|锁孔|门锁|锁舌/u);
+    expect(pairs[3]).toMatch(/侧脸|参考立绘|半脸/u);
+    expect(pairs[4]).toMatch(/长镜头|单镜时长|雨丝|纹理蠕动/u);
+    expect(pairs[3]).not.toContain("固定门、桌面和主光位置");
+    const markdown = normalizeNarrativeRequirementMarkdown([
+      "### 2.2 场景结构建议",
+      "**叙事结构**: 主体场景 2 个；加开场与结尾共 4 段",
+      "**开场** (3秒)",
+      "**场景 1** (3秒)",
+      "**场景 2** (4.5秒)",
+      "**结尾** (4.5秒)",
+      "---",
+      "### 2.3 技术难点预判",
+      "- **场景**（4）：旧契约",
+      "- **道具**（1）：台灯",
+      "- **动作**（1）：打开",
+      "- **风险结论**：旧结论",
+      "### 2.4 对标参考",
+      "- 旧参考",
+    ].join("\r\n"), discovery, 15, upstream);
+    const openingLine = markdown.split("\n").find((line) => line.includes("开场：目的="))!;
+    const openDoorLine = markdown.split("\n").find((line) => line.includes("主体场景 1：目的=开门"))!;
+    const endingLine = markdown.split("\n").find((line) => line.includes("结尾：目的="))!;
+    expect(openingLine).toMatch(/空间=(?:楼道|室外|门口)/u);
+    expect(openingLine).toMatch(/光位=(?:冷|路灯)/u);
+    expect(openDoorLine).toContain("光位=室内未开灯");
+    expect(endingLine).toContain("坐下听雨");
+    expect(endingLine).toMatch(/关键元素=.*台灯/u);
+    expect(markdown).toContain("- **道具**（");
+    expect(markdown).toContain("钥匙");
+    expect(markdown).toContain("积水");
+    expect(markdown).toContain("水滴");
+    expect(markdown).toContain("**叙事结构**: 主体场景 3 个；加开场与结尾共 5 段");
+    expect(markdown).toContain("**场景 3** (3秒)");
+    expect(markdown).toContain("- **声音锚点**（");
+    expect(markdown).toContain("门锁与开门声");
+    expect(markdown).toContain("钥匙开锁");
+    expect(markdown).toContain("坐具");
+    const endingNode = (discovery.sceneStructure as any).ending;
+    expect(endingNode.keyElements).toEqual(expect.arrayContaining(["坐具"]));
+    expect(endingLine).toMatch(/机位=中景/u);
+  });
+
+  it("G3 不把手持风格改成三脚架，也不把手部缓解错配给静止微表情", () => {
+    const pairs = pairRiskMitigations({
+      technicalRisks: [
+        { risk: "浅景深手持微晃与焦点转移的时序稳定性", level: "medium" },
+        { risk: "坐下听雨的静止微表情与情绪停顿", level: "medium" },
+        { risk: "台灯开关的手指微距动作与灯光由暗到亮渐变", level: "medium" },
+        { risk: "灯下静坐侧脸在低照度长镜中出现面部纹理漂移", level: "medium" },
+        { risk: "换鞋时鞋跟脱落、脚掌落在凉地板的接触形变", level: "high" },
+      ],
+      mitigationSuggestions: [
+        "将本镜改为三脚架固定机位",
+        "将手部动作拆成固定机位短特写",
+        "先按场景建立硬时间预算并写入镜头合同",
+      ],
+    });
+    expect(pairs[0]).toMatch(/保留.*手持|呼吸级/u);
+    expect(pairs[0]).toContain("机位高度");
+    expect(pairs[0]).not.toContain("三脚架固定机位");
+    expect(pairs[1]).toMatch(/背影|侧影|肩线/u);
+    expect(pairs[1]).not.toContain("手部动作拆成固定机位短特写");
+    expect(pairs[2]).toMatch(/台灯|旋钮|钨丝|灯光/u);
+    expect(pairs[2]).not.toContain("硬时间预算");
+    expect(pairs[3]).toMatch(/侧脸|侧逆光|参考帧|缩短单镜/u);
+    expect(pairs[3]).not.toContain("硬时间预算");
+    expect(pairs[4]).toMatch(/鞋跟|脚掌|换鞋/u);
+    expect(pairs[4]).not.toContain("低照度长镜");
+  });
+
+  it("G3 将低照度与雨滴物理拆成不同缓解，不让雨幕方案互相复制", () => {
+    const pairs = pairRiskMitigations({
+      technicalRisks: [
+        { risk: "低照度暖钨丝台灯与冷蓝雨光造成色偏和噪点闪烁", level: "medium" },
+        { risk: "雨滴方向不连贯、滴水悬空、雨帘循环重复", level: "medium" },
+        { risk: "固定机位长镜头中人物姿态、湿痕和道具状态漂移", level: "medium" },
+      ],
+      mitigationSuggestions: [
+        "把窗外雨幕设为独立背景板并锁定反射",
+        "固定曝光、白平衡、主辅光比与 LUT",
+        "把雨珠改为静态挂珠并用声音承接",
+      ],
+    });
+    expect(pairs[0]).toContain("曝光");
+    expect(pairs[0]).not.toContain("把窗外雨幕设为独立背景板");
+    expect(pairs[1]).toMatch(/雨珠|挂珠|滴水/u);
+    expect(pairs[1]).not.toBe(pairs[0]);
+    expect(pairs[2]).toMatch(/姿态|湿痕|道具|首帧|参考帧/u);
+  });
+
+  it("G3 清除评审指令、拆分过载主体场景、去重内容期望并过滤空动作", () => {
+    const discovery: Record<string, unknown> = {
+      audienceProfile: {
+        contentExpectations: [
+          "只记录自然环境与环境声的缓慢变化",
+          "只记录自然环境与环境声的缓慢变化",
+          "声音层次要经得起耳机",
+        ],
+      },
+      sceneStructure: {
+        opening: {
+          duration: 2.5,
+          purpose: "雨夜楼道高处俯拍，陈卓收拢黑伞，伞尖滴水；坐下听雨",
+          keyElements: ["黑伞", "鞋"],
+        },
+        scenes: [{
+          duration: 2.5,
+          purpose: "开门、换鞋、拧亮旧台灯",
+          keyElements: ["门", "台灯"],
+        }, {
+          duration: 5,
+          purpose: "删掉这镜，全片只剩收伞没有静下来，主题落空。观众看到陈卓换鞋后拧亮旧台灯，感到疲惫被慢慢放下，并愿意陪他多听一会儿雨。",
+          keyElements: ["旧台灯", "窗"],
+        }],
+        ending: {
+          duration: 5,
+          purpose: "外部喧嚣被门关住，内部安静被旧灯确认。",
+          keyElements: ["台灯"],
+        },
+      },
+    };
+    normalizeNarrativeDiscovery(discovery, 15, {
+      _originalStoryText: "雨夜，陈卓收伞回到出租屋，开门、换鞋、拧亮旧台灯，随后坐在灯下安静地听雨。全片无台词、无旁白、无字幕，仅保留动作与环境声。",
+      dialogue_requirement: "全片无台词、无旁白、无字幕，仅保留动作与环境声。",
+    });
+    const scene = discovery.sceneStructure as any;
+    const nodes = [scene.opening, ...scene.scenes, scene.ending];
+    expect(nodes).toHaveLength(5);
+    expect(nodes.every((node: any) => node.duration === 3)).toBe(true);
+    expect(JSON.stringify(scene)).not.toMatch(/删掉这镜|主题落空|观众看到/u);
+    expect(extractNarrativeActions(discovery, {})).not.toContain("放下");
+    const expectations = (discovery.audienceProfile as any).contentExpectations as string[];
+    expect(new Set(expectations).size).toBe(expectations.length);
+    const markdown = normalizeNarrativeRequirementMarkdown([
+      "**内容期望**",
+      "1. 只记录自然环境与环境声的缓慢变化",
+      "2. 只记录自然环境与环境声的缓慢变化",
+      "3. 声音层次要经得起耳机",
+      "---",
+      "- **动作**（1）：打开",
+    ].join("\n"), discovery, 15, { dialogue_requirement: "全片无台词、无旁白、无字幕，仅保留动作与环境声。" });
+    expect((markdown.match(/只记录自然环境与环境声的缓慢变化/gu) ?? []).length).toBe(1);
+  });
+
   it("通用占位式缓解会被按风险类别替换为可执行方案", () => {
     const pairs = pairRiskMitigations({
       technicalRisks: [
@@ -1157,6 +1383,49 @@ console.log("RESULT " + JSON.stringify({
     ]));
   });
 
+  it("无台词合同删除长句中部“轻声说”引语并修复残缺结尾", () => {
+    const discovery: Record<string, unknown> = {
+      sceneStructure: {
+        opening: { purpose: "陈卓收伞进门", duration: 5, keyElements: ["雨伞", "门"] },
+        scenes: [{
+          purpose: "陈卓拧亮旧台灯，暖黄光圈把雨窗收进室内，他坐下后肩线松下来，指腹摩挲杯壁，雨声从街道噪音变成室内底噪。最后切到杯壁反光里的雨痕特写，他轻声说「雨声，先别停。」",
+          duration: 5,
+          keyElements: ["台灯", "杯", "窗"],
+        }],
+        ending: { purpose: "」不是讲道理，而是让‘收留’落在指尖和雨声里。", duration: 5, keyElements: ["台灯", "杯"] },
+      },
+    };
+    normalizeNarrativeDiscovery(discovery, 15, {
+      _originalStoryText: "雨夜，陈卓收伞回到出租屋，开门、换鞋、拧亮旧台灯，随后坐在灯下安静地听雨。全片无台词、无旁白、无字幕，仅保留动作与环境声。",
+      dialogue_requirement: "全片无台词、无旁白、无字幕，仅保留动作与环境声。",
+    });
+    const scene = discovery.sceneStructure as any;
+    expect(String(scene.scenes[0].purpose)).not.toContain("雨声，先别停");
+    expect(String(scene.scenes[0].purpose)).not.toContain("轻声说");
+    expect(String(scene.ending.purpose)).not.toMatch(/^」|不是讲道理/u);
+  });
+
+  it("无台词合同删除未引号的“一句台词”元话语", () => {
+    const discovery: Record<string, unknown> = {
+      sceneStructure: {
+        opening: { purpose: "陈卓收伞进门", duration: 5, keyElements: ["雨伞"] },
+        scenes: [],
+        ending: {
+          purpose: "陈卓坐下听雨，一个特写收住整夜的雨，一句台词让孤独有了归处。",
+          duration: 10,
+          keyElements: ["台灯"],
+        },
+      },
+    };
+    normalizeNarrativeDiscovery(discovery, 15, {
+      _originalStoryText: "陈卓收伞回到出租屋，坐下听雨。全片无台词、无旁白、无字幕，仅保留动作与环境声。",
+      dialogue_requirement: "全片无台词、无旁白、无字幕，仅保留动作与环境声。",
+    });
+    const ending = String((discovery.sceneStructure as any).ending.purpose);
+    expect(ending).toContain("坐下听雨");
+    expect(ending).not.toContain("一句台词");
+  });
+
   it("无台词且明确无旁白时删除画外句，并把超时分镜按目标时长重投影", () => {
     const discovery: Record<string, unknown> = {
       audienceProfile: { contentExpectations: ["钉子台词在第50秒以旁白出现"] },
@@ -1265,6 +1534,227 @@ console.log("RESULT " + JSON.stringify({
       expect.objectContaining({ characterId: "char_1", name: "陈卓" }),
     ]);
     expect((prd.shotContract as any[]).every((shot) => shot.subjectIds.includes("char_1"))).toBe(true);
+  });
+
+  it("G6 前重新投影被标题、画幅和音频增强污染的最终提示词", () => {
+    const policy = {
+      noDialogue: true,
+      maxLength: 3000,
+      noCharacters: false,
+      noAnimals: true,
+      noMusic: true,
+      noTitles: true,
+      durationSeconds: 5,
+      aspectRatio: "9:16",
+      resolution: "1080x1920",
+      characterNames: ["陈卓"],
+      characterPortraits: [{ name: "陈卓", path: "bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png" }],
+      projectScene: "雨夜出租屋",
+      projectLighting: "旧台灯2800K暖光",
+      projectColor: "冷蓝与暖黄",
+      projectProps: ["旧台灯"],
+      projectActions: ["陈卓拧亮旧台灯"],
+    };
+    const clean = applyNarrativeFinalPromptContract({
+      shotId: "S1",
+      duration: 5,
+      dialogue: "",
+      dialogueText: "",
+      dialogueBlocks: [],
+      fields: {},
+    }, {
+      ...policy,
+      chineseOnly: true,
+      canonicalize: true,
+      shotIndex: 0,
+      isLastShot: true,
+    });
+    const contaminated = {
+      ...clean,
+      prompt: `${String(clean.prompt).replace("04.【约束】9:16画幅，1080x1920", "04.【约束】16:9画幅，1920x1080")}
+27.【主标题内容】雨夜那盏旧灯
+28.【副标题内容】他擦亮钨丝灯
+29.【标题动画设计】出现短暂过曝半档
+30.【开场音频设计】加入大提琴泛音`,
+    };
+    const [normalized] = normalizeNarrativePromptsForReview([contaminated], policy);
+    expect(String(normalized!.prompt)).toContain("04.【约束】9:16画幅，1080x1920");
+    expect(String(normalized!.prompt)).toContain("18.【台词】不适用：本片无台词、无旁白、无口播。");
+    expect(String(normalized!.prompt)).not.toContain("【主标题内容】");
+    expect(String(normalized!.prompt)).not.toContain("大提琴");
+    expect(inspectFinalShotContract([normalized!], { maxPromptLength: 3000, noDialogue: true }).pass).toBe(true);
+  });
+
+  it("G6 逐镜使用各自冻结场景，并删除无标题合同的片头附加字段和旧长度", () => {
+    const base = {
+      noDialogue: true,
+      maxLength: 3000,
+      noCharacters: false,
+      noAnimals: true,
+      noMusic: true,
+      noTitles: true,
+      durationSeconds: 3,
+      aspectRatio: "9:16",
+      resolution: "1080x1920",
+      characterNames: ["陈卓"],
+      characterPortraits: [{ name: "陈卓", path: "bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png" }],
+      projectScene: "错误的全片场景合集",
+      projectLighting: "冷蓝雨光",
+      projectColor: "冷蓝与暖黄",
+      projectProps: ["雨伞", "台灯"],
+      projectActions: ["收伞回到出租屋", "开门", "坐下听雨"],
+    };
+    const shots = [
+      {
+        shotId: "S1", duration: 3, sceneType: "opening", promptCharCount: 100,
+        title_content: "错误标题", subtitle_content: "错误副标题", title_animation: "4秒越界",
+        opening_audio_design: "大提琴长音", fields: { title_content: "错误标题" },
+        prompt: "01.【场景】错误场景", _workloomPromptReviewPolicy: { ...base, projectScene: "雨夜楼道门外", projectActions: ["收伞回到出租屋"] },
+      },
+      {
+        shotId: "S2", duration: 3,
+        prompt: "01.【场景】错误场景", _workloomPromptReviewPolicy: { ...base, projectScene: "出租屋玄关", projectActions: ["开门"] },
+      },
+      {
+        shotId: "S3", duration: 3,
+        prompt: "01.【场景】错误场景", _workloomPromptReviewPolicy: { ...base, projectScene: "出租屋窗边", projectActions: ["坐下听雨"] },
+      },
+    ];
+    const normalized = normalizeNarrativePromptsForReview(shots, base);
+    expect(String(normalized[0]!.prompt)).toContain("【场景】雨夜楼道门外");
+    expect(String(normalized[1]!.prompt)).toContain("【场景】出租屋玄关");
+    expect(String(normalized[2]!.prompt)).toContain("【场景】出租屋窗边");
+    for (const shot of normalized) {
+      expect(shot.promptCharCount).toBe(String(shot.prompt).length);
+      expect(shot.title_content).toBeUndefined();
+      expect(shot.subtitle_content).toBeUndefined();
+      expect(shot.title_animation).toBeUndefined();
+      expect(shot.title_font_design).toBeUndefined();
+      expect(shot.opening_audio_design).toBeUndefined();
+      expect(shot.fields).not.toHaveProperty("title_content");
+    }
+  });
+
+  it("G6 审核报告不再追加无标题片头字段、旧长度和裸编号", () => {
+    const script = `
+import { createRequire } from "node:module";
+import { installVendorNarrativePromptReviewBridge } from ${JSON.stringify(resolve(here, "vendor-compat.ts"))};
+const require = createRequire(${JSON.stringify(join(repoRoot, "package.json"))});
+const { HyperrealitySystem } = require(${JSON.stringify(join(repoRoot, "vendor/supermickey/hyperreality-system/index.js"))});
+const originalFormat = HyperrealitySystem.prototype._formatPromptWithSequenceNumbers;
+const originalReport = HyperrealitySystem.prototype._generatePromptsReport;
+const uninstall = installVendorNarrativePromptReviewBridge({ log: () => undefined });
+const prompt = [
+  "01.【语言约束】全部字段使用中文。",
+  "02.【场景】雨夜出租屋楼道。",
+  "03.【动作】陈卓收伞。",
+  "04.【台词】不适用：本片无台词。",
+].join("\\n");
+const row = { shotId: "S1", sceneType: "opening", duration: 3, prompt, promptCharCount: 100,
+  title_content: "错误标题", title_animation: "4秒越界", opening_audio_design: "大提琴长音",
+  _workloomPromptReviewPolicy: { noTitles: true } };
+const instance = Object.create(HyperrealitySystem.prototype);
+const report = instance._generatePromptsReport([row]);
+uninstall();
+console.log("RESULT " + JSON.stringify({
+  report,
+  headingOpening: report.includes("S1(片头·30字段)"),
+  hasStaleLength: report.includes("S1 | 3s | 100"),
+  hasTitle: report.includes("主标题内容") || report.includes("大提琴"),
+  hasBareNumber: /^\\d{2}\\.$/mu.test(report),
+  restored: originalFormat === HyperrealitySystem.prototype._formatPromptWithSequenceNumbers
+    && originalReport === HyperrealitySystem.prototype._generatePromptsReport
+}));
+`;
+    const result = runInChild(script);
+    expect(result.headingOpening).toBe(false);
+    expect(result.hasStaleLength).toBe(false);
+    expect(result.hasTitle).toBe(false);
+    expect(result.hasBareNumber).toBe(false);
+    expect(result.restored).toBe(true);
+    expect(String(result.report)).toMatch(/\| S1 \| 3s \| \d+ \| ❌ 4\/25 \|/u);
+    expect(String(result.report)).not.toContain("| S1 | 3s | 100 |");
+  }, 60_000);
+
+  it("PRD 把真实模型的配乐、复合光位和主观阈值收敛成可执行合同", () => {
+    const discovery = {
+      upstreamFields: {
+        duration_sec: 15,
+        platform_id: "douyin",
+        aspect_ratio: "9:16",
+        dialogue_requirement: "全片无台词、无旁白、无字幕，仅保留动作与环境声。",
+        _originalStoryText: "雨夜，一个年轻人收伞回到出租屋，开门、换鞋、拧亮旧台灯，随后坐在灯下安静地听雨。全片无台词、无旁白、无字幕，仅保留动作与环境声。",
+      },
+      _canonicalCharacters: [{
+        id: "chen-zhuo",
+        name: "陈卓",
+        role: "protagonist",
+        portraitRef: "bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png",
+        authorization: "real-authorized",
+      }],
+    };
+    const prd = normalizeNarrativePrdContract({
+      projectDefinition: { sourceIntent: discovery.upstreamFields._originalStoryText },
+      productPositioning: { targetDuration: 15, aspectRatio: "9:16", targetPlatform: "douyin" },
+      characterSystem: { characters: [{ name: "陈卓", role: "protagonist" }] },
+      visualSpecification: { lightingDirection: "旧台灯2700K暖光与窗外6500K冷蓝雨光分区" },
+      audioSpecification: {
+        musicStyle: "极简氛围弦乐与低频脉冲",
+        soundDesign: "雨声、门锁声、换鞋声、台灯开关声",
+        voicePolicy: "无人物声",
+        audioMood: "低频脉冲",
+        audioReferences: ["大提琴泛音"],
+      },
+      scenePlan: {
+        scenes: [{
+          sceneId: "SC01",
+          sequence: 1,
+          duration: 15,
+          purpose: "第一帧只拍伞尖水珠、鞋底湿印；随后陈卓开门、换鞋、坐下",
+          setting: "雨夜出租屋玄关",
+          keyProps: ["湿伞", "湿鞋印", "旧皮鞋", "门锁", "旧台灯"],
+          visualRequirements: [
+            "第一帧只拍伞尖水珠坠落地砖与鞋底湿印；窗外6500K冷蓝雨光勾边，台灯2700K从右侧门缝渗入",
+            "陈卓换鞋；2700K钨丝台灯为唯一暖源，窗外6500K冷蓝雨光压暗",
+            "陈卓坐下听雨；台灯2700K暖光从右侧照亮肩背，窗外6500K冷蓝光勾左侧轮廓",
+          ],
+          audioRequirements: ["雨声持续底噪", "门锁转动声", "换鞋声", "台灯开关声"],
+          dialogue: "",
+        }],
+        shotMapping: [{ sceneId: "SC01", estimatedShots: 3, shotBreakdownHint: ["establishing", "close-up", "medium"] }],
+      },
+      productionConstraints: {
+        technicalConstraints: ["不使用配乐，仅保留动作与环境声"],
+        qualityThresholds: { visual: 0.8, audio: 0.75, narrative: 0.85, consistency: 0.75 },
+      },
+      deliveryStandard: {
+        deliverables: [{ item: "video_master", spec: "MP4" }],
+        acceptanceCriteria: { visual: 0.8, audio: 0.75, narrative: 0.85, consistency: 0.75 },
+        outputFormat: {},
+      },
+    }, discovery);
+    const serialized = JSON.stringify(prd);
+    expect(serialized).not.toMatch(/弦乐|低频脉冲|大提琴泛音/u);
+    expect(serialized).toContain("不使用配乐");
+    const shots = prd.shotContract as Array<Record<string, unknown>>;
+    expect(shots).toHaveLength(3);
+    for (const shot of shots) {
+      expect(String(shot.lighting).length).toBeLessThanOrEqual(160);
+      expect(String(shot.colorTemperature).match(/\d{4}\s*K/gu)).toHaveLength(1);
+    }
+    expect(shots[0]).toMatchObject({
+      subjectIds: [],
+      subjectLabel: expect.stringMatching(/道具|局部/u),
+    });
+    expect(shots[1]!.subjectIds).toContain("chen-zhuo");
+    const character = (prd.characterSystem as any).characters[0];
+    expect(String(character.gender)).toMatch(/female|女性/iu);
+    const delivery = prd.deliveryStandard as any;
+    expect(typeof delivery.acceptanceCriteria.visual).not.toBe("number");
+    expect(String(delivery.acceptanceCriteria.visual)).toContain("unverified");
+    const markdown = renderPrdContractMarkdown(prd);
+    expect(markdown).toContain("性别=");
+    expect(markdown).toContain("道具/局部人体");
   });
 
   it("动物是角色而非道具；探头、伸爪、缩回等动作进入可执行契约", () => {
@@ -1748,6 +2238,29 @@ console.log("RESULT " + JSON.stringify({
     expect(markdown).toContain("拧动旋钮");
   });
 
+  it("质感短语不进入动作契约，禁止出现的手机不进入道具契约", () => {
+    const actions = extractNarrativeActions({}, {
+      _originalStoryText: "旧台灯旋钮被拧动的阻尼感；雨夜收伞回到出租屋，换鞋后坐下听雨。全片不出现手机屏幕亮光。",
+    });
+    expect(actions).toContain("换鞋");
+    expect(actions).not.toEqual(expect.arrayContaining([expect.stringContaining("阻尼感")]));
+    const props = inferNarrativeProps({
+      intent: "旧台灯旋钮被拧动的阻尼感；雨夜收伞回到出租屋。全片不出现手机屏幕亮光。",
+      discovery: {
+        sceneStructure: {
+          opening: { purpose: "陈卓收伞进门，台灯开关有阻尼感", keyElements: ["旧台灯", "手机"] },
+          scenes: [],
+          ending: { purpose: "坐下听雨", keyElements: ["窗"] },
+        },
+      },
+      upstream: {
+        _originalStoryText: "旧台灯旋钮被拧动的阻尼感；雨夜收伞回到出租屋。全片不出现手机屏幕亮光。",
+      },
+    });
+    expect(props).toContain("台灯");
+    expect(props).not.toContain("手机");
+  });
+
   it("场景正文被清理成碎片时用关键元素重建契约，且禁止项只出现一次", () => {
     const discovery = {
       sceneStructure: {
@@ -2113,6 +2626,7 @@ uninstall();
 console.log("RESULT " + JSON.stringify({ beforeSuccess: before.success, beforeError: before.error, beforeCalls,
  afterSuccess: after.success, counters, status: after.result.stages.phase3Fusion.status,
  prompt: after.shots[0].prompt, stamp: after.shots[0]._workloomFusion,
+ reviewPolicy: after.shots[0]._workloomPromptReviewPolicy,
  originalHasPrompt: Boolean(state.shots[0].prompt) }));
 `));
     expect(result.beforeSuccess).toBe(false);
@@ -2122,6 +2636,11 @@ console.log("RESULT " + JSON.stringify({ beforeSuccess: before.success, beforeEr
     expect(result.status).toBe("passed");
     expect(result.counters).toEqual(expect.objectContaining({ fusion: 1, checkpoints: 1, timing: 1 }));
     expect(result.originalHasPrompt).toBe(false);
+    expect(result.reviewPolicy).toMatchObject({
+      maxLength: expect.any(Number),
+      aspectRatio: expect.any(String),
+      characterNames: expect.any(Array),
+    });
     expect((result.stamp as Record<string, unknown>).promptHash).toMatch(/^[a-f\d]{64}$/);
     expect((result.stamp as Record<string, unknown>).semanticSkillExecution).toBe("unverified");
   }, 90_000);

@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, realpathSyn
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
-  AUTO_GATES, GATE_PRODUCER_STAGE, gateDeterministicChecks, portraitGateEvidence, portraitReviewManifest,
+  AUTO_GATES, GATE_PRODUCER_STAGE, auditPortraitGateNotApplicable, gateDeterministicChecks, portraitGateEvidence, portraitReviewManifest,
   renderSubmitAutoAllowed,
 } from "./gate-policy.js";
 let dir: string;
@@ -21,6 +21,13 @@ function fixture() {
   return { root, files, index, indexPath, input };
 }
 describe("服务预生产 G5/G7", () => {
+  it("只有显式无定妆照审计模式才把 G5 标为不适用", () => {
+    expect(auditPortraitGateNotApplicable("G5_PORTRAIT", { portraitsEnabled: false, allowNotApplicable: true })).toBe(true);
+    expect(auditPortraitGateNotApplicable("G4_PRD", { portraitsEnabled: false, allowNotApplicable: true })).toBe(false);
+    expect(auditPortraitGateNotApplicable("G5_PORTRAIT", { portraitsEnabled: false, allowNotApplicable: false })).toBe(false);
+    expect(() => auditPortraitGateNotApplicable("G5_PORTRAIT", { portraitsEnabled: true, allowNotApplicable: true }))
+      .toThrow("AUDIT_PORTRAIT_GATE_CONFLICT");
+  });
   it("G7 是文字预生产收口，不错误调用要求成片和听音回执的 master", () => expect(GATE_PRODUCER_STAGE.G7_FINAL).toBe("prompt"));
   it("只把实际读取的本项目四角度图片送审", () => {
     const f = fixture(); const evidence = portraitGateEvidence(f.input);

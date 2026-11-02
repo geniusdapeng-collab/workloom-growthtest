@@ -19,7 +19,8 @@
  *     [--product "米家空气净化器 4 Lite"] [--brand 米家] [--category 空气净化器] \
  *     [--route auto|marketing|narrative] [--producer review|auto] \
  *     [--project VID-AUDIT-01] [--work-dir .vm-work] [--out outputs/VID-AUDIT-01] \
- *     [--keys-file ~/.workloom/live.env] [--no-portraits] [--refresh-dossier] [--json]
+ *     [--keys-file ~/.workloom/live.env] [--no-portraits] [--audit-skip-portrait-gate] \
+ *     [--refresh-dossier] [--json]
  *
  * 退出码：0=跑通；2=缺 LLM 配置；3=分流判定为"需澄清"（这是**正确行为**，不是失败）；
  *        4=运行失败（vendor 抛错）。
@@ -44,6 +45,7 @@ import {
 } from "../../packages/video-studio/src/index.js";
 import {
   AUTO_GATES,
+  auditPortraitGateNotApplicable,
   GATE_PRODUCER_STAGE,
   GATE_RUBRIC,
   gateDeterministicChecks,
@@ -98,6 +100,11 @@ const KEYS_FILE = resolve(arg("--keys-file", join(homedir(), ".workloom", "live.
 const ROUTE_ARG = arg("--route", "auto");
 const PRODUCER = (arg("--producer", "review").toLowerCase() === "auto" ? "auto" : "review") as ProducerMode;
 const PORTRAITS_ENABLED = !flag("--no-portraits") && (process.env.HR_PORTRAIT_ENABLED ?? "1") !== "0";
+const PORTRAIT_RUNTIME_ENABLED = PORTRAITS_ENABLED && Boolean(process.env.VOLCENGINE_ARK_API_KEY);
+const AUDIT_SKIP_PORTRAIT_GATE = flag("--audit-skip-portrait-gate");
+if (AUDIT_SKIP_PORTRAIT_GATE && PORTRAITS_ENABLED) {
+  throw new Error("--audit-skip-portrait-gate 只能与 --no-portraits 同时使用，禁止用跳过门掩盖真实出图失败");
+}
 /** 需求口径（写进意图块，供生成器与 G2 监制核对；缺省与本仓 marketing brief 默认一致） */
 const REQUEST = validatePipelineRequest({
   intent: REQUESTED_INTENT,
@@ -224,9 +231,21 @@ if (flag("--dry-run")) {
 const gateRecords: Array<Record<string, unknown>> = [];
 const onApproval: ApprovalCallback = async (req) => {
   const gate = req.gate as GateKey;
-  const deterministic = gateDeterministicChecks(gate, req.contentMd ?? "");
+  const portraitGateSkipped = auditPortraitGateNotApplicable(gate, {
+    portraitsEnabled: PORTRAIT_RUNTIME_ENABLED,
+    allowNotApplicable: AUDIT_SKIP_PORTRAIT_GATE,
+  });
+  const deterministic = portraitGateSkipped
+    ? [{
+        id: "portrait-gate-audit-skip",
+        status: "not_applicable" as const,
+        pass: false,
+        hard: true,
+        detail: "审计矩阵显式关闭定妆照生成；G5 只标记不适用，不声称人物图像已生成或可提交渲染",
+      }]
+    : gateDeterministicChecks(gate, req.contentMd ?? "");
   let verdict: Awaited<ReturnType<typeof reviewStage>> | null = null;
-  if (PRODUCER === "review" && AUTO_GATES.has(gate)) {
+  if (!portraitGateSkipped && PRODUCER === "review" && AUTO_GATES.has(gate)) {
     // 与生产同一口径：门内容落盘成真实文件再送审（否则监制只看到 600 字摘录）
     const artifact = writeGateArtifact(WORK_DIR, PROJECT, gate, req.contentMd ?? "");
     verdict = await reviewStage({
@@ -243,19 +262,25 @@ const onApproval: ApprovalCallback = async (req) => {
       log: (line) => console.log(line),
     });
   }
-  const approved = PRODUCER === "auto" ? !deterministic.some((c) => c.hard && !c.pass) : Boolean(verdict?.approved);
+  const approved = portraitGateSkipped
+    ? true
+    : PRODUCER === "auto" ? !deterministic.some((c) => c.hard && !c.pass) : Boolean(verdict?.approved);
   gateRecords.push({
     at: stamp(), gate, vendorType: req.vendorType,
-    approved, via: verdict?.via ?? (PRODUCER === "auto" ? "auto" : "none"),
+    approved, via: portraitGateSkipped ? "not-applicable" : verdict?.via ?? (PRODUCER === "auto" ? "auto" : "none"),
     score: verdict?.score ?? null, deterministic,
-    reason: verdict?.reason ?? (PRODUCER === "auto" ? "auto 模式：仅跑确定性硬闸" : ""),
+    reason: portraitGateSkipped
+      ? "audit-only：本轮显式禁用定妆照生成，G5 不适用；结果不得作为可渲染人物片的肖像证据"
+      : verdict?.reason ?? (PRODUCER === "auto" ? "auto 模式：仅跑确定性硬闸" : ""),
     issues: verdict?.issues?.slice(0, 5) ?? [],
   });
   appendFileSync(gatesFile, `${JSON.stringify(gateRecords[gateRecords.length - 1])}\n`, "utf8");
-  log(`  [gate ${gate}] ${approved ? "放行" : "打回"}（${verdict ? `监制 ${verdict.score} 分 / via=${verdict.via}` : PRODUCER === "auto" ? "auto" : "无监制"}）`);
+  log(`  [gate ${gate}] ${portraitGateSkipped ? "审计跳过" : approved ? "放行" : "打回"}（${portraitGateSkipped ? "定妆照未启用，明确记 not_applicable" : verdict ? `监制 ${verdict.score} 分 / via=${verdict.via}` : PRODUCER === "auto" ? "auto" : "无监制"}）`);
   return {
     approved,
-    reason: verdict ? `${approved ? "producer-approved" : "producer-rejected"}(${gate} · score=${verdict.score})` : `auto(${gate})`,
+    reason: portraitGateSkipped
+      ? "audit-portrait-gate-not-applicable"
+      : verdict ? `${approved ? "producer-approved" : "producer-rejected"}(${gate} · score=${verdict.score})` : `auto(${gate})`,
     ...(verdict?.suggestions?.length ? { suggestions: verdict.suggestions } : {}),
     ...(approved ? {} : { fatal: "producer_rejected" }),
   };
@@ -324,7 +349,7 @@ const dataMining: StudioConfig["dataMining"] = decision.route === "marketing" &&
     }
   : undefined;
 
-const portraits: StudioConfig["portraits"] = PORTRAITS_ENABLED && process.env.VOLCENGINE_ARK_API_KEY
+const portraits: StudioConfig["portraits"] = PORTRAIT_RUNTIME_ENABLED
   ? {
       enabled: true,
       apiKey: process.env.VOLCENGINE_ARK_API_KEY,
@@ -409,6 +434,7 @@ writeFileSync(join(OUT_DIR, "meta.json"), `${JSON.stringify({
   routeDecision: decision,
   producerMode: PRODUCER,
   portraitsEnabled: Boolean(portraits?.enabled),
+  portraitGateMode: AUDIT_SKIP_PORTRAIT_GATE ? "not_applicable" : "review",
   renderSubmitted: false,
   startedAt: new Date(Date.now() - elapsedMs).toISOString(),
   finishedAt: stamp(),

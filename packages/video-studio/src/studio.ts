@@ -34,6 +34,7 @@ import {
   installVendorPhaseInternalsDiagnostics,
   installVendorPhaseDiagnosticsBridge,
   installVendorPromptRebuildBridge,
+  installVendorNarrativePromptReviewBridge,
   installSharedBridge
 } from "./vendor-compat.js";
 import { AUDIO_DISCIPLINE_CLAUSE, AUDIO_NEGATIVE_TERMS } from "./shot-spec.js";
@@ -159,12 +160,19 @@ export function sanitizeGateContent(gate: string, content: string): string {
   if (gate !== "G2_THEME") return content;
   return content
     .replace(
-      /id=([^;\n]+);[\s\S]{0,1500}?name=([^;\n]+);[\s\S]{0,1500}?authorization=[^\n]*/gu,
-      (_all, id: string, name: string) => `\n授权角色：${name.trim()}（${id.trim()}）；定妆照与授权信息已系统内部绑定，不进入创意正文。`,
+      /(?:\[默认模特锚点\]\s*)?id=[^;\n]+;[\s\S]{0,1800}?name=[^;\n]+;[\s\S]{0,1800}?authorization=[^\n]*/gu,
+      "\n",
     )
     .replace(/^\s*(?:id|name|portraitRef|authorization)=[^\n]*$/gmu, "")
+    .replace(/^\s*[║│|]?\s*ized\s*[║│|]?\s*$/gmu, "")
     .replace(/平江路讲述人/gu, "授权角色")
     .replace(/bundles\/ai-video\/library\/characters\/[^\s；;]+/gu, "【系统内部角色资产】")
+    .replace(
+      /时长口径:\s*Brief\s*覆盖（生成器推导\s*\d+(?:\.\d+)?s\s*→\s*(\d+(?:\.\d+)?s)）/gu,
+      "时长口径: 用户 Brief 指定为 $1（已冻结）",
+    )
+    .replace(/请确认以上创意主题是否符合您的预期：[\s\S]*$/u, "")
+    .replace(/^\s*[║│|]+\s*$/gmu, "")
     .replace(/\n{3,}/gu, "\n\n")
     .trim();
 }
@@ -362,6 +370,8 @@ export class VideoStudio {
          * 并标记 promptRebuilt（非静默兜底）。
          */
         keep(installVendorPromptRebuildBridge({ log }));
+        /** 后续字段质检/标题/导演增强会再改 prompt；G6 前必须重新按冻结策略投影。 */
+        keep(installVendorNarrativePromptReviewBridge({ log }));
         /** 需求洞察 _fillDefaults 修复（数组保形 + 消除 const 重赋值，静态审计发现） */
         keep(installVendorDiscoveryFixBridge({ log }));
         /** 叙事/营销隔离、人物契约补全与需求洞察首个 JSON 修复 */
