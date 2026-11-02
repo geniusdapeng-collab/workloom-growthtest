@@ -34,7 +34,12 @@ import {
   installVendorPhaseInternalsDiagnostics,
   installVendorPhaseDiagnosticsBridge,
   installVendorPromptRebuildBridge,
-  installSharedBridge
+  installVendorNarrativePromptReviewBridge,
+  installVendorPreproductionReviewBridge,
+  installVendorQualityGateBridge,
+  installSharedBridge,
+  narrativeSpeechPolicy,
+  runWithDurationProjectionPolicy
 } from "./vendor-compat.js";
 import { AUDIO_DISCIPLINE_CLAUSE, AUDIO_NEGATIVE_TERMS } from "./shot-spec.js";
 import { loadDurationRules } from "./duration-rules.js";
@@ -78,7 +83,8 @@ export type EventSink = (event: {
     | "pipeline.duration.skipped"
     | "pipeline.duration.package_check"
     | "pipeline.finished"
-    | "pipeline.failed";
+    | "pipeline.failed"
+    | "pipeline.deferred_render_incomplete";
   projectId: string;
   runId: string | null;
   gate?: string;
@@ -159,14 +165,64 @@ export function sanitizeGateContent(gate: string, content: string): string {
   if (gate !== "G2_THEME") return content;
   return content
     .replace(
-      /id=([^;\n]+);[\s\S]{0,1500}?name=([^;\n]+);[\s\S]{0,1500}?authorization=[^\n]*/gu,
-      (_all, id: string, name: string) => `\n授权角色：${name.trim()}（${id.trim()}）；定妆照与授权信息已系统内部绑定，不进入创意正文。`,
+      /(?:\[默认模特锚点\]\s*)?id=[^;\n]+;[\s\S]{0,1800}?name=[^;\n]+;[\s\S]{0,1800}?authorization=[^\n]*/gu,
+      "\n",
     )
     .replace(/^\s*(?:id|name|portraitRef|authorization)=[^\n]*$/gmu, "")
+    .replace(/^\s*[║│|]?\s*ized\s*[║│|]?\s*$/gmu, "")
     .replace(/平江路讲述人/gu, "授权角色")
     .replace(/bundles\/ai-video\/library\/characters\/[^\s；;]+/gu, "【系统内部角色资产】")
+    .replace(
+      /时长口径:\s*Brief\s*覆盖（生成器推导\s*\d+(?:\.\d+)?s\s*→\s*(\d+(?:\.\d+)?s)）/gu,
+      "时长口径: 用户 Brief 指定为 $1（已冻结）",
+    )
+    .replace(/请确认以上创意主题是否符合您的预期：[\s\S]*$/u, "")
+    .replace(/^\s*[║│|]+\s*$/gmu, "")
     .replace(/\n{3,}/gu, "\n\n")
     .trim();
+}
+
+/** Resolve the same platform profile used to plan the work, instead of silently falling back to cinematic 16:9. */
+export function packageAuditOptions(
+  metadata: Record<string, unknown>,
+  targetDuration: number | null,
+): { targetDuration?: number; platform?: string } {
+  const selection = metadata.platformSelection && typeof metadata.platformSelection === "object"
+    ? metadata.platformSelection as Record<string, unknown>
+    : {};
+  const brief = metadata.brief && typeof metadata.brief === "object"
+    ? metadata.brief as Record<string, unknown>
+    : {};
+  const prd = metadata._prd && typeof metadata._prd === "object"
+    ? metadata._prd as Record<string, unknown>
+    : {};
+  const positioning = prd.productPositioning && typeof prd.productPositioning === "object"
+    ? prd.productPositioning as Record<string, unknown>
+    : {};
+  const raw = String(
+    metadata.platform
+    ?? selection.id
+    ?? brief.platform
+    ?? positioning.targetPlatform
+    ?? "",
+  ).trim();
+  const aliases: Record<string, string> = {
+    "抖音": "douyin",
+    "快手": "kuaishou",
+    "小红书": "xiaohongshu",
+    "视频号": "wechat-channels",
+    "微信视频号": "wechat-channels",
+    "哔哩哔哩": "bilibili",
+    "B站": "bilibili",
+    "tiktok": "tiktok",
+  };
+  const platform = aliases[raw] ?? (raw ? raw.toLowerCase().replace(/\s+/gu, "-") : "");
+  return {
+    ...(Number.isFinite(Number(targetDuration)) && Number(targetDuration) > 0
+      ? { targetDuration: Number(targetDuration) }
+      : {}),
+    ...(platform ? { platform } : {}),
+  };
 }
 
 export function attachDefaultCharacterAnchor(
@@ -362,6 +418,12 @@ export class VideoStudio {
          * 并标记 promptRebuilt（非静默兜底）。
          */
         keep(installVendorPromptRebuildBridge({ log }));
+        /** 后续字段质检/标题/导演增强会再改 prompt；G6 前必须重新按冻结策略投影。 */
+        keep(installVendorNarrativePromptReviewBridge({ log }));
+        /** G7 消费完整三件套、摘要、时间轴和真实有效处理时间，不接受截断摘要。 */
+        keep(installVendorPreproductionReviewBridge({ log }));
+        /** 非数值的 unverified 验收口径不得被算成 NaN 并让全片质检假红。 */
+        keep(installVendorQualityGateBridge());
         /** 需求洞察 _fillDefaults 修复（数组保形 + 消除 const 重赋值，静态审计发现） */
         keep(installVendorDiscoveryFixBridge({ log }));
         /** 叙事/营销隔离、人物契约补全与需求洞察首个 JSON 修复 */
@@ -377,6 +439,10 @@ export class VideoStudio {
         const durationRules = loadDurationRules();
         const maxSingleShot = cfg.durationPolicy?.maxSingleShotSeconds ?? durationRules.modelMax;
         const minSingleShot = cfg.durationPolicy?.minSingleShotSeconds ?? durationRules.modelMin;
+        const inputSpeechPolicy = narrativeSpeechPolicy([
+          input.intent,
+          JSON.stringify(input.metadata ?? {}),
+        ].join("\n"));
         /**
          * 桥按"进程级共享 + 引用计数"安装（T-2026-0925-0001）：
          * 预生产 run 允许并发，而桥是进程全局的；若每个 run 各自装卸，
@@ -534,7 +600,10 @@ export class VideoStudio {
           const modelName = portraitCfg && portraitCfg.enabled !== false ? portraitCfg.model : "未指定模型";
           log(`[studio] 定妆照真实出图已启用（${modelName}，产物根 ${charactersDir}）`);
         }
-        const result = await system.create(effectiveIntent, metadata, createOptions);
+        const result = await runWithDurationProjectionPolicy(
+          { noDialogue: inputSpeechPolicy.allSpeechForbidden },
+          () => system.create(effectiveIntent, metadata, createOptions),
+        );
         if (portraitRuntime) {
           const index = portraitRuntime.snapshot();
           const characters = Object.keys(index.characters).length;
@@ -558,9 +627,10 @@ export class VideoStudio {
                 "vendor/supermickey/hyperreality-system/engines/production-engine/agents/prompt-delivery-guard.js"
               )
             ) as { PromptDeliveryGuard: new () => { verifyPackage: (list: unknown[], options?: Record<string, unknown>) => { pass: boolean; issues: string[] } } };
-            const check = new guardMod.PromptDeliveryGuard().verifyPackage(shots, {
-              targetDuration: lastProjectedTarget ?? undefined
-            });
+            const check = new guardMod.PromptDeliveryGuard().verifyPackage(
+              shots,
+              packageAuditOptions(metadata, lastProjectedTarget),
+            );
             await emit({
               kind: "pipeline.duration.package_check",
               projectId: input.projectId,
@@ -582,7 +652,11 @@ export class VideoStudio {
           log(`[studio] 作品级校验跳过：${err instanceof Error ? err.message : String(err)}`);
         }
         await emit({
-          kind: result.success ? "pipeline.finished" : "pipeline.failed",
+          kind: result.success
+            ? "pipeline.finished"
+            : cfg.deferRender === true
+              ? "pipeline.deferred_render_incomplete"
+              : "pipeline.failed",
           projectId: input.projectId,
           runId,
           payload: { stages: Object.keys(result.stages ?? {}) }

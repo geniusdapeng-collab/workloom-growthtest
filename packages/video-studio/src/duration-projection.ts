@@ -68,7 +68,7 @@ export type ProjectionResult =
   | {
       ok: false;
       error: "INFEASIBLE";
-      reason: "voice-floor-exceeds-target" | "capacity-below-target";
+      reason: "voice-floor-exceeds-target" | "min-duration-exceeds-target" | "capacity-below-target";
       overloadSeconds: number;
       entries: ProjectionEntry[];
       suggestions: string[];
@@ -278,7 +278,12 @@ export function projectShotDurations(shots: ProjectionShotInput[], options: Proj
   const floors = shots.map((shot) => {
     const floor = computeVoiceFloor(shot, shot.emotion ?? shot.mood);
     const plan = Math.round(Number(shot.duration ?? shot.timing?.duration ?? floor.seconds) || 0);
-    const bound = options.enforceVoiceFloor === false ? Math.max(plan, 0) : floor.seconds;
+    /**
+     * 规划模式只暂时不锁“台词硬下限”，但计划秒数也不是下限：
+     * 15s 六镜常被模型写成 2.5s/镜，四舍五入后会变成 18s；
+     * 此时必须在 [min,max] 内重新守恒分配，最终台词下限由 Phase3 再强制。
+     */
+    const bound = options.enforceVoiceFloor === false ? 0 : floor.seconds;
     return { shot, floor, lower: Math.max(min, Math.min(max, Math.max(bound, min))) };
   });
   const lowerSum = floors.reduce((sum, f) => sum + f.lower, 0);
@@ -299,16 +304,26 @@ export function projectShotDurations(shots: ProjectionShotInput[], options: Proj
 
   if (lowerSum > target) {
     const overload = lowerSum - target;
+    const voiceFloorSum = floors.reduce((sum, entry) => sum + entry.floor.seconds, 0);
+    const modelFloorSum = shots.length * min;
+    const reason = voiceFloorSum > target ? "voice-floor-exceeds-target" : "min-duration-exceeds-target";
+    const suggestions = voiceFloorSum > target
+      ? [
+          `台词硬下限合计 ${voiceFloorSum}s > 目标 ${target}s（至少超载 ${voiceFloorSum - target}s）`,
+          `含模型单镜下限后的排程下限为 ${lowerSum}s（超载 ${overload}s）`,
+          `可执行修复：① 精简台词（约删 ${Math.ceil(overload * loadSpeechRate().NORMAL)} 字）；② 目标总时长加至 ${lowerSum}s；③ 减少镜头数`,
+        ]
+      : [
+          `镜头排程下限合计 ${lowerSum}s（${shots.length} 镜 × 单镜下限 ${min}s）> 目标 ${target}s（超载 ${overload}s）`,
+          `本片无台词下限超载；可执行修复：① 减少镜头数至 ${Math.floor(target / min)}；② 目标总时长加至 ${modelFloorSum}s；③ 将该逻辑用于供应商单镜请求前，不要套到短剪辑时间线`,
+        ];
     return {
       ok: false,
       error: "INFEASIBLE",
-      reason: "voice-floor-exceeds-target",
+      reason,
       overloadSeconds: overload,
       entries,
-      suggestions: [
-        `台词硬下限合计 ${lowerSum}s > 目标 ${target}s（超载 ${overload}s）`,
-        `可执行修复：① 精简台词（约删 ${Math.ceil(overload * loadSpeechRate().NORMAL)} 字）；② 目标总时长加至 ${lowerSum}s；③ 减少镜头数`,
-      ],
+      suggestions,
     };
   }
   if (capacity < target) {

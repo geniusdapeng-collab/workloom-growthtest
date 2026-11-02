@@ -6,7 +6,7 @@ import { resolveGate } from "./gates.js";
 import { autoApproveHandler, runWithConfirmationHandler } from "./confirmation.js";
 import { WorkloomLLMEngine } from "./llm-adapter.js";
 import { buildRenderScript, loadPromptLengthSpec } from "./render-scripts.js";
-import { VideoStudio, attachDefaultCharacterAnchor, sanitizeGateContent, type ApprovalCallback, type EventSink } from "./studio.js";
+import { VideoStudio, attachDefaultCharacterAnchor, packageAuditOptions, sanitizeGateContent, type ApprovalCallback, type EventSink } from "./studio.js";
 
 const repoRoot = resolve(import.meta.dirname, "../../..");
 const studioMocks = vi.hoisted(() => ({
@@ -51,12 +51,20 @@ vi.mock("./vendor-compat.js", () => {
   };
   return {
     applyDurationPolicyToManager: vi.fn(),
+    narrativeSpeechPolicy: (value: unknown) => ({
+      allSpeechForbidden: /(?:无.{0,2}台词|无对白)/u.test(String(value ?? ""))
+        && !/(?:允许|保留)[^。；\n]*(?:旁白|画外音|画外)/u.test(String(value ?? "")),
+    }),
+    runWithDurationProjectionPolicy: (_policy: { noDialogue?: boolean }, callback: () => unknown) => callback(),
     installVendorConfigIsolatorBridge: install("isolator"),
     installVendorPhaseDiagnosticsBridge: install("phase"),
     installVendorFieldQualityBridge: install("field"),
     installVendorMicroMotionBridge: install("micro"),
     installVendorContractBridge: install("contract"),
     installVendorPromptRebuildBridge: install("prompt"),
+    installVendorNarrativePromptReviewBridge: install("prompt-review"),
+    installVendorPreproductionReviewBridge: install("preproduction-review"),
+    installVendorQualityGateBridge: install("quality-gate"),
     installVendorDiscoveryFixBridge: install("discovery"),
     installVendorDiscoveryNarrativeBridge: install("discovery-narrative"),
     installVendorPhaseInternalsDiagnostics: install("inner"),
@@ -117,13 +125,31 @@ describe("gates 映射", () => {
       "║ id=chen-zhuo;name=陈卓;portraitRef=bun  ║",
       "║ -01-chen-zhuo/portraits/v3/平江路讲述   ║",
       "║ 人-front.png;authorization=real-author  ║",
+      "同一输入在下文被重复展示：",
+      "║ id=chen-zhuo;name=陈卓;portraitRef=bun  ║",
+      "║ -01-chen-zhuo/portraits/v3/平江路讲述   ║",
+      "║ 人-front.png;authorization=real-author  ║",
+      "请确认以上创意主题是否符合您的预期：",
+      '• 回复 "确认" 或 "OK" → 进入视频生成链路',
     ].join("\n");
     const sanitized = sanitizeGateContent("G2_THEME", content);
-    expect(sanitized).toContain("授权角色：陈卓");
-    expect(sanitized).toContain("系统内部绑定");
+    expect(sanitized).toContain("雨夜归家的都市故事");
+    expect(sanitized).not.toContain("陈卓");
+    expect(sanitized).not.toContain("授权角色");
+    expect(sanitized).not.toContain("系统内部绑定");
     expect(sanitized).not.toContain("平江路讲述人");
     expect(sanitized).not.toContain("portraitRef=");
     expect(sanitized).not.toContain("authorization=");
+    expect(sanitized).not.toContain("ized");
+    expect(sanitized).not.toContain("请确认以上创意主题");
+    expect(sanitized).not.toContain('回复 "确认"');
+  });
+
+  it("作品级时长检查继承实际平台档，不把抖音片误判成默认电影档", () => {
+    expect(packageAuditOptions({ platform: "douyin" }, 15)).toEqual({ targetDuration: 15, platform: "douyin" });
+    expect(packageAuditOptions({ platformSelection: { id: "抖音" } }, 30)).toEqual({ targetDuration: 30, platform: "douyin" });
+    expect(packageAuditOptions({ brief: { platform: "小红书" } }, null)).toEqual({ platform: "xiaohongshu" });
+     expect(packageAuditOptions({}, 0)).toEqual({});
   });
 });
 

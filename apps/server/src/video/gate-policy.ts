@@ -72,6 +72,18 @@ export const GATE_RUBRIC: Partial<Record<GateKey, string[]>> = {
   G7_FINAL: ["预生产收口：镜头卡/定妆照/提示词三件套齐备且互相引用一致", "渲染提交前仍须通过 G8 预算、资格和质量围栏；人类审批等待已取消"]
 };
 
+/** Audit-only policy: a disabled portrait stage is explicitly not applicable, never a fake pass case. */
+export function auditPortraitGateNotApplicable(
+  gate: GateKey,
+  input: { portraitsEnabled: boolean; allowNotApplicable: boolean },
+): boolean {
+  if (!input.allowNotApplicable) return false;
+  if (input.portraitsEnabled) {
+    throw new Error("AUDIT_PORTRAIT_GATE_CONFLICT: 真实定妆照已启用时禁止将 G5 标为不适用");
+  }
+  return gate === "G5_PORTRAIT";
+}
+
 /**
  * 门内容的确定性检查（零 token 先判）：
  * 空内容 / 占位符 / 声称完成但没有产物 —— 一律硬失败，不浪费模型额度。
@@ -92,7 +104,14 @@ export function gateDeterministicChecks(gate: GateKey, content: string): Array<{
   const checks = [
     { id: "content-present", pass: trimmed.length > 0, hard: true, detail: trimmed.length > 0 ? `门内容 ${trimmed.length} 字` : "门内容为空（vendor 未产出该环节产物）" },
     { id: "no-placeholder", pass: !/undefined|null(?![\w])|NaN|\[object Object\]/.test(trimmed), hard: true, detail: /undefined|null(?![\w])|NaN|\[object Object\]/.test(trimmed) ? "门内容含 undefined/null/NaN/[object Object] 占位" : "无占位符泄漏" },
-    { id: "min-length", pass: trimmed.length >= 120, hard: true, detail: `内容长度 ${trimmed.length}（下限 120，过短通常意味着上游字段过薄）` }
+    {
+      id: "min-length",
+      pass: trimmed.length >= 120,
+      hard: true,
+      detail: trimmed.length >= 120
+        ? "有效内容已达到下限 120 字（统一按去掉首尾空白后的 Unicode 字符计数）"
+        : `有效内容仅 ${trimmed.length} 字（下限 120，过短通常意味着上游字段过薄）`,
+    }
   ];
   if (gate === "G5_PORTRAIT") {
     const pendingOnly = /completedPortraits["'\s:]+0/.test(trimmed) || /"pending"\s*:\s*true/.test(trimmed);
