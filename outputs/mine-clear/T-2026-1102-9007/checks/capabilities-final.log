@@ -1,0 +1,8 @@
+
+> workloom-ai-acquisition@0.1.0 capabilities:check /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest
+> node scripts/generate-capabilities.mjs --check
+
+  ✓ docs/capabilities.auto.md（已最新）
+  ✓ docs/capabilities.auto.json（已最新）
+  ✓ README.md（已最新）
+能力文档与生成器一致 ✓（不代表生产验证）

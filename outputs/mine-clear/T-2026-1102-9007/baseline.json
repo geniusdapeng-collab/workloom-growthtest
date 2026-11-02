@@ -1,0 +1,24 @@
+{
+  "schema": "workloom.mine-clear/baseline@1",
+  "task_id": "T-2026-1102-9007",
+  "repo": "growthtest",
+  "repo_path": "/Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest",
+  "remote": "origin",
+  "audit": {
+    "commit": "5ffe5047767c3e0e41feeac865ed36a76c0f9428",
+    "branch": "task/T-2026-1102-9007",
+    "remote": "origin",
+    "remote_main": "c78ee87957ff14ff62769308ef80616344e4b8ae",
+    "fetched_at": null,
+    "fetch_status": "skipped",
+    "dirty_count": 0,
+    "notes": [
+      "本地 HEAD 不是 origin/main 最新（云端 c78ee879 / 本地 5ffe5047）——按 §1.2 先对齐基线"
+    ]
+  },
+  "smoke": {
+    "status": "not-run",
+    "notes": "M0 冒烟：健康检查 + 一条核心业务链路，跑完回填这里"
+  },
+  "created_at": "2026-11-02T13:56:34.869Z"
+}

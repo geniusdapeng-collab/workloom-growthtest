@@ -1,0 +1,91 @@
+[
+  {
+    "id": "marketing-source-redirect",
+    "severity": "P1",
+    "baseline": "5ffe5047767c3e0e41feeac865ed36a76c0f9428",
+    "path": "apps/server/src/video/marketing-source-fetcher.ts",
+    "line": 178,
+    "rootCause": "来源ID未包含请求URL，归档按相同sourceId去重后替换后站实际审核快照",
+    "trigger": "A1与A2/A3不同跳转URL最终指向同文，finalizeMarketingFacts复读 MARKETING_SUPPORT_UNBOUND",
+    "commit": "6cdf366e",
+    "tests": [
+      "apps/server/src/video/marketing-authority.test.ts",
+      "apps/server/src/video/marketing-source-fetcher.test.ts"
+    ],
+    "red": "work/marketing-evidence/redirect-red.log",
+    "green": "work/marketing-evidence/redirect-green.log",
+    "followupCommits": [
+      "2e27994c"
+    ],
+    "extraRed": "work/marketing-evidence/source-fragment-red.log",
+    "extraGreen": "work/marketing-evidence/source-fragment-green.log"
+  },
+  {
+    "id": "marketing-search-pace",
+    "severity": "P2",
+    "baseline": "5ffe5047767c3e0e41feeac865ed36a76c0f9428",
+    "path": "apps/server/src/video/data-mining-executor.ts",
+    "line": 373,
+    "rootCause": "并发调用同时读取lastCallAt并等待，醒来突发；等待期间发生熔断也未复查",
+    "trigger": "四并发查询同provider，50ms目标变成10000/10050/10050/10050；429后另三请求仍出站",
+    "commit": "c6c0ef8f",
+    "tests": [
+      "apps/server/src/video/data-mining-pacing.test.ts",
+      "apps/server/src/video/data-mining-executor.test.ts"
+    ],
+    "red": "work/marketing-evidence/pacing-red.log",
+    "extraRed": "work/marketing-evidence/pacing-cooldown-red.log",
+    "green": "work/marketing-evidence/pacing-green.log",
+    "followupCommits": [
+      "47a3da70"
+    ],
+    "apiRed": "work/marketing-evidence/pacing-api-red.log",
+    "apiGreen": "work/marketing-evidence/pacing-api-green.log"
+  },
+  {
+    "id": "pipeline-explicit-negation",
+    "severity": "P1",
+    "baseline": "5ffe5047767c3e0e41feeac865ed36a76c0f9428",
+    "path": "packages/video-studio/src/pipeline-router.ts",
+    "line": 237,
+    "rootCause": "显式route match不区分否定，较早的否定被作为高优先级正向路由",
+    "trigger": "不要营销片，走叙事片→clarify缺商品；不要叙事片，走营销片+商品名→narrative跳过营销来源链",
+    "commit": "772df38c",
+    "tests": [
+      "packages/video-studio/src/pipeline-route-negation.test.ts",
+      "packages/video-studio/src/pipeline-router.test.ts"
+    ],
+    "red": "work/marketing-evidence/route-red.log",
+    "green": "work/marketing-evidence/route-green.log",
+    "followupCommits": [
+      "905441da"
+    ],
+    "extraRed": "work/marketing-evidence/route-verb-red.log",
+    "extraGreen": "work/marketing-evidence/route-verb-green.log"
+  },
+  {
+    "id": "marketing-price-currencies",
+    "severity": "P1",
+    "baseline": "5ffe5047767c3e0e41feeac865ed36a76c0f9428",
+    "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/product-info-collector.js",
+    "line": 180,
+    "rootCause": "全部amount跨币种求区间，仅拿第一个currency，下游CrossVerifier与摘要/钩子继续消费错误区间",
+    "trigger": "真实原始USD99/109+CNY699/799被装订USD99-799；最终事实审核可拒绝并浪费创作重试",
+    "commit": "36a00e3b",
+    "followupCommits": [
+      "9b0db705",
+      "7b2b6b21"
+    ],
+    "tests": [
+      "apps/server/src/video/marketing-authority.test.ts",
+      "packages/video-studio/src/studio.test.ts",
+      "packages/video-studio/src/marketing-price-contract.test.ts"
+    ],
+    "red": "work/marketing-evidence/mixed-currency-red.log",
+    "green": "work/marketing-evidence/mixed-currency-green.log",
+    "extraRed": "work/marketing-evidence/mixed-currency-zero-red.log",
+    "extraGreen": "work/marketing-evidence/mixed-currency-zero-green.log",
+    "zeroProvenanceRed": "work/marketing-evidence/all-free-price-red.log",
+    "zeroProvenanceGreen": "work/marketing-evidence/all-free-price-green.log"
+  }
+]

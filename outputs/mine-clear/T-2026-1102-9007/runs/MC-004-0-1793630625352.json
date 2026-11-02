@@ -1,0 +1,39 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-004-0-1793630625352",
+  "command": "node node_modules/vitest/vitest.mjs run packages/video-studio/src/duration-voice-ceiling.test.ts packages/video-studio/src/duration-projection.test.ts --maxWorkers=2",
+  "exec": {
+    "file": "node",
+    "args": [
+      "node_modules/vitest/vitest.mjs",
+      "run",
+      "packages/video-studio/src/duration-voice-ceiling.test.ts",
+      "packages/video-studio/src/duration-projection.test.ts",
+      "--maxWorkers=2"
+    ]
+  },
+  "actor": "/root/submission_audit",
+  "role": "acceptance",
+  "subject": {
+    "card_id": "MC-004",
+    "assertion_index": 0
+  },
+  "commit": "3f3d283315b9f521871622deb18ef15bbfad6568",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-02T14:43:45.352Z",
+  "finished_at": "2026-11-02T14:43:45.728Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-004-0-1793630625352.txt",
+      "sha256": "7b24b6b4e232b8002d34b452940fa61c7e3ffadd81050804dc6d572839ff681f",
+      "commit": "3f3d283315b9f521871622deb18ef15bbfad6568"
+    }
+  ]
+}

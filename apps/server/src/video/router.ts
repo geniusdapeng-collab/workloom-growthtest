@@ -989,6 +989,12 @@ const renderRouter = router({
           message: `G11 项目算力预算已用尽（${computeUsed}/${computeCap} 秒）：停止继续提交渲染`,
         });
       }
+      if (!qualified.reconciliationOnly && durationSec > computeCap - computeUsed) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `G11 项目算力预算不足（已用 ${computeUsed} 秒 + 本镜 ${durationSec} 秒 > 上限 ${computeCap} 秒）：停止继续提交渲染`,
+        });
+      }
       const autoReview = autoApproveVideoFence(rawVerdict, {
         scope: "ai-video",
         allowDefaultReview: true,

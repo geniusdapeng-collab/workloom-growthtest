@@ -1,0 +1,484 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest
+
+[RenderingEngine] 无法加载现有渲染核心: Cannot find module './prompt-guardian'
+Require stack:
+- /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest/[eval]
+[RenderingEngine] 将使用内置模拟模式
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+[ScriptGenerator] ⚠️ 未配置模型名，请设置 SUPERMICKEY_LLM_MODEL（兼容旧名 STORMAXE_LLM_MODEL）或传入 options.model
+[ScriptGenerator] ⚠️ 未配置模型名，请设置 SUPERMICKEY_LLM_MODEL（兼容旧名 STORMAXE_LLM_MODEL）或传入 options.model
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+[ScriptGenerator] ⚠️ 未配置模型名，请设置 SUPERMICKEY_LLM_MODEL（兼容旧名 STORMAXE_LLM_MODEL）或传入 options.model
+[PromptFusionAgent] ⚠️ 镜头 S1 精炼后仅 557 字符，低于精炼后下限 1200，请检查上游字段是否过薄
+[PromptFusionAgent] ⚠️ 镜头 S1 中文占比过低(28.5%), 尝试修正为中文输出
+[PromptFusionAgent] ⚠️ 镜头 S1 精炼后仅 596 字符，低于精炼后下限 1200，请检查上游字段是否过薄
+[PromptFusionAgent] ⚠️ 镜头 S1 精炼后仅 557 字符，低于精炼后下限 1200，请检查上游字段是否过薄
+[PromptFusionAgent] ⚠️ 镜头 S1 中文占比过低(28.5%), 尝试修正为中文输出
+[PromptFusionAgent] 尝试 1/3 失败: [BudgetExhausted] LLM引擎返回失败: offline-budget-fixture | type=NETWORK | retryable=false
+[PromptFusionAgent] 🔴 不可重试错误(NETWORK)，停止重试: 底层判定不可重试
+[PromptFusionAgent] 所有 1 次尝试均失败，最后错误: [BudgetExhausted] LLM引擎返回失败: offline-budget-fixture
+[PromptFusionAgent] 备用模型也失败: PHASE3_BUDGET_EXHAUSTED: 提供商调用前剩余预算不足 5 秒
+[PromptFusionAgent] 极限重试失败: PHASE3_BUDGET_EXHAUSTED: 提供商调用前剩余预算不足 5 秒
+[PromptFusionAgent] 降级结果为null/undefined: LLM failed after 1 attempts: [BudgetExhausted] LLM引擎返回失败: offline-budget-fixture
+[PromptFusionAgent] 尝试 1/3 失败: [BudgetExhausted] LLM引擎返回失败: offline-budget-fixture | type=NETWORK | retryable=false
+[PromptFusionAgent] 🔴 不可重试错误(NETWORK)，停止重试: 底层判定不可重试
+[PromptFusionAgent] 所有 1 次尝试均失败，最后错误: [BudgetExhausted] LLM引擎返回失败: offline-budget-fixture
+[PromptFusionAgent] 备用模型也失败: PHASE3_BUDGET_EXHAUSTED: 提供商调用前剩余预算不足 5 秒
+[PromptFusionAgent] 极限重试失败: PHASE3_BUDGET_EXHAUSTED: 提供商调用前剩余预算不足 5 秒
+[PromptFusionAgent] 降级结果为null/undefined: LLM failed after 1 attempts: [BudgetExhausted] LLM引擎返回失败: offline-budget-fixture
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+ ❯ packages/video-studio/src/vendor-compat.test.ts (107 tests | 12 failed) 6109ms
+     × 无角色空镜最终提示词清除人物模板、人声与配乐，并保持编号连续 8ms
+     × canonical 最终合同从可信字段重建固定26栏并追加逐镜验收，不继承模型字段漂移 2ms
+     × 动物和自然空镜逐镜保留真实动作，不再被通用环境模板覆盖 2ms
+     × 三动作动物场即使被模型压成两段，也按探头接水缩回拆分并纠正顺序 3ms
+     × 猫片五镜按动作分配景别与节奏，G7 只声明可核验的文字身份锚点 3ms
+     × 归家动作逐镜约束门外、开门、换鞋、开灯与落座的场景灯态和道具 1ms
+     × 六镜归家合同补齐关门状态，并逐镜区分鞋态、情绪、时间轴和场景 0ms
+     × 七镜归家合同把两只湿便鞋拆成不同时间轴、情绪和鞋态 0ms
+     × G6 最终归一删除开灯与听雨场景中的或式二义 1ms
+     × PRD 把真实模型的配乐、复合光位和主观阈值收敛成可执行合同 3ms
+     × PRD 三场归家合同统一伞鞋灯态，补齐关门并删除单音和未开门悬念 2ms
+     × Phase3 单镜重试仍降级时用源合同恢复，并在最终评审投影后继续推进 197ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 12 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/video-studio/src/vendor-compat.test.ts > 定妆照绑定桥（真机故障复现 → 修复） > 无角色空镜最终提示词清除人物模板、人声与配乐，并保持编号连续
+AssertionError: expected '01.【语言约束】全部字段必须使用中文；画幅、分辨率、帧率、编码、时间码与…' to contain '无人物声、无旁白、无音乐'
+
+- Expected
++ Received
+
+- 无人物声、无旁白、无音乐
++ 01.【语言约束】全部字段必须使用中文；画幅、分辨率、帧率、编码、时间码与格式名等制作标记可作为受控例外；不输出英文叙事标签、英文风格词或英文负面词。
++ 02.【约束】9:16画幅，1080x1920，5秒，24fps，MP4格式。
++ 03.【明亮约束】自然景物高光不过曝，暗部保留材质细节；本镜不涉及人物面部或肤色。
++ 04.【角色】无人物、无人影、无动物入画；主体仅来自源证据中的湖面、芦苇、山体、雾、水痕等自然景物。
++ 05.【服装】不适用：无人物出场。
++ 06.【台词】不适用：本片无台词、无旁白、无口播。
++ 07.【时间轴】T00:00-T00:5.0 从静止起幅开始，风、雾、水、光在连续物理范围内完成变化；落幅保持同一空间与光源方向，不跨越下一镜。
++ 08.【情绪】平静、克制；仅通过光线、水面、雾层和芦苇的节奏表达，不要求人物表情。
++ 09.【音频】仅有风声；无人物声、无旁白；无音乐、无配乐、无音乐节拍。
++ 10.【负面约束】无文字、无字幕、无水印、无品牌标识、无人物、无人影、无人体局部、无动物、无飞鸟、无船只、无建筑、无现代设备、无镜头光晕伪影、无生成特效、无模糊、无过曝
++ 11.【角色约束】画面禁止人物、人影、人体局部和拟人化表演模板；仅允许源证据中的自然景物。
++ 12.【角色一致性】本镜无角色；场景、自然物位置、光源方向与时间阶段以源证据和统一视觉方案为准，不追加未经核实的参数。
++ 13.【动作】只执行画面中可见的连续动作，动作主体、先后顺序和结束姿态与场景字段一致
++ 14.【化妆】不适用：无人物出场。
++ 15.【场景】
++ 16.【灯光设计】统一自然晨光；低角度自然侧逆光经薄雾柔化，无人工光源；全片保持同一主光方向、白平衡与光比，不自行切换冷暖基调。
++ 17.【定妆照】不适用：无人物出场，不生成也不引用人像定妆照。
++ 18.【道具】源证据中的自然物；不添加人工道具、人物或动物。
++ 19.【运镜】固定机位，不做推拉摇移或变焦；从起幅到落幅连续稳定，不写厘米、米每秒或其他无法兑现的位移参数。
++ 20.【节奏】整体节奏依据源证据中的自然变化连续推进，不使用人工强转折或情绪性加速。
++ 21.【转场】本镜落幅后硬切至下一镜；不使用叠化、黑场或其他转场特效。
+
+ ❯ packages/video-studio/src/vendor-compat.test.ts:1047:20
+    1045|     expect(prompt).toContain("不要求人物表情");
+    1046|     expect(prompt).toContain("【台词】不适用");
+    1047|     expect(prompt).toContain("无人物声、无旁白、无音乐");
+       |                    ^
+    1048|     expect(prompt).toContain("无文字、无字幕、无水印");
+    1049|     expect(prompt).not.toMatch(/面部明亮|站立姿态|微笑或点头|人声对话|弦乐|BPM|no text|no…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/12]⎯
+
+ FAIL  packages/video-studio/src/vendor-compat.test.ts > 定妆照绑定桥（真机故障复现 → 修复） > canonical 最终合同从可信字段重建固定26栏并追加逐镜验收，不继承模型字段漂移
+AssertionError: expected '01.【语言约束】全部字段使用中文；画幅、分辨率、帧率、编码、时间码与资产…' to contain '【化妆】自然写实妆'
+
+- Expected
++ Received
+
+- 【化妆】自然写实妆
++ 01.【语言约束】全部字段使用中文；画幅、分辨率、帧率、编码、时间码与资产路径可作为受控制作标记。
++ 02.【导演意图】克制写实的自然长镜或稳定短镜；以人物动作、空间关系和真实光线推进，不增加无关叙事、特效或模板表演。
++ 03.【基础】电影级写实质感；保留真实材质、自然颗粒与连续物理运动。
++ 04.【约束】9:16画幅，1080x1920，3秒，24fps，MP4格式。
++ 05.【场景】雨夜出租屋玄关，湿伞、门框与旧台灯形成同一空间
++ 06.【灯光设计】玄关冷蓝雨光与台灯2800K局部暖光分区锁定
++ 07.【明亮约束】人物与主体轮廓可辨，按已确认灯光设计保留明暗层次，环境高光不过曝，不使用额外正面补光。
++ 08.【构图】中景景别，9:16构图；陈卓位于可执行表演区并保持可辨轮廓，为其动作和视线保留空间。
++ 09.【色彩/色调】冷青蓝环境色，局部暖黄
++ 10.【景深】中等景深，焦点跟随人物上半身与当前动作，背景保留空间层次但不过度抢焦点。
++ 11.【运镜】固定机位，三脚架锁死，全镜零推拉零横移零变焦
++ 12.【角色】陈卓入画；保持当前授权角色档案中的发型脸型、身高体型与服装一致
++ 13.【服装】深灰连帽外套、深色长裤与湿鞋
++ 14.【化妆】雨夜自然裸妆，保持同一肤色
++ 15.【动作】陈卓收伞、关门，目光短暂落在旧台灯上
++ 16.【道具】湿伞、旧木门、旧台灯
++ 17.【定妆照】使用 陈卓=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；跨镜不得替换。
++ 18.【台词】不适用：本片无台词、无旁白、无口播。
++ 19.【时间轴】T00:00.0-T00:00.9 陈卓收伞、关门，目光短暂落在旧台灯上；T00:00.9-T00:02.3 陈卓收伞、关门，目光短暂落在旧台灯上；T00:02.3-T00:03.0 动作落定，保持结束姿态
++ 20.【情绪】视线跟随本镜可见动作目标移动，表情与呼吸按已确认情绪合同自然变化，不使用固定微笑或模板化凝视。
++ 21.【节奏】3.0 秒内按约 30%/45%/25% 分配：前段陈卓收伞、关门，目光短暂落在旧台灯上，中段完成主要变化，末段动作落定收束；不做额外加速或无关转场。
++ 22.【转场】本镜动作落定后硬切至下一镜，人物、道具与场景状态以相邻源镜头合同为准，不使用额外特效。
++ 23.【音频】仅保留真实环境声与主体动作声；无人物声、无旁白、无音乐、无配乐、无节拍。
++ 24.【负面约束】无文字、无字幕、无水印、无品牌标识、无动物、无飞鸟、无生成特效、无镜头光晕伪影、无模糊、无过曝、无未声明角色、无暗黑风调色、无塑料或金属感高光。
++ 25.【角色约束】本镜仅允许 陈卓 入画；不得增加未声明人物。
++ 26.【角色一致性】分别绑定 陈卓 的授权外观、服装与发型；不得合并、替换或增减人物。
++ 27.【本镜验收】逐段核对起点、中段与落幅的目标帧，主体、动作方向、接触点和结束姿态必须与本镜编号字段一致；检查中景构图的安全区、焦平面、主体占比与背景层次；核对主辅光方向、白平衡、材质高光、暗部纹理与冷暖边界；核对道具数量、位置、湿度状态和跨镜连续性；核对声音事件与画面动作同帧，且不新增合同外人物、文字、品牌、字幕或配乐
+
+ ❯ packages/video-studio/src/vendor-compat.test.ts:1131:20
+    1129|     expect(prompt).toContain("【本镜验收】");
+    1130|     expect(prompt).toContain("【角色】陈卓入画");
+    1131|     expect(prompt).toContain("【化妆】自然写实妆");
+       |                    ^
+    1132|     expect(prompt).toContain("【动作】陈卓收伞、关门");
+    1133|     expect(prompt).toContain("平江路讲述人-front.png");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/12]⎯
+
+ FAIL  packages/video-studio/src/vendor-compat.test.ts > 定妆照绑定桥（真机故障复现 → 修复） > 动物和自然空镜逐镜保留真实动作，不再被通用环境模板覆盖
+AssertionError: expected '01.【语言约束】全部字段使用中文；画幅、分辨率、帧率、编码、时间码与资产…' to match /耳尖先转向滴水声|视线锁定下落水滴/u
+
+- Expected:
+/耳尖先转向滴水声|视线锁定下落水滴/u
+
++ Received:
+"01.【语言约束】全部字段使用中文；画幅、分辨率、帧率、编码、时间码与资产路径可作为受控制作标记。
+02.【导演意图】克制写实的动物观察短片；以动物动作、空间关系和真实光线推进，不拟人化、不增加无关叙事或模板表演。
+03.【基础】电影级写实质感；保留真实材质、自然颗粒与连续物理运动。
+04.【约束】9:16画幅，1080x1920，3秒，24fps，MP4格式。
+05.【场景】雨后纸箱与屋檐，湿地面反光
+06.【灯光设计】冷蓝夜空与暖黄屋檐灯分区
+07.【明亮约束】动物主体高光不过曝，湿毛、爪垫与纸箱纤维保留纹理，暗部不死黑；不要求人物面部曝光。
+08.【构图】close-up景别，9:16构图；橘猫作为唯一动物主体清晰可辨，画面边缘保留安全区，不增加人物。
+09.【色彩/色调】5600K
+10.【景深】浅景深，焦点锁定动物眼睛、爪部或当前接触点，前后景自然虚化；主体轮廓与接触关系始终清晰。
+11.【运镜】固定机位，三脚架锁死，全镜零推拉零横移零变焦
+12.【角色】橘猫作为本镜唯一动物主体入画；外观锚点=橘色虎斑短毛，胸腹浅白，圆亮琥珀色眼睛，体型偏小，毛尖带雨水；身份证据仅文字外观锚点，本审计轮无已登记图片参考资产；画面不出现人物、人影或人体局部。
+13.【服装】不适用：本镜无人物。
+14.【化妆】不适用：本镜无人物。
+15.【动作】橘猫作为唯一动物主体：伸爪接屋檐滴水
+16.【道具】纸箱、屋檐、积水、水滴
+17.【定妆照】不适用人像定妆照：动物主体只复用同一段文字外观锚点；本审计轮无已登记参考帧或图片资产，不声称图像锁定，不生成人物肖像。
+18.【台词】不适用：本片无台词、无旁白、无口播。
+19.【时间轴】T00:00.0-T00:00.9 伸爪接屋檐滴水；T00:00.9-T00:02.3 伸爪接屋檐滴水；T00:02.3-T00:03.0 动作落定，保持结束姿态
+20.【情绪】橘猫通过本镜已确认动作“伸爪接屋檐滴水”与身体重心变化表达状态，不增加源合同外的环境、道具或拟人化表演。
+21.【节奏】3.0 秒内按约 30%/45%/25% 分配：前段伸爪接屋檐滴水，中段完成主要变化，末段动作落定收束；不做额外加速或无关转场。
+22.【转场】本镜动作落定后硬切至下一镜，人物、道具与场景状态以相邻源镜头合同为准，不使用额外特效。
+23.【音频】仅保留真实环境声与主体动作声；无人物声、无旁白、无音乐、无配乐、无节拍。
+24.【负面约束】无文字、无字幕、无水印、无品牌标识、无人物、无人影、无人体局部、无生成特效、无镜头光晕伪影、无模糊、无过曝、无未声明角色、无暗黑风调色、无塑料或金属感高光。
+25.【角色约束】画面禁止人物、人影、人体局部和拟人化表演模板。
+26.【角色一致性】本镜无人物；锁定同一场景、道具、光源与空间关系。
+27.【本镜验收】逐段核对起点、中段与落幅的目标帧，主体、动作方向、接触点和结束姿态必须与本镜编号字段一致；检查close-up构图的安全区、焦平面、主体占比与背景层次；核对主辅光方向、白平衡、材质高光、暗部纹理与冷暖边界；核对道具数量、位置、湿度状态和跨镜连续性；核对声音事件与画面动作同帧，且不新增合同外人物、文字、品牌、字幕或配乐"
+
+ ❯ packages/video-studio/src/vendor-compat.test.ts:1177:26
+    1175|     expect(animalPrompt).not.toContain("无动物、无飞鸟");
+    1176|     expect(animalPrompt).not.toContain("风、雾、水面、光线与植物");
+    1177|     expect(animalPrompt).toMatch(/耳尖先转向滴水声|视线锁定下落水滴/u);
+       |                          ^
+    1178|
+    1179|     const contradictory = applyNarrativeFinalPromptContract({
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/12]⎯
+
+ FAIL  packages/video-studio/src/vendor-compat.test.ts > 定妆照绑定桥（真机故障复现 → 修复） > 三动作动物场即使被模型压成两段，也按探头接水缩回拆分并纠正顺序
+AssertionError: expected '伸爪接屋檐滴水' to match /探头/u
+
+- Expected:
+/探头/u
+
++ Received:
+"伸爪接屋檐滴水"
+
+ ❯ packages/video-studio/src/vendor-compat.test.ts:1274:25
+    1272|     expect(String(nodes.at(-1)!.purpose)).toMatch(/缩回|盘成|蜷缩/u);
+    1273|     const sequence = projectNarrativeActionSequence(["伸爪接屋檐滴水", "缩回纸箱盘…
+    1274|     expect(sequence[0]).toMatch(/探头/u);
+       |                         ^
+    1275|     expect(sequence[1]).toMatch(/抬起前爪|伸向屋檐滴水/u);
+    1276|     expect(sequence[2]).toMatch(/水滴.*爪垫/u);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/12]⎯
+
+ FAIL  packages/video-studio/src/vendor-compat.test.ts > 定妆照绑定桥（真机故障复现 → 修复） > 猫片五镜按动作分配景别与节奏，G7 只声明可核验的文字身份锚点
+AssertionError: expected [ Array(5) ] to deeply equal [ 'medium', 'close-up', …(3) ]
+
+- Expected
++ Received
+
+  [
+-   "medium",
+-   "close-up",
+-   "extreme-close-up",
+-   "medium",
+-   "close-up",
++   "establishing",
++   "establishing",
++   "establishing",
++   "establishing",
++   "establishing",
+  ]
+
+ ❯ packages/video-studio/src/vendor-compat.test.ts:1342:82
+    1340|     const field = (shot: Record<string, unknown>, label: string): stri…
+    1341|       new RegExp(`^\\s*\\d+\\.【${label}】([^\\n]*)$`, "mu").exec(String…
+    1342|     expect(prompts.map((shot) => field(shot, "构图").replace(/景别.*/u, ""…
+       |                                                                                  ^
+    1343|       "medium",
+    1344|       "close-up",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/12]⎯
+
+ FAIL  packages/video-studio/src/vendor-compat.test.ts > 定妆照绑定桥（真机故障复现 → 修复） > 归家动作逐镜约束门外、开门、换鞋、开灯与落座的场景灯态和道具
+AssertionError: expected { action: '收伞回到出租屋', …(4) } to match object { scene: StringContaining{…}, …(3) }
+(1 matching property omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "color": StringContaining "冷蓝",
+-   "lighting": StringContaining "旧台灯关闭",
+-   "props": [
+-     "雨伞",
+-   ],
+-   "scene": StringContaining "人物尚未进入出租屋",
++   "color": undefined,
++   "lighting": undefined,
++   "props": [],
++   "scene": undefined,
+  }
+
+ ❯ packages/video-studio/src/vendor-compat.test.ts:2147:65
+    2145|
+    2146|   it("归家动作逐镜约束门外、开门、换鞋、开灯与落座的场景灯态和道具", () => {
+    2147|     expect(deriveNarrativeShotDirection({ action: "收伞回到出租屋" })).toMatc…
+       |                                                                 ^
+    2148|       scene: expect.stringContaining("人物尚未进入出租屋"),
+    2149|       lighting: expect.stringContaining("旧台灯关闭"),
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/12]⎯
+
+ FAIL  packages/video-studio/src/vendor-compat.test.ts > 定妆照绑定桥（真机故障复现 → 修复） > 六镜归家合同补齐关门状态，并逐镜区分鞋态、情绪、时间轴和场景
+AssertionError: expected [ Array(6) ] to deeply equal [ '陈卓收伞走到出租屋门前', '陈卓用钥匙开门并跨进玄关', …(4) ]
+
+- Expected
++ Received
+
+  [
+-   "陈卓收伞走到出租屋门前",
+-   "陈卓用钥匙开门并跨进玄关",
+-   "陈卓回身把门关好，确认门锁落位",
+-   "陈卓在玄关弯腰脱下白色湿便鞋，换穿室内拖鞋",
+-   "陈卓伸手拧亮旧台灯",
+-   "陈卓在灯下坐下，抬头安静听雨",
++   "收伞回到出租屋",
++   "开门",
++   "换鞋",
++   "拧亮旧台灯",
++   "坐下听雨",
++   "收伞回到出租屋（推进段）",
+  ]
+
+ ❯ packages/video-studio/src/vendor-compat.test.ts:2191:21
+    2189|       "坐下听雨",
+    2190|     ], 6);
+    2191|     expect(actions).toEqual([
+       |                     ^
+    2192|       "陈卓收伞走到出租屋门前",
+    2193|       "陈卓用钥匙开门并跨进玄关",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/12]⎯
+
+ FAIL  packages/video-studio/src/vendor-compat.test.ts > 定妆照绑定桥（真机故障复现 → 修复） > 七镜归家合同把两只湿便鞋拆成不同时间轴、情绪和鞋态
+AssertionError: expected '01.【语言约束】全部字段使用中文；画幅、分辨率、帧率、编码、时间码与资产…' to contain '第一只鞋跟松脱'
+
+- Expected
++ Received
+
+- 第一只鞋跟松脱
++ 01.【语言约束】全部字段使用中文；画幅、分辨率、帧率、编码、时间码与资产路径可作为受控制作标记。
++ 02.【导演意图】克制写实的自然长镜或稳定短镜；以人物动作、空间关系和真实光线推进，不增加无关叙事、特效或模板表演。
++ 03.【基础】电影级写实质感；保留真实材质、自然颗粒与连续物理运动。
++ 04.【约束】9:16画幅，1080x1920，2秒，24fps，MP4格式。
++ 05.【场景】出租屋玄关内侧，门已关上，旧台灯关闭
++ 06.【灯光设计】旧台灯关闭，仅窗外与门缝冷光
++ 07.【明亮约束】人物与主体轮廓可辨，按已确认灯光设计保留明暗层次，环境高光不过曝，不使用额外正面补光。
++ 08.【构图】中景景别，9:16构图；陈卓位于可执行表演区并保持可辨轮廓，为其动作和视线保留空间。
++ 09.【色彩/色调】冷蓝灰环境色
++ 10.【景深】中等景深，焦点跟随人物上半身与当前动作，背景保留空间层次但不过度抢焦点。
++ 11.【运镜】固定机位，三脚架锁死，全镜零推拉零横移零变焦
++ 12.【角色】陈卓入画；保持当前授权角色档案中的发型脸型、身高体型与服装一致
++ 13.【服装】米白针织开衫、深色直筒长裤，配小白鞋
++ 14.【化妆】保持已确认角色档案与本镜妆造，不新增源合同外的湿度、肤色或妆容变化。
++ 15.【动作】陈卓在本镜保持同一外观，拧亮旧台灯
++ 16.【道具】黑色折叠伞、鞋架、地垫、白色湿便鞋、室内拖鞋
++ 17.【定妆照】使用 陈卓=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；跨镜不得替换。
++ 18.【台词】不适用：本片无台词、无旁白、无口播。
++ 19.【时间轴】T00:00.0-T00:00.6 拧亮旧台灯；T00:00.6-T00:01.5 拧亮旧台灯；T00:01.5-T00:02.0 动作落定，保持结束姿态
++ 20.【情绪】视线跟随本镜可见动作目标移动，表情与呼吸按已确认情绪合同自然变化，不使用固定微笑或模板化凝视。
++ 21.【节奏】2.0 秒内按约 30%/45%/25% 分配：前段拧亮旧台灯，中段完成主要变化，末段动作落定收束；不做额外加速或无关转场。
++ 22.【转场】本镜动作落定后硬切至下一镜，人物、道具与场景状态以相邻源镜头合同为准，不使用额外特效。
++ 23.【音频】仅保留真实环境声与主体动作声；无人物声、无旁白、无音乐、无配乐、无节拍。
++ 24.【负面约束】无文字、无字幕、无水印、无品牌标识、无生成特效、无镜头光晕伪影、无模糊、无过曝、无未声明角色、无暗黑风调色、无塑料或金属感高光。
++ 25.【角色约束】本镜仅允许 陈卓 入画；不得增加未声明人物。
++ 26.【角色一致性】分别绑定 陈卓 的授权外观、服装与发型；不得合并、替换或增减人物。
++ 27.【本镜验收】逐段核对起点、中段与落幅的目标帧，主体、动作方向、接触点和结束姿态必须与本镜编号字段一致；检查中景构图的安全区、焦平面、主体占比与背景层次；核对主辅光方向、白平衡、材质高光、暗部纹理与冷暖边界；核对道具数量、位置、湿度状态和跨镜连续性；核对声音事件与画面动作同帧，且不新增合同外人物、文字、品牌、字幕或配乐
+
+ ❯ packages/video-studio/src/vendor-compat.test.ts:2303:25
+    2301|     const firstPrompt = String(first.prompt);
+    2302|     const secondPrompt = String(second.prompt);
+    2303|     expect(firstPrompt).toContain("第一只鞋跟松脱");
+       |                         ^
+    2304|     expect(secondPrompt).toContain("第二只鞋跟松脱");
+    2305|     expect(firstPrompt).not.toBe(secondPrompt);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/12]⎯
+
+ FAIL  packages/video-studio/src/vendor-compat.test.ts > 定妆照绑定桥（真机故障复现 → 修复） > G6 最终归一删除开灯与听雨场景中的或式二义
+AssertionError: expected '01.【语言约束】全部字段使用中文；画幅、分辨率、帧率、编码、时间码与资产…' to contain '旧台灯旋钮、灯罩与操作手部同框'
+
+- Expected
++ Received
+
+- 旧台灯旋钮、灯罩与操作手部同框
++ 01.【语言约束】全部字段使用中文；画幅、分辨率、帧率、编码、时间码与资产路径可作为受控制作标记。
++ 02.【导演意图】克制写实的自然长镜或稳定短镜；以人物动作、空间关系和真实光线推进，不增加无关叙事、特效或模板表演。
++ 03.【基础】电影级写实质感；保留真实材质、自然颗粒与连续物理运动。
++ 04.【约束】9:16画幅，1080x1920，2秒，24fps，MP4格式。
++ 05.【场景】出租屋室内灯旁：台灯、开关或旋钮与操作手部同框
++ 06.【灯光设计】窗外冷光
++ 07.【明亮约束】人物与主体轮廓可辨，按已确认灯光设计保留明暗层次，环境高光不过曝，不使用额外正面补光。
++ 08.【构图】extreme-close-up景别，9:16构图；陈卓位于可执行表演区并保持可辨轮廓，为其动作和视线保留空间。
++ 09.【色彩/色调】冷蓝灰
++ 10.【景深】浅景深，焦点锁定眼睫、手指或当前接触点，前后景自然虚化；面部与动作接触点始终清晰。
++ 11.【运镜】固定机位，三脚架锁死，全镜零推拉零横移零变焦
++ 12.【角色】陈卓入画；保持当前授权角色档案中的发型脸型、身高体型与服装一致
++ 13.【服装】按本镜源证据执行
++ 14.【化妆】保持已确认角色档案与本镜妆造，不新增源合同外的湿度、肤色或妆容变化。
++ 15.【动作】陈卓伸手拧亮旧台灯
++ 16.【道具】旧台灯、窗
++ 17.【定妆照】使用 陈卓=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；跨镜不得替换。
++ 18.【台词】不适用：本片无台词、无旁白、无口播。
++ 19.【时间轴】T00:00.0-T00:00.6 陈卓伸手拧亮旧台灯；T00:00.6-T00:01.5 陈卓伸手拧亮旧台灯；T00:01.5-T00:02.0 动作落定，保持结束姿态
++ 20.【情绪】视线跟随本镜可见动作目标移动，表情与呼吸按已确认情绪合同自然变化，不使用固定微笑或模板化凝视。
++ 21.【节奏】2.0 秒内按约 30%/45%/25% 分配：前段陈卓伸手拧亮旧台灯，中段完成主要变化，末段动作落定收束；不做额外加速或无关转场。
++ 22.【转场】本镜动作落定后硬切至下一镜，人物、道具与场景状态以相邻源镜头合同为准，不使用额外特效。
++ 23.【音频】仅保留真实环境声与主体动作声；无人物声、无旁白、无音乐、无配乐、无节拍。
++ 24.【负面约束】无文字、无字幕、无水印、无品牌标识、无生成特效、无镜头光晕伪影、无模糊、无过曝、无未声明角色、无暗黑风调色、无塑料或金属感高光。
++ 25.【角色约束】本镜仅允许 陈卓 入画；不得增加未声明人物。
++ 26.【角色一致性】分别绑定 陈卓 的授权外观、服装与发型；不得合并、替换或增减人物。
++ 27.【本镜验收】逐段核对起点、中段与落幅的目标帧，主体、动作方向、接触点和结束姿态必须与本镜编号字段一致；检查extreme-close-up构图的安全区、焦平面、主体占比与背景层次；核对主辅光方向、白平衡、材质高光、暗部纹理与冷暖边界；核对道具数量、位置、湿度状态和跨镜连续性；核对声音事件与画面动作同帧，且不新增合同外人物、文字、品牌、字幕或配乐
+
+ ❯ packages/video-studio/src/vendor-compat.test.ts:2365:43
+    2363|       },
+    2364|     ], base);
+    2365|     expect(String(normalized[0]!.prompt)).toContain("旧台灯旋钮、灯罩与操作手部同框");
+       |                                           ^
+    2366|     expect(String(normalized[0]!.prompt)).not.toContain("开关或旋钮");
+    2367|     expect(String(normalized[1]!.prompt)).toContain("灯下窗边");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/12]⎯
+
+ FAIL  packages/video-studio/src/vendor-compat.test.ts > 定妆照绑定桥（真机故障复现 → 修复） > PRD 把真实模型的配乐、复合光位和主观阈值收敛成可执行合同
+AssertionError: expected [ '6500K' ] to deeply equal [ '2700K', '5600K' ]
+
+- Expected
++ Received
+
+  [
+-   "2700K",
+-   "5600K",
++   "6500K",
+  ]
+
+ ❯ packages/video-studio/src/vendor-compat.test.ts:2646:66
+    2644|     for (const shot of shots) {
+    2645|       expect(String(shot.lighting).length).toBeLessThanOrEqual(160);
+    2646|       expect(String(shot.colorTemperature).match(/\d{4}\s*K/gu)).toEqu…
+       |                                                                  ^
+    2647|     }
+    2648|     expect(shots[0]).toMatchObject({
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/12]⎯
+
+ FAIL  packages/video-studio/src/vendor-compat.test.ts > 定妆照绑定桥（真机故障复现 → 修复） > PRD 三场归家合同统一伞鞋灯态，补齐关门并删除单音和未开门悬念
+AssertionError: expected '{"projectDefinition":{"sourceIntent":…' not to match /黑色长柄伞|沾泥皮鞋|旧帆布鞋|小白鞋|未开门悬念|结尾单音|3000K/u
+
+- Expected:
+/黑色长柄伞|沾泥皮鞋|旧帆布鞋|小白鞋|未开门悬念|结尾单音|3000K/u
+
++ Received:
+"{\"projectDefinition\":{\"sourceIntent\":\"雨夜，一个年轻人收伞回到出租屋，开门、换鞋、拧亮旧台灯，随后坐在灯下安静地听雨。仅保留动作与现场自然环境声。\"},\"productPositioning\":{\"targetDuration\":15,\"aspectRatio\":\"9:16\",\"targetPlatform\":\"douyin\",\"resolution\":\"1080x1920\",\"frameRate\":24},\"creativeCore\":{\"creativeHook\":\"第一帧：收伞回到出租屋；动作对象、空间和声音同时成立，不使用源文本之外的悬念或隐喻\",\"keyMessages\":[\"P0：镜头必须完整呈现“收伞回到出租屋”，并保留其动作对象、场景状态与同步声音\",\"P1：镜头必须完整呈现“开门”，并保留其动作对象、场景状态与同步声音\",\"P1：镜头必须完整呈现“换鞋”，并保留其动作对象、场景状态与同步声音\",\"P1：镜头必须完整呈现“拧亮旧台灯”，并保留其动作对象、场景状态与同步声音\",\"P1：镜头必须完整呈现“坐下听雨”，并保留其动作对象、场景状态与同步声音\",\"P1：镜头必须完整呈现“收伞回到出租屋（推进段）”，并保留其动作对象、场景状态与同步声音\",\"P1：镜头必须完整呈现“开门（推进段）”，并保留其动作对象、场景状态与同步声音\",\"P1：镜头必须完整呈现“换鞋（推进段）”，并保留其动作对象、场景状态与同步声音\"],\"twistPoint\":\"最后落在“换鞋（推进段）”，由动作、光线和空间关系收束，不追加源文本之外的剧情反转\",\"emotionalArc\":\"setup→rising→resolution\"},\"characterSystem\":{\"characters\":[{\"name\":\"陈卓\",\"role\":\"protagonist\",\"costume\":\"米白针织开衫配深色直筒长裤，日常通勤造型，配小白鞋\",\"characterId\":\"chen-zhuo\",\"gender\":\"female\",\"ageRange\":\"三十岁上下\",\"appearance\":\"female；三十岁上下；东亚女性面孔，鹅蛋脸偏小圆，下颌线柔和，颧骨不突出，下巴圆润微尖，三庭均衡而中庭略长，自然平眉微挑且毛流感细，鼻梁直而窄、鼻头圆润小巧、鼻翼窄，唇形饱满、唇峰清晰、自然玫瑰豆沙唇色；深栗棕色及肩锁骨发（室内接近黑、日光下见棕调），中分偏左，顺直带自然微卷、发尾自然内扣，发量中等偏多、发丝有真实碎发；纤细挺拔，肩窄腰细，比例自然偏修长，站姿肩背打开、放松；模特ID=chen-zhuo；定妆照=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；授权=real-authorized\",\"portraitPath\":\"bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png\",\"portraitEvidence\":{\"exists\":true,\"path\":\"bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png\",\"bytes\":190978,\"sha256\":\"3d177401ed014376992489da04d2e35977ca282c205edc43bc8f6dca2f9a8184\",\"mediaType\":\"image/jpeg\",\"extensionMatches\":false,\"width\":1664,\"height\":2496},\"authorization\":\"real-authorized\",\"consistencyRequirements\":\"所有镜头绑定 chen-zhuo 的当前定妆照与指纹；不得替换为未登记人物\"}]},\"visualSpecification\":{\"lightingDirection\":\"旧台灯2700K暖光与窗外6500K冷蓝雨光分区\"},\"audioSpecification\":{\"musicStyle\":\"不使用配乐，仅保留环境声与动作声。\",\"soundDesign\":\"雨声、门锁声、换鞋声、台灯开关声\",\"audioMood\":\"仅保留环境声、主体动作声和现场声\",\"audioReferences\":[]},\"scenePlan\":{\"scenes\":[{\"sceneId\":\"SC01\",\"sequence\":1,\"duration\":5,\"purpose\":\"用伞尖滴水与门前停顿建立未开门悬念\",\"setting\":\"楼道门口，门内未亮灯\",\"keyProps\":[\"黑色长柄伞\",\"滴水伞尖\",\"防盗门\",\"钥匙\"],\"visualRequirements\":[\"第一帧为伞尖水珠砸地\",\"门框前景遮挡，陈卓不掏钥匙\"],\"audioRequirements\":[\"雨打窗棚与楼道滴水先行\",\"钥匙未插入前的短暂静默\"],\"dialogue\":\"\"},{\"sceneId\":\"SC02\",\"sequence\":2,\"duration\":5,\"purpose\":\"通过换鞋把泥污留在门外\",\"setting\":\"狭小玄关，门已半开，室内仅远处台灯余光\",\"keyProps\":[\"沾泥皮鞋\",\"鞋柜\",\"地垫\"],\"visualRequirements\":[\"低机位拍鞋底泥水蹭过地垫\",\"暖光只擦到玄关边缘\"],\"audioRequirements\":[\"鞋底摩擦地垫声\",\"门锁转动声\"],\"dialogue\":\"\"},{\"sceneId\":\"SC03\",\"sequence\":3,\"duration\":5,\"purpose\":\"拧亮旧台灯并坐下听雨\",\"setting\":\"书桌一角，窗外冷蓝，旧台灯渐亮\",\"keyProps\":[\"旧台灯\",\"旋钮开关\",\"书桌\",\"窗棂\"],\"visualRequirements\":[\"特写手指拧动旋钮，暖光渐亮\",\"人物在灯下坐下听雨\"],\"audioRequirements\":[\"台灯开关咔哒与电流微响\",\"结尾单音极轻进入\"],\"dialogue\":\"\"}],\"shotMapping\":[{\"sceneId\":\"SC01\",\"estimatedShots\":3,\"shotBreakdownHint\":[\"extreme-close-up\",\"medium\",\"close-up\"]},{\"sceneId\":\"SC02\",\"estimatedShots\":2,\"shotBreakdownHint\":[\"close-up\",\"medium\"]},{\"sceneId\":\"SC03\",\"estimatedShots\":3,\"shotBreakdownHint\":[\"extreme-close-up\",\"medium\",\"static\"]}]},\"productionConstraints\":{\"technicalConstraints\":[\"不使用配乐，仅保留环境声与动作声。\"],\"qualityThresholds\":{\"visual\":\"unverified：画面效果不采用无上下文的自动数值评分；生成后按角色、构图、光源与安全区人工抽帧复核。\",\"audio\":\"unverified：听感与声音内容不采用无上下文的自动数值评分；ffprobe 核验流参数，内容锚点由人工听审。\",\"narrative\":\"unverified：叙事完成度不采用无上下文的自动数值评分；按原始需求与逐镜合同人工复核。\",\"consistency\":\"unverified：跨镜一致性不采用无上下文的自动数值评分；按角色档案、场景锚点和道具连续性人工复核。\"}},\"deliveryStandard\":{\"deliverables\":[{\"item\":\"video_master\",\"spec\":\"1080x1920, 9:16, 15s ±0.3s, 24fps, MP4/H.264/AAC\"}],\"outputFormat\":{\"videoCodec\":\"H.264\",\"audioCodec\":\"AAC\",\"container\":\"MP4\",\"platform\":\"douyin\",\"width\":1080,\"height\":1920,\"aspectRatio\":\"9:16\",\"durationSeconds\":15,\"durationToleranceSeconds\":0.3,\"frameRate\":24,\"audioSampleRate\":48000,\"audioChannels\":2,\"audioLoudnessLufs\":-14,\"audioTruePeakDbtp\":-1},\"acceptanceCriteria\":{\"visual\":\"unverified：画面效果不采用无上下文的自动数值评分；生成后按角色、构图、光源与安全区人工抽帧复核。\",\"audio\":\"unverified：听感与声音内容不采用无上下文的自动数值评分；ffprobe 核验流参数，内容锚点由人工听审。\",\"narrative\":\"unverified：叙事完成度不采用无上下文的自动数值评分；按原始需求与逐镜合同人工复核。\",\"consistency\":\"unverified：跨镜一致性不采用无上下文的自动数值评分；按角色档案、场景锚点和道具连续性人工复核。\",\"technical\":\"ffprobe 核验画幅、时长、帧率、编码、音频流；ffmpeg ebur128/loudnorm 实测 integrated loudness 与 true peak；首中尾帧核平台安全区；所有项绑定当前导出文件\"},\"subtitles\":{\"mode\":\"none\",\"burned\":false,\"sidecar\":false},\"platformConstraints\":{\"platform\":\"douyin\",\"safeArea\":true,\"safeAreaInsets\":{\"topPercent\":6,\"bottomPercent\":12,\"rightRailPercent\":11},\"safeAreaReview\":\"顶部 6% / 底部 12% / 右侧栏 11% 内不放关键文字或主体动作；首中尾帧逐项复核\",\"firstFrameReview\":true,\"canvasVerified\":true},\"visualVerification\":{\"warmAreaMaxRatio\":\"不适用\",\"firstMiddleLastFrameReviewRequired\":true,\"artisticQuality\":\"unverified\"},\"audioVerification\":{\"streamProbe\":true,\"measurementTool\":\"ffmpeg-ebur128\",\"integratedLoudnessMeasured\":false,\"truePeakMeasured\":false,\"loudnessTargetLufs\":-14,\"truePeakTargetDbtp\":-1,\"contentAnchorsRequired\":true,\"listeningVerified\":false},\"listeningVerification\":{\"verified\":false,\"reason\":\"ffprobe 只核验音频流，响度与 true peak 须由 ffmpeg ebur128/loudnorm 实测；两者都不证明旋钮声、雨声等内容锚点已被人工听审\"},\"fallbackPlan\":{\"trigger\":\"逐镜核对角色、动作、场景、光源、道具、构图与平台安全区；任一硬契约失败，或同一镜连续两次定向修复仍无改善\",\"action\":\"锁定失败镜头 ID 与失败字段，只重做该镜；保留已通过镜头、角色锚点和灯态，不做整片无依据重生成\",\"expectedOutput\":\"失败镜定向修复；无法修复时保留未验证状态并停止渲染提交\"}},\"audienceProfile\":{},\"shotContract\":[{\"shotId\":\"SC01-S01\",\"sceneId\":\"SC01\",\"status\":\"planned\",\"startSeconds\":0,\"endSeconds\":1.67,\"durationSeconds\":1.67,\"shotSize\":\"medium\",\"cameraMovement\":\"locked\",\"cameraHint\":\"extreme-close-up\",\"purpose\":\"收伞回到出租屋；第一帧为伞尖水珠砸地\",\"location\":\"楼道门口，门内未亮灯\",\"lighting\":\"旧台灯暖光与窗外冷蓝雨光分区\",\"colorTemperature\":\"6500K\",\"warmAreaMaxRatio\":\"不适用\",\"subjectIds\":[],\"subjectLabel\":\"道具/局部人体（不露脸）\",\"subjectCount\":1,\"faceVisible\":false,\"costumeState\":\"both_wet_shoes\",\"footwearState\":\"both_wet_shoes\",\"lampState\":\"off\",\"keyProps\":[\"黑色长柄伞\",\"滴水伞尖\",\"防盗门\",\"钥匙\"],\"dialogue\":\"\",\"audio\":[\"雨打窗棚与楼道滴水先行\",\"钥匙未插入前的短暂静默\"],\"audioAnchors\":[\"雨打窗棚与楼道滴水先行\",\"钥匙未插入前的短暂静默\"],\"safeArea\":true,\"safeAreaInsets\":{\"topPercent\":6,\"bottomPercent\":12,\"rightRailPercent\":11},\"listeningVerified\":false},{\"shotId\":\"SC01-S02\",\"sceneId\":\"SC01\",\"status\":\"planned\",\"startSeconds\":1.67,\"endSeconds\":3.33,\"durationSeconds\":1.66,\"shotSize\":\"medium\",\"cameraMovement\":\"locked\",\"cameraHint\":\"medium\",\"purpose\":\"开门；门框前景遮挡，陈卓不掏钥匙\",\"location\":\"楼道门口，门内未亮灯\",\"lighting\":\"旧台灯暖光与窗外冷蓝雨光分区\",\"colorTemperature\":\"2700K\",\"warmAreaMaxRatio\":\"不适用\",\"subjectIds\":[\"chen-zhuo\"],\"subjectLabel\":\"陈卓\",\"subjectCount\":1,\"faceVisible\":true,\"costumeState\":\"both_wet_shoes\",\"footwearState\":\"both_wet_shoes\",\"lampState\":\"off\",\"keyProps\":[\"黑色长柄伞\",\"滴水伞尖\",\"防盗门\",\"钥匙\"],\"dialogue\":\"\",\"audio\":[\"雨打窗棚与楼道滴水先行\",\"钥匙未插入前的短暂静默\"],\"audioAnchors\":[\"雨打窗棚与楼道滴水先行\",\"钥匙未插入前的短暂静默\"],\"safeArea\":true,\"safeAreaInsets\":{\"topPercent\":6,\"bottomPercent\":12,\"rightRailPercent\":11},\"listeningVerified\":false},{\"shotId\":\"SC01-S03\",\"sceneId\":\"SC01\",\"status\":\"planned\",\"startSeconds\":3.33,\"endSeconds\":5,\"durationSeconds\":1.67,\"shotSize\":\"full\",\"cameraMovement\":\"locked\",\"cameraHint\":\"close-up\",\"purpose\":\"换鞋；用伞尖滴水与门前停顿建立未开门悬念\",\"location\":\"楼道门口，门内未亮灯\",\"lighting\":\"旧台灯暖光与窗外冷蓝雨光分区\",\"colorTemperature\":\"6500K\",\"warmAreaMaxRatio\":\"不适用\",\"subjectIds\":[],\"subjectLabel\":\"道具/局部人体（不露脸）\",\"subjectCount\":1,\"faceVisible\":false,\"costumeState\":\"wet_shoes_being_changed_to_indoor_slippers\",\"footwearState\":\"wet_shoes_being_changed_to_indoor_slippers\",\"lampState\":\"off\",\"keyProps\":[\"黑色长柄伞\",\"滴水伞尖\",\"防盗门\",\"钥匙\"],\"dialogue\":\"\",\"audio\":[\"雨打窗棚与楼道滴水先行\",\"钥匙未插入前的短暂静默\"],\"audioAnchors\":[\"雨打窗棚与楼道滴水先行\",\"钥匙未插入前的短暂静默\"],\"safeArea\":true,\"safeAreaInsets\":{\"topPercent\":6,\"bottomPercent\":12,\"rightRailPercent\":11},\"listeningVerified\":false},{\"shotId\":\"SC02-S01\",\"sceneId\":\"SC02\",\"status\":\"planned\",\"startSeconds\":5,\"endSeconds\":7.5,\"durationSeconds\":2.5,\"shotSize\":\"extreme-close-up\",\"cameraMovement\":\"locked\",\"cameraHint\":\"close-up\",\"purpose\":\"拧亮旧台灯；低机位拍鞋底泥水蹭过地垫\",\"location\":\"狭小玄关，门已半开，室内仅远处台灯余光\",\"lighting\":\"暖光只擦到玄关边缘\",\"colorTemperature\":\"2700K\",\"warmAreaMaxRatio\":\"不适用\",\"subjectIds\":[],\"subjectLabel\":\"道具/局部人体（不露脸）\",\"subjectCount\":1,\"faceVisible\":false,\"costumeState\":\"both_indoor_slippers\",\"footwearState\":\"both_indoor_slippers\",\"lampState\":\"off_to_on\",\"keyProps\":[\"沾泥皮鞋\",\"鞋柜\",\"地垫\"],\"dialogue\":\"\",\"audio\":[\"鞋底摩擦地垫声\",\"门锁转动声\"],\"audioAnchors\":[\"鞋底摩擦地垫声\",\"门锁转动声\"],\"safeArea\":true,\"safeAreaInsets\":{\"topPercent\":6,\"bottomPercent\":12,\"rightRailPercent\":11},\"listeningVerified\":false},{\"shotId\":\"SC02-S02\",\"sceneId\":\"SC02\",\"status\":\"planned\",\"startSeconds\":7.5,\"endSeconds\":10,\"durationSeconds\":2.5,\"shotSize\":\"medium\",\"cameraMovement\":\"locked\",\"cameraHint\":\"medium\",\"purpose\":\"坐下听雨；暖光只擦到玄关边缘\",\"location\":\"狭小玄关，门已半开，室内仅远处台灯余光\",\"lighting\":\"暖光只擦到玄关边缘\",\"colorTemperature\":\"2700K\",\"warmAreaMaxRatio\":\"不适用\",\"subjectIds\":[\"chen-zhuo\"],\"subjectLabel\":\"陈卓（局部入画）\",\"subjectCount\":1,\"faceVisible\":false,\"costumeState\":\"both_indoor_slippers\",\"footwearState\":\"both_indoor_slippers\",\"lampState\":\"on\",\"keyProps\":[\"沾泥皮鞋\",\"鞋柜\",\"地垫\"],\"dialogue\":\"\",\"audio\":[\"鞋底摩擦地垫声\",\"门锁转动声\"],\"audioAnchors\":[\"鞋底摩擦地垫声\",\"门锁转动声\"],\"safeArea\":true,\"safeAreaInsets\":{\"topPercent\":6,\"bottomPercent\":12,\"rightRailPercent\":11},\"listeningVerified\":false},{\"shotId\":\"SC03-S01\",\"sceneId\":\"SC03\",\"status\":\"planned\",\"startSeconds\":10,\"endSeconds\":11.67,\"durationSeconds\":1.67,\"shotSize\":\"medium\",\"cameraMovement\":\"locked\",\"cameraHint\":\"extreme-close-up\",\"purpose\":\"收伞回到出租屋（推进段）；特写手指拧动旋钮，暖光渐亮\",\"location\":\"书桌一角，窗外冷蓝，旧台灯渐亮\",\"lighting\":\"特写手指拧动旋钮，暖光渐亮\",\"colorTemperature\":\"2700K\",\"warmAreaMaxRatio\":\"不适用\",\"subjectIds\":[\"chen-zhuo\"],\"subjectLabel\":\"陈卓（局部入画）\",\"subjectCount\":1,\"faceVisible\":false,\"costumeState\":\"both_indoor_slippers\",\"footwearState\":\"both_indoor_slippers\",\"lampState\":\"off\",\"keyProps\":[\"旧台灯\",\"旋钮开关\",\"书桌\",\"窗棂\"],\"dialogue\":\"\",\"audio\":[\"台灯开关咔哒与电流微响\",\"结尾单音极轻进入\"],\"audioAnchors\":[\"台灯开关咔哒与电流微响\",\"结尾单音极轻进入\"],\"safeArea\":true,\"safeAreaInsets\":{\"topPercent\":6,\"bottomPercent\":12,\"rightRailPercent\":11},\"listeningVerified\":false},{\"shotId\":\"SC03-S02\",\"sceneId\":\"SC03\",\"status\":\"planned\",\"startSeconds\":11.67,\"endSeconds\":13.33,\"durationSeconds\":1.66,\"shotSize\":\"medium\",\"cameraMovement\":\"locked\",\"cameraHint\":\"medium\",\"purpose\":\"开门（推进段）；人物在灯下坐下听雨\",\"location\":\"书桌一角，窗外冷蓝，旧台灯渐亮\",\"lighting\":\"特写手指拧动旋钮，暖光渐亮\",\"colorTemperature\":\"2700K\",\"warmAreaMaxRatio\":\"不适用\",\"subjectIds\":[\"chen-zhuo\"],\"subjectLabel\":\"陈卓（局部入画）\",\"subjectCount\":1,\"faceVisible\":false,\"costumeState\":\"both_indoor_slippers\",\"footwearState\":\"both_indoor_slippers\",\"lampState\":\"off\",\"keyProps\":[\"旧台灯\",\"旋钮开关\",\"书桌\",\"窗棂\"],\"dialogue\":\"\",\"audio\":[\"台灯开关咔哒与电流微响\",\"结尾单音极轻进入\"],\"audioAnchors\":[\"台灯开关咔哒与电流微响\",\"结尾单音极轻进入\"],\"safeArea\":true,\"safeAreaInsets\":{\"topPercent\":6,\"bottomPercent\":12,\"rightRailPercent\":11},\"listeningVerified\":false},{\"shotId\":\"SC03-S03\",\"sceneId\":\"SC03\",\"status\":\"planned\",\"startSeconds\":13.33,\"endSeconds\":15,\"durationSeconds\":1.67,\"shotSize\":\"full\",\"cameraMovement\":\"static\",\"cameraHint\":\"static\",\"purpose\":\"换鞋（推进段）；拧亮旧台灯并坐下听雨\",\"location\":\"书桌一角，窗外冷蓝，旧台灯渐亮\",\"lighting\":\"特写手指拧动旋钮，暖光渐亮\",\"colorTemperature\":\"2700K\",\"warmAreaMaxRatio\":\"不适用\",\"subjectIds\":[\"chen-zhuo\"],\"subjectLabel\":\"陈卓（局部入画）\",\"subjectCount\":1,\"faceVisible\":false,\"costumeState\":\"wet_shoes_being_changed_to_indoor_slippers\",\"footwearState\":\"wet_shoes_being_changed_to_indoor_slippers\",\"lampState\":\"off\",\"keyProps\":[\"旧台灯\",\"旋钮开关\",\"书桌\",\"窗棂\"],\"dialogue\":\"\",\"audio\":[\"台灯开关咔哒与电流微响\",\"结尾单音极轻进入\"],\"audioAnchors\":[\"台灯开关咔哒与电流微响\",\"结尾单音极轻进入\"],\"safeArea\":true,\"safeAreaInsets\":{\"topPercent\":6,\"bottomPercent\":12,\"rightRailPercent\":11},\"listeningVerified\":false}]}"
+
+ ❯ packages/video-studio/src/vendor-compat.test.ts:2732:28
+    2730|     });
+    2731|     const serialized = JSON.stringify(prd);
+    2732|     expect(serialized).not.toMatch(/黑色长柄伞|沾泥皮鞋|旧帆布鞋|小白鞋|未开门悬念|结尾单音|300…
+       |                            ^
+    2733|     expect(serialized).toContain("黑色折叠伞");
+    2734|     expect(serialized).toContain("白色湿便鞋");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/12]⎯
+
+ FAIL  packages/video-studio/src/vendor-compat.test.ts > Phase3 宿主融合桥（C1） > Phase3 单镜重试仍降级时用源合同恢复，并在最终评审投影后继续推进
+AssertionError: expected '01.【语言约束】全部字段使用中文；画幅、分辨率、帧率、编码、时间码与资产…' to contain '楼道/门外门口'
+
+- Expected
++ Received
+
+- 楼道/门外门口
++ 01.【语言约束】全部字段使用中文；画幅、分辨率、帧率、编码、时间码与资产路径可作为受控制作标记。
++ 02.【导演意图】克制写实的自然长镜或稳定短镜；以人物动作、空间关系和真实光线推进，不增加无关叙事、特效或模板表演。
++ 03.【基础】按已通过的 Phase2 镜头合同执行，保留源场景、主体动作、空间关系和已确认约束。
++ 04.【约束】9:16画幅，1080x1920，5秒，24fps，MP4格式。
++ 05.【场景】出租屋门外楼道，雨夜，湿伞靠在门边
++ 06.【灯光设计】楼道冷光，室内旧台灯尚未点亮
++ 07.【明亮约束】人物与主体轮廓可辨，按已确认灯光设计保留明暗层次，环境高光不过曝，不使用额外正面补光。
++ 08.【构图】medium景别，9:16构图；已登记角色位于可执行表演区并保持可辨轮廓，为其动作和视线保留空间。
++ 09.【色彩/色调】色温按已确认视觉方案执行
++ 10.【景深】中等景深，焦点跟随人物上半身与当前动作，背景保留空间层次但不过度抢焦点。
++ 11.【运镜】固定机位，三脚架锁死，全镜零推拉零横移零变焦
++ 12.【角色】按本镜源证据执行
++ 13.【服装】按本镜源证据执行
++ 14.【化妆】保持已确认角色档案与本镜妆造，不新增源合同外的湿度、肤色或妆容变化。
++ 15.【动作】陈卓在门外收伞，随后用钥匙开门
++ 16.【道具】
++ 17.【定妆照】使用 使用本次已审核角色档案中的当前定妆照，不得替换为未登记人物。；跨镜不得替换。
++ 18.【台词】按已确认台词合同执行。
++ 19.【时间轴】T00:00.0-T00:01.5 陈卓在门外收伞，随后用钥匙开门；T00:01.5-T00:03.8 陈卓在门外收伞，随后用钥匙开门；T00:03.8-T00:05.0 动作落定，保持结束姿态
++ 20.【情绪】视线跟随本镜可见动作目标移动，表情与呼吸按已确认情绪合同自然变化，不使用固定微笑或模板化凝视。
++ 21.【节奏】5.0 秒内按约 30%/45%/25% 分配：前段陈卓在门外收伞，随后用钥匙开门，中段完成主要变化，末段动作落定收束；不做额外加速或无关转场。
++ 22.【转场】本镜为全片最后一镜；动作落定后保持静止，再由输出合同决定是否硬切黑，不追加超出镜长的特效。
++ 23.【音频】沿用已通过的上游环境声与主体动作声。
++ 24.【负面约束】无文字、无字幕、无水印、无品牌标识、无生成特效、无镜头光晕伪影、无模糊、无过曝、无未声明角色、无暗黑风调色、无塑料或金属感高光。
++ 25.【角色约束】本镜仅允许 已登记角色 入画；不得增加未声明人物。
++ 26.【角色一致性】分别绑定 当前角色 的授权外观、服装与发型；不得合并、替换或增减人物。
++ 27.【本镜验收】逐段核对起点、中段与落幅的目标帧，主体、动作方向、接触点和结束姿态必须与本镜编号字段一致；检查medium构图的安全区、焦平面、主体占比与背景层次；核对主辅光方向、白平衡、材质高光、暗部纹理与冷暖边界；核对道具数量、位置、湿度状态和跨镜连续性；核对声音事件与画面动作同帧，且不新增合同外人物、文字、品牌、字幕或配乐
+
+ ❯ packages/video-studio/src/vendor-compat.test.ts:4123:35
+    4121|     });
+    4122|     expect(result.retry).toMatchObject({ repaired: ["SC-01"] });
+    4123|     expect(String(result.prompt)).toContain("楼道/门外门口");
+       |                                   ^
+    4124|     expect(String(result.prompt)).toContain("陈卓在门外收伞");
+    4125|     expect(result.policy).toMatchObject({ aspectRatio: expect.any(Stri…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/12]⎯
+
+
+ Test Files  1 failed | 4 passed (5)
+      Tests  12 failed | 141 passed (153)
+   Start at  22:06:35
+   Duration  6.50s (transform 1.14s, setup 0ms, import 1.45s, tests 6.23s, environment 0ms)
+

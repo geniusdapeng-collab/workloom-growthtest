@@ -1,0 +1,53 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest
+
+ ❯ packages/video-studio/src/duration-voice-ceiling.test.ts (4 tests | 2 failed) 11ms
+     × returns a localized infeasible result without modifying the source dialogue 4ms
+     × rejects a single overfull shot even when project total can hold all spoken words 6ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/video-studio/src/duration-voice-ceiling.test.ts > voice floor is a hard constraint, even above the per-shot provider ceiling > returns a localized infeasible result without modifying the source dialogue
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ packages/video-studio/src/duration-voice-ceiling.test.ts:11:23
+      9|     expect(floor).toBeGreaterThan(12);
+     10|     const result = projectShotDurations(shots, { targetSeconds: 12, mi…
+     11|     expect(result.ok).toBe(false);
+       |                       ^
+     12|     if (result.ok) throw new Error('infeasible voice was accepted');
+     13|     expect(result.reason).toBe('voice-floor-exceeds-model-limit');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  packages/video-studio/src/duration-voice-ceiling.test.ts > voice floor is a hard constraint, even above the per-shot provider ceiling > rejects a single overfull shot even when project total can hold all spoken words
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ packages/video-studio/src/duration-voice-ceiling.test.ts:25:23
+     23|     expect(computeVoiceFloor(shots[0]!).seconds).toBeGreaterThan(12);
+     24|     const result = projectShotDurations(shots, { targetSeconds: 52, mi…
+     25|     expect(result.ok).toBe(false);
+       |                       ^
+     26|     if (!result.ok) expect(result.reason).toBe('voice-floor-exceeds-mo…
+     27|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 2 passed (4)
+   Start at  22:14:51
+   Duration  114ms (transform 26ms, setup 0ms, import 34ms, tests 11ms, environment 0ms)
+

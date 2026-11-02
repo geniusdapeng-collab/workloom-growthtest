@@ -175,7 +175,9 @@ export async function fetchMarketingSource(rawUrl: string, options: {
     const document = sourceDocument(raw, contentType, current.href);
     const hash = (bytes: string | Buffer) => createHash("sha256").update(bytes).digest("hex");
     const rawSha256 = hash(decoded), textSha256 = hash(document.text);
-    return { snapshot: { sourceId: `SRC-${hash(`${current.href}\n${textSha256}`).slice(0, 24)}`, requestedUrl: requested.href,
+    // 同一正文可由不同搜索跳转抵达。来源快照还包含 requestedUrl/redirectChain；
+    // 身份必须保留请求路径，避免归档去重把另一站已审核的抓取快照替换掉。
+    return { snapshot: { sourceId: `SRC-${hash(`${requested.href}\n${current.href}\n${textSha256}`).slice(0, 24)}`, requestedUrl: requested.href,
       finalUrl: current.href, redirectChain: chain, fetchedAt: new Date().toISOString(), contentType,
       rawSha256, textSha256, bytes: decoded.length, ...document }, rawBytes: decoded };
   }

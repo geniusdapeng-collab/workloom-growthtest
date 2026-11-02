@@ -1,0 +1,96 @@
+{
+  "schema": "workloom.video-audit-verification/v1",
+  "task": "T-2026-1102-9007",
+  "sourceCommit": "3f3d283315b9f521871622deb18ef15bbfad6568",
+  "generatedAt": "2026-11-02T14:46:19.427878+00:00",
+  "environment": {
+    "kind": "local-preview",
+    "database": "isolated PostgreSQL17, port56437",
+    "server": "loopback57437",
+    "paidExternalCalls": 0,
+    "productionVerified": false
+  },
+  "checks": [
+    {
+      "name": "workspace typecheck",
+      "command": "pnpm -r --if-present typecheck",
+      "exitCode": 0,
+      "log": "checks/typecheck-final.log"
+    },
+    {
+      "name": "server video",
+      "command": "RUN_DB_TESTS=1 node_modules/.bin/vitest run apps/server/src/video --maxWorkers=2",
+      "filesPassed": 39,
+      "passed": 1016,
+      "skipped": 1,
+      "failed": 0,
+      "exitCode": 0,
+      "log": "checks/server-video-final.log"
+    },
+    {
+      "name": "video-studio",
+      "command": "(cd packages/video-studio && node node_modules/vitest/vitest.mjs run --maxWorkers=2)",
+      "filesPassed": 109,
+      "passed": 1944,
+      "failed": 0,
+      "exitCode": 0,
+      "log": "checks/video-studio-final.log"
+    },
+    {
+      "name": "node submission boundary",
+      "command": "node --test scripts/tools/film-render-task.test.mjs scripts/tools/film-render-ledger.test.mjs",
+      "passed": 21,
+      "failed": 0,
+      "exitCode": 0,
+      "log": "checks/node-boundary-final.log"
+    },
+    {
+      "name": "release gate",
+      "command": "pnpm release:gate",
+      "passed": 11,
+      "failed": 0,
+      "exitCode": 0,
+      "log": "checks/release-gate-final.log"
+    },
+    {
+      "name": "capability documents",
+      "command": "pnpm capabilities:check",
+      "exitCode": 0,
+      "log": "checks/capabilities-final.log"
+    },
+    {
+      "name": "compiled pipelines",
+      "command": "pnpm pipelines:check",
+      "pipelines": 6,
+      "exitCode": 0,
+      "log": "checks/pipelines-final.log"
+    },
+    {
+      "name": "mine-clear independent acceptance",
+      "cards": 12,
+      "repairRuns": 12,
+      "acceptanceRuns": 12,
+      "result": "all verified",
+      "ledger": "ledger.json",
+      "handoff": "handoff.json"
+    }
+  ],
+  "skips": [
+    "Optional talkcraft 108-card engine parser not installed; outside general/marketing preproduction scope. Real PostgreSQL ledger/qualification/authority tests enabled."
+  ],
+  "limitations": [
+    "No real paid text/image/video requests, no production success-rate, latency or visual-quality measurement.",
+    "RDAS276 full matrix not executed; targeted local-preview audit/acceptance only.",
+    "Test counts are per suite; repeated and overlapping runs are not summed as unique cases."
+  ],
+  "historicalEvidence": {
+    "pathRemapping": "Original agent work/<relative> maps to agent-evidence/<relative> in this evidence bundle.",
+    "marketingIndependentRuntimeSourceCorrection": {
+      "originalField": "34d668397db96707ababd8ddf8660dc36f134aa1",
+      "actualFinalRunCommit": "3f3d283315b9f521871622deb18ef15bbfad6568",
+      "authority": "Actual author message and worktreeHead in agent-evidence/marketing-independent-review.json; final log has134 passed including final source cases."
+    },
+    "duringEditLog": "checks/video-studio-during-edit.log records an earlier run overlapping final edits; not a passing final-source verification. Final exact source rerun is checks/video-studio-final.log.",
+    "pendingText": "Original agent findings were recorded before independent acceptance. Final ledger/runs override historical fixed/pending status, without rewriting the original reports."
+  }
+}

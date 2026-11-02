@@ -1,0 +1,33 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest
+
+stderr | apps/server/src/video/marketing-authority.test.ts
+[pii] PII_SALT 未配置，使用 dev 占位盐（仅限开发/测试，生产必须注入 PII_SALT）
+
+ ❯ apps/server/src/video/marketing-authority.test.ts (21 tests | 1 failed | 20 skipped) 177ms
+     × 混币报价从来源提取、G1档案到最终镜头复核始终逐币种表达，零价=true 173ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/server/src/video/marketing-authority.test.ts > 营销事实宿主完整执行 > 混币报价从来源提取、G1档案到最终镜头复核始终逐币种表达，零价=true
+AssertionError: expected 'USD 699' to be 'USD 0；CNY 699' // Object.is equality
+
+Expected: "USD 0；CNY 699"
+Received: "USD 699"
+
+ ❯ apps/server/src/video/marketing-authority.test.ts:101:86
+     99|     const expectedBand = zeroPrice ? "USD 0；CNY 699" : "USD 99-109；CNY…
+    100|     const prepared = await prepare({ mixedCurrencies: true, zeroPrice …
+    101|     expect((prepared.bundle.dossier.identity as Record<string, unknown…
+       |                                                                                      ^
+    102|     expect(prepared.g1Content).toContain(expectedBand);
+    103|     expect(prepared.g1Content).not.toContain("USD 99-799");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 20 skipped (21)
+   Start at  22:22:35
+   Duration  904ms (transform 498ms, setup 0ms, import 656ms, tests 177ms, environment 0ms)
+

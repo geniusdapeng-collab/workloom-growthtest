@@ -1,0 +1,298 @@
+{
+  "actor": "/root/submission_audit",
+  "baseline": "5ffe5047767c3e0e41feeac865ed36a76c0f9428",
+  "fixCommits": [
+    "b287bd86",
+    "c7210855",
+    "fe199ec386447229d5d81734c18249826355c82a",
+    "21da524f79dfb90415512ee7e5f08d03b4838d5b",
+    "5d40da57"
+  ],
+  "scope": "shared compilation, qualification, provider submission and compute budget boundary; aggregate with other audit roles, not repository-wide coverage",
+  "files": [
+    {
+      "path": "packages/video-studio/src/generation-submission.mjs",
+      "level": "A",
+      "complete": true,
+      "lines": 115
+    },
+    {
+      "path": "packages/video-studio/src/generation-submission.d.mts",
+      "level": "A",
+      "complete": true,
+      "lines": 17
+    },
+    {
+      "path": "packages/video-studio/src/generation-submission.test.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 102
+    },
+    {
+      "path": "packages/video-studio/src/route-preflight.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 191
+    },
+    {
+      "path": "packages/video-studio/src/render-scripts.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 107
+    },
+    {
+      "path": "scripts/tools/film-render-task.mjs",
+      "level": "A",
+      "complete": true,
+      "lines": 121
+    },
+    {
+      "path": "scripts/tools/film-render-ledger.mjs",
+      "level": "A",
+      "complete": true,
+      "lines": 99
+    },
+    {
+      "path": "scripts/tools/render-project.mts",
+      "level": "A",
+      "complete": true,
+      "lines": 594
+    },
+    {
+      "path": "packages/video-studio/src/production-client.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 174
+    },
+    {
+      "path": "packages/video-studio/src/final-shot-contract.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 116
+    },
+    {
+      "path": "packages/video-studio/src/film-service-client.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 205
+    },
+    {
+      "path": "apps/server/src/video/gen/compiled-request.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 154
+    },
+    {
+      "path": "apps/server/src/video/gen/compiled-request.test.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 63
+    },
+    {
+      "path": "apps/server/src/video/gen/params.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 27
+    },
+    {
+      "path": "apps/server/src/video/gen/submit.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 295
+    },
+    {
+      "path": "apps/server/src/video/gen/providers.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 311
+    },
+    {
+      "path": "apps/server/src/video/gen/submission-ledger.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 231
+    },
+    {
+      "path": "apps/server/src/video/gen/types.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 158
+    },
+    {
+      "path": "apps/server/src/video/gen/db.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 33
+    },
+    {
+      "path": "apps/server/src/video/gen/catalog.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 193
+    },
+    {
+      "path": "apps/server/src/video/gen/cost.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 149
+    },
+    {
+      "path": "apps/server/src/video/gen/gen.test.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 465
+    },
+    {
+      "path": "apps/server/src/video/production-authority.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 469
+    },
+    {
+      "path": "apps/server/src/video/production-authority.test.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 364
+    },
+    {
+      "path": "apps/server/src/video/production-authority.pg.test.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 393
+    },
+    {
+      "path": "apps/server/src/video/production-router.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 42
+    },
+    {
+      "path": "apps/server/src/video/production-router.test.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 152
+    },
+    {
+      "path": "apps/server/src/video/scene-policy-render-gate.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 179
+    },
+    {
+      "path": "apps/server/src/video/router.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 1583
+    },
+    {
+      "path": "apps/server/src/video/project-compute-budget.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 100
+    },
+    {
+      "path": "apps/server/src/video/accounting.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 29
+    },
+    {
+      "path": "packages/db/migrations/0044_generation_submissions.sql",
+      "level": "A",
+      "complete": true,
+      "lines": 84
+    },
+    {
+      "path": "packages/db/migrations/0045_production_qualifications.sql",
+      "level": "A",
+      "complete": true,
+      "lines": 82
+    },
+    {
+      "path": "scripts/tools/film-render-task.test.mjs",
+      "level": "B",
+      "complete": false,
+      "method": "test execution plus reference scan; catalog reference scan only",
+      "reason": "supporting tests/catalog machine-checked; not claimed as full semantic reading"
+    },
+    {
+      "path": "scripts/tools/film-render-ledger.test.mjs",
+      "level": "B",
+      "complete": false,
+      "method": "test execution plus reference scan; catalog reference scan only",
+      "reason": "supporting tests/catalog machine-checked; not claimed as full semantic reading"
+    },
+    {
+      "path": "apps/server/src/video/gen/submission-ledger.pg.test.ts",
+      "level": "B",
+      "complete": false,
+      "method": "test execution plus reference scan; catalog reference scan only",
+      "reason": "supporting tests/catalog machine-checked; not claimed as full semantic reading"
+    },
+    {
+      "path": "apps/server/src/video/gen/submit.test.ts",
+      "level": "B",
+      "complete": false,
+      "method": "test execution plus reference scan; catalog reference scan only",
+      "reason": "supporting tests/catalog machine-checked; not claimed as full semantic reading"
+    },
+    {
+      "path": "packages/video-studio/src/production-client.test.ts",
+      "level": "B",
+      "complete": false,
+      "method": "test execution plus reference scan; catalog reference scan only",
+      "reason": "supporting tests/catalog machine-checked; not claimed as full semantic reading"
+    },
+    {
+      "path": "bundles/ai-video/library/media-catalog/media-catalog.json",
+      "level": "B",
+      "complete": false,
+      "method": "test execution plus reference scan; catalog reference scan only",
+      "reason": "supporting tests/catalog machine-checked; not claimed as full semantic reading"
+    },
+    {
+      "path": "scripts/tools/full-chain-film.mts",
+      "level": "C",
+      "complete": false,
+      "readRanges": [
+        [
+          2370,
+          2500
+        ],
+        [
+          4240,
+          4390
+        ]
+      ],
+      "reason": "focused provider submission and G7/G8/anchor fragments; 6846-line entrypoint includes out-of-scope postproduction, scope narrowing coordinated with root"
+    },
+    {
+      "path": "apps/server/src/video/studio-worker.ts",
+      "level": "C",
+      "complete": false,
+      "readRanges": [
+        [
+          600,
+          700
+        ],
+        [
+          1360,
+          1485
+        ]
+      ],
+      "reason": "only portrait bridge and final prompt archive inspected; full worker assigned to root"
+    },
+    {
+      "path": "packages/video-studio/src/final-shot-character-qualification.ts",
+      "level": "C",
+      "complete": false,
+      "reason": "output-truncated read; no definitive defect claim from this file"
+    }
+  ],
+  "totals": {
+    "A": 33,
+    "B": 6,
+    "C": 3,
+    "D": 0
+  }
+}

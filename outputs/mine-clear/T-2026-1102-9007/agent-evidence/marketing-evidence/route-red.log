@@ -1,0 +1,128 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest
+
+ ❯ packages/video-studio/src/pipeline-route-negation.test.ts (14 tests | 11 failed) 8ms
+     × 不要营销片，走叙事片 → narrative 4ms
+     × 不要叙事片，走营销片，商品名：星野风扇 → marketing 1ms
+     × 不做营销片，而是叙事片 → narrative 0ms
+     × 不做叙事片，而是营销片，商品名：星野风扇 → marketing 0ms
+     × 不要口播片，走叙事片 → narrative 0ms
+     × 不用营销管线，用通用管线 → narrative 0ms
+     × 不要走营销管线，按通用管线拍清晨 → narrative 0ms
+     × 不要营销片，走口播片 → explainer 0ms
+     × 走叙事片，不要用口播管线 → narrative 0ms
+     × 只有否定而没有正向选择时，不借商品锚点重新选择已禁止的营销线 0ms
+     × 规则强信号和模型都不能恢复用户已禁止的管线 0ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 11 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/video-studio/src/pipeline-route-negation.test.ts > 视频路由保留用户明确的否定选择 > 不要营销片，走叙事片 → narrative
+ FAIL  packages/video-studio/src/pipeline-route-negation.test.ts > 视频路由保留用户明确的否定选择 > 不做营销片，而是叙事片 → narrative
+ FAIL  packages/video-studio/src/pipeline-route-negation.test.ts > 视频路由保留用户明确的否定选择 > 不用营销管线，用通用管线 → narrative
+ FAIL  packages/video-studio/src/pipeline-route-negation.test.ts > 视频路由保留用户明确的否定选择 > 不要走营销管线，按通用管线拍清晨 → narrative
+AssertionError: expected 'clarify' to be 'narrative' // Object.is equality
+
+Expected: "narrative"
+Received: "clarify"
+
+ ❯ packages/video-studio/src/pipeline-route-negation.test.ts:21:28
+     19|     const llmCall = vi.fn();
+     20|     const decision = await routeVideoPipeline({ text }, { llmCall });
+     21|     expect(decision.route).toBe(route);
+       |                            ^
+     22|     expect(llmCall).not.toHaveBeenCalled();
+     23|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/11]⎯
+
+ FAIL  packages/video-studio/src/pipeline-route-negation.test.ts > 视频路由保留用户明确的否定选择 > 不要叙事片，走营销片，商品名：星野风扇 → marketing
+ FAIL  packages/video-studio/src/pipeline-route-negation.test.ts > 视频路由保留用户明确的否定选择 > 不做叙事片，而是营销片，商品名：星野风扇 → marketing
+AssertionError: expected 'narrative' to be 'marketing' // Object.is equality
+
+Expected: "marketing"
+Received: "narrative"
+
+ ❯ packages/video-studio/src/pipeline-route-negation.test.ts:21:28
+     19|     const llmCall = vi.fn();
+     20|     const decision = await routeVideoPipeline({ text }, { llmCall });
+     21|     expect(decision.route).toBe(route);
+       |                            ^
+     22|     expect(llmCall).not.toHaveBeenCalled();
+     23|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/11]⎯
+
+ FAIL  packages/video-studio/src/pipeline-route-negation.test.ts > 视频路由保留用户明确的否定选择 > 不要口播片，走叙事片 → narrative
+ FAIL  packages/video-studio/src/pipeline-route-negation.test.ts > 视频路由保留用户明确的否定选择 > 走叙事片，不要用口播管线 → narrative
+AssertionError: expected 'explainer' to be 'narrative' // Object.is equality
+
+Expected: "narrative"
+Received: "explainer"
+
+ ❯ packages/video-studio/src/pipeline-route-negation.test.ts:21:28
+     19|     const llmCall = vi.fn();
+     20|     const decision = await routeVideoPipeline({ text }, { llmCall });
+     21|     expect(decision.route).toBe(route);
+       |                            ^
+     22|     expect(llmCall).not.toHaveBeenCalled();
+     23|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/11]⎯
+
+ FAIL  packages/video-studio/src/pipeline-route-negation.test.ts > 视频路由保留用户明确的否定选择 > 不要营销片，走口播片 → explainer
+AssertionError: expected 'clarify' to be 'explainer' // Object.is equality
+
+Expected: "explainer"
+Received: "clarify"
+
+ ❯ packages/video-studio/src/pipeline-route-negation.test.ts:21:28
+     19|     const llmCall = vi.fn();
+     20|     const decision = await routeVideoPipeline({ text }, { llmCall });
+     21|     expect(decision.route).toBe(route);
+       |                            ^
+     22|     expect(llmCall).not.toHaveBeenCalled();
+     23|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/11]⎯
+
+ FAIL  packages/video-studio/src/pipeline-route-negation.test.ts > 视频路由保留用户明确的否定选择 > 只有否定而没有正向选择时，不借商品锚点重新选择已禁止的营销线
+AssertionError: expected 'marketing' to be undefined
+
+- Expected:
+undefined
+
++ Received:
+"marketing"
+
+ ❯ packages/video-studio/src/pipeline-route-negation.test.ts:27:39
+     25|   it("只有否定而没有正向选择时，不借商品锚点重新选择已禁止的营销线", async () => {
+     26|     const text = "不要营销片，商品名：星野风扇";
+     27|     expect(scoreRoute(text).explicit).toBeUndefined();
+       |                                       ^
+     28|     const decision = await routeVideoPipeline({ text });
+     29|     expect(decision.route).toBe("clarify");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/11]⎯
+
+ FAIL  packages/video-studio/src/pipeline-route-negation.test.ts > 视频路由保留用户明确的否定选择 > 规则强信号和模型都不能恢复用户已禁止的管线
+AssertionError: expected 'marketing' to be 'clarify' // Object.is equality
+
+Expected: "clarify"
+Received: "marketing"
+
+ ❯ packages/video-studio/src/pipeline-route-negation.test.ts:39:30
+     37|         llmCall: async () => JSON.stringify({ route: "marketing", conf…
+     38|       });
+     39|       expect(decision.route).toBe("clarify");
+       |                              ^
+     40|     }
+     41|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/11]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  11 failed | 3 passed (14)
+   Start at  22:04:42
+   Duration  127ms (transform 23ms, setup 0ms, import 30ms, tests 8ms, environment 0ms)
+

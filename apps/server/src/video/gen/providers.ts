@@ -20,7 +20,25 @@ import { whiteboardEngineReady } from "../whiteboard/engine.js";
 import { RemotionProvider } from "../explainer/remotion-provider.js";
 
 /** HTTP 失败 → 统一分类（401/并发满/模型不可用/可重试/其他） */
-function classify(status: number, body: string): ProviderError {
+function classify(status: number, body: string, provider?: string): ProviderError {
+  // 状态码不能覆盖实际接受/产物线索，否则重新签发资格后可能再次付费。
+  // 各适配器共用这条优先规则；错误对象里的追踪request_id不作为任务号。
+  const hasAcceptanceHint = (value: unknown, depth = 0): boolean => {
+    if (!value || typeof value !== "object" || depth > 4) return false;
+    if (Array.isArray(value)) return value.length > 0;
+    const item = value as Record<string, unknown>;
+    const idKeys = ["id", "task_id", "taskId", "url", "video_url",
+      ...(provider === "higgsfield" || provider === "muapi" ? ["request_id", "requestId"] : [])];
+    if (idKeys.some(key =>
+      typeof item[key] === "string" && Boolean((item[key] as string).trim()))) return true;
+    return ["data", "content", "result", "output", "video", "images", "outputs"].some(key => hasAcceptanceHint(item[key], depth + 1));
+  };
+  let decoded: unknown;
+  try { decoded = JSON.parse(body); }
+  catch { decoded = null; /* 非JSON错误响应继续按现有HTTP错误种类处理。 */ }
+  if (hasAcceptanceHint(decoded)) {
+    return new ProviderError("PROVIDER_FAILED", `供应商错误HTTP ${status} 同时返回任务或产物线索，须核对已有任务，禁止自动重发`, status, "unknown");
+  }
   const text = body.slice(0, 300);
   if (status === 401 || status === 403) return new ProviderError("AUTH", `鉴权失败：HTTP ${status} ${text}`, status);
   /**
@@ -63,7 +81,7 @@ async function postJson(url: string, headers: Record<string, string>, body: unkn
 async function postCompiled(compiled: CompiledProviderRequest, headers: Record<string, string>): Promise<unknown> {
   const res = await fetch(compiled.endpoint, { method: compiled.method, headers: { "content-type": "application/json", ...headers }, body: compiled.bodyJson, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }); // C-06
   const text = await res.text();
-  if (!res.ok) throw classify(res.status, text);
+  if (!res.ok) throw classify(res.status, text, compiled.provider);
   try { return JSON.parse(text) as unknown; }
   catch { throw new ProviderError("PROVIDER_FAILED", "供应商响应不是有效 JSON"); }
 }

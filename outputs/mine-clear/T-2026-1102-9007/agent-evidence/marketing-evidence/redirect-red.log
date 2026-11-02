@@ -1,0 +1,32 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest
+
+stderr | apps/server/src/video/marketing-authority.test.ts
+[pii] PII_SALT 未配置，使用 dev 占位盐（仅限开发/测试，生产必须注入 PII_SALT）
+
+ ❯ apps/server/src/video/marketing-authority.test.ts (19 tests | 1 failed | 18 skipped) 180ms
+     × 不同检索跳转指向同一正文时，逐站来源审核仍绑定其实际抓取快照 175ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/server/src/video/marketing-authority.test.ts > 营销事实宿主完整执行 > 不同检索跳转指向同一正文时，逐站来源审核仍绑定其实际抓取快照
+SubmissionError: MARKETING_SUPPORT_UNBOUND: 支持关系审核未绑定当前完整主张与来源正文
+ ❯ fail apps/server/src/video/marketing-authority.ts:40:61
+     38|   };
+     39| }
+     40| function fail(code: string, message: string): never { throw new Submis…
+       |                                                             ^
+     41| function object(value: unknown, name: string): RecordValue {
+     42|   if (!value || typeof value !== "object" || Array.isArray(value)) fai…
+ ❯ verifyMarketingFacts apps/server/src/video/marketing-authority.ts:283:60
+ ❯ finalizeMarketingFacts apps/server/src/video/marketing-authority.ts:249:3
+ ❯ apps/server/src/video/marketing-authority.test.ts:87:19
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 18 skipped (19)
+   Start at  22:00:30
+   Duration  888ms (transform 478ms, setup 0ms, import 641ms, tests 180ms, environment 0ms)
+

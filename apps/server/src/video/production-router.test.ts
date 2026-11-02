@@ -103,6 +103,31 @@ describe("生产入口正常可达且不能覆盖已审核请求", () => {
     });
     expect(d.submit).not.toHaveBeenCalled();
   });
+  it("G11 在提交前计入本镜时长，不能用剩余一秒预算提交五秒镜头", async () => {
+    vi.stubEnv("WORKLOOM_PROJECT_COMPUTE_CAP", "30");
+    d.query.mockImplementation(async (sql: string) => {
+      if (sql.includes("FROM render_jobs")) return { rows: [{ used: "29" }], rowCount: 1 };
+      return { rows: [], rowCount: 0 };
+    });
+    await expect(caller().render.submit({ qualificationToken: "test-token" }))
+      .rejects.toThrow("G11 项目算力预算不足（已用 29 秒 + 本镜 5 秒 > 上限 30 秒）");
+    expect(d.submit).not.toHaveBeenCalled();
+    expect(d.autoApproveScript).not.toHaveBeenCalled();
+  });
+  it("G11 允许本镜正好用完剩余预算，已受理补账不再次占用预算", async () => {
+    vi.stubEnv("WORKLOOM_PROJECT_COMPUTE_CAP", "30");
+    d.query.mockImplementation(async (sql: string) => {
+      if (sql.includes("FROM render_jobs")) return { rows: [{ used: "25" }], rowCount: 1 };
+      return { rows: [], rowCount: 0 };
+    });
+    await expect(caller().render.submit({ qualificationToken: "test-token" }))
+      .resolves.toMatchObject({ jobId: "RJ-1" });
+    d.load.mockResolvedValue({ ...canonical(), reconciliationOnly: true });
+    vi.stubEnv("WORKLOOM_PROJECT_COMPUTE_CAP", "1");
+    await expect(caller().render.submit({ qualificationToken: "test-token" }))
+      .resolves.toMatchObject({ jobId: "RJ-1" });
+    expect(d.submit).toHaveBeenCalledTimes(2);
+  });
   it.each(["block", "budget", "cost"])("%s 不允许新外部动作", async kind => {
     if (kind === "block") d.judge.mockReturnValue({ level: "block", impacts: [], triggeredBy: ["G8"] });
     if (kind === "budget") d.budget.mockReturnValue({ allowed: false, reason: "配额不足" });

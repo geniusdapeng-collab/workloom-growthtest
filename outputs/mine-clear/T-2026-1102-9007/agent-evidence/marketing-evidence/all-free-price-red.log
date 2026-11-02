@@ -1,0 +1,52 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest
+
+ ❯ packages/video-studio/src/marketing-price-contract.test.ts (3 tests | 2 failed) 8ms
+     × 全零价仍有来源与正确摘要：[{"amount":0,"currency":"USD"},{"amount":0,"currency":"CNY"}] 7ms
+     × 全零价仍有来源与正确摘要：[{"amount":0,"currency":"CNY"}] 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/video-studio/src/marketing-price-contract.test.ts > 营销价格原币种装订与零报价边界 > 全零价仍有来源与正确摘要：[{"amount":0,"currency":"USD"},{"amount":0,"currency":"CNY"}]
+AssertionError: expected [] to have a length of 2 but got +0
+
+- Expected
++ Received
+
+- 2
++ 0
+
+ ❯ packages/video-studio/src/marketing-price-contract.test.ts:26:121
+     24|     expect(result.dossier.identity.price_band).toBe(expected);
+     25|     expect(result.cards.insight_card.market_position.price_band).toBe(…
+     26|     expect(result.dossier.provenance.filter((item: { claim_ref: string…
+       |                                                                                                                         ^
+     27|     expect(result.dossier.gaps).not.toContain("未采集到价格信息，price_band 为空"…
+     28|     expect(JSON.stringify(raw)).toBe(original);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  packages/video-studio/src/marketing-price-contract.test.ts > 营销价格原币种装订与零报价边界 > 全零价仍有来源与正确摘要：[{"amount":0,"currency":"CNY"}]
+AssertionError: expected '' to be 'CNY 0' // Object.is equality
+
+- Expected
++ Received
+
+- CNY 0
+
+ ❯ packages/video-studio/src/marketing-price-contract.test.ts:24:48
+     22|     const result = engine.assemble(engine.plan(input).trace_id, input,…
+     23|     expect(result.ok).toBe(true);
+     24|     expect(result.dossier.identity.price_band).toBe(expected);
+       |                                                ^
+     25|     expect(result.cards.insight_card.market_position.price_band).toBe(…
+     26|     expect(result.dossier.provenance.filter((item: { claim_ref: string…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 1 passed (3)
+   Start at  22:30:20
+   Duration  279ms (transform 163ms, setup 0ms, import 196ms, tests 8ms, environment 0ms)
+

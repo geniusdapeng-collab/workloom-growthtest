@@ -1,0 +1,184 @@
+{
+  "schema": "workloom.video-audit-review/v1",
+  "sourceCommit": "3f3d283315b9f521871622deb18ef15bbfad6568",
+  "environment": "local-preview",
+  "reviewers": {
+    "general": "/root/general_audit",
+    "marketing": "/root/marketing_audit",
+    "submission": "/root/submission_audit",
+    "coordinationAndIndependentSubmissionAcceptance": "/root"
+  },
+  "changedFiles": [
+    {
+      "path": "README.md",
+      "coverageLevel": "generated-document-collateral",
+      "sha256": "cb72a4493ab010a7c1b33392a5a75ba9adaa8d848cc43ecac1164c11a64ca33c"
+    },
+    {
+      "path": "apps/server/src/video/data-mining-executor.ts",
+      "coverageLevel": "A",
+      "sha256": "0d9c571255b82213d8b2b6b7aa19b55386d22fd8dd69a4c68417a0abc8187636"
+    },
+    {
+      "path": "apps/server/src/video/data-mining-pacing.test.ts",
+      "coverageLevel": "A",
+      "sha256": "67f9267f616220e55f1cebb804f8ed9d631c9b17b6f6543d78b51a739dc6613d"
+    },
+    {
+      "path": "apps/server/src/video/gen/gen.test.ts",
+      "coverageLevel": "A",
+      "sha256": "93ee7b8d2d526fb75b5a69e4dbb54b5da396d9c018e7d7ba291bd605e54ac7bb"
+    },
+    {
+      "path": "apps/server/src/video/gen/providers.ts",
+      "coverageLevel": "A",
+      "sha256": "37781dc8d2033f02a50408e9d936ce2867a5cfe74ab2bd738adea1322921ce02"
+    },
+    {
+      "path": "apps/server/src/video/gen/submit.ts",
+      "coverageLevel": "A",
+      "sha256": "389778d71d66154b026faa5a5bd516c9c6130103029eb4881351f8313fb15b3a"
+    },
+    {
+      "path": "apps/server/src/video/marketing-authority.test.ts",
+      "coverageLevel": "A",
+      "sha256": "9e9dbcb3419c8c7bd0b6326a37b443536bd8fafbfd353936b8aa5a8c1c331bc3"
+    },
+    {
+      "path": "apps/server/src/video/marketing-authority.ts",
+      "coverageLevel": "A",
+      "sha256": "c7078f6bba0af5746316f252d13578e0ef54c4693c1ffe5ca06da5839b476956"
+    },
+    {
+      "path": "apps/server/src/video/marketing-source-fetcher.ts",
+      "coverageLevel": "A",
+      "sha256": "85703a073db2478b2ed4be300f79677745788d7615e95fa310a951890ef3200f"
+    },
+    {
+      "path": "apps/server/src/video/pipeline-control-plane.pg.test.ts",
+      "coverageLevel": "A",
+      "sha256": "aa942f58a623c43551e1874ba00d71cff2771a61070d18fd78b66ded192b555e"
+    },
+    {
+      "path": "apps/server/src/video/production-authority.pg.test.ts",
+      "coverageLevel": "A",
+      "sha256": "b5296858ec59e064d7ad100649532715d23802cde7834d08173aefea2104d13d"
+    },
+    {
+      "path": "apps/server/src/video/production-router.test.ts",
+      "coverageLevel": "A",
+      "sha256": "c14227916ce2a6d1f4502fae0cb1cac4ff1807c3c9baf88d9770c31a2a9659c1"
+    },
+    {
+      "path": "apps/server/src/video/project-compute-budget.ts",
+      "coverageLevel": "A",
+      "sha256": "569baf94b4f3f05a3097a6ab4229b677403cb739c9b98ab3f0ee41c46f7fc932"
+    },
+    {
+      "path": "apps/server/src/video/router.ts",
+      "coverageLevel": "A",
+      "sha256": "0c15336d7cf8dc9793f08c4e54b8650f79097441d1ea83c04320cf991ffa1e93"
+    },
+    {
+      "path": "docs/capabilities.auto.json",
+      "coverageLevel": "generated-document-collateral",
+      "sha256": "f9d65ae5328552e1b027c8aa5e978babf0d78437a9e220c73caa22a6575cc79f"
+    },
+    {
+      "path": "docs/capabilities.auto.md",
+      "coverageLevel": "generated-document-collateral",
+      "sha256": "88ced8bf4ac8af0e7343f4cc9035a9442ecd6952dd544b890b83d547fd701458"
+    },
+    {
+      "path": "packages/video-studio/src/duration-projection.ts",
+      "coverageLevel": "A",
+      "sha256": "4f1ae7ff8ed5102a0a4ef7e205181c3de6bd8c0fbffa3a23ec93aed896b70421"
+    },
+    {
+      "path": "packages/video-studio/src/duration-voice-ceiling.test.ts",
+      "coverageLevel": "A",
+      "sha256": "ad29de60a8196ed786b802df1de7691539beb4a8c20cc523ba29a6010162e9a4"
+    },
+    {
+      "path": "packages/video-studio/src/index.ts",
+      "coverageLevel": "A",
+      "sha256": "a84c5e7591f1880960c194c52df84a341444c4f432901e3524955373f3d073db"
+    },
+    {
+      "path": "packages/video-studio/src/marketing-price-contract.test.ts",
+      "coverageLevel": "A",
+      "sha256": "eb3110c167845e475f171ad01a34ef86994fecb1e2b8d5a81a52a01a66141ba2"
+    },
+    {
+      "path": "packages/video-studio/src/marketing-price-contract.ts",
+      "coverageLevel": "A",
+      "sha256": "b3e2eab4daa8bff5a3c0b000db0f372aa292d559da1854c201e959f34c4ccaab"
+    },
+    {
+      "path": "packages/video-studio/src/narrative-aspect-contract.test.ts",
+      "coverageLevel": "A",
+      "sha256": "bf40b0b039b1a2ad7155053b018304695896ebb906363f0b173c62b229eba2b1"
+    },
+    {
+      "path": "packages/video-studio/src/narrative-no-person-source.test.ts",
+      "coverageLevel": "A",
+      "sha256": "5a1a75d20144eaf4864cec855d98bbbfdf4ac78cb348a4ccd7e6f30c6c1d54b5"
+    },
+    {
+      "path": "packages/video-studio/src/narrative-source-action.test.ts",
+      "coverageLevel": "A",
+      "sha256": "af69ca3888bb653193bad19bf6356e297a671b642f0d3d57eb67ad37b13bbd1a"
+    },
+    {
+      "path": "packages/video-studio/src/narrative-speech-contract.test.ts",
+      "coverageLevel": "A",
+      "sha256": "dd34d45c83d703bdc71b7c93608d1a6dd246f8e846aec7d8be09993697aa6bae"
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-route-negation.test.ts",
+      "coverageLevel": "A",
+      "sha256": "061234b046025031d4e1bec55fe4d8d65fdf8317623213c135ff845550c1f7df"
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-router.ts",
+      "coverageLevel": "A",
+      "sha256": "844f643175296c82a969b606b5f566d07236aad797e13898fc72b8c99737a4a2"
+    },
+    {
+      "path": "packages/video-studio/src/studio-bridge-concurrency.test.ts",
+      "coverageLevel": "A",
+      "sha256": "6b20b756fce496d7135fae0f7340d60d8f9611a99d28b36fe39118ef520aad4a"
+    },
+    {
+      "path": "packages/video-studio/src/studio.ts",
+      "coverageLevel": "A",
+      "sha256": "007109a4347c57a33a7cb9ca18ea246ce83f0235d8f3b5cfb2790f3213545074"
+    },
+    {
+      "path": "packages/video-studio/src/vendor-compat.test.ts",
+      "coverageLevel": "A",
+      "sha256": "58b2622e2febc050818bf6321ac46d90dc418b4820536a85c644c2364389159f"
+    },
+    {
+      "path": "packages/video-studio/src/vendor-compat.ts",
+      "coverageLevel": "A",
+      "sha256": "f2a32ab61546688061b6d639d9fa015e4c3ba72f89b6fade97cd7fe79822cd4e"
+    }
+  ],
+  "separation": "General/marketing repair accepted by submission_audit; submission repair accepted by root. Root-authored test fixture correction additionally covered by full server-video and cloud required checks.",
+  "actualAcceptanceLedger": "ledger.json",
+  "paidExternalCalls": 0,
+  "secretsScan": {
+    "currentTaskTokenMatches": 0,
+    "credentialPatterns": 0,
+    "checkedFiles": "31 changed tracked files and complete task evidence tree"
+  },
+  "reportReview": {
+    "actor": "/root/marketing_audit",
+    "result": "no blocking issue; three wording improvements incorporated",
+    "scope": "full report and full architecture proposal, marketing facts and evidence boundary"
+  },
+  "limitations": [
+    "No paid live-model/media verification; no full RDAS276 execution; no measured latency/success-rate claim."
+  ]
+}

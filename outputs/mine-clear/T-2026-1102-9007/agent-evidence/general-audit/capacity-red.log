@@ -1,0 +1,49 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest
+
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+ ❯ packages/video-studio/src/narrative-source-action.test.ts (16 tests | 2 failed) 307ms
+   × rejects source actions exceeding the final prompt capacity instead of emitting an overlong successful prompt 2ms
+   × capacity failure before G6 leaves the original action intact and never reaches a render boundary 298ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/video-studio/src/narrative-source-action.test.ts > rejects source actions exceeding the final prompt capacity instead of emitting an overlong successful prompt
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ packages/video-studio/src/narrative-source-action.test.ts:89:7
+     87|   expect(() => applyNarrativeFinalPromptContract({ shotId: 'S-long', d…
+     88|     noDialogue: true, maxLength: 3000, canonicalize: true, projectActi…
+     89|   })).toThrow(/FINAL_PROMPT_SOURCE_CAPACITY_EXCEEDED.*S-long.*3000/u);
+       |       ^
+     90| });
+     91|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  packages/video-studio/src/narrative-source-action.test.ts > capacity failure before G6 leaves the original action intact and never reaches a render boundary
+TypeError: .toMatch() expects to receive a string, but got object
+ ❯ packages/video-studio/src/narrative-source-action.test.ts:132:26
+    130|     expect(line).toBeDefined();
+    131|     const result = JSON.parse(line!.slice(7));
+    132|     expect(result.error).toMatch(/FINAL_PROMPT_SOURCE_CAPACITY_EXCEEDE…
+       |                          ^
+    133|     expect(result.approvals).toBe(0);
+    134|     expect(result.renderCalls).toBe(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 14 passed (16)
+   Start at  22:26:43
+   Duration  572ms (transform 167ms, setup 0ms, import 195ms, tests 307ms, environment 0ms)
+

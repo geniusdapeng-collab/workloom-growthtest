@@ -3382,7 +3382,7 @@ function buildShotContract(
         : narrativeActionKind(action) === "listen"
           ? "on"
           : "off";
-      const shotSize = shotSizeForAction(action) || (hint === "static" ? "medium" : hint);
+      const shotSize = hint === "static" ? "medium" : hint;
       rows.push({
         shotId: `${sceneId || "SC"}-S${String(index + 1).padStart(2, "0")}`,
         sceneId: sceneId || null,
@@ -3428,7 +3428,7 @@ function reconcileShotContractExecutionCoherence(prd: Record<string, unknown>): 
   const visual = recordValue(prd.visualSpecification);
   const movements = [...new Set(shots.map((shot) => String(shot.cameraMovement ?? "").trim()).filter(Boolean))];
   if (movements.length === 1 && /^(?:locked|static)$/iu.test(movements[0]!)) {
-    visual.cameraLanguage = "固定机位，三脚架锁死；镜头内只做焦点在猫眼、爪部、水滴和纸箱边缘之间的转移，不做机位位移、变焦或运镜摇摆。";
+    visual.cameraLanguage = "固定机位，三脚架锁死；焦点只在本次源镜头合同已确认的主体与接触点之间转移，不做机位位移、变焦或运镜摇摆。";
   }
   const visualTemperature = colorTemperatureFromText(JSON.stringify(visual));
   if (visualTemperature && /\b2700K\b/u.test(visualTemperature) && /\b5600K\b/u.test(visualTemperature)) {
@@ -3443,6 +3443,9 @@ function reconcileShotContractExecutionCoherence(prd: Record<string, unknown>): 
 
 export function normalizeHomecomingPrdContinuity(prd: Record<string, unknown>, musicForbidden: boolean): boolean {
   const project = recordValue(prd.projectDefinition);
+  const sourceText = String(project.sourceIntent ?? project._originalStoryText ?? "");
+  const sampleFacts = ["陈卓", "黑色折叠伞", "旧防盗门", "钥匙", "白色湿便鞋", "室内拖鞋", "2700K", "楼道", "玄关", "出租屋", "地砖", "地垫", "门后挂钩", "鞋架", "通勤包", "旧台灯", "旋钮", "钨丝", "书桌", "窗玻璃雨珠", "坐具"];
+  if (!sampleFacts.every((fact) => sourceText.includes(fact))) return false;
   const sourceActions = extractNarrativeActions({}, {
     _originalStoryText: String(project.sourceIntent ?? project._originalStoryText ?? ""),
   });
@@ -4980,13 +4983,18 @@ export interface DurationProjectionBridgeOptions {
   maxShotSeconds?: number;
 }
 
-const durationPolicyStore = new AsyncLocalStorage<{ noDialogue: boolean }>();
+interface DurationProjectionPolicy {
+  noDialogue?: boolean;
+  minShotSeconds?: number;
+  maxShotSeconds?: number;
+}
+const durationPolicyStore = new AsyncLocalStorage<DurationProjectionPolicy>();
 
 export function runWithDurationProjectionPolicy<T>(
-  policy: { noDialogue?: boolean },
+  policy: DurationProjectionPolicy,
   callback: () => T,
 ): T {
-  return durationPolicyStore.run({ noDialogue: policy.noDialogue === true }, callback);
+  return durationPolicyStore.run({ ...policy, noDialogue: policy.noDialogue === true }, callback);
 }
 
 /** 进程级共享桥注册表：第一个安装、最后一个卸载（并发 run 安全） */
@@ -5029,8 +5037,6 @@ export function listSharedBridges(): Array<{ key: string; refs: number }> {
 export function installVendorDurationProjectionBridge(options: DurationProjectionBridgeOptions = {}): () => void {
   const log = options.log ?? (() => undefined);
   const emit = options.onEvent ?? (() => undefined);
-  const minShot = options.minShotSeconds ?? 4;
-  const maxShot = options.maxShotSeconds ?? 30;
   const repoRoot = videoRuntimeRoot(import.meta.url);
   let vendorRequire: NodeJS.Require;
   try {
@@ -5076,7 +5082,10 @@ export function installVendorDurationProjectionBridge(options: DurationProjectio
       });
       return false;
     }
-    const noDialogue = durationPolicyStore.getStore()?.noDialogue === true;
+    const policy = durationPolicyStore.getStore();
+    const noDialogue = policy?.noDialogue === true;
+    const minShot = policy?.minShotSeconds ?? options.minShotSeconds ?? 4;
+    const maxShot = policy?.maxShotSeconds ?? options.maxShotSeconds ?? 30;
     if (noDialogue) {
       for (const record of records) {
         record.dialogue = "";
@@ -5102,7 +5111,7 @@ export function installVendorDurationProjectionBridge(options: DurationProjectio
       });
     let result = projectOnce(true);
     if (!result.ok && planningMode) {
-      if (result.reason === "voice-floor-exceeds-target"
+      if ((result.reason === "voice-floor-exceeds-target" || result.reason === "voice-floor-exceeds-model-limit")
         && (source === "dcm.constrain" || source === "phase-3")) {
         emit({
           kind: "infeasible",
@@ -5640,6 +5649,10 @@ export function applyNarrativeFinalPromptContract(
     replaceField("台词", "不适用：本片无台词、无旁白、无口播。");
   }
   const characterNames = (options.characterNames ?? []).map((name) => String(name).trim()).filter(Boolean);
+  const sourceEnvironmentProhibitions = [...new Set(
+    [promptFieldText(next.negative ?? (next.fields as FusionRecord).negative ?? next.negative_prompt), fieldValue("负面约束")]
+      .join("；").match(/(?:无|禁止|不出现)(?:船只|建筑|现代设备)/gu) ?? [],
+  )];
   const shotCharacterEvidence = promptFieldText(next.character ?? (next.fields as FusionRecord).character);
   const shotCharacterRef = promptFieldText(next.characterRef);
   const explicitNoPersonInShot = /^(?:无|none|n\/a)$/iu.test(shotCharacterRef)
@@ -5672,55 +5685,41 @@ export function applyNarrativeFinalPromptContract(
     replaceField("时间轴", `T00:00-T00:${duration.toFixed(1)} 起幅建立本镜空间，中段只执行动作字段中的连续变化，落幅保持同一光位并接到下一镜。`);
   }
   if (options.noCharacters) {
-    prompt = prompt
-      .replace(/[^。；\n]{0,20}(?:机器后撤|镜头同步后撤|镜头后撤|后拉|后撤)[^。；\n]*/gu, "镜位保持稳定")
-      .replace(/约?[零一二三四五六七八九十百\d.]+厘米/gu, "低机位高度")
-      .replace(/比上一镜[^，。；\n]*/gu, "按统一景别序列执行");
-    if (options.colorTemperature) {
-      prompt = prompt.replace(/\b\d{4}\s*K\b/giu, options.colorTemperature);
-    }
-    replaceField("场景", fieldValue("场景")
-      .replace(/清晨\s*/gu, "清晨")
-      .replace(/(?:海拔|六点|五点半|日出前)[^，。；\s]*/gu, "")
-      .replace(/，{2,}/gu, "，"));
-    const colorTemperature = String(options.colorTemperature ?? "统一自然晨光");
-    replaceField("灯光设计", `${colorTemperature}；低角度自然侧逆光经薄雾柔化，无人工光源；全片保持同一主光方向、白平衡与光比，不自行切换冷暖基调。`);
-    replaceField("明亮约束", "自然景物高光不过曝，暗部保留材质细节；本镜不涉及人物面部或肤色。");
-    replaceField("角色", "无人物、无人影、无动物入画；主体仅来自源证据中的湖面、芦苇、山体、雾、水痕等自然景物。");
+    // “无人物”只约束演员；厨房、商品、建筑和人工灯光仍按源合同执行。
+    replaceField("场景", promptFieldText(options.projectScene ?? next.scene ?? (next.fields as FusionRecord).scene)
+      || fieldValue("场景") || "按本镜已确认场景执行");
+    replaceField("灯光设计", promptFieldText(options.projectLighting ?? next.lighting ?? (next.fields as FusionRecord).lighting)
+      || fieldValue("灯光设计") || "沿用已确认灯光方向、白平衡与光比，不新增光源");
+    replaceField("明亮约束", "画面主体高光不过曝，暗部保留材质细节；本镜不涉及人物面部或肤色。");
+    replaceField("角色", `无人物、无人影、无人体局部入画；画面主体仅来自本镜源合同${options.noAnimals ? "；无动物入画" : ""}。`);
     replaceField("服装", "不适用：无人物出场。");
     replaceField("化妆", "不适用：无人物出场。");
     replaceField("定妆照", "不适用：无人物出场，不生成也不引用人像定妆照。");
-    const action = fieldValue("动作")
-      .replace(/[^；。\n]*(?:水黾|飞鸟|鸟鸣|动物|猫|狗|鱼|站立姿态|缓慢走动|张开双臂|指向|握拳|抱头|微笑|点头|人物动作)[^；。\n]*[；。]?/gu, "")
-      .replace(/^[；。\s]+|[；。\s]+$/gu, "");
-    replaceField("动作", action || "画面内仅有源证据中的自然物理运动：薄雾慢移、水面细涟漪、芦苇与草叶随风轻摆；无人物、无动物。");
-    const props = promptFieldText((next.fields as FusionRecord).props ?? next.props)
-      .replace(/[^；。\n]*(?:动物|人物|角色)[^；。\n]*[；。]?/gu, "")
-      .trim();
-    replaceField("道具", `${props || "源证据中的自然物"}；不添加人工道具、人物或动物。`);
+    const action = actionSource;
+    replaceField("动作", action || "按本镜源合同执行主体的连续变化，不新增人物动作。");
+    const props = options.projectProps?.length
+      ? options.projectProps.join("、")
+      : promptFieldText((next.fields as FusionRecord).props ?? next.props) || fieldValue("道具");
+    replaceField("道具", props || "仅使用本镜源合同中的物件，不新增道具。");
     const movement = promptFieldText((next.fields as FusionRecord).camera_movement ?? next.camera_movement);
-    const normalizedMovement = /(?:固定|锁死|locked|static|零位移)/iu.test(movement)
-      ? "固定机位，三脚架锁死，全镜零推拉零横移零变焦"
-      : /推近|推镜/u.test(movement)
-        ? "极缓单次推近，速度连续且逐渐减速停稳，不跨越景别等级"
-        : /横移|平移/u.test(movement)
-          ? "极缓单次横移，速度连续且停稳，不跨越景别等级"
-          : "固定机位，不做推拉摇移或变焦";
-    replaceField("运镜", `${normalizedMovement}；从起幅到落幅连续稳定，不写厘米、米每秒或其他无法兑现的位移参数。`);
-    replaceField("情绪", "平静、克制；仅通过光线、水面、雾层和芦苇的节奏表达，不要求人物表情。");
-    replaceField("节奏", "整体节奏依据源证据中的自然变化连续推进，不使用人工强转折或情绪性加速。");
-    replaceField("角色约束", "画面禁止人物、人影、人体局部和拟人化表演模板；仅允许源证据中的自然景物。");
-    replaceField("角色一致性", "本镜无角色；场景、自然物位置、光源方向与时间阶段以源证据和统一视觉方案为准，不追加未经核实的参数。");
+    if (movement) replaceField("运镜", movement);
+    replaceField("情绪", "通过源合同中的主体变化、光线与空间关系表达，不要求人物表情。");
+    replaceField("节奏", "按源动作的先后顺序连续推进，不使用无关的强转折或情绪性加速。");
+    replaceField("角色约束", "画面禁止人物、人影、人体局部和拟人化表演模板；主体以源合同为准。");
+    replaceField("角色一致性", "本镜无人物；场景、物件位置、光源方向与时间阶段以源证据为准，不追加未经核实的参数。");
     replaceField("转场", options.isLastShot
       ? "本镜为全片最后一镜；落幅定格0.5秒后淡出至黑，持续1秒，无其他转场特效。"
       : "本镜落幅后硬切至下一镜；不使用叠化、黑场或其他转场特效。");
-    if (duration > 0) {
-      replaceField("时间轴", `T00:00-T00:${duration.toFixed(1)} 从静止起幅开始，风、雾、水、光在连续物理范围内完成变化；落幅保持同一空间与光源方向，不跨越下一镜。`);
-    }
+    if (duration > 0) replaceField("时间轴", timelineTextForAction(action || actionSource, duration));
   }
   if (options.noMusic || options.noDialogue) {
     const rawAudio = promptFieldText((next.fields as FusionRecord).audio ?? next.audio);
-    const prohibited = /(?:音乐|配乐|旋律|弦乐|钢琴|氛围音|铺底|BPM|BGM|soundtrack|music|score|台词|人声|对话|旁白|口播|voiceover)/iu;
+    const musicTerms = "音乐|配乐|旋律|弦乐|钢琴|氛围音|铺底|BPM|BGM|soundtrack|music|score";
+    const speechTerms = "台词|人声|对话|旁白|口播|voiceover";
+    const prohibited = new RegExp(`(?:${[
+      ...(options.noMusic ? [musicTerms] : []),
+      ...(options.noDialogue ? [speechTerms] : []),
+    ].join("|")})`, "iu");
     const forbiddenAnimal = options.noAnimals ? /(?:鸟|虫|动物|水黾)/u : null;
     const anchors = rawAudio
       .split(/[；;。，,、|\n]+/u)
@@ -5728,18 +5727,18 @@ export function applyNarrativeFinalPromptContract(
       .filter((item) => item.length >= 2 && !prohibited.test(item) && !forbiddenAnimal?.test(item))
       .filter((item) => !/(?:音效上加入|拟音|后期|叠加)/u.test(item))
       .map((item) => item.replace(/^(?:仅有|只有|仅保留|只保留)+/u, "").trim())
-      .filter((item) => /(?:风|水|波|涟漪|雾|芦苇|雨|环境|动作|呼吸|草|叶|石|泥)/u.test(item));
-    const fallbackAudio = options.noCharacters ? "风声、水面涟漪声、芦苇摩擦声" : "与画面同步的环境声和主体动作声";
+      .filter(Boolean);
+    const fallbackAudio = "与画面同步的环境声和主体动作声";
     const audio = anchors.length > 0 ? [...new Set(anchors)].slice(0, 6).join("、") : fallbackAudio;
-    replaceField("音频", `仅有${audio}；无人物声、无旁白、无音乐、无配乐、无音乐节拍。`);
+    replaceField("音频", `仅有${audio}${options.noDialogue ? "；无人物声、无旁白" : "，以及合同允许的人声与台词"}${options.noMusic ? "；无音乐、无配乐、无音乐节拍" : ""}。`);
   }
   if (options.chineseOnly) {
     const forbidden = [
       "无文字", "无字幕", "无水印", "无品牌标识",
       ...(options.noCharacters ? ["无人物", "无人影", "无人体局部"] : []),
       ...(shotNoPerson ? ["无人物", "无人影", "无人体局部"] : []),
-      ...(options.noAnimals || options.noCharacters ? ["无动物", "无飞鸟"] : []),
-      ...(options.noCharacters ? ["无船只", "无建筑", "无现代设备"] : []),
+      ...(options.noAnimals ? ["无动物", "无飞鸟"] : []),
+      ...sourceEnvironmentProhibitions,
       "无镜头光晕伪影", "无生成特效", "无模糊", "无过曝",
     ];
     replaceField("负面约束", [...new Set(forbidden)].join("、"));
@@ -5845,7 +5844,7 @@ export function applyNarrativeFinalPromptContract(
       );
     const makeup = canonicalNoPerson
       ? "不适用：本镜无人物。"
-      : makeupTextForAction(projectedAction);
+      : makeupSource || makeupTextForAction(projectedAction);
     const portraitText = canonicalAnimalOnly
       ? (profiles.filter((item) => item.path).map((item) => `${item.name}=${item.path}`).join("；")
         || "不适用人像定妆照：动物主体只复用同一段文字外观锚点；本审计轮无已登记参考帧或图片资产，不声称图像锁定，不生成人物肖像。")
@@ -5858,9 +5857,7 @@ export function applyNarrativeFinalPromptContract(
     const dialogueText = options.noDialogue
       ? "不适用：本片无台词、无旁白、无口播。"
       : promptFieldText(next.dialogue ?? (next.fields as FusionRecord).dialogue) || "按已确认台词合同执行。";
-    const audioText = options.noMusic || options.noDialogue
-      ? "仅保留真实环境声与主体动作声；无人物声、无旁白、无音乐、无配乐、无节拍。"
-      : fieldValue("音频") || "环境声、主体动作声与合同允许的人声同步；无未声明配乐。";
+    const audioText = fieldValue("音频") || "环境声、主体动作声与合同允许的人声同步；无未声明配乐。";
     const rawAction = cleanText(actionSource)
       .replace(/[^；。\n]*(?:画面内无人物|没有实体肢体入画|无角色出场|空镜无角色)[^；。\n]*[；。]?/gu, "")
       .trim();
@@ -5873,7 +5870,7 @@ export function applyNarrativeFinalPromptContract(
     const actions = options.projectActions ?? [];
     const subjectlessFallback = canonicalAnimalOnly
       ? `${canonicalAnimalNames.join("、")}在${cleanText(options.projectScene ?? "") || "已确认空间"}完成本镜可见动作`
-      : "风、雾、水面、光线与植物在连续物理范围内完成本镜自然变化，无人物动作";
+      : "按本镜源合同执行主体与场景的连续变化，无人物动作";
     const assignedAction = canonicalAnimalOnly
       ? (projectedAction || visibleAction || subjectlessFallback)
       : canonicalNoPerson
@@ -5899,10 +5896,10 @@ export function applyNarrativeFinalPromptContract(
       || "中景";
     const shotSize = shotSizeRaw.replace(/景别$/u, "");
     const compositionText = canonicalAnimalOnly
-      ? `${shotSize}景别，9:16竖构图；${canonicalAnimalNames.join("、")}作为唯一动物主体清晰可辨，画面边缘保留安全区，不增加人物。`
+      ? `${shotSize}景别，${aspect}构图；${canonicalAnimalNames.join("、")}作为唯一动物主体清晰可辨，画面边缘保留安全区，不增加人物。`
       : canonicalNoPerson
-        ? `${shotSize}景别，9:16竖构图；自然景物主体清晰，画面边缘保留安全区，不增加人物或动物。`
-      : `${shotSize}景别，9:16竖构图；${characterNames.join("、") || "已登记角色"}位于可执行表演区并保持可辨轮廓，为其动作和视线保留空间。`;
+        ? `${shotSize}景别，${aspect}构图；源合同主体清晰，画面边缘保留安全区，不增加人物${options.noAnimals ? "或动物" : ""}。`
+      : `${shotSize}景别，${aspect}构图；${characterNames.join("、") || "已登记角色"}位于可执行表演区并保持可辨轮廓，为其动作和视线保留空间。`;
     const cameraSource = promptFieldText(next.camera_movement ?? (next.fields as FusionRecord).camera_movement) || "固定机位";
     const cameraText = /(?:固定|锁死|locked|static|零位移)/iu.test(cameraSource)
       ? "固定机位，三脚架锁死，全镜零推拉零横移零变焦"
@@ -5916,15 +5913,15 @@ export function applyNarrativeFinalPromptContract(
     const emotionText = canonicalAnimalOnly
       ? emotionTextForAnimalAction(assignedAction, canonicalAnimalNames)
       : canonicalNoPerson
-        ? "平静、克制；情绪只通过自然变化、光线与空间关系表达。"
+        ? "情绪只通过源动作、光线与空间关系表达，不要求人物表情。"
       : emotionTextForAction(assignedAction);
     const baseText = cleanText(fieldValue("基础") || "电影级写实质感；保留真实材质、自然颗粒与连续物理运动。")
       .replace(/\b(?:8K|4K)\b/giu, "电影级");
     const forbidden = [
       "无文字", "无字幕", "无水印", "无品牌标识",
       ...(canonicalNoPerson ? ["无人物", "无人影", "无人体局部"] : []),
-      ...(options.noAnimals || canonicalNoActors ? ["无动物", "无飞鸟"] : []),
-      ...(canonicalNoActors ? ["无船只", "无建筑", "无现代设备"] : []),
+      ...(options.noAnimals ? ["无动物", "无飞鸟"] : []),
+      ...sourceEnvironmentProhibitions,
       "无生成特效", "无镜头光晕伪影", "无模糊", "无过曝", "无未声明角色",
     ];
     const portraitLine = portraitText.startsWith("不适用") ? portraitText : `使用 ${portraitText}；跨镜不得替换。`;
@@ -5957,14 +5954,14 @@ export function applyNarrativeFinalPromptContract(
       `核对声音事件与画面动作同帧，且不新增合同外人物、文字、品牌、字幕或配乐`,
     ].join("；");
     const brightnessText = canonicalAnimalOnly
-      ? "动物主体高光不过曝，湿毛、爪垫与纸箱纤维保留纹理，暗部不死黑；不要求人物面部曝光。"
+      ? "动物主体高光不过曝，按源合同保留主体表面与所接触物件的真实纹理，暗部不死黑；不要求人物面部曝光。"
       : canonicalNoPerson
-        ? "自然景物高光不过曝，暗部保留材质细节；不涉及人物面部。"
+        ? "画面主体高光不过曝，暗部保留材质细节；不涉及人物面部。"
         : brightnessTextForAction(assignedAction);
     const directorIntent = canonicalAnimalOnly
       ? "克制写实的动物观察短片；以动物动作、空间关系和真实光线推进，不拟人化、不增加无关叙事或模板表演。"
       : canonicalNoPerson
-        ? "克制写实的自然观察短片；以自然运动、材质反射和真实光线推进，不增加无关叙事、特效或模板表演。"
+        ? "按源合同观察场景与物件；以主体变化、空间关系和已确认光线推进，不增加无关叙事、特效或人物表演。"
         : "克制写实的自然长镜或稳定短镜；以人物动作、空间关系和真实光线推进，不增加无关叙事、特效或模板表演。";
     prompt = [
       "01.【语言约束】全部字段使用中文；画幅、分辨率、帧率、编码、时间码与资产路径可作为受控制作标记。",
@@ -6049,6 +6046,12 @@ export function applyNarrativeFinalPromptContract(
       } : {}),
     };
   }
+  // canonicalize 会从源合同重建字段；不得绕过前面的长度检查，也不得静默截掉源动作。
+  if (prompt.length > options.maxLength) {
+    throw new Error(
+      `FINAL_PROMPT_SOURCE_CAPACITY_EXCEEDED: ${String(next.shotId ?? next.shot_id ?? "未编号镜头")} 重建后 ${prompt.length} 字符，超过 ${options.maxLength}；保留源合同并停止本次预生产`,
+    );
+  }
   next.prompt = prompt;
   return next;
 }
@@ -6105,68 +6108,14 @@ export function deriveNarrativeShotDirection(input: {
   fallbackColor?: string;
   fallbackProps?: string[];
 }): NarrativeShotDirection {
-  const action = String(input.action ?? "").trim();
-  const fallbackProps = (input.fallbackProps ?? []).map(String).map((item) => item.trim()).filter(Boolean);
-  if (/(?:收伞|抖落.*伞)/u.test(action)) {
-    return {
-      action,
-      scene: "楼道/门外门口：楼道冷光、地垫与门框可见，人物尚未进入出租屋",
-      lighting: "旧台灯关闭；楼道光偏冷，室内只从门缝露出暗部，不在门外提前点亮台灯",
-      color: "冷蓝灰环境色（旧台灯未点亮）",
-      props: ["黑色折叠伞", "雨伞", "旧防盗门", "地垫", "地砖", "门口"],
-    };
-  }
-  if (/开门/u.test(action)) {
-    return {
-      action,
-      scene: "出租屋门口：门处于开启过程，人物由门外进入玄关",
-      lighting: "旧台灯关闭；门外楼道冷光沿门缝进入，门内保持暗部",
-      color: "冷蓝灰环境色（旧台灯未点亮）",
-      props: ["黑色折叠伞", "旧防盗门", "钥匙", "门", "门把手", "玄关", "地垫"],
-    };
-  }
-  if (/(?:关门|门关好|门锁落位|回身.*门)/u.test(action)) {
-    return {
-      action,
-      scene: "出租屋玄关内侧：门扇正从开启位置合拢，门框、门锁、鞋架与地垫在同一空间；陈卓把收拢的黑色折叠伞靠到门边挂钩后再确认门锁",
-      lighting: "旧台灯仍关闭；门缝冷光随门扇合拢变窄，室内保留冷蓝暗部",
-      color: "冷蓝灰环境色（旧台灯未点亮）",
-      props: ["黑色折叠伞", "旧防盗门", "门", "门把手", "门锁", "玄关", "鞋架", "地垫"],
-    };
-  }
-  if (/(?:换鞋|脱鞋|穿鞋|脱下[^。；\n]*鞋|换穿[^。；\n]*拖鞋)/u.test(action)) {
-    return {
-      action,
-      scene: "出租屋玄关内侧：鞋架、地垫与门后挂钩在同一空间，门已关上；收拢的黑色折叠伞已靠在门边",
-      lighting: "旧台灯仍关闭；仅保留窗外雨夜冷光",
-      color: "冷蓝灰环境色（旧台灯未点亮）",
-      props: ["黑色折叠伞", "白色湿便鞋", "室内拖鞋", "鞋架", "地垫", "门后挂钩", "门", "旧台灯（未亮）"],
-    };
-  }
-  if (/(?:拧亮|拧开|打开|按下|按动).*(?:台灯|灯)|(?:台灯|灯).*(?:拧亮|拧开|打开|开关|旋钮)/u.test(action)) {
-    return {
-      action,
-      scene: "出租屋室内灯旁：旧台灯旋钮、灯罩与操作手部同框",
-      lighting: "起幅为旧台灯关闭的冷暗环境；旋转旋钮后2700K暖光渐亮，门外冷蓝只作勾边",
-      color: "2700K暖光主调，起幅保留冷蓝暗部",
-      props: ["旧台灯", "旋钮", "书桌"],
-    };
-  }
-  if (/(?:坐下|坐回|坐进|坐在).*(?:听雨|灯下|暖光)|听雨/u.test(action)) {
-    return {
-      action,
-      scene: "出租屋室内灯下窗边：坐具、旧台灯、窗与雨痕在同一空间",
-      lighting: "旧台灯2700K暖光为主，窗外冷蓝只勾人物或窗框边缘",
-      color: "2700K暖光主调，窗外冷蓝仅作边缘勾光",
-      props: ["旧台灯", "台灯", "窗", "窗玻璃雨珠", "坐具", "书桌"],
-    };
-  }
+  // Action words alone do not prove an actor, house, lock, footwear or light state.
+  // The already frozen source contract owns those facts.
   return {
-    action,
+    action: String(input.action ?? "").trim(),
     scene: input.fallbackScene,
     lighting: input.fallbackLighting,
     color: input.fallbackColor,
-    props: fallbackProps,
+    props: [...new Set((input.fallbackProps ?? []).map(String).map((item) => item.trim()).filter(Boolean))],
   };
 }
 
@@ -6230,73 +6179,26 @@ function sceneMatchesAction(action: string, scene: string | undefined): boolean 
  * door. The transformation is keyed by semantics, not by project IDs.
  */
 export function projectNarrativeActionSequence(actions: string[], shotCount: number): string[] {
-  const extracted = [...new Set(actions.map(String).map((item) => item.trim()).filter(Boolean))];
-  const clean = /(?:橘猫|猫|狗|鸟|爪|耳朵|尾巴)/u.test(extracted.join("；"))
-    ? [...extracted].sort((left, right) =>
-      narrativeAnimalActionRank(left) - narrativeAnimalActionRank(right))
-    : extracted;
-  const joined = clean.join("；");
-  const homecoming = /(?:收伞|雨伞)/u.test(joined)
-    && /开门/u.test(joined)
-    && /(?:换鞋|脱鞋)/u.test(joined)
-    && /(?:台灯|灯)/u.test(joined)
-    && /(?:听雨|坐下)/u.test(joined);
-  if (homecoming && shotCount === 7) {
-    return [
-      "陈卓收伞走到出租屋门前",
-      "陈卓用钥匙开门并跨进玄关",
-      "陈卓回身把门关好，确认门锁落位",
-      "陈卓在玄关弯腰脱下一只白色湿便鞋",
-      "陈卓脱下另一只湿便鞋，换穿室内拖鞋并站稳",
-      "陈卓伸手拧亮旧台灯",
-      "陈卓在灯下坐下，抬头安静听雨",
-    ];
+  if (!Number.isInteger(shotCount) || shotCount < 1) return [];
+  const clean = actions.map(String).map((item) => item.trim()).filter(Boolean);
+  if (clean.length === 0) return Array.from({ length: shotCount }, (_unused, index) => `第 ${index + 1} 镜连续动作`);
+  // Partition consecutive source actions rather than dropping actions or cycling
+  // back to an earlier story state after the closing action.
+  if (shotCount <= clean.length) {
+    return Array.from({ length: shotCount }, (_unused, index) => clean.slice(
+      Math.floor(index * clean.length / shotCount),
+      Math.floor((index + 1) * clean.length / shotCount),
+    ).join("；"));
   }
-  if (homecoming && shotCount === 6) {
-    return [
-      "陈卓收伞走到出租屋门前",
-      "陈卓用钥匙开门并跨进玄关",
-      "陈卓回身把门关好，确认门锁落位",
-      "陈卓在玄关弯腰脱下白色湿便鞋，换穿室内拖鞋",
-      "陈卓伸手拧亮旧台灯",
-      "陈卓在灯下坐下，抬头安静听雨",
-    ];
-  }
-  if (homecoming && shotCount === 5) {
-    return [
-      "陈卓收伞走到出租屋门前",
-      "陈卓用钥匙开门并进入，随后回身把门关好",
-      "陈卓在玄关脱下白色湿便鞋，换穿室内拖鞋",
-      "陈卓伸手拧亮旧台灯",
-      "陈卓在灯下坐下，抬头安静听雨",
-    ];
-  }
-  const animalProbe = clean.some((action) => animalActionKind(action) === "probe");
-  const animalReach = clean.some((action) => ["reach", "contact"].includes(animalActionKind(action)));
-  const animalRetreat = clean.some((action) => ["retreat", "curl"].includes(animalActionKind(action)));
-  if (animalProbe && animalReach && animalRetreat && shotCount >= 3) {
-    const stages = [
-      "橘猫从纸箱探头观察屋檐滴水",
-      "橘猫抬起前爪伸向屋檐滴水线",
-      "水滴落在橘猫爪垫上并溅起细小水花",
-      "橘猫受冷缩回前爪，身体仍留在纸箱内",
-      "橘猫把身体退入纸箱暗部",
-      "橘猫盘成一团，尾尖盖住口鼻并缓慢闭眼",
-    ];
-    if (shotCount === 3) return [stages[0]!, stages[1]!, stages[5]!];
-    if (shotCount === 4) return [stages[0]!, stages[1]!, stages[3]!, stages[5]!];
-    if (shotCount === 5) return [stages[0]!, stages[1]!, stages[2]!, stages[4]!, stages[5]!];
-    return Array.from({ length: shotCount }, (_unused, index) =>
-      stages[index] ?? `${stages[5]}（呼吸保持段）`);
-  }
-  if (clean.length === shotCount) return clean;
   const phases = ["起幅", "推进", "落幅"];
-  return Array.from({ length: shotCount }, (_unused, index) => {
-    if (index < clean.length) return clean[index]!;
-    const base = clean[index % Math.max(1, clean.length)] || `第 ${index + 1} 镜连续动作`;
-    const phase = phases[Math.min(phases.length - 1, Math.floor(index / Math.max(1, clean.length)))];
-    return `${base}（${phase}段）`;
-  });
+  const result: string[] = [];
+  for (let index = 0; index < clean.length; index += 1) {
+    const count = Math.floor((index + 1) * shotCount / clean.length) - Math.floor(index * shotCount / clean.length);
+    for (let part = 0; part < count; part += 1) {
+      result.push(count === 1 ? clean[index]! : `${clean[index]}（${phases[Math.min(part, phases.length - 1)]}段）`);
+    }
+  }
+  return result;
 }
 
 function timelineTextForAction(action: string, duration: number): string {
@@ -6304,162 +6206,36 @@ function timelineTextForAction(action: string, duration: number): string {
   const firstEnd = Math.max(0.1, Math.min(safeDuration, safeDuration * 0.3));
   const secondEnd = Math.max(firstEnd, Math.min(safeDuration, safeDuration * 0.75));
   const code = (value: number): string => `T00:${Math.max(0, value).toFixed(1).padStart(4, "0")}`;
-  const kind = narrativeActionKind(action);
-  const animalKind = animalActionKind(action);
-  const shoePhase = shoeWorkPhase(action);
-  const sourceBeats = action
-    .split(/[；。]+/u)
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .slice(0, 3);
-  const beats = animalKind === "probe"
-    ? ["猫耳先向滴水声转动，眼睛从纸箱暗部露出", "鼻尖探出箱沿，胡须擦过潮湿纸板，头部只出半截", "视线锁住屋檐水线，身体仍低伏在箱内"]
-    : animalKind === "reach"
-      ? ["前爪从胸口抬起，爪尖靠近屋檐滴水线", "前腿继续伸向箱口外，掌面缓慢翻开去迎水滴", "爪尖停在滴水线下方，身体重心仍留在箱内"]
-      : animalKind === "contact"
-        ? ["前爪已停在滴水线下方，爪垫朝上并保持趾数稳定", "水滴落在爪垫上，趾节轻颤并溅起细小水花", "前爪短暂停住，视线仍锁定水滴，不提前回缩"]
-      : animalKind === "withdraw"
-        ? ["前爪从滴水线下方收回，爪背带起细小水珠", "前腿撤回箱沿内侧，身体重心向纸箱暗部后移", "前爪收到胸前，头部仍朝外观察"]
-      : animalKind === "retreat"
-        ? ["耳朵后压，头部开始缩回纸箱阴影", "肩背和身体重心继续退入纸箱暗部", "前爪收到胸前，箱口只剩模糊暖橘轮廓"]
-        : animalKind === "curl"
-          ? ["起幅承接箱口模糊暖橘轮廓，暗部内肩背继续内收", "身体盘紧成团，尾尖贴住口鼻", "眼皮缓慢合拢，只留一小团呼吸起伏"]
-        : kind === "umbrella"
-    ? ["固定机位起幅，伞骨合拢，伞尖离地滴水", "把收拢的湿伞换到持伞侧，另一只手摸到钥匙", "在门前站定，呼气，钥匙尖对准锁孔"]
-    : kind === "open"
-      ? ["钥匙尖对准锁孔，手指稳定握住钥匙", "钥匙转动并推开门，门轴缓慢张开", "跨入门槛，确认门扇仍在身后"]
-      : kind === "close"
-        ? ["回身把收拢的湿伞靠到门边，再握住门把", "带门合拢，门扇减速贴入门框", "门锁落位，肩线下沉并转向鞋架"]
-        : kind === "shoes"
-          ? shoePhase === "second"
-            ? ["重心移到另一只脚，视线落向剩余湿便鞋", "第二只鞋跟松脱，脚掌离开湿便鞋", "第二只脚穿入室内拖鞋并落地，双脚站稳"]
-            : shoePhase === "combined"
-              ? ["重心移到鞋架旁，先解开第一只湿便鞋的鞋跟", "第一只脚离开湿鞋并穿入室内拖鞋，另一只脚仍穿湿便鞋", "第二只鞋跟松脱，脚掌离鞋并穿入另一只室内拖鞋，双脚站稳"]
-            : shoePhase === "first"
-              ? ["重心移到鞋架旁，视线看向第一只湿便鞋", "第一只鞋跟松脱，脚掌离开湿便鞋", "第一只脚穿入室内拖鞋，另一只脚仍穿湿便鞋"]
-              : ["重心移到鞋架旁，视线看向脚边湿鞋", "鞋跟松脱，脚掌离开湿鞋并保持平衡", "脚掌穿入室内拖鞋并落地，身体站直"]
-          : kind === "lamp"
-            ? ["指尖触到旋钮，先保持暗部曝光", "旋钮转到点亮段，钨丝由暗红转为暖黄", "暖光覆盖桌面，手离开旋钮并停住"]
-            : kind === "listen"
-              ? ["转向坐具，视线从雨痕落向椅面", "坐下并调整重心，双手落在膝上", "肩背放松，抬眼听雨并保持静止"]
-              : [
-                sourceBeats[0] || "建立本镜空间与主体位置",
-                sourceBeats[1] || sourceBeats[0] || "连续完成动作字段中的主要变化",
-                sourceBeats[2] || sourceBeats[1] || "动作落定，保持结束姿态",
-              ];
+  const sourceBeats = action.split(/[；。]+/u).map((item) => item.trim()).filter(Boolean);
+  const beats = [
+    sourceBeats[0] || "建立本镜空间与主体位置",
+    sourceBeats[1] || sourceBeats[0] || "连续完成动作字段中的主要变化",
+    sourceBeats.slice(2).join("；") || sourceBeats[1] || "动作落定，保持结束姿态",
+  ];
   return `${code(0)}-${code(firstEnd)} ${beats[0]}；${code(firstEnd)}-${code(secondEnd)} ${beats[1]}；${code(secondEnd)}-${code(safeDuration)} ${beats[2]}`;
 }
 
-function emotionTextForAction(action: string): string {
-  switch (narrativeActionKind(action)) {
-    case "umbrella":
-      return "眉眼被冷光压住，视线先落在滴水的伞尖，随后抬眼确认门锁；呼气一次，下颌放松但不笑，手指保持稳定。";
-    case "open":
-      return "目光跟随钥匙进入锁孔，眉头只轻微收紧，门开时快速眨一次眼，嘴唇保持闭合，肩线随推门前移。";
-    case "close":
-      return "回身时视线落在门缝与门锁，眼睑略垂，鼻翼随呼气放松，嘴唇轻抿，肩背在门锁落位后下沉。";
-    case "shoes":
-      return shoeWorkPhase(action) === "second"
-        ? "焦点落在另一只湿便鞋的鞋跟、脚踝和拖鞋入口；脚踝随第二次解鞋动作轻转，脚掌离开湿鞋后穿入拖鞋，双脚站稳时腿部与肩线明显下沉。"
-        : shoeWorkPhase(action) === "combined"
-          ? "焦点依次落在两只湿便鞋的鞋跟、脚踝和拖鞋入口；第一只脚离鞋后保持单脚稳定，第二只脚完成脱换，末段双脚落地且腿部与肩线放松。"
-          : "焦点落在第一只湿便鞋的鞋跟、脚踝和支撑脚；手指解开鞋跟后，脚掌离鞋、保持单脚稳定，再穿入室内拖鞋，重心缓慢落回前脚掌。";
-    case "lamp":
-      return "视线先锁定旋钮，指尖转动后抬眼看向灯罩，瞳孔随暖光收窄，嘴角轻微松开，呼吸放缓。";
-    case "listen":
-      return "视线从窗框雨痕移向远处，眼神变柔，眼睫缓慢眨动，鼻翼轻张吸气，肩胛下沉，嘴唇闭合。";
-    default:
-      return "视线跟随本镜可见动作目标移动，眼睫、鼻翼与下颌有细微连续变化，表情保持克制，不使用固定微笑或模板化凝视。";
-  }
+function emotionTextForAction(_action: string): string {
+  return "视线跟随本镜可见动作目标移动，表情与呼吸按已确认情绪合同自然变化，不使用固定微笑或模板化凝视。";
 }
 
 function emotionTextForAnimalAction(action: string, names: string[]): string {
   const subject = names.join("、") || "动物主体";
-  switch (animalActionKind(action)) {
-    case "probe":
-      return `${subject}耳尖先转向滴水声，眼睛从纸箱暗部缓慢露出，鼻尖轻颤，头部只探出半截，颈部保持低伏；不拟人化微笑或夸张凝视。`;
-    case "reach":
-      return `${subject}视线锁定下落水滴，前爪从胸口抬起、缓慢伸向滴水线，爪尖保持趾数稳定，身体重心仍留在纸箱内。`;
-    case "contact":
-      return `${subject}视线锁定已到爪前的单颗水滴，爪垫保持朝上，水珠接触爪垫时趾节轻颤并溅起细小水花；本镜不提前回缩。`;
-    case "withdraw":
-      return `${subject}耳尖向后轻压，视线仍追着水滴，前爪从接触点迅速收回胸前，肩背内收但头部保持朝外观察。`;
-    case "retreat":
-      return `${subject}耳朵后压，头部先缩回纸箱阴影，肩背与身体重心继续退入暗部，末段前爪收到胸前，呼吸仍保持警觉。`;
-    case "curl":
-      return `${subject}在上一镜留下的箱内暗部轮廓中继续收紧，尾巴逐圈贴近身体，尾尖最后盖住口鼻，眼皮缓慢合拢，呼吸幅度变小；情绪由警觉转为安定。`;
-    default:
-      return `${subject}眼神跟随本镜可见目标，耳尖、鼻翼、爪部和身体重心做小幅连续变化，不拟人化表演。`;
-  }
+  return `${subject}通过本镜已确认动作“${action}”与身体重心变化表达状态，不增加源合同外的环境、道具或拟人化表演。`;
 }
 
 function pacingTextForAction(action: string, duration: number): string {
-  const kind = narrativeActionKind(action);
-  const animalKind = animalActionKind(action);
-  const sourceBeats = action
-    .split(/[；。]+/u)
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .slice(0, 3);
-  const body = animalKind === "probe"
-    ? "前段先动耳尖与眼睛，中段探头出箱沿，末段视线锁定屋檐水线"
-    : animalKind === "reach"
-      ? "前段抬爪离箱，中段伸向滴水线，末段停在滴水线下方"
-      : animalKind === "contact"
-        ? "前段保持爪垫接水姿态，中段完成接触与水花，末段短暂停稳"
-      : animalKind === "withdraw"
-        ? "前段前爪离开滴水线，中段前腿撤回箱内，末段身体重心稳定"
-        : animalKind === "retreat"
-          ? "前段头部缩回，中段肩背退入纸箱暗部，末段前爪收到胸前"
-          : animalKind === "curl"
-            ? "前段承接箱内暗部轮廓，中段尾巴贴住口鼻，末段闭眼并保持呼吸起伏"
-          : kind === "umbrella"
-    ? "前段只为收伞起势，中段推进到门边，末段在门前停顿"
-    : kind === "open"
-      ? "前段锁孔对位，中段转钥推门，末段跨门落定"
-      : kind === "close"
-        ? "前段回身抓握，中段一次合门，末段门锁落定"
-        : kind === "shoes"
-          ? shoeWorkPhase(action) === "second"
-            ? "前段把重心移到另一只脚，中段完成第二只鞋脱换，末段双脚站稳"
-            : shoeWorkPhase(action) === "combined"
-              ? "前段脱下第一只湿鞋并穿入拖鞋，中段保持单脚支撑脱下第二只湿鞋，末段穿好第二只拖鞋并双脚站稳"
-            : shoeWorkPhase(action) === "first"
-              ? "前段找稳支撑脚，中段脱第一只鞋并穿拖鞋，末段保持单脚支撑"
-              : "前段找重心，中段完成脱鞋与换穿，末段站稳"
-          : kind === "lamp"
-            ? "前段保持暗态，中段旋钮点亮，末段暖光停稳"
-            : kind === "listen"
-              ? "前段转向坐具，中段坐下，末段静止听雨"
-                : `前段${sourceBeats[0] || "建立空间"}，中段${sourceBeats[1] || "完成主要变化"}，末段${sourceBeats[2] || "动作落定收束"}`;
+  const sourceBeats = action.split(/[；。]+/u).map((item) => item.trim()).filter(Boolean);
+  const body = `前段${sourceBeats[0] || "建立空间"}，中段${sourceBeats[1] || "完成主要变化"}，末段${sourceBeats.slice(2).join("；") || "动作落定收束"}`;
   return `${Math.max(0.1, duration).toFixed(1)} 秒内按约 30%/45%/25% 分配：${body}；不做额外加速或无关转场。`;
 }
 
-function brightnessTextForAction(action: string): string {
-  const kind = narrativeActionKind(action);
-  if (kind === "lamp") {
-    return "起幅保留冷暗部并看清旋钮与指节；点亮后2700K暖光渐亮，面部与桌面不过曝，门外冷蓝只作边缘勾光，不突然跳亮。";
-  }
-  if (kind === "shoes" || kind === "close") {
-    return "人物轮廓与手部接触点可辨，面部保留冷暗层次；湿鞋与地砖高光受控，不强制正面补光，环境暗部不死黑。";
-  }
-  if (kind === "listen") {
-    return "2700K暖光作为主光照亮面部与手部，窗外冷蓝只勾轮廓；保留暗部纹理，灯罩与雨痕高光不过曝。";
-  }
-  return "人物与主体轮廓可辨，按灯光设计保留明暗层次，环境高光不过曝，不使用额外正面补光。";
+function brightnessTextForAction(_action: string): string {
+  return "人物与主体轮廓可辨，按已确认灯光设计保留明暗层次，环境高光不过曝，不使用额外正面补光。";
 }
 
-function sceneTextForAction(action: string, scene: string): string {
-  let value = scene;
-  const kind = narrativeActionKind(action);
-  if (kind === "shoes" || kind === "close") value = value.replace(/鞋柜/gu, "鞋架");
-  if (kind === "shoes") {
-    value = value.replace(/旧台灯(?!.*关闭)[^，。；\n]*/gu, "旧台灯保持关闭");
-    if (/旧台灯/u.test(value) && !/旧台灯[^。；\n]*(?:关闭|未亮|熄灭)/u.test(value)) {
-      value = `${value.replace(/[。；]?\s*$/u, "")}；旧台灯保持关闭。`;
-    }
-  }
-  return value;
+function sceneTextForAction(_action: string, scene: string): string {
+  return scene;
 }
 
 function depthTextForShotSize(shotSize: string, noCharacters: boolean, animalOnly = false): string {
@@ -6470,8 +6246,8 @@ function depthTextForShotSize(shotSize: string, noCharacters: boolean, animalOnl
   }
   if (noCharacters) {
     return /(?:close|特写)/iu.test(shotSize)
-      ? "近距浅景深，焦点锁定当前自然物与水滴，前后景柔和分离。"
-      : "近中远景层次连续，主体与倒影可辨，使用中等至深景深保证空间关系清楚。";
+      ? "近距浅景深，焦点锁定本镜源合同的主体与当前变化位置，前后景柔和分离。"
+      : "近中远景层次连续，本镜主体可辨，使用中等至深景深保证空间关系清楚。";
   }
   if (/(?:extreme-close|close|特写|近景)/iu.test(shotSize)) {
     return "浅景深，焦点锁定眼睫、手指或当前接触点，前后景自然虚化；面部与动作接触点始终清晰。";
@@ -6507,71 +6283,22 @@ function shotSizeForAction(action: string): string | null {
   }
 }
 
-function makeupTextForAction(action: string): string {
-  const kind = narrativeActionKind(action);
-  if (kind === "umbrella" || kind === "open" || kind === "close") {
-    return "自然写实妆；鬓角、睫毛与开衫袖口保留雨水微湿痕迹，皮肤有真实纹理，不补成干燥棚拍妆。";
-  }
-  if (kind === "shoes") {
-    return "自然写实妆；雨水使鬓角微湿，低头换鞋后鼻翼与面颊保留轻微潮红，不新增高饱和妆色。";
-  }
-  if (kind === "lamp") {
-    return "自然写实妆；旋钮点亮后2700K暖光只轻微抬亮肤色，睫毛与手指接触点清晰，不改变妆容。";
-  }
-  return "自然写实妆；暖光下保留真实皮肤与轻微疲劳感，眼神清醒但不做精致棚拍修饰。";
+function makeupTextForAction(_action: string): string {
+  return "保持已确认角色档案与本镜妆造，不新增源合同外的湿度、肤色或妆容变化。";
 }
 
-function transitionTextForAction(action: string, isLastShot: boolean): string {
-  if (isLastShot) return "本镜为全片最后一镜；动作落定后保持静止，再由输出合同决定是否硬切黑，不追加超出镜长的特效。";
-  switch (narrativeActionKind(action)) {
-    case "umbrella": return "钥匙对准锁孔的动作完成后硬切到开门镜，不使用叠化。";
-    case "open": return "门开到位后硬切到回身关门镜，保持门轴方向连续。";
-    case "close": return "门锁落位后硬切到换鞋镜，门保持关闭状态。";
-    case "shoes":
-      return shoeWorkPhase(action) === "second"
-        ? "第二只鞋换好、双脚站稳后硬切到台灯镜，两只室内拖鞋状态延续。"
-        : shoeWorkPhase(action) === "combined"
-          ? "两只鞋都换好、双脚站稳后硬切到开灯镜，两只室内拖鞋状态延续。"
-          : "第一只脚换入拖鞋后硬切到另一只鞋的换鞋镜，已换好的拖鞋状态延续。";
-    case "lamp": return "暖光稳定后硬切到坐下听雨镜，灯保持点亮。";
-    default: return "本镜动作落定后硬切至下一镜，不使用叠化、黑场或其他特效。";
-  }
+function transitionTextForAction(_action: string, isLastShot: boolean): string {
+  return isLastShot
+    ? "本镜为全片最后一镜；动作落定后保持静止，再由输出合同决定是否硬切黑，不追加超出镜长的特效。"
+    : "本镜动作落定后硬切至下一镜，人物、道具与场景状态以相邻源镜头合同为准，不使用额外特效。";
 }
 
-function costumeTextForFootwear(base: string, action: string, shotIndex: number, shoeIndex: number): string {
-  if (shoeIndex < 0) return base;
-  const upper = base
-    .replace(/[，,；;]\s*(?:脚穿|配|穿).*$/u, "")
-    .replace(/[，,；;]?\s*(?:小白鞋|白色便鞋|白色湿便鞋|旧帆布鞋|湿鞋|拖鞋).*$/u, "")
-    .trim();
-  const shoePhase = shoeWorkPhase(action);
-  if (shotIndex < shoeIndex) return `${upper}；脚穿白色便鞋，鞋面与裤脚被雨水打湿，开衫袖口湿润。`;
-  if (shoePhase === "second") return `${upper}；第一只白色湿便鞋已放在鞋架旁，一脚已穿室内拖鞋，另一脚仍穿白色湿便鞋并正在脱换。`;
-  if (shoePhase === "combined") {
-    return `${upper}；起幅双脚仍穿白色湿便鞋，前段第一只脚离鞋并穿入室内拖鞋，末段第二只脚完成脱换，双脚都穿室内拖鞋。`;
-  }
-  if (shoePhase === "first") {
-    return `${upper}；第一只白色湿便鞋正脱在鞋架旁，一脚换入室内拖鞋，另一脚仍穿白色湿便鞋。`;
-  }
-  return `${upper}；脚穿室内拖鞋，湿便鞋放在鞋架旁。`;
+function costumeTextForFootwear(base: string, _action: string, _shotIndex: number, _shoeIndex: number): string {
+  return base;
 }
 
-function normalizeFootwearProps(props: string[], action: string, shotIndex: number, shoeIndex: number): string[] {
-  const footwear = /^(?:(?:白色|黑色|旧|湿|室内|日常|通勤)+)?(?:便鞋|皮鞋|帆布鞋|拖鞋|鞋)$/u;
-  const base = props.map(String).map((item) => item.trim()).filter((item) => item && !footwear.test(item));
-  const withoutSynonyms = (values: string[]): string[] => {
-    const set = new Set(values);
-    if (set.has("黑色折叠伞")) set.delete("雨伞");
-    if (set.has("旧台灯")) set.delete("台灯");
-    return [...set];
-  };
-  if (shoeIndex < 0) return withoutSynonyms(props.map(String).map((item) => item.trim()).filter(Boolean));
-  const shoePhase = shoeWorkPhase(action);
-  if (shotIndex < shoeIndex) return withoutSynonyms([...base, "白色湿便鞋"]);
-  if (shoePhase === "first" || shoePhase === "second" || shoePhase === "combined") {
-    return withoutSynonyms([...base, "白色湿便鞋", "室内拖鞋"]);
-  }
-  return withoutSynonyms([...base, "室内拖鞋"]);
+function normalizeFootwearProps(props: string[], _action: string, _shotIndex: number, _shoeIndex: number): string[] {
+  return [...new Set(props.map(String).map((item) => item.trim()).filter(Boolean))];
 }
 
 function normalizeHomecomingReviewDurations(
@@ -6633,7 +6360,7 @@ export function normalizeNarrativePromptsForReview(
   prompts: FusionRecord[],
   policy: NarrativePromptReviewPolicy,
 ): FusionRecord[] {
-  const normalizedPrompts = normalizeHomecomingReviewDurations(prompts, policy);
+  const normalizedPrompts = prompts;
   return normalizedPrompts.map((shot, shotIndex) => {
     const rowPolicy = shot._workloomPromptReviewPolicy
       && typeof shot._workloomPromptReviewPolicy === "object"
@@ -6670,7 +6397,9 @@ export function normalizeNarrativePromptsForReview(
       ),
       projectActions: rowActions,
     };
-    const enforcedShotSize = shotSizeForAction(action);
+    const enforcedShotSize = promptFieldText(shot.shotSize ?? recordValue(shot.fields).shotSize)
+      ? null
+      : shotSizeForAction(action);
     const shotForReview = enforcedShotSize
       ? { ...shot, shotSize: enforcedShotSize, cameraHint: enforcedShotSize }
       : shot;
@@ -7985,7 +7714,7 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
             fallbackColor: contractColor || promptReviewPolicy.projectColor,
             fallbackProps: contractProps.length > 0 ? contractProps : promptReviewPolicy.projectProps,
           });
-          const contractShotSize = shotSizeForAction(orderedAction) || promptFieldText(contractShot.shotSize);
+          const contractShotSize = promptFieldText(contractShot.shotSize) || shotSizeForAction(orderedAction);
           const contractCameraMovement = promptFieldText(contractShot.cameraMovement);
           const rowPolicy: NarrativePromptReviewPolicy = {
             ...promptReviewPolicy,

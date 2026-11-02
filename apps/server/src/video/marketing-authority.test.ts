@@ -8,13 +8,20 @@ import { prepareMarketingFacts, finalizeMarketingFacts, verifyMarketingFacts, ty
 import { primeSearchCache } from "./data-mining-executor.js";
 import { fetchMarketingSource, requestSource } from "./marketing-source-fetcher.js";
 import { canonicalRenderJson, renderSha256 } from "./gen/compiled-request.js";
+import { reviewStage } from "@hyperreality/video-studio";
 const scope = { tenantId: "tenant-a", workspaceId: "ws-a", projectId: "P1", runId: "RUN1", attempt: 1 };
 const env = { LLM_BASE_URL: "https://api.deepseek.com", LLM_API_KEY: "test-only", LLM_MODEL: "deepseek-flash" };
 const sourceUrl = "https://source.example.com/f3";
 const sourceText = "星野 F3 是一款风扇，风量 9 档。尾部注意：9 档是风量档位，不是能耗等级；不得声称静音或市场第一。";
+const currencyText = `${sourceText} 海外规格价格99美元；海外另一规格109美元；国内规格699元；国内另一规格799元；免费试用规格0美元。`;
 let server: Server, origin: string, root: string, modelCalls: any[], rejectJudge: boolean, extractionCalls: string[];
 beforeAll(async () => {
-  server = createServer((_req, res) => { res.writeHead(200, { "content-type": "text/plain; charset=utf-8" }); res.end(sourceText); });
+  server = createServer((req, res) => {
+    if (req.url === "/redirect-a" || req.url === "/redirect-b") {
+      res.writeHead(302, { location: "/f3" }); res.end(); return;
+    }
+    res.writeHead(200, { "content-type": "text/plain; charset=utf-8" }); res.end(req.url === "/currencies" ? currencyText : sourceText);
+  });
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve)); origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
 });
 afterAll(async () => { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); });
@@ -53,6 +60,10 @@ async function prepare(options: {
   mode?: string;
   attempt?: number;
   searchCacheFile?: string;
+  redirectAliases?: boolean;
+  mixedCurrencies?: boolean;
+  zeroPrice?: boolean;
+  fragmentAliases?: boolean;
 } = {}): Promise<PreparedMarketingFacts> {
   let searches = 0;
   return prepareMarketingFacts({ scope: { ...scope, attempt: options.attempt ?? 1 }, root, intent: "做一条风扇介绍", metadata: { brief: { product: "星野 F3", brand: "星野" } }, env: { ...env, ...(options.mode ? { VM_DATA_MINING_MODE: options.mode } : {}) },
@@ -60,20 +71,81 @@ async function prepare(options: {
       extractionCalls.push(prompt); if (options.modelFailure) return { success: false, error: "LLM unavailable" };
       const match = /当前阶段：(A[123])\n(.*)$/s.exec(prompt)!; const source = JSON.parse(match[2]!).sources[0];
       if (match[1] !== "A1") return { success: true, data: { payload: match[1] === "A2" ? { reviews: [] } : { competitors: [] }, citations: [], noEvidenceReason: "页面仅商品规格，无可核实评价或竞品" } };
-      return { success: true, data: { payload: { identity: { name: "星野 F3", specs: { 风量: "9 档" }, official_selling_points: [{ point: "风量 9 档", source_url: sourceUrl }] }, images: [] }, citations: ["/identity/name", "/identity/specs/风量", "/identity/official_selling_points/0/point"].map(pointer => ({ pointer, sourceId: source.sourceId, quote: options.badQuote ? "不存在的事实" : sourceText })) } };
+      const prices = options.zeroPrice ? [
+        { amount: 0, currency: "USD", source_url: sourceUrl }, { amount: 699, currency: "CNY", source_url: sourceUrl },
+      ] : options.mixedCurrencies ? [
+        { amount: 99, currency: "USD", source_url: sourceUrl }, { amount: 109, currency: "USD", source_url: sourceUrl },
+        { amount: 699, currency: "CNY", source_url: sourceUrl }, { amount: 799, currency: "CNY", source_url: sourceUrl },
+      ] : undefined;
+      return { success: true, data: { payload: { identity: { name: "星野 F3", specs: { 风量: "9 档" }, official_selling_points: [{ point: "风量 9 档", source_url: sourceUrl }], ...(prices ? { prices } : {}) }, images: [] }, citations: [
+        ...["/identity/name", "/identity/specs/风量", "/identity/official_selling_points/0/point"].map(pointer => ({ pointer, sourceId: source.sourceId, quote: options.badQuote ? "不存在的事实" : sourceText })),
+        ...(prices ?? []).flatMap((price, index) => ["amount", "currency"].map(field => ({ pointer: `/identity/prices/${index}/${field}`, sourceId: source.sourceId, quote: `${price.amount}${price.currency === "USD" ? "美元" : "元"}` }))),
+      ] } };
     } }, dependencies: {
       ...(options.searchCacheFile
         ? { searchCacheFile: options.searchCacheFile }
         : {
             search: async () => (++searches, options.noSearch || options.noAux && searches > 20
               ? []
-              : [{ title: "星野规格", url: sourceUrl, snippet: "故意错误摘要999档，不能当事实" }]),
+              : [{ title: "星野规格", url: options.fragmentAliases
+                ? `${sourceUrl}#${searches <= 8 ? "specs" : "reviews"}`
+                : options.redirectAliases
+                ? `https://source.example.com/${searches <= 8 ? "redirect-a" : "redirect-b"}`
+                : sourceUrl, snippet: "故意错误摘要999档，不能当事实" }]),
           }),
-      fetchSource: async url => fetchMarketingSource(url, { resolver: async () => [{ address: "93.184.216.34", family: 4 }], transport: async (_url, _address, signal) => requestSource(new URL(origin), { address: "127.0.0.1", family: 4 }, signal) }),
+      fetchSource: async url => {
+        if (options.fragmentAliases) await new Promise(resolve => setTimeout(resolve, 5));
+        return fetchMarketingSource(url, { resolver: async () => [{ address: "93.184.216.34", family: 4 }], transport: async (requested, _address, signal) => requestSource(new URL(options.mixedCurrencies ? "/currencies" : requested.pathname, origin), { address: "127.0.0.1", family: 4 }, signal) });
+      },
     } });
 }
 const shots = [{ shotId: "S1", prompt: "窗边展示星野 F3 风扇，字幕说明风量 9 档。", fields: { 场景: "窗边", 产品: "星野 F3", 规格: "9 档" } }];
 describe("营销事实宿主完整执行", () => {
+  it("跨站不同fragment指向同一规范来源时复用同次抓取快照，不因抓取时间不同破坏审核绑定", async () => {
+    const prepared = await prepare({ fragmentAliases: true });
+    const saved = await finalizeMarketingFacts(prepared, shots, env);
+    const checked = await verifyMarketingFacts({ root, ...saved, scope, shots });
+    expect(checked.sources).toHaveLength(1);
+    expect(checked.sources[0]!.requestedUrl).toBe(sourceUrl);
+  });
+  it.each([false, true])("混币报价从来源提取、G1档案到最终镜头复核始终逐币种表达，零价=%s", async zeroPrice => {
+    const expectedBand = zeroPrice ? "USD 0；CNY 699" : "USD 99-109；CNY 699-799";
+    const prepared = await prepare({ mixedCurrencies: true, zeroPrice });
+    expect((prepared.bundle.dossier.identity as Record<string, unknown>).price_band).toBe(expectedBand);
+    expect(prepared.g1Content).toContain(expectedBand);
+    expect(prepared.g1Content).not.toContain("USD 99-799");
+    expect((prepared.bundle.cards.insight_card as { market_position: { price_band: string } }).market_position.price_band).toBe(expectedBand);
+    expect(JSON.stringify(prepared.bundle.cards.prd_card)).toContain(expectedBand);
+    const a1 = prepared.bundle.stages[0]!.facts;
+    expect(a1.claims.filter(claim => claim.pointer.endsWith("/currency")).map(claim => claim.value)).toEqual(zeroPrice ? ["USD", "CNY"] : ["USD", "USD", "CNY", "CNY"]);
+    expect(prepared.bundle.rawSha256).toBe(renderSha256(canonicalRenderJson(prepared.raw)));
+    const g1File = path.join(root, "g1-facts.json"); await writeFile(g1File, prepared.g1Content);
+    const verdict = await reviewStage({ stage: "script", projectId: scope.projectId, env,
+      artifacts: [{ path: g1File, kind: "json", note: "完整G1事实档案与价格来源" }],
+      deterministic: [{ id: "currency-groups", pass: true, hard: true, detail: "原始报价按币种分组，未汇率换算" }],
+      requiredCheckIds: ["currency-groups"], minScore: 85,
+      rubric: ["报价必须保留原币种，不能将美元与人民币数值合成同一价格区间"],
+    });
+    expect(verdict.status).toBe("passed");
+    const outputShots = [{ ...shots[0]!, prompt: `按来源分别展示价格区间：${expectedBand}。` }];
+    const saved = await finalizeMarketingFacts(prepared, outputShots, env);
+    const checked = await verifyMarketingFacts({ root, ...saved, scope, shots: outputShots });
+    expect((checked.dossier.identity as Record<string, unknown>).price_band).toBe(expectedBand);
+    const persisted = JSON.parse(await readFile(path.join(prepared.storeRoot, String(prepared.bundle.dossier.product_id), "dossier.json"), "utf8"));
+    expect(persisted.identity.price_band).toBe(expectedBand);
+  });
+  it("不同检索跳转指向同一正文时，逐站来源审核仍绑定其实际抓取快照", async () => {
+    const prepared = await prepare({ redirectAliases: true });
+    const saved = await finalizeMarketingFacts(prepared, shots, env);
+    const checked = await verifyMarketingFacts({ root, ...saved, scope, shots });
+    expect(checked.sources).toHaveLength(2);
+    expect(new Set(checked.sources.map(source => source.sourceId)).size).toBe(2);
+    expect(checked.sources.map(source => source.requestedUrl)).toEqual([
+      "https://source.example.com/redirect-a", "https://source.example.com/redirect-b",
+    ]);
+    expect(checked.sources.every(source => source.finalUrl === sourceUrl)).toBe(true);
+    expect(checked.sources[0]!.textSha256).toBe(checked.sources[1]!.textSha256);
+  });
   it("CLI 预置检索缓存可直接注入宿主，不需要调用方另造检索函数", async () => {
     const cacheFile = path.join(root, "search-cache.json");
     primeSearchCache(cacheFile, {

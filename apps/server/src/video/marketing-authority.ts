@@ -4,9 +4,9 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { constants } from "node:fs";
 import { mkdir, open, realpath, writeFile } from "node:fs/promises";
-import { reviewStage, type ProducerVerdict } from "@hyperreality/video-studio";
+import { installVendorMarketingPriceBridge, reviewStage, type ProducerVerdict } from "@hyperreality/video-studio";
 import { createDataMiningExecutor, type DataMiningStagePlan, type ExecutorLlm, type IntelStage, type SearchFn, type SearchHit } from "./data-mining-executor.js";
-import { fetchMarketingSource, type SourceSnapshot } from "./marketing-source-fetcher.js";
+import { fetchMarketingSource, sourceUrl, type SourceSnapshot } from "./marketing-source-fetcher.js";
 import { assertMarketingFactsFresh, validateStageFacts, revalidateStageFacts, type ValidatedStageFacts } from "./marketing-facts.js";
 import { canonicalRenderJson, renderSha256 } from "./gen/compiled-request.js";
 import { SubmissionError } from "./gen/submission-ledger.js";
@@ -132,10 +132,13 @@ export async function prepareMarketingFacts(input: {
       for (const hit of candidates.slice(0, 6)) {
         if (pages.length === 3) break;
         attempted++;
-        let snapshot = cache.get(hit.url);
+        let cacheKey: string;
+        try { cacheKey = sourceUrl(hit.url).href; }
+        catch (error) { failures.push({ url: hit.url, reason: error instanceof Error ? error.message : String(error) }); continue; }
+        let snapshot = cache.get(cacheKey);
         if (!snapshot) {
           let result: Awaited<ReturnType<typeof fetchMarketingSource>>;
-          try { result = await sourceFetch(hit.url); }
+          try { result = await sourceFetch(cacheKey); }
           catch (error) { failures.push({ url: hit.url, reason: error instanceof Error ? error.message : String(error) }); continue; }
           snapshot = result.snapshot;
           // 网络不可用可换候选；证据写盘失败必须终止，不能伪装成来源不可用继续。
@@ -145,7 +148,7 @@ export async function prepareMarketingFacts(input: {
             const { text: _text, ...stored } = snapshot;
             sources.push({ ...stored, rawRef: raw.ref, textRef: text.ref });
           }
-          cache.set(hit.url, snapshot);
+          cache.set(cacheKey, snapshot);
         }
         if (!pages.some(page => page.sourceId === snapshot!.sourceId)) pages.push(snapshot);
       }
@@ -208,7 +211,10 @@ export async function prepareMarketingFacts(input: {
     }
     identity.specs = specs;
   }
-  const assembled = collector.assemble(plan.trace_id, product, assemblyRaw);
+  const restorePriceBridge = installVendorMarketingPriceBridge();
+  let assembled: ReturnType<DossierEngine["assemble"]>;
+  try { assembled = collector.assemble(plan.trace_id, product, assemblyRaw); }
+  finally { restorePriceBridge(); }
   if (assembled.ok !== true || assembled.chain?.ok !== true || !assembled.dossier || !assembled.cards) fail("MARKETING_DOSSIER_UNVERIFIED", "情报五站未完成有效档案装订");
   const restrictions = reports.filter(report => report.facts.status === "no_evidence").map(report => report.stage === "A2"
     ? "没有可核实用户评价：禁止用户口碑、评分、人数、销量或使用效果共识主张" : "没有可核实竞品证据：禁止对比、竞品弱点或市场领先主张");

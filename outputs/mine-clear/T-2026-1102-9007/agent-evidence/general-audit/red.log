@@ -1,0 +1,213 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest
+
+ ❯ packages/video-studio/src/narrative-source-action.test.ts (5 tests | 4 failed) 6ms
+     × keeps explicit performer and props with 5 shots 3ms
+     × keeps explicit performer and props with 6 shots 0ms
+     × keeps explicit performer and props with 7 shots 0ms
+     × keeps exact ordered source actions when shot count is already equal 1ms
+ ❯ packages/video-studio/src/narrative-aspect-contract.test.ts (5 tests | 4 failed) 10ms
+     × canonical prompt uses 16:9 in both constraint and composition 6ms
+     × canonical prompt uses 1:1 in both constraint and composition 0ms
+     × canonical prompt uses 4:3 in both constraint and composition 0ms
+     × G6 re-projection preserves 16:9 after a post-fusion mutation 1ms
+ ❯ packages/video-studio/src/narrative-speech-contract.test.ts (4 tests | 2 failed) 8ms
+     × noMusic preserves approved speech, canonicalize=false 4ms
+     × noMusic preserves approved speech, canonicalize=true 2ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/video-studio/src/narrative-aspect-contract.test.ts > narrative final framing preserves the frozen aspect > canonical prompt uses 16:9 in both constraint and composition
+AssertionError: expected '中景景别，9:16竖构图；林悦位于可执行表演区并保持可辨轮廓，为其动作和视…' to contain '16:9'
+
+Expected: "16:9"
+Received: "中景景别，9:16竖构图；林悦位于可执行表演区并保持可辨轮廓，为其动作和视线保留空间。"
+
+ ❯ packages/video-studio/src/narrative-aspect-contract.test.ts:10:62
+      8|     const result = applyNarrativeFinalPromptContract(shot, { ...policy…
+      9|     expect(result.prompt).toContain(`【约束】${aspectRatio}画幅`);
+     10|     expect(String(result.prompt).match(/【构图】([^\n]*)/)?.[1]).toContain…
+       |                                                              ^
+     11|     if (aspectRatio !== '9:16') expect(String(result.prompt).match(/【构…
+     12|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/10]⎯
+
+ FAIL  packages/video-studio/src/narrative-aspect-contract.test.ts > narrative final framing preserves the frozen aspect > canonical prompt uses 1:1 in both constraint and composition
+AssertionError: expected '中景景别，9:16竖构图；林悦位于可执行表演区并保持可辨轮廓，为其动作和视…' to contain '1:1'
+
+Expected: "1:1"
+Received: "中景景别，9:16竖构图；林悦位于可执行表演区并保持可辨轮廓，为其动作和视线保留空间。"
+
+ ❯ packages/video-studio/src/narrative-aspect-contract.test.ts:10:62
+      8|     const result = applyNarrativeFinalPromptContract(shot, { ...policy…
+      9|     expect(result.prompt).toContain(`【约束】${aspectRatio}画幅`);
+     10|     expect(String(result.prompt).match(/【构图】([^\n]*)/)?.[1]).toContain…
+       |                                                              ^
+     11|     if (aspectRatio !== '9:16') expect(String(result.prompt).match(/【构…
+     12|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/10]⎯
+
+ FAIL  packages/video-studio/src/narrative-aspect-contract.test.ts > narrative final framing preserves the frozen aspect > canonical prompt uses 4:3 in both constraint and composition
+AssertionError: expected '中景景别，9:16竖构图；林悦位于可执行表演区并保持可辨轮廓，为其动作和视…' to contain '4:3'
+
+Expected: "4:3"
+Received: "中景景别，9:16竖构图；林悦位于可执行表演区并保持可辨轮廓，为其动作和视线保留空间。"
+
+ ❯ packages/video-studio/src/narrative-aspect-contract.test.ts:10:62
+      8|     const result = applyNarrativeFinalPromptContract(shot, { ...policy…
+      9|     expect(result.prompt).toContain(`【约束】${aspectRatio}画幅`);
+     10|     expect(String(result.prompt).match(/【构图】([^\n]*)/)?.[1]).toContain…
+       |                                                              ^
+     11|     if (aspectRatio !== '9:16') expect(String(result.prompt).match(/【构…
+     12|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/10]⎯
+
+ FAIL  packages/video-studio/src/narrative-aspect-contract.test.ts > narrative final framing preserves the frozen aspect > G6 re-projection preserves 16:9 after a post-fusion mutation
+AssertionError: expected '中景景别，9:16竖构图；林悦位于可执行表演区并保持可辨轮廓，为其动作和视…' to contain '16:9'
+
+Expected: "16:9"
+Received: "中景景别，9:16竖构图；林悦位于可执行表演区并保持可辨轮廓，为其动作和视线保留空间。"
+
+ ❯ packages/video-studio/src/narrative-aspect-contract.test.ts:15:63
+     13|   it('G6 re-projection preserves 16:9 after a post-fusion mutation', (…
+     14|     const [result] = normalizeNarrativePromptsForReview([{ ...shot, _w…
+     15|     expect(String(result!.prompt).match(/【构图】([^\n]*)/)?.[1]).toContai…
+       |                                                               ^
+     16|   });
+     17| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/10]⎯
+
+ FAIL  packages/video-studio/src/narrative-source-action.test.ts > action projection preserves this project source instead of a sample story > keeps explicit performer and props with 5 shots
+AssertionError: expected '陈卓收伞走到出租屋门前；陈卓用钥匙开门并进入，随后回身把门关好；陈卓在玄关…' not to match /陈卓|白色|钥匙|出租屋/
+
+- Expected:
+/陈卓|白色|钥匙|出租屋/
+
++ Received:
+"陈卓收伞走到出租屋门前；陈卓用钥匙开门并进入，随后回身把门关好；陈卓在玄关脱下白色湿便鞋，换穿室内拖鞋；陈卓伸手拧亮旧台灯；陈卓在灯下坐下，抬头安静听雨"
+
+ ❯ packages/video-studio/src/narrative-source-action.test.ts:8:34
+      6|     const result = projectNarrativeActionSequence(actions, shotCount);
+      7|     expect(result).toHaveLength(shotCount);
+      8|     expect(result.join('；')).not.toMatch(/陈卓|白色|钥匙|出租屋/);
+       |                                  ^
+      9|     for (const action of actions) expect(result.some(value => value.in…
+     10|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/10]⎯
+
+ FAIL  packages/video-studio/src/narrative-source-action.test.ts > action projection preserves this project source instead of a sample story > keeps explicit performer and props with 6 shots
+AssertionError: expected '陈卓收伞走到出租屋门前；陈卓用钥匙开门并跨进玄关；陈卓回身把门关好，确认门…' not to match /陈卓|白色|钥匙|出租屋/
+
+- Expected:
+/陈卓|白色|钥匙|出租屋/
+
++ Received:
+"陈卓收伞走到出租屋门前；陈卓用钥匙开门并跨进玄关；陈卓回身把门关好，确认门锁落位；陈卓在玄关弯腰脱下白色湿便鞋，换穿室内拖鞋；陈卓伸手拧亮旧台灯；陈卓在灯下坐下，抬头安静听雨"
+
+ ❯ packages/video-studio/src/narrative-source-action.test.ts:8:34
+      6|     const result = projectNarrativeActionSequence(actions, shotCount);
+      7|     expect(result).toHaveLength(shotCount);
+      8|     expect(result.join('；')).not.toMatch(/陈卓|白色|钥匙|出租屋/);
+       |                                  ^
+      9|     for (const action of actions) expect(result.some(value => value.in…
+     10|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/10]⎯
+
+ FAIL  packages/video-studio/src/narrative-source-action.test.ts > action projection preserves this project source instead of a sample story > keeps explicit performer and props with 7 shots
+AssertionError: expected '陈卓收伞走到出租屋门前；陈卓用钥匙开门并跨进玄关；陈卓回身把门关好，确认门…' not to match /陈卓|白色|钥匙|出租屋/
+
+- Expected:
+/陈卓|白色|钥匙|出租屋/
+
++ Received:
+"陈卓收伞走到出租屋门前；陈卓用钥匙开门并跨进玄关；陈卓回身把门关好，确认门锁落位；陈卓在玄关弯腰脱下一只白色湿便鞋；陈卓脱下另一只湿便鞋，换穿室内拖鞋并站稳；陈卓伸手拧亮旧台灯；陈卓在灯下坐下，抬头安静听雨"
+
+ ❯ packages/video-studio/src/narrative-source-action.test.ts:8:34
+      6|     const result = projectNarrativeActionSequence(actions, shotCount);
+      7|     expect(result).toHaveLength(shotCount);
+      8|     expect(result.join('；')).not.toMatch(/陈卓|白色|钥匙|出租屋/);
+       |                                  ^
+      9|     for (const action of actions) expect(result.some(value => value.in…
+     10|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/10]⎯
+
+ FAIL  packages/video-studio/src/narrative-source-action.test.ts > action projection preserves this project source instead of a sample story > keeps exact ordered source actions when shot count is already equal
+AssertionError: expected [ '陈卓收伞走到出租屋门前', …(4) ] to deeply equal [ '王女士收伞', '王女士开门', '王女士换鞋', …(2) ]
+
+- Expected
++ Received
+
+  [
+-   "王女士收伞",
+-   "王女士开门",
+-   "王女士换鞋",
+-   "王女士拧亮台灯",
+-   "王女士坐下听雨",
++   "陈卓收伞走到出租屋门前",
++   "陈卓用钥匙开门并进入，随后回身把门关好",
++   "陈卓在玄关脱下白色湿便鞋，换穿室内拖鞋",
++   "陈卓伸手拧亮旧台灯",
++   "陈卓在灯下坐下，抬头安静听雨",
+  ]
+
+ ❯ packages/video-studio/src/narrative-source-action.test.ts:19:69
+     17|   it('keeps exact ordered source actions when shot count is already eq…
+     18|     const actions = ['王女士收伞', '王女士开门', '王女士换鞋', '王女士拧亮台灯', '王女士坐下听雨'];
+     19|     expect(projectNarrativeActionSequence(actions, actions.length)).to…
+       |                                                                     ^
+     20|   });
+     21| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/10]⎯
+
+ FAIL  packages/video-studio/src/narrative-speech-contract.test.ts > narrative speech and music are independent constraints > noMusic preserves approved speech, canonicalize=false
+AssertionError: expected '仅有与画面同步的环境声和主体动作声；无人物声、无旁白、无音乐、无配乐、无音…' not to match /无人物声|无旁白/
+
+- Expected:
+/无人物声|无旁白/
+
++ Received:
+"仅有与画面同步的环境声和主体动作声；无人物声、无旁白、无音乐、无配乐、无音乐节拍。"
+
+ ❯ packages/video-studio/src/narrative-speech-contract.test.ts:8:23
+      6|     const result = applyNarrativeFinalPromptContract(shot, { noDialogu…
+      7|     const audio = String(result.prompt).match(/【音频】([^\n]*)/)?.[1] ?? …
+      8|     expect(audio).not.toMatch(/无人物声|无旁白/);
+       |                       ^
+      9|     expect(audio).toMatch(/人物|人声|台词/);
+     10|     expect(audio).toMatch(/无音乐|无配乐/);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/10]⎯
+
+ FAIL  packages/video-studio/src/narrative-speech-contract.test.ts > narrative speech and music are independent constraints > noMusic preserves approved speech, canonicalize=true
+AssertionError: expected '仅保留真实环境声与主体动作声；无人物声、无旁白、无音乐、无配乐、无节拍。' not to match /无人物声|无旁白/
+
+- Expected:
+/无人物声|无旁白/
+
++ Received:
+"仅保留真实环境声与主体动作声；无人物声、无旁白、无音乐、无配乐、无节拍。"
+
+ ❯ packages/video-studio/src/narrative-speech-contract.test.ts:8:23
+      6|     const result = applyNarrativeFinalPromptContract(shot, { noDialogu…
+      7|     const audio = String(result.prompt).match(/【音频】([^\n]*)/)?.[1] ?? …
+      8|     expect(audio).not.toMatch(/无人物声|无旁白/);
+       |                       ^
+      9|     expect(audio).toMatch(/人物|人声|台词/);
+     10|     expect(audio).toMatch(/无音乐|无配乐/);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/10]⎯
+
+
+ Test Files  3 failed (3)
+      Tests  10 failed | 4 passed (14)
+   Start at  21:59:20
+   Duration  278ms (transform 478ms, setup 0ms, import 574ms, tests 24ms, environment 0ms)
+

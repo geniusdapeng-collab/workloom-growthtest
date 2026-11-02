@@ -1,0 +1,350 @@
+{
+  "actor": "/root/marketing_audit",
+  "baseline": "5ffe5047767c3e0e41feeac865ed36a76c0f9428",
+  "scope": "营销来源与约束流转、路由，以及另三项修复的独立复核。为审计子范围，需与root/general清单按path合并。",
+  "summary": {
+    "total": 53,
+    "A": 50,
+    "B": 0,
+    "C": 3,
+    "D": 0
+  },
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "level": "A",
+      "read": "full",
+      "lines": 136
+    },
+    {
+      "path": "AGENTS.repo.md",
+      "level": "A",
+      "read": "full",
+      "lines": 58
+    },
+    {
+      "path": "WORKLOOM_PRODUCT_CONTEXT.md",
+      "level": "A",
+      "read": "full",
+      "lines": 596
+    },
+    {
+      "path": "docs/AUTOMATIC-RD-DELIVERY.md",
+      "level": "A",
+      "read": "full",
+      "lines": 19
+    },
+    {
+      "path": "docs/ai-video-workbench-guide.md",
+      "level": "A",
+      "read": "full",
+      "lines": 267
+    },
+    {
+      "path": "bundles/ai-video/pipelines/marketing-film.yml",
+      "level": "A",
+      "read": "full",
+      "lines": 90
+    },
+    {
+      "path": "bundles/ai-video/skills/marketing-brief-parser/SKILL.md",
+      "level": "A",
+      "read": "full",
+      "lines": 66
+    },
+    {
+      "path": "apps/server/src/video/marketing-authority.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 306
+    },
+    {
+      "path": "apps/server/src/video/marketing-facts.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 220
+    },
+    {
+      "path": "apps/server/src/video/marketing-source-fetcher.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 185
+    },
+    {
+      "path": "apps/server/src/video/data-mining-executor.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 835
+    },
+    {
+      "path": "apps/server/src/video/marketing-authority.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 209
+    },
+    {
+      "path": "apps/server/src/video/marketing-source-fetcher.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 85
+    },
+    {
+      "path": "apps/server/src/video/data-mining-pacing.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 78
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-router.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 696
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-router.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 278
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-route-negation.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 47
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/skills/marketing-brief/index.js",
+      "level": "A",
+      "read": "full",
+      "lines": 132
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/truth-check-bridge.js",
+      "level": "A",
+      "read": "full",
+      "lines": 202
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/index.js",
+      "level": "A",
+      "read": "full",
+      "lines": 280
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/product-info-collector.js",
+      "level": "A",
+      "read": "full",
+      "lines": 285
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/pipeline/evidence-ledger.js",
+      "level": "A",
+      "read": "full",
+      "lines": 152
+    },
+    {
+      "path": "apps/server/src/video/production-router.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 152
+    },
+    {
+      "path": "apps/server/src/video/gen/submit.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 295
+    },
+    {
+      "path": "apps/server/src/video/gen/db.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 33
+    },
+    {
+      "path": "packages/video-studio/src/narrative-aspect-contract.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 17
+    },
+    {
+      "path": "packages/video-studio/src/narrative-speech-contract.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 32
+    },
+    {
+      "path": "apps/server/src/video/data-mining-executor.test.ts",
+      "level": "C",
+      "read": "sampled",
+      "reason": "1-180；仅旧测试形状，正式回归本轮实际运行",
+      "lines": 252
+    },
+    {
+      "path": "packages/video-studio/src/vendor-compat.ts",
+      "level": "C",
+      "read": "sampled",
+      "reason": "1-140,4000-4130,5370-6105,6310-6445；独立验收applyNarrativeFinalPromptContract完整函数与normalizeNarrativePromptsForReview主要实现，未读整文件；另全文读本轮source/action/no-person变更diff及依赖函数，未把整个大文件标A",
+      "lines": 7867
+    },
+    {
+      "path": "apps/server/src/video/router.ts",
+      "level": "C",
+      "read": "sampled",
+      "reason": "1-170,850-1195；render.submit完整过程及scope/fence辅助；其他UI/发布路由未读",
+      "lines": 1583
+    },
+    {
+      "path": "apps/server/src/video/project-compute-budget.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "完整初版及c721/fe199ec3最终预算锁与在途计算已读",
+      "lines": 100
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/competitor-scout.js",
+      "level": "A",
+      "read": "full",
+      "lines": 200,
+      "reason": "按root要求逐个全文补读确定性装订与下游卡片实现"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/cross-verifier.js",
+      "level": "A",
+      "read": "full",
+      "lines": 184,
+      "reason": "按root要求逐个全文补读确定性装订与下游卡片实现"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/dossier-binder.js",
+      "level": "A",
+      "read": "full",
+      "lines": 149,
+      "reason": "按root要求逐个全文补读确定性装订与下游卡片实现"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/review-miner.js",
+      "level": "A",
+      "read": "full",
+      "lines": 283,
+      "reason": "按root要求逐个全文补读确定性装订与下游卡片实现"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/card-consumers.js",
+      "level": "A",
+      "read": "full",
+      "lines": 133,
+      "reason": "按root要求逐个全文补读确定性装订与下游卡片实现"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/contracts/confirmation-sheet.js",
+      "level": "A",
+      "read": "full",
+      "lines": 81,
+      "reason": "按root要求逐个全文补读确定性装订与下游卡片实现"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/contracts/dossier-schema.js",
+      "level": "A",
+      "read": "full",
+      "lines": 184,
+      "reason": "按root要求逐个全文补读确定性装订与下游卡片实现"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/contracts/summary-cards.js",
+      "level": "A",
+      "read": "full",
+      "lines": 185,
+      "reason": "按root要求逐个全文补读确定性装订与下游卡片实现"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/pipeline/dossier-store.js",
+      "level": "A",
+      "read": "full",
+      "lines": 137,
+      "reason": "按root要求逐个全文补读确定性装订与下游卡片实现"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/pipeline/handoff-validator.js",
+      "level": "A",
+      "read": "full",
+      "lines": 136,
+      "reason": "按root要求逐个全文补读确定性装订与下游卡片实现"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/pipeline/message-envelope.js",
+      "level": "A",
+      "read": "full",
+      "lines": 122,
+      "reason": "按root要求逐个全文补读确定性装订与下游卡片实现"
+    },
+    {
+      "path": "packages/video-studio/src/marketing-price-contract.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 85
+    },
+    {
+      "path": "packages/video-studio/src/runtime-root.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 16
+    },
+    {
+      "path": "packages/video-studio/src/index.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 77
+    },
+    {
+      "path": "packages/video-studio/src/studio.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 713
+    },
+    {
+      "path": "apps/server/src/video/gen/submission-ledger.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 231
+    },
+    {
+      "path": "packages/video-studio/src/marketing-price-contract.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 38
+    },
+    {
+      "path": "apps/server/src/video/gen/providers.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 311
+    },
+    {
+      "path": "apps/server/src/video/production-authority.pg.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 393
+    },
+    {
+      "path": "packages/video-studio/src/narrative-source-action.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 140,
+      "reason": "独立验通用最终变更与运行边界"
+    },
+    {
+      "path": "packages/video-studio/src/narrative-no-person-source.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 50,
+      "reason": "独立验通用最终变更与运行边界"
+    },
+    {
+      "path": "packages/video-studio/src/studio-bridge-concurrency.test.ts",
+      "level": "A",
+      "read": "full",
+      "lines": 95,
+      "reason": "独立验通用最终变更与运行边界"
+    }
+  ]
+}
