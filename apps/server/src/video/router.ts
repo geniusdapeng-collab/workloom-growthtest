@@ -60,7 +60,7 @@ import { resolveScenePolicyForIntent, ScenePolicyRouteError } from "./scene-poli
 import { resolvePlatformForIntent } from "./platform-routing.js";
 import { makeStageArchive } from "./archive-host.js";
 import { readArchiveSummary, resumeProject, scanStaleRunsOnStartup } from "./archive-resume.js";
-import { applyRouteToMetadata, buildPipelineIntent, filmTargetSecondsFromIntent, routeVideoPipeline } from "@hyperreality/video-studio";
+import { applyRouteToMetadata, buildPipelineIntent, filmTargetSecondsFromIntent, platformIdOf, routeVideoPipeline } from "@hyperreality/video-studio";
 import { routedLlmCall } from "../service/llm.js";
 import { deliveryIngestHook, mediaRouter } from "./media/index.js";
 import { whiteboardRouter } from "./whiteboard/router.js";
@@ -490,7 +490,7 @@ const studioRouter = router({
       officialIntent: z.literal(true),
       intent: z.string().min(1).max(2000).refine((value) => Boolean(value.trim())),
       durationSec: z.number().int().min(1).max(300).optional(),
-      platform: z.string().min(1).max(40).optional(),
+      platform: z.string().trim().min(1).max(40).refine(value => Boolean(platformIdOf(value)), "未登记的目标平台").optional(),
       product: z.object({
         name: z.string().trim().min(1).max(160).refine((value) => !/[\u0000-\u001f<>\\/]|\.\./u.test(value)),
         brand: z.string().trim().min(1).max(100).optional(),
@@ -642,7 +642,7 @@ const studioRouter = router({
           projectId: started.projectId,
           pipeline: decision.route,
           product: decision.product?.name ?? null,
-          ...(official && durationSec !== undefined ? { durationSec } : {}),
+          ...(official ? { platform: standardPlatform.decision.id, ...(durationSec === undefined ? {} : { durationSec }) } : {}),
           via: decision.via,
         };
       } catch (err) {

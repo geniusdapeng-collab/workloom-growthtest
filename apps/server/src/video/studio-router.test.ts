@@ -144,14 +144,14 @@ describe("正式一句话生产入口", () => {
     d.route.mockResolvedValue({ route, signals: [], via: "rules" });
     const result = await caller().studio.start({ officialIntent: true, intent: raw,
       ...(route === "marketing" ? { product: { name: "测试商品" } } : {}) });
-    expect(result).toMatchObject({ kind: "routed", runId: "RUN-test", projectId: "VID-test", pipeline: route, durationSec: 20 });
+    expect(result).toMatchObject({ kind: "routed", runId: "RUN-test", projectId: "VID-test", pipeline: route, durationSec: 20, platform: "douyin" });
     expect(d.route).toHaveBeenCalledWith(expect.objectContaining({ text: raw, explicit: undefined }), expect.any(Object));
     expect(d.start).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: identity.workspaceId }), expect.objectContaining({
       rawIntent: raw, intent: expect.stringContaining("时长：20秒"), isMarketing: route === "marketing", creativeMode: "manual",
     }));
   });
 
-  it.each([{ projectId: "VID-sibling" }, { metadata: {} }, { route: "marketing" }, { durationSec: 301 },
+  it.each([{ projectId: "VID-sibling" }, { metadata: {} }, { route: "marketing" }, { durationSec: 301 }, { platform: "unknown-platform" },
     { product: { name: "测试商品", referenceManifest: {} } }])("拒绝额外生产输入 %j", async extra => {
     await expect(caller().studio.start({ officialIntent: true, intent: "做视频", ...extra })).rejects.toMatchObject({ code: "BAD_REQUEST" });
     expect(d.route).not.toHaveBeenCalled(); expect(d.start).not.toHaveBeenCalled();

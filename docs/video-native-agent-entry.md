@@ -22,7 +22,7 @@ node scripts/workloom-source-session.mjs video -- status --job-file "$job_root/j
 
 ## 从同一作业渲染并交付
 
-选取运行实例目录里可用的模型，在同一项目使用经核对的 [标准后期设置](video-standard-post.md)。设置声明封面、字幕、调色与可选既有音乐，以及字体和输入摘要。制作工作台复用已登记设置；缺授权或缺必要素材时保留当前回执。设置文件须在首次渲染前就绪。以下金额来自本次批准，由执行环境传入。
+选取运行实例目录里可用的模型，在同一项目使用经核对的 [标准后期设置](video-standard-post.md)。设置声明封面、字幕、调色与可选既有音乐，以及字体和输入摘要。封面平台须与同一正式工作单记录的平台一致。制作工作台复用已登记设置；缺授权或缺必要素材时保留当前回执。设置文件须在首次渲染前就绪。以下金额来自本次批准，由执行环境传入。
 
 ```bash
 node scripts/workloom-source-session.mjs video-deliver -- \

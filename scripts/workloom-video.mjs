@@ -6,6 +6,7 @@ import { constants } from "node:fs";
 import { open, readFile, realpath, rename, rm } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { COVER_PLATFORM_IDS } from "../packages/video-studio/src/cover-platforms.ts";
 import { CapabilityError, sanitizeErrorMessage } from "./agent-capabilities.mjs";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
@@ -17,10 +18,12 @@ const PIPELINES = new Set(["marketing", "narrative"]);
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/u;
 const SHA256 = /^[a-f0-9]{64}$/u;
 const COMMIT = /^[a-f0-9]{40}$/u;
+const PLATFORM = /^[a-z][a-z0-9-]{0,39}$/u;
 const BINDING_FIELDS = ["repository", "commit", "productId", "origin", "instance", "tenantId", "workspaceId", "memberId", "memberNo"];
 const record = value => value !== null && typeof value === "object" && !Array.isArray(value);
 const hash = value => createHash("sha256").update(value).digest("hex");
 const validDuration = value => Number.isSafeInteger(value) && value >= 1 && value <= 300;
+const canonicalPlatform = value => typeof value === "string" && PLATFORM.test(value) && COVER_PLATFORM_IDS.includes(value);
 const fail = (code, message, exitCode = 2) => { throw new CapabilityError(code, message, exitCode); };
 
 export function validateVideoIntent(input) {
@@ -171,6 +174,7 @@ export async function readVideoJob(path) {
     || ![binding.productId, binding.instance, binding.tenantId, binding.workspaceId, binding.memberId, binding.memberNo].every(id => ID.test(id ?? ""))
     || !["start_unknown", "preproduction_submitted", "clarify", "unsupported"].includes(raw.phase)
     || (raw.durationSec !== undefined && !validDuration(raw.durationSec))
+    || (raw.platform !== undefined && !canonicalPlatform(raw.platform))
     || (raw.phase === "preproduction_submitted" && (!ID.test(raw.runId ?? "") || !ID.test(raw.projectId ?? "") || !PIPELINES.has(raw.pipeline)))) {
     fail("JOB_FILE_INVALID", "工作单结构或来源不符合正式视频入口", 4);
   }
@@ -186,7 +190,8 @@ export function verifyVideoJobBinding(job, session) {
 const receipt = (job, phase = job.phase, detail = {}) => ({
   schemaVersion: RESULT_SCHEMA, phase, mediaReady: false, ...job.binding, requestSha256: job.requestSha256,
   ...(job.runId ? { runId: job.runId, projectId: job.projectId, pipeline: job.pipeline } : {}),
-  ...(job.durationSec === undefined ? {} : { durationSec: job.durationSec }), ...detail,
+  ...(job.durationSec === undefined ? {} : { durationSec: job.durationSec }),
+  ...(job.platform === undefined ? {} : { platform: job.platform }), ...detail,
 });
 
 export async function startVideo(input, jobFile, deps = {}) {
@@ -226,8 +231,14 @@ export async function startVideo(input, jobFile, deps = {}) {
       return receipt(job, "start_unknown", { error: "服务回执时长与原工作单不符；核对同一运行，禁止重新提交",
         runId: result.runId, projectId: result.projectId, pipeline: result.pipeline });
     }
+    if (result.platform !== undefined && (!canonicalPlatform(result.platform)
+      || (canonicalPlatform(wire.platform) && result.platform !== wire.platform))) {
+      return receipt(job, "start_unknown", { error: "服务回执平台与原工作单不符；核对同一运行，禁止重新提交",
+        runId: result.runId, projectId: result.projectId, pipeline: result.pipeline });
+    }
     Object.assign(job, { phase: "preproduction_submitted", runId: result.runId, projectId: result.projectId, pipeline: result.pipeline });
     if (result.durationSec !== undefined) job.durationSec = result.durationSec;
+    if (result.platform !== undefined) job.platform = result.platform;
   } else {
     return receipt(job, "start_unknown", { error: "服务回执无法绑定正式项目和运行", next: "保留工作单；核对服务记录，禁止重新提交" });
   }

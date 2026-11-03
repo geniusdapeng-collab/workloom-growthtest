@@ -266,9 +266,9 @@ function projectShots(projectId: string, source: Source) {
       fields: record(shot.fields, "镜头字段缺失"), promptSha256: renderSha256(shot.prompt) };
   });
   const gates = (source.output.productionEvidence as { gates: JsonRecord[] }).gates;
-  const referenceMode = source.row.kind === "narrative" && gates.some(gate => gate.gate === "G5_PORTRAIT"
+  const referenceMode: "text-only" | "binding-required" = source.row.kind === "narrative" && gates.some(gate => gate.gate === "G5_PORTRAIT"
     && gate.status === "not_applicable" && gate.basis === "no-characters-or-products") ? "text-only" : "binding-required";
-  return { projectId, runId: source.row.run_id, pipeline: source.row.kind, referenceMode: referenceMode as "text-only" | "binding-required",
+  return { projectId, runId: source.row.run_id, pipeline: source.row.kind, referenceMode,
     sourceStageRunId: source.row.id, sourceAttempt: source.row.attempt, promptsSha256: source.promptsHash, shots };
 }
 
@@ -314,6 +314,7 @@ export async function listProductionOriginals(input: {
           AND q.source_stage_run_id=$5 AND q.source_attempt=$6 AND q.source_output_sha256=$7
           AND q.prompts_sha256=$8 AND q.status='passed' AND q.mode='auto'`,
       [scope.tenantId, scope.workspaceId, projectId, modelId, source.row.id, source.row.attempt, source.row.output_sha256, source.promptsHash])).rows);
+    let hasBoundVisualReference = false;
     const originals = plan.shots.map(shot => {
       const matches = rows.filter(row => row.shot_id === shot.shotId);
       if (!matches.length) return null;
@@ -327,10 +328,14 @@ export async function listProductionOriginals(input: {
         || ![`video/${scope.workspaceId}/${row.sha256}.mp4`, `video/${scope.workspaceId}/${row.sha256}.webm`].includes(row.local_path)) {
         fail("ORIGINAL_UNVERIFIED", "生成签名、镜头原文或媒体入库证据与当前预生产不一致");
       }
+      hasBoundVisualReference ||= Boolean(row.params.firstFrameUrl || row.params.referenceImageUrls?.length || row.params.referenceVideoUrls?.length);
       return { shotId: shot.shotId, durationSec: shot.durationSec, promptSha256: shot.promptSha256,
         qualificationId: row.id, requestHash: row.request_hash, payloadHash: row.payload_hash, jobId: row.job_id,
         taskId: row.task_id, assetId: row.asset_id, sha256: row.sha256, bytes: row.bytes, url: mediaUrl(row.local_path) };
     });
+    if (plan.referenceMode === "binding-required" && originals.every(Boolean) && !hasBoundVisualReference) {
+      fail("ORIGINAL_REFERENCE_UNVERIFIED", "本项目的供应商请求均无已绑定的视觉参考输入");
+    }
     return { ...plan, modelId, originals };
   } finally { await locked.release(); }
 }

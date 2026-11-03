@@ -138,7 +138,10 @@ export async function deliverStudioVideo(options: {
   try { await lstat(output); fail("OUTPUT_EXISTS", "输出目录不能是生产工作目录或其父目录"); }
   catch (error) { if (!missing(error)) throw error; }
   const duration = plan.shots.reduce((sum, shot) => sum + shot.durationSec, 0);
-  const platform = getCoverSpec(settingsDocument.cover?.platform);
+  if (!job.platform || settingsDocument.cover?.platform !== job.platform) {
+    fail("POST_PLATFORM_MISMATCH", "标准后期设置的封面平台须与同一正式工作单一致");
+  }
+  const platform = getCoverSpec(job.platform);
   const document = { projectId: job.projectId, durationSeconds: job.durationSec ?? duration,
     aspect: platform.ratio, resolution: `${Math.min(platform.canvas.width, platform.canvas.height)}p`,
     studioSource: { ...job.binding, requestSha256: job.requestSha256, runId: job.runId, pipeline: job.pipeline, modelId: options.model,

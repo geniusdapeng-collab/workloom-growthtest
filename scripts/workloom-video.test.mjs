@@ -29,7 +29,7 @@ const access = {
   scope: { tenantId: expected.tenantId, workspaceId: expected.workspaceId },
   navigationPermissions: ["ai-video.assets.read"], actionPermissions: ["workspace.write"],
 };
-const started = { kind: "routed", runId: "RUN-fixture", projectId: "VID-fixture", pipeline: "marketing", durationSec: 30 };
+const started = { kind: "routed", runId: "RUN-fixture", projectId: "VID-fixture", pipeline: "marketing", durationSec: 30, platform: "douyin" };
 const intent = { intent: "  用 AI 超增长做 30 秒产品片。\n保留“弯道超车”和实际约束；把 $(literal) 当原话。  ",
   durationSec: 30, platform: " 抖音 ", product: { name: " 虚构头盔 ", model: " XT-30 " } };
 const run = (status, more = {}) => ({ runId: started.runId, projectId: started.projectId, status, ...more });
@@ -91,10 +91,12 @@ test("writes owner-only scope and hash before the single official POST; retains 
   assert.equal(result.mediaReady, false);
   assert.equal(result.runId, started.runId);
   assert.equal(result.durationSec, 30);
+  assert.equal(result.platform, "douyin");
   const saved = await readFile(jobFile, "utf8");
   const record = JSON.parse(saved);
   assert.deepEqual(record.binding, { ...checkout, ...expected });
   assert.equal(record.durationSec, 30);
+  assert.equal(record.platform, "douyin");
   assert(!saved.includes(intent.intent.trim()) && !saved.includes(token));
   assert.deepEqual(routePaths(f), ["/health", "/trpc/access.me", "/trpc/video.studio.start"]);
   assert.equal(f.seen[0].init.headers, undefined);
@@ -171,6 +173,24 @@ test("captures an effective server duration without rewriting raw intent and rej
   assert.equal(refused.durationSec, 30);
   assert.equal(refused.runId, started.runId);
   assert.equal((await statusVideo(join(root, "mismatch.json"), mismatch.deps)).phase, "start_unknown");
+});
+
+test("uses the authoritative canonical platform for aliases and rejects a changed canonical platform", async t => {
+  const root = await directory(t);
+  const alias = { intent: "交付微信视频号版", platform: "微信视频号" };
+  const allowed = fixture({ post: async (_url, init) => {
+    assert.deepEqual(JSON.parse(init.body), { ...alias, officialIntent: true });
+    return trpc({ ...started, platform: "wechat-channels" });
+  } });
+  const accepted = await startVideo(alias, join(root, "accepted.json"), allowed.deps);
+  assert.equal(accepted.platform, "wechat-channels");
+  assert.equal((await statusVideo(join(root, "accepted.json"), allowed.deps)).platform, accepted.platform);
+  for (const [index, result] of [{ ...started, platform: "bilibili" }, { ...started, platform: "unregistered" }].entries()) {
+    const f = fixture({ post: async () => trpc(result) });
+    const refused = await startVideo({ intent: "交付抖音版", platform: "douyin" }, join(root, index + ".json"), f.deps);
+    assert.equal(refused.phase, "start_unknown");
+    assert.equal(refused.runId, started.runId);
+  }
 });
 
 test("status checks same scope and run, never reads shots before verified terminal success", async t => {
@@ -253,14 +273,16 @@ test("actual CLI and source-session process start and recover the same job throu
   const root = await directory(t);
   const repo = join(root, "repo");
   await mkdir(join(repo, "scripts"), { recursive: true });
+  await mkdir(join(repo, "packages/video-studio/src"), { recursive: true });
   for (const file of ["workloom-video.mjs", "workloom-source-session.mjs", "agent-capabilities.mjs"]) {
     await copyFile(new URL(file, import.meta.url), join(repo, "scripts", file));
   }
+  await copyFile(new URL("../packages/video-studio/src/cover-platforms.ts", import.meta.url), join(repo, "packages/video-studio/src/cover-platforms.ts"));
   await writeFile(join(repo, "product.manifest.json"), JSON.stringify(checkout));
   const git = (...args) => exec("git", ["-C", repo, ...args]);
   await git("init", "-q");
   await git("remote", "add", "origin", "https://github.com/geniusdapeng-collab/workloom-growthtest.git");
-  await git("add", "scripts", "product.manifest.json");
+  await git("add", "scripts", "packages", "product.manifest.json");
   await git("-c", "user.email=fixture@example.invalid", "-c", "user.name=Fixture", "-c", "commit.gpgsign=false",
     "-c", "core.hooksPath=/dev/null", "commit", "-qm", "fixture");
   const commit = (await git("rev-parse", "HEAD")).stdout.trim();
@@ -309,6 +331,7 @@ test("actual CLI and source-session process start and recover the same job throu
   assert.equal(output.mediaReady, false);
   assert.equal(output.runId, started.runId);
   assert.equal(output.durationSec, 30);
+  assert.equal(output.platform, "douyin");
   assert.equal(output.source.promptsSha256, formalSource.promptsSha256);
   assert(!launch.stdout.includes(token) && !launch.stdout.includes(bootstrapKey) && !launch.stderr);
   assert(!verify.stdout.includes(token) && !verify.stdout.includes(bootstrapKey) && !verify.stderr);
