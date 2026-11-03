@@ -90,6 +90,35 @@ describe.runIf(RUN_DB)("film provider acceptance survives local failure", () => 
     expect((await component()).state).toBe("unknown"); expect(submit).toHaveBeenCalledTimes(1);
   });
 
+  it("retains a late provider acknowledgement when its first database write fails after cancellation", async () => {
+    let acknowledge!: (value: { taskId: string }) => void;
+    let injected = false;
+    const faultApp = { connect: async () => {
+      const client = await app.connect();
+      return { query: async (sql: string, params?: unknown[]) => {
+        if (!injected && sql.includes("'providerTaskId',$5")) { injected = true; throw new Error("injected late receipt write failure"); }
+        return client.query(sql, params);
+      }, release: (discard?: boolean) => client.release(discard) };
+    } } as unknown as pg.Pool;
+    ctx.ledger = new FilmLedger(faultApp, scope);
+    const accepted = new Promise<{ taskId: string }>(resolve => { acknowledge = resolve; });
+    const submit = vi.spyOn(ArkVideoProvider.prototype, "submit").mockReturnValue(accepted);
+    const poll = vi.spyOn(ArkVideoProvider.prototype, "poll").mockResolvedValue({ status: "submitted" });
+    const pending = handleChannelRequest(ctx, frame("video"));
+    await vi.waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
+    controller.abort();
+    await expect(pending).rejects.toThrow("DEADLINE");
+    expect((await component()).state).toBe("unknown");
+    acknowledge({ taskId: "late-paid-video-with-write-fault" });
+    await vi.waitFor(() => expect(injected).toBe(true));
+    await vi.waitFor(async () => expect((await component()).evidence).toMatchObject({
+      providerTaskId: "late-paid-video-with-write-fault", providerRequestHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+    }));
+    expect((await component()).state).toBe("unknown");
+    expect((await component()).dispatch_count).toBe(1);
+    expect(poll).not.toHaveBeenCalled();
+  });
+
   it("the database rejects replacing a known provider task or request even on an unknown component", async () => {
     const reserved = await ledger.reserveComponent({ jobId: ctx.job.id, component: "video", stepKey: "videos:S1", shotId: "S1",
       idempotencyKey: "guard-task", requestHash: hash("guard-request"), payloadHash: hash("guard-payload"), reservedCny: 1 });
