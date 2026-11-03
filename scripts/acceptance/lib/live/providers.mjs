@@ -2,10 +2,8 @@
  * providers.mjs · 生产实测（P 域）真实模型适配器（RDAS v3.1 §19）
  *
  * 四个适配器，报告必须写明链路与当前预算边界：
- * 正式 CLI 当前只放行受数量/时长约束的 gen-http；外部 LLM 缺可信
- * 输入/输出/重试总 token 上界，product 缺服务端逐请求预算 seam，均调用前 blocked。
- * dsh-harness/model-gateway 低层适配器保留给受控 transport/selftest 的机制验证，
- * 不能据此宣称正式付费链路已可执行或有先验总费用保证。
+ * 正式 CLI 放行受数量/时长约束的 gen-http 及官方 DeepSeek 文本网关有界单次请求。
+ * DSH 和产品隐式调用缺独立的传输/预算证明，调用前 blocked；本地 selftest 不计入生产证据。
  *
  *   1. `dsh-harness`    客户端内置 DeepSeek Harness（dsh）headless 会话：
  *                       真实 provider → 工具调用过 WorkLoom 围栏瀑布 → session/event 落哈希链账本。
@@ -355,7 +353,108 @@ function runProcess(cmd, args, { cwd, env, timeoutMs }) {
 
 export const LLM_TOTAL_BUDGET_BLOCK = "文本模型入口缺少可信的输入、输出及重试总 token 用量上界；expectedTokens 只是估算，DSH maxTokens 仅约束输出。正式非 selftest 执行在调用前阻断，尚未预占、登录、启动 DSH 或请求供应商，真实 LLM 链未验证";
 
-/** Controlled low-level transport only; formal CLI blocks external LLM admission before this adapter. */
+export function isBoundedTextGateway(resolved) {
+  return resolved?.adapter === "model-gateway" && resolved.model === DSH_DEEPSEEK_DEFAULTS.model
+    && resolved.baseUrl === DSH_DEEPSEEK_DEFAULTS.openAiBaseURL;
+}
+
+/** Official text-only transport. Reserve aggregate capacity without changing the model's legal request ceiling. */
+export async function runBoundedGatewayTask({ resolved, task, budget, timeoutMs, env, fetchImpl }) {
+  if (!isBoundedTextGateway(resolved) || task.fixture || task.imageFixture) {
+    return { status: "blocked", called: false, reason: LLM_TOTAL_BUDGET_BLOCK };
+  }
+  const apiKey = pickEnv([resolved.credentialEnv], env).value;
+  if (!resolved.ready || !apiKey) return { status: "blocked", called: false, reason: "正式文本模型凭据未配置" };
+  if (typeof task.prompt !== "string" || !task.prompt.trim() || !["text", "json_object"].includes(task.responseFormat ?? "text")) {
+    return { status: "blocked", called: false, reason: "正式文本任务须声明非空 prompt 和支持的响应格式" };
+  }
+  const started = Date.now();
+  const { tsImport } = await import("tsx/esm/api");
+  const { OpenAiCompatibleProvider } = await tsImport("../../../../packages/base/model-router/providers.ts", import.meta.url);
+  const provider = new OpenAiCompatibleProvider(resolved.model, { baseUrl: resolved.baseUrl, apiKey, fetchImpl });
+  let dispatch;
+  let admitted = false;
+  let denial;
+  let result;
+  let failure;
+  try {
+    result = await provider.chat([{ role: "user", content: task.prompt }], {
+      scene: "generic",
+      responseFormat: { type: task.responseFormat ?? "text" },
+      timeoutMs,
+      retries: 0,
+      beforeDispatch(request) {
+        if (admitted || request.attempt !== 1 || request.modelId !== resolved.model || request.imageCount !== 0
+          || ![request.inputTokenEstimate, request.outputCeiling, request.maxOutputTokens, request.contextTokens].every(Number.isSafeInteger)
+          || request.inputTokenEstimate < 1 || request.outputCeiling < 1
+          || request.outputCeiling !== Math.min(request.maxOutputTokens, request.contextTokens - request.inputTokenEstimate)) {
+          throw new Error("正式网关请求未满足全窗口文本单次约束");
+        }
+        dispatch = request;
+        const gate = budget.reserve({ taskId: task.id, kind: "llm", tokens: request.contextTokens, llmRequestHash: request.requestHash,
+          detail: "官方共享上下文作为本次总计量上界；请求输出窗口独立保持全开，单次发送" });
+        if (!gate.allowed || gate.duplicate) {
+          denial = gate.reason ?? "同一网关请求已有预占或已结算；禁止重复提交，请读取原回执";
+          throw new Error(denial);
+        }
+        admitted = true;
+      },
+    });
+  } catch (error) { failure = error; }
+
+  if (!admitted) return { status: "blocked", called: false, reason: denial ?? "正式文本请求在供应商调用前未通过本地规划或预算",
+    ...(dispatch ? { evidence: { requestPlan: dispatch } } : {}) };
+
+  const observed = result ?? failure?.options?.receipt;
+  const responseBound = observed?.requestHash === dispatch.requestHash && /^[a-f0-9]{64}$/u.test(observed?.responseHash ?? "")
+    && typeof observed.responseId === "string" && observed.responseId.trim().length > 0;
+  const tokens = Number(observed?.promptTokens) + Number(observed?.completionTokens);
+  const measured = responseBound && observed.modelId === resolved.model && (Boolean(result) || observed.usageVerified === true)
+    && Number.isSafeInteger(observed.promptTokens) && observed.promptTokens >= 0
+    && Number.isSafeInteger(observed.completionTokens) && observed.completionTokens >= 0 && Number.isSafeInteger(tokens);
+  const exceededRequest = measured && (tokens > dispatch.contextTokens || observed.completionTokens > dispatch.outputCeiling);
+  let validResponse = Boolean(result && measured && !exceededRequest && observed.finishReason === "stop"
+    && observed.outputCeiling === dispatch.outputCeiling);
+  if (validResponse && task.responseFormat === "json_object") {
+    try {
+      const parsed = JSON.parse(result.text);
+      validResponse = Boolean(parsed && typeof parsed === "object" && !Array.isArray(parsed));
+    } catch { validResponse = false; }
+  }
+  let status = !measured ? "blocked" : validResponse ? "ok" : "failed";
+  let reason = !measured ? "已发送官方文本请求，供应商实际计量未验证；持有预占并冻结"
+    : validResponse ? undefined : "供应商实际用量已记录，响应终止状态、内容或身份未通过";
+  const settlement = budget.commit({ taskId: task.id, kind: "llm", tokens: measured ? tokens : 0, calls: 1, measured, status,
+    detail: measured ? "官方文本请求的供应商实际输入/输出用量" : reason });
+  if (!settlement.committed || settlement.exceeded.length) {
+    status = "failed";
+    reason = settlement.reason ?? `正式网关用量超限：${settlement.exceeded.join("、")}`;
+  }
+  if (exceededRequest) {
+    status = "failed";
+    reason = "官方网关实际用量超过共享上下文或已发送输出上限，已记录全部用量并冻结后续调用";
+    budget.freeze({ taskId: task.id, reason });
+  }
+  const usage = { complete: measured, calls: 1, totalTokens: measured ? tokens : null,
+    inputTokens: measured ? observed.promptTokens : null, outputTokens: measured ? observed.completionTokens : null,
+    reasoningTokens: measured ? observed.reasoningTokens ?? null : null };
+  return { status, reason, called: true, answer: status === "ok" ? result.text : undefined, ms: Date.now() - started,
+    model: observed?.modelId ?? null, tokens: usage.totalTokens, usage,
+    receipt: { kind: "model-gateway", model: observed?.modelId ?? null, requestedModel: resolved.model,
+      endpoint: `${resolved.baseUrl}/chat/completions`, id: observed?.responseId ?? null, tokens: usage.totalTokens,
+      usageComplete: measured, synced: status === "ok", verified_at: new Date().toISOString(),
+      inputTokens: usage.inputTokens, outputTokens: usage.outputTokens, reasoningTokens: usage.reasoningTokens,
+      requestHash: dispatch.requestHash, responseHash: observed?.responseHash ?? null,
+      finishReason: observed?.finishReason ?? null, contextTokens: dispatch.contextTokens, maxOutputTokens: dispatch.maxOutputTokens,
+      inputTokenEstimate: dispatch.inputTokenEstimate, outputCeiling: dispatch.outputCeiling,
+      policyVersion: observed?.policyVersion ?? null, registryVersion: observed?.registryVersion ?? null,
+      scene: observed?.scene ?? "generic", mode: observed?.mode ?? null, effort: observed?.effort ?? null,
+      ...(Number.isInteger(failure?.options?.status) ? { httpStatus: failure.options.status } : {}),
+    },
+  };
+}
+
+/** Synthetic/legacy low-level transport. Formal CLI uses only the canonical bounded adapter above. */
 export async function runChatTask({ resolved, prompt, timeoutMs = 180_000, env = process.env, image = null }) {
   if (!resolved?.ready) return { status: "blocked", called: false, reason: resolved?.missing?.join("；") ?? "文本模型未配置" };
   const apiKey = pickEnv([resolved.credentialEnv, DSH_DEEPSEEK_DEFAULTS.apiKeyEnv, "LLM_API_KEY"], env).value;

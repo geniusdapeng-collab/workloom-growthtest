@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { test } from "node:test";
-import { createBudget, LIVE_BUDGET_CAPS, normalizeBudgets } from "./budget.mjs";
+import { createBudget, DEEPSEEK_GATEWAY_CNY_PER_1K, DEFAULT_LIVE_BUDGETS, LIVE_BUDGET_CAPS, normalizeBudgets } from "./budget.mjs";
 
 function directory(t) {
   const out = mkdtempSync(join(tmpdir(), "workloom-budget-"));
@@ -68,6 +68,39 @@ test("budget: smaller actual usage and failed unknown usage do not release the r
   b.reserve(llm("failed", 6000)); b.commit({ ...llm("failed", 0), measured: false, status: "failed" });
   assert.equal(b.summary().used.llmTokens, 10_000);
   assert.equal(b.summary().actual.llmTokens, 20);
+  assert.equal(b.reserve(llm("next", 1)).allowed, false);
+});
+
+test("budget: selected aggregate tokens, verified bounded usage release, and unknown hold are independent of provider limits", (t) => {
+  const contextTokens = 1_048_576;
+  const pricing = { llmCnyPer1kTokens: DEEPSEEK_GATEWAY_CNY_PER_1K };
+  const request = (taskId) => ({ taskId, kind: "llm", tokens: contextTokens, llmRequestHash: "a".repeat(64) });
+  assert.equal(normalizeBudgets({}).budgets.maxLlmTokens, DEFAULT_LIVE_BUDGETS.maxLlmTokens);
+  assert.equal(budget(t, { maxLlmTokens: 300_000, pricing }).reserve(request("low-tokens")).allowed, false);
+  assert.equal(budget(t, { maxLlmTokens: contextTokens, pricing, maxCostCny: 8 }).reserve(request("low-money")).allowed, false);
+  assert.equal(budget(t, { maxLlmTokens: contextTokens }).reserve(request("untrusted-rate")).allowed, false);
+
+  const b = budget(t, { maxLlmTokens: contextTokens + 10, pricing });
+  assert.equal(b.reserve(request("first")).allowed, true);
+  assert.equal(b.summary().pending.llmTokens, contextTokens);
+  assert.equal(b.reserve(request("second")).allowed, false);
+  assert.equal(b.reserve({ ...request("first"), llmRequestHash: "b".repeat(64) }).allowed, false);
+  assert.equal(b.commit(llm("first", 10)).committed, true);
+  assert.equal(b.summary().used.llmTokens, 10);
+  assert.equal(b.summary().pending.llmTokens, 0);
+  assert.equal(b.summary().actual.llmTokens, 10);
+  assert.equal(b.reserve(request("second")).allowed, true);
+  assert.equal(b.commit({ ...llm("second", 0), measured: false, status: "blocked" }).committed, true);
+  assert.equal(b.summary().used.llmTokens, contextTokens + 10);
+  assert.equal(b.summary().unmeasured.llmTokens, contextTokens);
+  assert.equal(b.reserve(request("third")).allowed, false);
+});
+
+test("budget: a bounded provider overrun freezes admission even when the selected aggregate would still fit", (t) => {
+  const b = budget(t, { maxLlmTokens: 2_000_000, pricing: { llmCnyPer1kTokens: DEEPSEEK_GATEWAY_CNY_PER_1K } });
+  assert.equal(b.reserve({ ...llm("first", 1_000_000), llmRequestHash: "a".repeat(64) }).allowed, true);
+  assert.deepEqual(b.commit(llm("first", 1_000_001)).exceeded, ["llmReservation"]);
+  assert.equal(b.summary().actual.llmTokens, 1_000_001);
   assert.equal(b.reserve(llm("next", 1)).allowed, false);
 });
 
@@ -184,7 +217,7 @@ test("budget: unreadable and corrupted journals fail before paid-call permission
 test("budget: wall-clock zero disables admission and invalid caps cannot widen limits", (t) => {
   assert.equal(budget(t, { maxWallClockMin: 0 }).reserve(llm("first", 1)).allowed, false);
   const normalized = normalizeBudgets({ maxLlmTokens: Infinity, maxImages: -1, maxLlmCalls: 1.5, maxCostCny: NaN, pricing: { imageCny: -1 } });
-  assert.equal(normalized.budgets.maxLlmTokens, LIVE_BUDGET_CAPS.maxLlmTokens);
+  assert.equal(normalized.budgets.maxLlmTokens, 0);
   assert.equal(normalized.budgets.maxImages, LIVE_BUDGET_CAPS.maxImages);
   assert.equal(normalized.budgets.maxLlmCalls, LIVE_BUDGET_CAPS.maxLlmCalls);
   assert.ok(normalized.warnings.length >= 5);

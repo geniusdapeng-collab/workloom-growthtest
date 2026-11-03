@@ -73,6 +73,11 @@ export async function planDirectorFilm(input:{intent:string;engine:DirectorPlann
         const result=await input.engine.reasonStructured(prompt,{type:"object"},{forceJson:true,temperature:attempt===1?.6:.3,maxTokens:9000,
           signal:input.signal,timeoutMs:Math.max(1,Math.min(180_000,deadline-Date.now()))});
         receipt.usage=result.usage??null;receipt.responseSha256=result.content?directorHash(result.content):null;
+        if(result.unknown) {
+          check();
+          receipt.error=`模型结果未知：${result.error??"无有效终态"}`;
+          break;
+        }
         if(!result.success) throw new Error(result.error??"模型调用失败");
         const data=object(result.data??JSON.parse(result.content??""));
         check();validate(data);
@@ -85,7 +90,7 @@ export async function planDirectorFilm(input:{intent:string;engine:DirectorPlann
         receipt.elapsedMs=Date.now()-started;receipts.push(receipt);await input.onProgress?.(stage,[...receipts]);
       }
     }
-    throw new Error("DIRECTOR_MODEL_FAILED: 调用未返回结果");
+    throw new Error(`DIRECTOR_MODEL_OUTCOME_UNKNOWN: ${stage}未返回确定终态，未自动重试`);
   };
   const brief=await call("导演与美术","{title:string,logline:string,emotionalArc:string,visualMotif:string,presentation:string,world:string,hardFacts:string[],assumptions: [{value:string,origin:'inferred'}],chronologyLocked:boolean}",
     {constraints:input.constraints??{},preferences:profile.preferences},data=>{

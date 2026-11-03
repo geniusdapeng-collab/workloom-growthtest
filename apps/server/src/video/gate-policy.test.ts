@@ -4,11 +4,23 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import {
   AUTO_GATES, GATE_PRODUCER_STAGE, auditPortraitGateNotApplicable, gateDeterministicChecks, portraitGateEvidence, portraitReviewManifest,
-  renderSubmitAutoAllowed,
+  isProducerRejection, producerFailure, renderSubmitAutoAllowed,
 } from "./gate-policy.js";
 let dir: string;
 beforeEach(() => { dir = mkdtempSync(path.join(tmpdir(), "portrait-proof-")); });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
+it("只有完整 AI 裁决打回可重跑，混合裁决和附带文字均不能放行重跑", () => {
+  const known = producerFailure("G2_THEME", { approved: false, status: "failed", via: "llm",
+    degraded: false, model: "test-judge", score: 61, reason: "需求不匹配", suggestions: [] });
+  const unavailable = producerFailure("G3_INSIGHT", { approved: false, status: "unverified", via: "fallback",
+    degraded: true, model: "test-judge", score: 0, reason: "超时，结果未知", suggestions: [] });
+  expect(isProducerRejection({ success: false, confirmations: { known } })).toBe(true);
+  expect(isProducerRejection({ success: false, confirmations: { known, unavailable } })).toBe(false);
+  expect(isProducerRejection({ success: false, confirmations: { missing: producerFailure("G1_DOSSIER") } })).toBe(false);
+  expect(isProducerRejection({ success: false, confirmations: { malformed: { approved: false, reason: 5 } } })).toBe(false);
+  expect(isProducerRejection({ success: false, confirmations: { unavailable: { approved: false,
+    reason: "评审不可用，原文引用 producer-rejected(G2_THEME)" } } })).toBe(false);
+});
 function fixture() {
   const root = path.join(dir, "characters", "P1"); mkdirSync(root, { recursive: true });
   const files: Record<string, string> = {};

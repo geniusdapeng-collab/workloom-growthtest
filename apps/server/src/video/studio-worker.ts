@@ -69,6 +69,7 @@ import {
   GATE_RUBRIC,
   gateDeterministicChecks,
   isProducerRejection,
+  producerFailure,
   producerModeFromEnv,
   portraitGateEvidence,
   portraitReviewManifest,
@@ -841,16 +842,13 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
       if (effectiveProducerMode === "auto") {
         return { approved: true, reason: `auto-approved(${req.gate})`, suggestions: [] };
       }
-      return producerVerdict
+      return producerVerdict?.approved
         ? {
-            approved,
-            reason: producerVerdict.approved
-              ? `producer-approved(${req.gate} · score=${producerVerdict.score} · via=${producerVerdict.via})`
-              : `producer-rejected(${req.gate} · score=${producerVerdict.score})：${producerVerdict.reason}`,
+            approved: true,
+            reason: `producer-approved(${req.gate} · score=${producerVerdict.score} · via=${producerVerdict.via})`,
             suggestions: producerVerdict.suggestions,
-            fatal: producerVerdict.approved ? undefined : "producer_rejected"
           }
-        : { approved: false, reason: `producer-unavailable(${req.gate})`, fatal: "producer_unavailable" };
+        : producerFailure(gate, producerVerdict);
     }
     /**
      * G5 定妆照：默认系统自动审批；必须先通过实际出图、四角度、字节和项目作用域核验。
@@ -1207,16 +1205,19 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
                 return { files: 0, bytes: 0, skipped: [] as string[] };
               });
             let marketing: PreparedMarketingFacts | undefined;
-            let g1Approved = true;
+            let g1Failure: Awaited<ReturnType<ApprovalCallback>> | undefined;
             if (input.isMarketing) {
               marketing = await prepareMarketingFacts({ scope: { ...scope, projectId: input.projectId, runId: entry.runId, attempt: ctx.attempt },
                 root: archive.root, metadata: input.metadata ?? {}, intent: input.intent, llm });
               const verdict = await onApproval({ runId: entry.runId, gate: "G1_DOSSIER", vendorType: "host-source-dossier",
                 title: "本次营销来源正文与逐主张事实审核", contentMd: marketing.g1Content });
               const proof = gateProofs.get("G1_DOSSIER");
-              g1Approved = verdict.approved === true && proof?.status === "passed" && proof?.via === "llm" && proof?.degraded === false
+              const g1Approved = verdict.approved === true && proof?.status === "passed" && proof?.via === "llm" && proof?.degraded === false
                 && typeof proof.model === "string" && proof.model.length > 0
                 && Array.isArray(proof.evidence) && proof.evidence.some(item => item?.scope === "complete-text" && item?.sha256 === renderSha256(marketing!.g1Content));
+              if (!g1Approved) g1Failure = verdict.approved
+                ? { approved: false, reason: "producer-unavailable(G1_DOSSIER)：缺少与本次完整来源正文绑定的真实监制裁决", fatal: "producer_unavailable" }
+                : verdict;
               marketingDossierRoot = marketing.storeRoot;
               marketingDossierRef = path.posix.join("archive", scope.workspaceId, input.projectId, `${marketing.prefix}-dossier`);
             }
@@ -1229,11 +1230,9 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
              * 传入 runInput（而不是 input）：它带上了本轮的片型选型结论与注入指引，
              * vendor 的提示词/分镜必须按本次选中的知识条目生成；G1 营销事实仍取自原始 input。
              */
-            const r: Awaited<ReturnType<VideoStudio["runPreproduction"]>> = g1Approved
-              ? await withVendorEngineBridge(llm, () => withVendorPortraitBindingBridge(portraitBindingOptions, () => studio.runPreproduction(runInput)))
-              : {
-              success: false, stages: {}, confirmations: { hostG1: { approved: false, reason: "producer-rejected(G1_DOSSIER)：本次来源与事实未通过真实监制" } },
-            };
+            const r: Awaited<ReturnType<VideoStudio["runPreproduction"]>> = g1Failure
+              ? { success: false, stages: {}, confirmations: { hostG1: g1Failure } }
+              : await withVendorEngineBridge(llm, () => withVendorPortraitBindingBridge(portraitBindingOptions, () => studio.runPreproduction(runInput)));
             completedVendorResult = r;
             if (r.success) {
               // vendor 真出图批量模式跳过的是生成前询问；服务必须在实际图片存在后完成 G5。
@@ -1260,7 +1259,7 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
               if (missing.length) {
                 r.success = false;
                 r.confirmations = { ...((r.confirmations ?? {}) as Record<string, unknown>), hostQualification: { approved: false,
-                  reason: `producer-rejected：缺少服务监制裁决 ${missing.join(",")}`, fatal: "producer_rejected" } };
+                  reason: `producer-unavailable：缺少服务监制裁决 ${missing.join(",")}`, fatal: "producer_unavailable" } };
               }
             }
             rawResult = r;

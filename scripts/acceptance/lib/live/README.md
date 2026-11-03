@@ -2,7 +2,7 @@
 
 本目录由 `scripts/acceptance/live.mjs` 调用。它将模型响应、产品线程状态、媒体落盘与任务断言分别核验；任何一项缺失都不能成为 `status: "ok"`。本机预览和 `--selftest` 的任务可以完成管道检查，但 18 项 P 域检查均为 `unverified`，不能充作生产模型或客户业务通过证据。
 
-当前正式 CLI 的 `gen-http` 图片/视频可在配额内执行；所有非 `--selftest` 的 LLM 路由（DSH、模型网关及未知 fallback chain）在外部调用前 `blocked`，因为尚无可信的输入、输出及重试总 token 上界。产品派单也在可信服务端逐请求预算接口接通前 `blocked`。四个适配器的代码和受控回归存在，不代表四条正式付费/业务链均已可执行。
+正式 CLI 支持配额内的 `gen-http` 媒体任务，以及官方 DeepSeek 的单次纯文本 `model-gateway` 任务。DSH、产品派单和其它未获得可信逐请求上界的路线继续在外部调用前 `blocked`。
 
 ## 运行与退出码
 
@@ -26,16 +26,16 @@ node scripts/acceptance/live.mjs --profile acceptance/profile.json --require-liv
 {
   "live": {
     "enabled": true,
-    "budgets": { "maxLlmCalls": 2, "maxLlmTokens": 16000 },
+    "budgets": { "maxLlmCalls": 1, "maxLlmTokens": 1048576, "maxCostCny": 9 },
     "models": [{
       "id": "reasoning-model", "kind": "llm", "adapter": "model-gateway",
-      "model": "your-declared-model",
-      "apiKeyEnv": "LIVE_API_KEY", "baseUrlEnv": "LIVE_BASE_URL"
+      "model": "deepseek-flash",
+      "apiKeyEnv": "DEEPSEEK_API_KEY", "openAiBaseUrlEnv": "LLM_BASE_URL"
     }],
     "tasks": [{
-      "id": "LLM-R1", "kind": "llm", "chain": "model-gateway",
-      "model": "reasoning-model", "purpose": "reasoning",
-      "expectedTokens": 8000, "prompt": "your declared fixture",
+      "id": "LLM-G1", "kind": "llm", "chain": "model-gateway",
+      "model": "reasoning-model", "responseFormat": "json_object",
+      "prompt": "阅读任务的完整授权资料，输出包含 TASK_COMPLETE 标记的 JSON 对象。",
       "expectAll": ["TASK_COMPLETE"]
     }]
   }
@@ -55,15 +55,15 @@ node scripts/acceptance/live.mjs --profile acceptance/profile.json --require-liv
 - `freeze({ taskId, reason })`：计量或事件证据不完整时阻断后续全部付费模态。
 - `summary()` / `persist()`：返回并保存 `used`、`pending`、`actual`、`unmeasured`、`measurementComplete`、`frozenBy`、`exceeded` 与逐项 reservations。
 
-`used` 对每项预占与实际量取较大者后累计，实际较少不退回额度；`actual` 只含已取得供应商计量的结算。异常/中断的请求保留在 `unmeasured`，不能写成实际零 token、零图片或零视频秒数。没有放行外部 I/O 的请求可据 `called: false` 记录真实调用数/生成量为零。缺计量或实际超限后，后续全部付费模态在外部 I/O 前被拒绝。单价仅是冻结估算，`costBasis.invoiced` 为 `null`，不能宣称供应商实付账单或实际成本绝不会超过估算。
+`used` 对已核实的正式单次文本请求累计实际 token，并释放未使用的预占；其它模态及历史占额记录维持预占与实际量取较大者的口径。`actual` 只含已取得供应商计量的结算。异常或中断的请求保留预占并冻结后续全部付费模态。未放行请求以 `called: false` 记录。已核实的超量仍全额入账并阻断后续调用。`costBasis.invoiced` 为 `null`，冻结单价计算的是估算成本。
 
-`expectedTokens` 的预占和供应商响应后的实际结算不能证明一次外部 LLM 请求在计费前必然满足剩余总 token 上限。DSH 的 `maxTokens` 只限制输出，输入、历史上下文及重试仍可能发生费用；网关调用也没有可信总量约束。因此正式 CLI 在任何多模态夹具、DSH 登录/围栏读取、子进程、预算预占或供应商请求之前阻断该任务，记录 `called: false`，LLM 调用数/token/预占为零。配置很小或很大的 `expectedTokens`、修改 chain 或手写预算声明均不能绕过。将来放行需先接通可验证的每次请求总量约束，覆盖所有输入、输出、重试及子调用；调用后发现超量并冻结不能代替这一前置条件。
+正式文本网关只接受官方端点 `https://api.deepseek.com` 和 `deepseek-flash`，需要声明并核验目标环境。`responseFormat` 可为 `text` 或 `json_object`。统一模型适配器以完整请求输入的本地分词规划输出，发送 `min(模型输出上限, 共享上下文 − 输入计量)`，关闭重试。账本独立按官方共享上下文上界预占，避免把本地输入估计当成服务端严格上界。供应商实际用量返回后结算，结束原因为 `length` 的不完整响应也记录可核实用量，但该任务失败。回执保存模型、输入估计、实际输出上限、结束原因、请求与响应摘要及真实用量。协议见 [DeepSeek Chat Completions](https://api-docs.deepseek.com/api/create-chat-completion/)。
 
-上限以 `LIVE_BUDGET_CAPS` 为准，profile 只能收紧。调用前预占是预算控制，供应商实际量仍需事后回读；若实际量大于预占，必须全额记录并失败/阻断，不掩去超量部分。完整账本必须归档，不能仅保留汇总。
+累计 `live.budgets.maxLlmTokens` 缺省为 300,000。单次官方文本实测须在授权的运行 profile 中显式配置足够的累计余量，额度不足就阻断，输出窗口保持原值。该路线以官方峰值输出费率为所有 token 保守估价，计费依据见 [DeepSeek 模型和价格](https://api-docs.deepseek.com/zh-cn/quick_start/pricing/)。其它次数、金额、时长和媒体硬上限由 `LIVE_BUDGET_CAPS` 约束。完整账本与汇总一并归档。
 
 ## DSH 与网关计量
 
-以下描述的是低层适配机制及受控 fixture 回归。正式 CLI 当前不会进入外部 DSH/网关请求；只有内部启动本地替身的 `--selftest` 可以验证管道。直接低层适配器要求调用方控制无费用 transport，不能把函数存在、合成运行时测试或计量事后完整当作正式生产 LLM 已通过或具有先验总量保证。
+以下 DSH 和旧网关适配机制仅供受控 transport 与 `--selftest` 使用。DSH 的 `maxTokens` 仅约束输出，`expectedTokens` 无法证明所有物理请求的输入、工具历史及重试总量，正式 DSH 在调用前阻断。
 
 `runDshTask` 只支持锁定的 `0.2.0-rc.2` 事件协议，并回读已安装 package 版本。模型凭据通过 `@deepseek-ai/dsh-llm-deepseek-api-key` 的 `apiKeyEnv` 传给子进程；显式 Messages 端点进 patch，密钥和 `rulesToken` 不得落盘。临时 HOME 必须处在本次输出目录；子进程只接收运行所需环境和显式模型变量。
 
@@ -143,4 +143,4 @@ node --test scripts/acceptance/lib/live/media-decoder.test.mjs \
   scripts/acceptance/lib/live/live-cli-browser.test.mjs
 ```
 
-`dsh-process.test.mjs` 启动真实子进程并加载实际 audit/budget/usage 代码，但子进程的 DSH runtime metadata 和 provider 都是合成 fixture；它证明适配机制的物理请求计量与错误路径，不能证明官方完整 CLI 或真实供应商已通过。`live-cli-wire.test.mjs` 使用真实 CLI 和 loopback HTTP，验证非 selftest LLM 在供应商/DSH 登录前零调用、`expectedTokens` 不可绕过、内部 selftest 计量、媒体错误后持额并禁止后续全部模态、完整图片用量与交付失败分开、以及自定义凭据变量的错误体在写预算日志前即脱敏；`providers-http.test.mjs` 还通过真实 loopback HTTP 检查图片/视频的实际 fetch 超时。正式 LLM 仍然未验证；接通可信前置总量约束之前，不得以“补凭据重跑”宣称其已可执行。官方完整 runtime/真实客户端/真实付费模型的独立验收须单独披露，禁止用本目录测试替代。
+`dsh-process.test.mjs` 启动子进程并加载实际 audit/budget/usage 代码，运行时和供应商使用合成夹具。`live-cli-wire.test.mjs` 验证模型窗口与累计额度、预占拒绝、未知用量冻结、内部 selftest 计量和敏感错误脱敏。`providers-http.test.mjs` 通过回环 HTTP 检查媒体 fetch 超时。真实供应商、客户端与产品业务链各自以实际运行回执判定。

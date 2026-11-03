@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { OpenAiCompatibleProvider, type ChatOptions } from "./providers.js";
@@ -5,7 +6,7 @@ import { OpenAiCompatibleProvider, type ChatOptions } from "./providers.js";
 let server: Server;
 let origin: string;
 let bodies: Array<Record<string, unknown>>;
-let mode: "ok" | "error" | "hang" | "hang-body";
+let mode: "ok" | "error" | "hang" | "hang-body" | "length" | "length-no-usage";
 beforeAll(async () => {
   server = createServer(async (req, res) => {
     if (req.url === "/models") { res.writeHead(200); res.end("{}"); return; }
@@ -19,8 +20,8 @@ beforeAll(async () => {
     res.end(JSON.stringify({
       id: "provider-response",
       model: "deepseek-flash",
-      choices: [{ finish_reason: "stop", message: { content: "provider answer" } }],
-      usage: {
+      choices: [{ finish_reason: mode.startsWith("length") ? "length" : "stop", message: { content: "provider answer" } }],
+      usage: mode === "length-no-usage" ? undefined : {
         prompt_tokens: 20,
         completion_tokens: 5,
         total_tokens: 25,
@@ -61,6 +62,49 @@ describe("OpenAI-compatible generation controls at the HTTP boundary", () => {
       reasoning_effort: "high",
     });
     expect(bodies[0]!.max_tokens).toBeGreaterThan(300_000);
+  });
+  it("binds admission to the whole wire request and cannot send after denial", async () => {
+    const history = [
+      { role: "system" as const, content: "Instruction and response schema" },
+      { role: "user" as const, content: "Evidence and sources" },
+      { role: "assistant" as const, content: "Earlier finding" },
+      { role: "user" as const, content: "Latest task and final evidence marker" },
+    ];
+    const denied = vi.fn(() => { throw new Error("aggregate budget denied"); });
+    await expect(provider().chat(history, { beforeDispatch: denied })).rejects.toThrow("aggregate budget denied");
+    expect(bodies).toHaveLength(0);
+    const allowed = vi.fn();
+    const result = await provider().chat(history, { beforeDispatch: allowed });
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]?.messages).toEqual(history);
+    expect(allowed).toHaveBeenCalledExactlyOnceWith({
+      modelId: "deepseek-flash",
+      requestHash: createHash("sha256").update(JSON.stringify(bodies[0])).digest("hex"),
+      inputTokenEstimate: result.inputTokenEstimate,
+      outputCeiling: 393_216,
+      contextTokens: 1_048_576,
+      maxOutputTokens: 393_216,
+      imageCount: 0,
+      attempt: 1,
+    });
+  });
+  it("rejects truncated output, retaining measured usage and the request and response identities", async () => {
+    mode = "length";
+    await expect(provider().chat(messages)).rejects.toMatchObject({
+      message: "模型未完整结束：length", retryable: false, unknown: false,
+      options: { receipt: { finishReason: "length", modelId: "deepseek-flash", responseId: "provider-response",
+        usageVerified: true, promptTokens: 20, completionTokens: 5, reasoningTokens: 0,
+        requestHash: expect.stringMatching(/^[a-f0-9]{64}$/), responseHash: expect.stringMatching(/^[a-f0-9]{64}$/) } },
+    });
+    expect(bodies).toHaveLength(1);
+  });
+  it("marks truncated output without usage as unknown and does not retry", async () => {
+    mode = "length-no-usage";
+    await expect(provider().chat(messages, { retries: 2 })).rejects.toMatchObject({
+      message: "模型未完整结束：length", retryable: false, unknown: true,
+      options: { receipt: { finishReason: "length", usageVerified: false } },
+    });
+    expect(bodies).toHaveLength(1);
   });
   it("honors a resolved scene format override", async () => {
     await provider().chat(messages, {

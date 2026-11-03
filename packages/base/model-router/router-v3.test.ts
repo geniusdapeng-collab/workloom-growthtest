@@ -137,6 +137,30 @@ describe("scene policy", () => {
     expect(resolveTextScenePolicy("video.schema.repair").thinking).toEqual({ type: "disabled" });
   });
 
+  it("resolves the independent evaluation scene without rejecting the paired model group", async () => {
+    const evaluation = resolveTextScenePolicy("workloom.evaluation");
+    expect(evaluation).toMatchObject({
+      modelId: "deepseek-flash",
+      generationReviewGroup: resolveTextScenePolicy("generic").generationReviewGroup,
+      type: "reasoning_review",
+      thinking: { type: "enabled", effort: "high" },
+      responseFormat: "text",
+    });
+    const provider: ModelProvider = {
+      modelId: "deepseek-flash",
+      healthy: async () => true,
+      chat: async (_messages, options) => {
+        expect(options?.responseFormat).toEqual({ type: "text" });
+        return chatResult("PASS\n完整结论");
+      },
+    };
+    const routed = await routeSmart({
+      action: "workloom.evaluation", scene: "workloom.evaluation",
+      messages: [{ role: "user", content: "请先给出 PASS 或 FAIL，再列出依据。" }],
+    }, new Map([["deepseek-flash", provider]]), sink());
+    expect(routed).toMatchObject({ kind: "answered", text: "PASS\n完整结论" });
+  });
+
   it("bundle policy can override thinking without changing the model", () => {
     const parsed = parseModelPolicy(`
 scenes:
