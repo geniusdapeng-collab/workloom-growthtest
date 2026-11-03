@@ -151,15 +151,17 @@ function parseH3Results(html: string, base: string, limit: number): SearchHit[] 
   return out;
 }
 
+interface SearchProviderResult { hits: SearchHit[]; blocked: boolean; failed?: boolean }
+
 /** Bing 公开 RSS（keyless）：返回的是真实目标 URL（不是跳转链接），作为补充通道 */
-async function searchBingRss(query: string, limit: number, timeoutMs: number): Promise<{ hits: SearchHit[]; blocked: boolean }> {
+async function searchBingRss(query: string, limit: number, timeoutMs: number): Promise<SearchProviderResult> {
   const url = `https://www.bing.com/search?q=${encodeURIComponent(query.slice(0, 80))}&format=rss&count=${Math.max(1, Math.min(limit, 10))}`;
   const res = await fetch(url, {
     signal: AbortSignal.timeout(timeoutMs),
     headers: { "user-agent": "WorkLoom/1.0 (+jenny-loom-research)" },
     redirect: "follow",
   });
-  if (!res.ok) return { hits: [], blocked: res.status === 403 || res.status === 429 };
+  if (!res.ok) return { hits: [], blocked: res.status === 403 || res.status === 429, failed: true };
   const xml = await res.text();
   const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, limit);
   const hits: SearchHit[] = [];
@@ -194,7 +196,7 @@ export interface ApiSearchConfig {
 export interface ApiSearchRunner {
   enabled: boolean;
   label: string | null;
-  search: (query: string, limit: number) => Promise<{ hits: SearchHit[]; blocked: boolean }>;
+  search: (query: string, limit: number) => Promise<SearchProviderResult>;
 }
 
 /** 从环境解析 API 检索配置：`TAVILY_API_KEY` 或 `WL_SEARCH_API_URL`+`WL_SEARCH_API_KEY` */
@@ -247,7 +249,7 @@ export function createApiSearchRunner(config: ApiSearchConfig = {}): ApiSearchRu
         });
         if (!res.ok) {
           log(`[intel] API 检索非 200（${res.status}，provider=${resolved.provider}）`);
-          return { hits: [], blocked: res.status === 403 || res.status === 429 };
+          return { hits: [], blocked: res.status === 403 || res.status === 429, failed: true };
         }
         const json = await res.json() as Record<string, unknown>;
         /** 结果数组位置兼容：`results` / `items` / `data[]` / `data.items[]`（网关风格不统一） */
@@ -255,7 +257,11 @@ export function createApiSearchRunner(config: ApiSearchConfig = {}): ApiSearchRu
         const dataObj = (json.data && typeof json.data === "object") ? json.data as Record<string, unknown> : null;
         if (dataObj) candidates.push(dataObj.results, dataObj.items, dataObj.list);
         const rows = candidates.find((candidate) => Array.isArray(candidate)) as unknown[] | undefined;
-        const list = rows ?? [];
+        if (!rows) {
+          log(`[intel] API 检索响应缺少结果数组（provider=${resolved.provider}）`);
+          return { hits: [], blocked: false, failed: true };
+        }
+        const list = rows;
         const hits: SearchHit[] = [];
         for (const row of list) {
           const record = (row && typeof row === "object") ? row as Record<string, unknown> : {};
@@ -269,7 +275,7 @@ export function createApiSearchRunner(config: ApiSearchConfig = {}): ApiSearchRu
         return { hits, blocked: false };
       } catch (err) {
         log(`[intel] API 检索异常（provider=${resolved.provider}）：${err instanceof Error ? err.message : String(err)}`);
-        return { hits: [], blocked: false };
+        return { hits: [], blocked: false, failed: true };
       }
     },
   };
@@ -287,7 +293,7 @@ async function searchOneProvider(
   query: string,
   limit: number,
   timeoutMs: number,
-): Promise<{ hits: SearchHit[]; blocked: boolean }> {
+): Promise<SearchProviderResult> {
   if (provider === "bing") return searchBingRss(query, limit, timeoutMs);
   if (provider === "api") return { hits: [], blocked: false }; // API 通道由 createApiSearchRunner 独立处理
   const { base, ua } = PROVIDER_CONFIG[provider];
@@ -296,7 +302,7 @@ async function searchOneProvider(
     headers: { "user-agent": ua, "accept-language": "zh-CN,zh;q=0.9" },
     redirect: "follow",
   });
-  if (!res.ok) return { hits: [], blocked: res.status === 403 || res.status === 429 };
+  if (!res.ok) return { hits: [], blocked: res.status === 403 || res.status === 429, failed: true };
   const html = await res.text();
   // 人机校验页 / 前端渲染空壳：明确识别，按熔断处理（不是"查询无结果"）
   if (BLOCK_PAGE_PATTERN.test(html)) return { hits: [], blocked: true };
@@ -426,7 +432,7 @@ export function createWebSearch(options: {
         if (Date.now() < until) { perProvider.push("api=cooldown"); continue; }
         await pace("api");
         if (Date.now() < (cooldownUntil.get("api") ?? 0)) { perProvider.push("api=cooldown"); continue; }
-        const { hits, blocked } = await apiRunner.search(query, limit);
+        const { hits, blocked, failed } = await apiRunner.search(query, limit);
         if (blocked) {
           const minutes = 15;
           cooldownUntil.set("api", Date.now() + minutes * 60_000);
@@ -434,6 +440,7 @@ export function createWebSearch(options: {
           perProvider.push("api=blocked");
           continue;
         }
+        if (failed) { perProvider.push("api=error"); continue; }
         writeCachedHits(cache, "api", query, hits);
         take("api", hits);
         continue;
@@ -455,7 +462,7 @@ export function createWebSearch(options: {
           perProvider.push(`${provider}=cooldown`);
           continue;
         }
-        const { hits, blocked } = await searchOneProvider(provider, query, limit, timeoutMs);
+        const { hits, blocked, failed } = await searchOneProvider(provider, query, limit, timeoutMs);
         if (blocked) {
           const minutes = 15;
           cooldownUntil.set(provider, Date.now() + minutes * 60_000);
@@ -463,6 +470,7 @@ export function createWebSearch(options: {
           perProvider.push(`${provider}=blocked`);
           continue;
         }
+        if (failed) { perProvider.push(`${provider}=error`); continue; }
         writeCachedHits(cache, provider, query, hits);
         take(provider, hits);
       } catch (err) {
