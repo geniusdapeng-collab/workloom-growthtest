@@ -4047,7 +4047,11 @@ export function renderPrdContractMarkdown(prd: Record<string, unknown>): string 
  * 2. 把明确人物补入 requirementList.characters，避免 G3 契约“无真人角色”与场景矛盾；
  * 3. 需求洞察统一走可修复的 JSON 提取，兼容合法首个 JSON 后带尾随文本的回包。
  */
-export function installVendorDiscoveryNarrativeBridge(options: { log?: (line: string) => void } = {}): () => void {
+export function installVendorDiscoveryNarrativeBridge(options: {
+  log?: (line: string) => void;
+  /** The caller's current host run requires G4; unscoped vendor previews retain their fallback. */
+  requireVerifiedPrd?: () => boolean;
+} = {}): () => void {
   const log = options.log ?? (() => undefined);
   const restores: Array<() => void> = [];
   try {
@@ -4057,6 +4061,19 @@ export function installVendorDiscoveryNarrativeBridge(options: { log?: (line: st
       HyperrealitySystem?: { prototype: Record<string, unknown> };
     };
     const systemPrototype = systemMod?.HyperrealitySystem?.prototype;
+    if (systemPrototype && typeof systemPrototype._generateMinimalPRD === "function") {
+      const original = systemPrototype._generateMinimalPRD as (discovery: Record<string, unknown>) => Record<string, unknown>;
+      systemPrototype._generateMinimalPRD = function guardedHostPrdFallback(
+        this: unknown,
+        discovery: Record<string, unknown>,
+      ) {
+        if (options.requireVerifiedPrd?.()) {
+          throw new Error("HOST_PRD_UNVERIFIED: 未生成并核实本次 PRD，停止后续剧本、定妆照及生成调用");
+        }
+        return original.call(this, discovery);
+      };
+      restores.push(() => { systemPrototype._generateMinimalPRD = original; });
+    }
     if (systemPrototype && typeof systemPrototype._buildThemeInput === "function") {
       const original = systemPrototype._buildThemeInput as (intent: string, metadata?: Record<string, unknown>) => string;
       systemPrototype._buildThemeInput = function patchedBuildThemeInput(

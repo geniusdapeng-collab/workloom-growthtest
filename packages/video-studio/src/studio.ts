@@ -367,6 +367,7 @@ export class VideoStudio {
 
     const emit: EventSink = (e) => (cfg.onEvent ? cfg.onEvent(e) : undefined);
     let runId: string | null = null;
+    let approvalFailure: { error: unknown } | undefined;
 
     const handler: ConfirmationHandler = async (req) => {
       const gate = resolveGate(req.type);
@@ -377,13 +378,21 @@ export class VideoStudio {
         gate,
         payload: { vendorType: req.type }
       });
-      const verdict = await cfg.onApproval({
-        gate,
-        vendorType: req.type,
-        title: `预生产确认门 · ${gate}`,
-        contentMd: sanitizeGateContent(gate, req.content),
-        runId: req.runId ?? runId
-      });
+      let verdict: GateVerdict;
+      try {
+        verdict = await cfg.onApproval({
+          gate,
+          vendorType: req.type,
+          title: `预生产确认门 · ${gate}`,
+          contentMd: sanitizeGateContent(gate, req.content),
+          runId: req.runId ?? runId
+        });
+      } catch (error) {
+        // A missing approval cannot become the vendor's PRD-generation fallback.
+        approvalFailure = { error };
+        log(`[studio] ${gate} 审批处理器失败（${error instanceof Error ? error.name : "unknown"}），按未批准结束本次预生产`);
+        verdict = { approved: false, reason: `APPROVAL_UNVERIFIED: ${gate} 未取得可核实的审批结果`, fatal: "APPROVAL_UNVERIFIED" };
+      }
       await emit({
         kind: "pipeline.gate.resolved",
         projectId: input.projectId,
@@ -468,7 +477,10 @@ export class VideoStudio {
         /** 需求洞察 _fillDefaults 修复（数组保形 + 消除 const 重赋值，静态审计发现） */
         keep(installSharedBridge("vendor-discovery-fix", () => installVendorDiscoveryFixBridge({ log: logFromBridge })));
         /** 叙事/营销隔离、人物契约补全与需求洞察首个 JSON 修复 */
-        keep(installSharedBridge("vendor-discovery-narrative", () => installVendorDiscoveryNarrativeBridge({ log: logFromBridge })));
+        keep(installSharedBridge("vendor-discovery-narrative", () => installVendorDiscoveryNarrativeBridge({
+          log: logFromBridge,
+          requireVerifiedPrd: () => Boolean(studioBridgeScopes.getStore()),
+        })));
         /** Phase 3 后融合链路深栈诊断（vendor 内部 catch 会吞掉栈帧） */
         keep(installSharedBridge("vendor-phase-internals-diagnostics", () => installVendorPhaseInternalsDiagnostics({ log: logFromBridge })));
         /** 镜头内音频纪律（禁止 BGM）与时长策略（模型能力 4–30s）两条产品口径 */
@@ -626,6 +638,9 @@ export class VideoStudio {
           { noDialogue: inputSpeechPolicy.allSpeechForbidden, minShotSeconds: minSingleShot, maxShotSeconds: maxSingleShot },
           () => system.create(effectiveIntent, metadata, createOptions),
         );
+        // Vendor consumes the explicit rejection; the caller still receives
+        // the original infrastructure failure after vendor has stopped safely.
+        if (approvalFailure) throw approvalFailure.error;
         if (portraitRuntime) {
           const index = portraitRuntime.snapshot();
           const characters = Object.keys(index.characters).length;
