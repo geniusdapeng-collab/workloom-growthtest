@@ -29,8 +29,10 @@ describe("营销检索短暂失败后的真实恢复", () => {
     { provider: "api" as const, failure: "network", restart: false },
     { provider: "api" as const, failure: "bad-json", restart: true },
     { provider: "api" as const, failure: "error-envelope", restart: true },
+    { provider: "api" as const, failure: "error-with-empty-results", restart: true },
     { provider: "bing" as const, failure: "500", restart: false },
     { provider: "bing" as const, failure: "500", restart: true },
+    { provider: "bing" as const, failure: "broken-item", restart: true },
     { provider: "so360" as const, failure: "500", restart: true },
   ])("$provider $failure重试不复用失败空缓存，重建实例=$restart", async ({ provider, failure, restart }) => {
     const file = await cacheFile();
@@ -41,6 +43,8 @@ describe("营销检索短暂失败后的真实恢复", () => {
       if (failure === "network") throw new TypeError("controlled network failure");
       if (failure === "bad-json") return new Response("{broken-json");
       if (failure === "error-envelope") return new Response(JSON.stringify({ error: "temporary upstream failure" }));
+      if (failure === "error-with-empty-results") return Response.json({ error: "temporary upstream failure", results: [] });
+      if (failure === "broken-item") return new Response("<rss><channel><item><title>unclosed</title></channel></rss>");
       return new Response("temporary failure", { status: 500 });
     });
     vi.stubGlobal("fetch", fetchImpl);
@@ -98,15 +102,34 @@ describe("营销检索短暂失败后的真实恢复", () => {
   it("升级后重取无法区分失败或正常的旧空缓存，同时复用旧非空命中", async () => {
     const file = await cacheFile();
     const oldPositive = `${query} 价格`;
+    const oldClaimedSuccess = `${query} 配置`;
     await writeFile(file, JSON.stringify({ version: 1, entries: {
       [searchCacheKey("api", query)]: { at: new Date().toISOString(), hits: [] },
+      [searchCacheKey("api", oldClaimedSuccess)]: { at: new Date().toISOString(), hits: [], outcome: "success" },
       [searchCacheKey("api", oldPositive)]: { at: new Date().toISOString(), hits: [expectedHit] },
     } }));
     const fetchImpl = vi.fn(async () => success("api"));
     const search = createWebSearch({ providers: ["api"], cacheFile: file, paceMs: 0,
       api: { provider: "generic", apiKey: "test-only", apiUrl: "https://search.example.com/search", fetchImpl: fetchImpl as typeof fetch } });
     expect(await search(query, 2)).toEqual([expectedHit]);
+    expect(await search(oldClaimedSuccess, 2)).toEqual([expectedHit]);
     expect(await search(oldPositive, 2)).toEqual([expectedHit]);
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("可识别的空RSS和含合法条目的部分API结果保持缓存", async () => {
+    const file = await cacheFile();
+    const fetchImpl = vi.fn(async (input: string | URL | Request) => String(input).includes("bing.com")
+      ? new Response('<?xml version="1.0"?><rss version="2.0"><channel><title>Search</title><link>https://www.bing.com/</link><description>Search</description></channel></rss>')
+      : Response.json({ results: [{ title: {}, url: "https://invalid.example.com" }, { title: "星野 F3 invalid", url: "javascript:alert(1)" }, expectedHit] }));
+    vi.stubGlobal("fetch", fetchImpl);
+    const common = { cacheFile: file, paceMs: 0 };
+    const api = { ...common, providers: ["api" as const], api: { provider: "generic" as const, apiKey: "test-only", apiUrl: "https://search.example.com/search" } };
+    const rss = { ...common, providers: ["bing" as const] };
+    expect(await createWebSearch(rss)(query, 2)).toEqual([]);
+    expect(await createWebSearch(rss)(query, 2)).toEqual([]);
+    expect(await createWebSearch(api)(query, 2)).toEqual([expectedHit]);
+    expect(await createWebSearch(api)(query, 2)).toEqual([expectedHit]);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 });
