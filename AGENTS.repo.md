@@ -1,8 +1,14 @@
 # WorkLoom 获客用增系统 · 本仓专属规则
 
-> 本文件只适用于 workloom-ai/WorkLoom-growth（及其隔离实验副本的对应版本）。
+> 本文件适用于 GitHub 上的 `geniusdapeng-collab/workloom-growthtest` 隔离副本。
 > 开始实质性工作前，必须先完整阅读根级 `AGENTS.md` 与 `WORKLOOM_PRODUCT_CONTEXT.md`；
 > 本文件只补充本仓的运行、验证与目录约定，**不替代、也不放宽**共享安全不变量与产品边界。
+
+## 〇、Codex 与其他 Agent 的视频接入
+
+1. 从 [GitHub](https://github.com/geniusdapeng-collab/workloom-growthtest) 拉取默认分支并记录完整 SHA。在仓库根目录打开 Agent 工作区，按照 [Agent 接入指引](docs/AGENT-CLIENTS.md) 准备依赖、隔离数据库、运行环境和会话身份。
+2. 按 [视频工作台指南](docs/ai-video-workbench-guide.md) 固定人物、商品、平台、时长、声音、授权和预算。先运行 `growth.repo.readiness`、内置素材检查和 `video:doctor`，再用实际运行服务的 `/health` 和成员权限回读目标身份。MCP 可发现能力，制作的写操作走正式 CLI 或服务入口。
+3. 用同一工作区和项目依次取得前期方案、渲染资格和预算回执、供应商任务与原片、后期交付清单。超时后查询原任务；先核对已受理回执再决定下一步。只有当前成片文件可完整解码并通过交付检查，才向用户交付视频。
 
 ## 一、视频工位：内置角色资产（新接手最容易踩的一条）
 

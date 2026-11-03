@@ -492,12 +492,25 @@ describe("frozen shot coverage and canonical CLI options", () => {
     expect(() => assertFilmStageCoverage(["spec"], {}, source, [{ ...passed("prompt-package"), invoked: false }])).not.toThrow();
     expect(() => assertFilmStageCoverage(["spec"], {}, source, [{ ...passed("prompt-package"), invoked: false, ok: false }])).toThrow("没有通过");
   });
-  it("keeps failures visible even for inapplicable stages and only skips mux for explicit burn", () => {
+  it("keeps failures visible even for inapplicable stages and defaults to burn-only subtitles", () => {
     expect(() => assertFilmStageCoverage(["material-gen"], {}, spoken, [{ ...passed("material-gen", "S1"), ok: false }])).toThrow("没有通过");
-    expect(() => assertFilmStageCoverage(["mux"], {}, spoken, [])).toThrow("mux");
+    expect(() => assertFilmStageCoverage(["mux"], { "subtitle-mode": "sidecar" }, spoken, [])).toThrow("mux");
+    expect(() => assertFilmStageCoverage(["mux"], {}, spoken, [])).not.toThrow();
     expect(() => assertFilmStageCoverage(["mux"], { "subtitle-mode": "burn" }, spoken, [])).not.toThrow();
     expect(() => assertFilmStageCoverage(["danmaku"], {}, spoken, [])).toThrow("danmaku");
     expect(() => assertFilmStageCoverage(["revise"], { "revise-note": "修第一镜" }, spoken, [])).toThrow("revise");
+  });
+  it("only frozen dialogue and the requested subtitle mode determine caption-stage applicability", () => {
+    const silent = { shots: [{ shotId: "S1", dialogue: [] }, { shotId: "S2", dialogue: [{ text: "  " }] }] };
+    const skipped = (stage: string) => ({ ...passed(stage), invoked: false, cached: false, evidence: { applicable: false } });
+    const rows = [skipped("subtitle"), skipped("mux")];
+    for (const mode of ["burn", "sidecar", "both"]) {
+      const options = { "subtitle-mode": mode };
+      expect(() => assertFilmStageCoverage(["subtitle", "mux"], options, silent, rows)).not.toThrow();
+      expect(() => assertFilmStageCoverage(["subtitle", "mux"], options, spoken, rows)).toThrow("subtitle");
+    }
+    expect(() => assertFilmStageCoverage(["mux"], { "subtitle-mode": "both" }, spoken, [skipped("mux")])).toThrow("mux");
+    expect(() => assertFilmStageCoverage(["subtitle"], { "opening-title": "指定标题" }, silent, [skipped("subtitle")])).toThrow("subtitle");
   });
   it("canonical aliases share the same latest slot and an older successful alias cannot mask failure", () => {
     const rows = [passed("keyframe", "S1"), passed("plates", "S1"), passed("keyframe", "S2"), { ...passed("plates", "S1"), ok: false }];

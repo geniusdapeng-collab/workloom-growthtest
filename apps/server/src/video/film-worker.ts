@@ -45,6 +45,7 @@ import {
   assessCharacterGenerationInput,
   assessCharacterRelease,
   buildFilmVideoSubmissionReceipt,
+  encodeLocalImageDataUrl,
   type RegisteredCharacterReleaseSource,
   type CharacterIdentityEvidence,
   type CharacterIdentityReviewRequest,
@@ -204,9 +205,9 @@ async function writeJobBytes(ctx: RunContext, ref: string, bytes: Buffer | strin
 }
 
 function dataUrlFor(file: string, bytes: Buffer): string {
-  const lower = file.toLowerCase();
-  const mime = lower.endsWith(".png") ? "png" : lower.endsWith(".webp") ? "webp" : "jpeg";
-  return `data:image/${mime};base64,${bytes.toString("base64")}`;
+  const url = encodeLocalImageDataUrl(bytes);
+  if (url === null) fail("REFERENCE_IMAGE_TYPE_UNSUPPORTED", `本地参考图内容不是 PNG、JPEG 或 WebP：${file}`);
+  return url;
 }
 
 export interface RunContext {

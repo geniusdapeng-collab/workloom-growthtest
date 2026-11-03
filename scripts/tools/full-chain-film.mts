@@ -69,6 +69,7 @@ import {
   applyMicromotion, assessVariantDistinctness, auditContinuity, buildDeliveryManifest, buildGateEvent,
   assessMotionRichness, motionPolicyForShot, buildCoverDesignPrompt, buildMaterialMotionPrompt, buildPlatePrompt, buildRevisionPlan, buildRevisionReport, buildVariantPlan,
   buildMaterialScenePrompt, assessReferenceIndependence, decidePlateCache, plateRequestSha256, MATERIAL_SCENE_POLICY_VERSION,
+  encodeLocalImageDataUrl,
   isDoubledNarration, speechAcceptance,
   termPronunciationCheck,
   REFERENCE_INDEPENDENCE_POLICY,
@@ -579,17 +580,18 @@ function pinGenerationSources(files: string[], ids: string[]): void {
 function generationRequirements(hasVariants = false, hasGradedVariants = false): Array<Record<string, unknown>> {
   const requested: Record<string, boolean> = {
     cover: STAGES.has("cover"), bgm: !flag("--no-bgm") && !flag("--no-music") && (bgmManifestInfo?.layer === "on" || hasVariants),
-    subtitles: STAGES.has("subtitle") || STAGES.has("mux"), danmaku: DANMAKU_ENABLED && STAGES.has("danmaku"),
+    subtitles: subtitleBurnRequired || subtitleSidecarRequired || softSubtitleRequired, danmaku: DANMAKU_ENABLED && STAGES.has("danmaku"),
     transitions: true, color: (STAGES.has("color") && COLOR_MODE !== "preserve") || hasGradedVariants, resolution: true,
   };
   return Object.entries(requested).map(([name, required]) => required ? { name, requirement: "required" }
-    : { name, requirement: "not_applicable", reason: `本次明确请求的阶段及开关未启用 ${name}` });
+    : { name, requirement: "not_applicable", reason: name === "subtitles" && !hasAuthoredDialogue
+      ? "冻结原稿无台词，不生成空字幕" : `本次明确请求的阶段及开关未启用 ${name}` });
 }
 function generationArtifacts(scope: "master" | "delivery", masterFile: string,
   variants: Array<{ id: string; path: string; gradeProfile: string | null; gradeIntensity?: number; gradeLut?: string | null; colorSourceSha256?: string; colorDecision?: ContentColorDecision; cover?: { path: string; sha256: string } | null; bgm?: unknown }> = [],
   sidecars: string[] = []): Array<Record<string, any>> {
   const requested = ["transitions", ...(STAGES.has("color") && COLOR_MODE !== "preserve" ? ["color"] : []),
-    ...(STAGES.has("subtitle") && SUBTITLE_MODE !== "sidecar" ? ["subtitles"] : []),
+    ...(subtitleBurnRequired ? ["subtitles"] : []),
     ...(DANMAKU_ENABLED && STAGES.has("danmaku") ? ["danmaku"] : []), ...(bgmManifestInfo?.layer === "on" ? ["bgm"] : [])];
   const artifacts: Array<Record<string, any>> = [{ id: "master", path: masterFile, media: "video", role: "master", requiredStages: requested, ...(COLOR_MODE === "preserve" ? { expectedColorCount: 0 } : {}), fps: FPS, durationSeconds: expectedMasterSeconds }];
   for (const variant of variants) {
@@ -604,9 +606,9 @@ function generationArtifacts(scope: "master" | "delivery", masterFile: string,
   if (existsSync(cover)) artifacts.push({ id: "cover:master", path: cover, media: "image", role: "cover" });
   if (STAGES.has("cover") && !existsSync(cover)) throw new Error("GENERATION_REQUIRED_COVER_MISSING");
   if (softsubFile) artifacts.push({ id: "softsub", path: softsubFile, media: "video", role: "softsub", requireSubtitleStream: true, requiredStages: ["transitions", "subtitles"] });
-  if (STAGES.has("mux") && !softsubFile) throw new Error("GENERATION_REQUIRED_SOFTSUB_MISSING");
+  if (softSubtitleRequired && !softsubFile) throw new Error("GENERATION_REQUIRED_SOFTSUB_MISSING");
   const files = sidecars.length ? sidecars : subtitleSidecar ? [subtitleSidecar.srt, subtitleSidecar.ass] : [];
-  if (STAGES.has("subtitle") && SUBTITLE_MODE !== "burn" && (!subtitleSidecar || files.filter(file => /\.(srt|ass)$/i.test(file)).length < 2)) throw new Error("GENERATION_REQUIRED_SIDECARS_MISSING");
+  if (subtitleSidecarRequired && (!subtitleSidecar || files.filter(file => /\.(srt|ass)$/i.test(file)).length < 2)) throw new Error("GENERATION_REQUIRED_SIDECARS_MISSING");
   for (const [index, file] of files.filter(file => /\.(srt|ass|vtt)$/i.test(file)).entries()) artifacts.push({ id: `subtitle:${index}`, path: file, media: "subtitle", durationSeconds: expectedMasterSeconds });
   const intro = join(OUT_DIR, `${PROJECT}-with-cover.mp4`);
   if (existsSync(intro) && stageApproved("cover-intro")) artifacts.push({ id: "cover-intro", path: intro, media: "video", role: "cover-intro", requiredStages: ["transitions", "cover"] });
@@ -756,6 +758,7 @@ const lineageComponentHash = productionHash([
   "packages/video-studio/src/film-completion.mjs", "packages/video-studio/src/standard-post-contract.ts",
   "packages/video-studio/src/character-release-source.ts", "packages/video-studio/src/film-worker-runtime.ts",
   "packages/video-studio/src/film-worker-provenance.ts", "packages/video-studio/src/film-worker-channel.ts",
+  "packages/video-studio/src/image-data-url.ts",
 ].map((file) => ({ file, sha256: sha256FileSync(join(REPO_ROOT, file)) })));
 const SCENE_BIBLE_FILE = arg("--scene-bible");
 const sceneBible: SceneBible | null = SCENE_BIBLE_FILE
@@ -2351,8 +2354,9 @@ function dataUrl(file: string): string {
   /** 方舟授权真人素材（`asset://<asset ID>`）不是本地文件：**原样透传**给平台，不能 base64 编码 */
   if (isAssetRefLocal(file)) return file;
   if (WORKER_RUNTIME) return `film-ref:${WORKER_RUNTIME.reference(file)}`;
-  const ext = file.toLowerCase().endsWith(".png") ? "png" : file.toLowerCase().endsWith(".webp") ? "webp" : "jpeg";
-  return `data:image/${ext};base64,${readFileSync(file).toString("base64")}`;
+  const url = encodeLocalImageDataUrl(readFileSync(file));
+  if (url === null) throw new Error(`REFERENCE_IMAGE_TYPE_UNSUPPORTED: 本地参考图内容不是 PNG、JPEG 或 WebP：${file}`);
+  return url;
 }
 
 async function arkImage(prompt: string, anchors: string[], size: string, shotId: string, target: string): Promise<string> {
@@ -2552,7 +2556,7 @@ function buildSrt(): string {
   };
   shots.forEach((shot, index) => {
     const duration = Number(shot.duration ?? 5);
-    const text = dialogueText(shot);
+    const text = dialogueLines(shot).join(" ");
     if (text) {
       /**
        * 时间轴口径（2026-09-25 南昌片真机修正）：字幕起点必须用**真实切点**（`CUT_GRID`，已扣逐刀转场重叠），
@@ -2563,10 +2567,12 @@ function buildSrt(): string {
       const start = shotStart + Math.min(0.6, duration * 0.12);
       const end = Math.min(shotStart + duration - Math.min(0.35, duration * 0.08), expectedMasterSeconds);
       if (!(duration > 0) || !(end > start)) throw new Error(`GENERATION_SUBTITLE_INTERVAL_INVALID: ${shot.shotId}`);
+      const cue = wrapCue(text);
+      if (!cue) throw new Error(`GENERATION_REQUIRED_SUBTITLE_CUE_MISSING: ${shot.shotId}`);
       lines.push(
         String(index + 1),
         `${srtTime(start)} --> ${srtTime(end)}`,
-        wrapCue(text),
+        cue,
         ""
       );
     }
@@ -4728,10 +4734,20 @@ let colored = master;
  * 旁挂文件与烧录共用同一套字体选型 / 版式 / ASS 生成器（subtitle-bridge plan），所以两种形态观感一致。
  */
 /** 未重跑字幕时，若磁盘上有"不早于当前上游"的字幕版就沿用它（只重跑后段的场景） */
-let subtitled = STAGES.has("subtitle") ? colored : preferDownstream(join(POST_DIR, "master-subtitled.mp4"), colored, "subtitle");
+const hasAuthoredDialogue = shots.some(shot => dialogueLines(shot).length > 0);
+const openingTitlePolicy = resolveOpeningTitle({ explicitTitle: arg("--opening-title", ""), disabled: flag("--no-title-card") });
+const subtitleBurnRequired = STAGES.has("subtitle") && SUBTITLE_MODE !== "sidecar" && (hasAuthoredDialogue || openingTitlePolicy.burn);
+const subtitleSidecarRequired = STAGES.has("subtitle") && SUBTITLE_MODE !== "burn" && hasAuthoredDialogue;
+const softSubtitleRequired = STAGES.has("mux") && SUBTITLE_MODE !== "burn" && hasAuthoredDialogue;
+let subtitled = STAGES.has("subtitle") || (!hasAuthoredDialogue && !openingTitlePolicy.burn)
+  ? colored : preferDownstream(join(POST_DIR, "master-subtitled.mp4"), colored, "subtitle");
 /** 旁挂字幕文件（sidecar 模式的产物；burn 模式下为 null，下游仍走烧字版） */
 let subtitleSidecar: { dir: string; srt: string; ass: string; manifest: string | null; timelineOk: boolean } | null = null;
-if (STAGES.has("subtitle") && existsSync(colored)) {
+if (STAGES.has("subtitle") && !subtitleBurnRequired && !subtitleSidecarRequired) {
+  record({ stage: "subtitle", shotId: null, invoked: false, ok: true, cached: false, degraded: false,
+    attempt: 0, ms: 0, artifact: null, evidence: { mode: SUBTITLE_MODE, applicable: false, reason: "no-authored-dialogue" },
+    verdict: null, note: "冻结原稿无台词，且未启用烧录片头标题" });
+} else if ((subtitleBurnRequired || subtitleSidecarRequired) && existsSync(colored)) {
   rememberInputs("subtitle", [colored]);
   const started = Date.now();
   const srtFile = join(POST_DIR, "subtitle.srt");
@@ -4739,7 +4755,7 @@ if (STAGES.has("subtitle") && existsSync(colored)) {
   const briefFile = BRIEF_FILE ? abs(BRIEF_FILE) : null;
   const platform = arg("--platform", "抖音/快手");
 
-  if (SUBTITLE_MODE !== "burn") {
+  if (subtitleSidecarRequired) {
     const sidecarDir = join(POST_DIR, "subtitles");
     const sidecarResult = runCli(SUBTITLE_CLI, [
       "sidecar", "--in", colored, "--out-dir", sidecarDir, "--srt", srtFile, "--name", PROJECT,
@@ -4777,7 +4793,7 @@ if (STAGES.has("subtitle") && existsSync(colored)) {
     if (sidecarResult.ok) log(`字幕以旁挂文件产出（母版不烧字）：${zhSrt}`);
   }
 
-  if (SUBTITLE_MODE !== "sidecar") {
+  if (subtitleBurnRequired) {
     const out = join(POST_DIR, "master-subtitled.mp4");
     /**
      * 片头标题卡（2026-09-27 真机事故）：字幕工位的 `burn --title` 会在**正片开头烧一张 3 秒标题卡**。
@@ -4789,9 +4805,7 @@ if (STAGES.has("subtitle") && existsSync(colored)) {
      *     不再把整条片名塞进画面。
      */
     // 片名用于项目元数据；仅显式 --opening-title 授权烧入开场画面。
-    const titlePolicy = resolveOpeningTitle({ explicitTitle: arg("--opening-title", ""), disabled: flag("--no-title-card") });
-    const openingTitle = titlePolicy.title;
-    const burnOpeningTitle = titlePolicy.burn;
+    const { title: openingTitle, burn: burnOpeningTitle } = openingTitlePolicy;
     if (!burnOpeningTitle) log("  · 片头标题卡：未明确请求，不从项目片名推导");
     const result = runCli(SUBTITLE_CLI, [
       "burn", "--in", colored, "--out", out, "--srt", srtFile,
@@ -6024,7 +6038,7 @@ if (!DRY_RUN && ["mux", "master", "deliver"].some((stage) => STAGES.has(stage)))
  *     （工位复检四件：video_unchanged / audio_unchanged / duration_kept / subtitle_tracks）。
  * 这样"要带字幕的片子"和"不要字幕的片子"是同一个画面母版派生的两个文件，不会各烧一遍。
  */
-if (!subtitleSidecar && SUBTITLE_MODE !== "burn" && stageApproved("subtitle")) {
+if (!subtitleSidecar && hasAuthoredDialogue && SUBTITLE_MODE !== "burn" && stageApproved("subtitle")) {
   const sidecarDir = join(POST_DIR, "subtitles"), srt = join(sidecarDir, `${PROJECT}.zh.srt`), ass = join(sidecarDir, `${PROJECT}.zh.ass`), manifest = join(sidecarDir, `${PROJECT}.subtitle-manifest.json`);
   if ([srt, ass, manifest].every((file) => existsSync(file))) {
     const doc = JSON.parse(readFileSync(manifest, "utf8")) as { checks?: Array<{ kind?: string; ok?: boolean }> };
@@ -6033,7 +6047,12 @@ if (!subtitleSidecar && SUBTITLE_MODE !== "burn" && stageApproved("subtitle")) {
   }
 }
 let softsubFile: string | null = null;
-if (STAGES.has("mux") && subtitleSidecar && existsSync(scored) && !DRY_RUN) {
+if (STAGES.has("mux") && !softSubtitleRequired) {
+  record({ stage: "mux", shotId: null, invoked: false, ok: true, cached: false, degraded: false,
+    attempt: 0, ms: 0, artifact: null, evidence: { mode: SUBTITLE_MODE, applicable: false,
+      reason: SUBTITLE_MODE === "burn" ? "burn-only-subtitle-mode" : "no-authored-dialogue" },
+    verdict: null, note: SUBTITLE_MODE === "burn" ? "烧录模式不交付软字幕轨" : "冻结原稿无台词，不生成空软字幕轨" });
+} else if (softSubtitleRequired && subtitleSidecar && existsSync(scored) && !DRY_RUN) {
   rememberInputs("mux", [scored, subtitleSidecar.srt, subtitleSidecar.ass]);
   const started = Date.now();
   const deliverSubtitleDir = join(OUT_DIR, "subtitles");
@@ -6095,7 +6114,8 @@ if (STAGES.has("master") && existsSync(scored) && !DRY_RUN) {
     || Math.abs(actualFps - FPS) > 1e-6 || Math.abs(actualDuration - expectedMasterSeconds) > 2e-6
     || Math.abs(actualDuration - actualFrames / FPS) > 2e-6)
     throw new Error(`MASTER_EXPORT_SPEC_INVALID: requested ${OUTPUT_SIZE.width}x${OUTPUT_SIZE.height}@${FPS} ${expectedMasterSeconds}s; actual ${JSON.stringify(info)}`);
-  if (STAGES.has("subtitle") && (SUBTITLE_MODE === "burn" ? !existsSync(join(POST_DIR, "master-subtitled.mp4")) : !subtitleSidecar || !existsSync(subtitleSidecar.srt)))
+  if ((subtitleBurnRequired && !existsSync(join(POST_DIR, "master-subtitled.mp4")))
+    || (subtitleSidecarRequired && (!subtitleSidecar || !existsSync(subtitleSidecar.srt))))
     throw new Error("MASTER_SUBTITLE_MISSING: requested actual subtitle output was not produced");
   const naming = auditDeliverableNaming({ path: DELIVERABLE, durationSec: actualDuration });
   const finalPath = naming.suggestedName ? join(OUT_DIR, naming.suggestedName) : DELIVERABLE;
@@ -6628,7 +6648,7 @@ ${shotLines}
     subtitles: { sidecarDir: subtitleSidecar
         ? publicDeliveryPath(join(OUT_DIR, "subtitles"))
         : null,
-      softsub: softsubFile ? publicDeliveryPath(softsubFile) : null, burned: SUBTITLE_MODE !== "sidecar" },
+      softsub: softsubFile ? publicDeliveryPath(softsubFile) : null, burned: hasAuthoredDialogue && subtitled !== colored },
     cover: { path: existsSync(join(OUT_DIR, `${PROJECT}-cover.png`)) ? publicDeliveryPath(join(OUT_DIR, `${PROJECT}-cover.png`)) : null, hook: arg("--cover-hook", shotlist.title ?? "") },
     variants: publishedVariants,
     distinctness,
@@ -6819,7 +6839,8 @@ if (!DRY_RUN) {
   const aliases: Record<string, string[]> = { spec: ["prompt-review", "prompt-package"], plates: ["keyframe"], videos: ["shot"], "material-gen": ["material-gen"], voice: ["voice"], continuity: ["continuity"] };
   const notApplicable = (stage: string): boolean =>
     (stage === "material-gen" && materialShots().length === 0)
-    || (stage === "mux" && SUBTITLE_MODE === "burn")
+    || (stage === "subtitle" && !subtitleBurnRequired && !subtitleSidecarRequired)
+    || (stage === "mux" && !softSubtitleRequired)
     || (stage === "danmaku" && !DANMAKU_ENABLED);
   const missing = [...STAGES].filter((stage) => !notApplicable(stage) && !(aliases[stage] ?? [stage]).some((alias) => records.some((row) => row.stage === alias)));
   const latest = new Map<string, StageRecord>();

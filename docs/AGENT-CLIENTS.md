@@ -1,79 +1,169 @@
-# 桌面 Agent 接入指南：Codex / DeepSeek Harness
+# 从 GitHub 接入 Codex / DeepSeek Harness
 
-> 读者：要把本仓能力接进**桌面 Agent**的人（或 Agent 自己）。目标是**5 分钟能跑通**：
-> 先 `list` 看到能力 → 再 `invoke` 读一条真实状态 → 最后把 stdio MCP 挂进客户端。
-> 视频链路的完整操作手册在 [`bundles/ai-video/README.md`](../bundles/ai-video/README.md)（§0–§6），本文只讲**接入**。
+从本仓源码启动的 AI 工作台可以发现能力、读取回执，并通过正式 CLI 组织视频制作。第一次接入先跑本地只读验证。要调用文字模型、图片或视频供应商，再准备独立服务环境和当前工作区授权。视频制作、交付与恢复见 [视频工作台指南](ai-video-workbench-guide.md)。
 
 ---
 
-## 1. 5 分钟接入（所有客户端通用）
+## 1. 克隆后验证只读接入
 
-前置：Node.js ≥ 24（与 `package.json#engines` 一致）、已 `pnpm install`；**不需要**先起服务端也能用只读/预览能力。
+准备 Git、Node.js ≥ 24 和本仓锁定的 pnpm（见 [package.json](../package.json)）。在用于本作业的目录克隆并记录当前提交。将检出的仓库根目录设为 Codex、DSH 或其他工作台的项目，按根目录 `AGENTS.md` 读取本仓指引。
 
 ```bash
-# ① 看能力清单（每项含 ID / 操作类别 / 风险 / 数据模式）
+git clone https://github.com/geniusdapeng-collab/workloom-growthtest.git
+cd workloom-growthtest
+git rev-parse HEAD
+node --version
+pnpm --version
+
+# 本地只读发现与预览
 node scripts/workloom-agent.mjs list
+node scripts/workloom-agent.mjs invoke growth.repo.status
+node scripts/workloom-agent.mjs invoke growth.repo.readiness
+node scripts/workloom-agent.mjs invoke growth.video.workbench.guide
+printf '%s' '{"intent":"雨后民宿，只拍空景，只交付抖音一版"}' \
+  | node scripts/workloom-agent.mjs invoke growth.video.director.preview --input-file -
 
-# ② 看单项契约（输入 JSON Schema、传输方式）
-node scripts/workloom-agent.mjs describe growth.video.production.status
-
-# ③ 真跑一条只读能力（读本仓产物的阶段账本）
-printf '%s' '{"projectId":"VID-FF02-FULL","workDir":"work"}' \
-  | node scripts/workloom-agent.mjs invoke growth.video.production.status --input-file -
-
-# ④ MCP 冒烟（stdio JSON-RPC，两个请求：initialize + tools/list）
-printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"probe","version":"1"}}}\n{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}\n' \
+# 本机 MCP 握手、发现工具并实际读取指南
+printf '%s\n' \
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"probe","version":"1"}}}' \
+  '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+  '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
+  '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"workloom_growth_video_workbench_guide","arguments":{}}}' \
   | node scripts/workloom-agent-mcp.mjs
 ```
 
-成功标志：`list` 打印**本仓清单**（本仓为 27 条：核心 8 + 服务 4 + 视频 6 + 导演 5 + 仓库通用只读 4）；`invoke` 返回单行 JSON，形如
-`{"schemaVersion":"workloom.agent-capability-result/v1","status":"succeeded",...}`；MCP 冒烟返回
-`tools/list`（本仓 26 个工具，禁用项不出现在列表里）。数量以本仓清单和实际 `tools/list` 为准。
+核对 `growth.video.workbench.guide` 的 `result.repository=geniusdapeng-collab/workloom-growthtest`、`result.markdown` 和 `result.sha256`。预览应返回目标平台和数量，MCP `tools/list` 应包含 `workloom_growth_video_workbench_guide`。`invoke` 的 `status=succeeded` 表示本次工具调用成功。请继续检查 `result` 内各项状态。`growth.repo.readiness` 的 `ready` 只检查 Node、依赖目录和 MCP 入口，缺失依赖时先读指南再按下节配置。
 
 > 产物根：默认 = 仓库根。若你的工作目录在仓外（客户常见），用**运行者**环境变量指定：
 > `WORKLOOM_VIDEO_ARTIFACT_ROOT=/abs/path/to/work`（调用方仍只能给相对路径，边界由环境变量而非请求决定）。
 
 ---
 
-## 2. 能力边界：只读/预览 vs 执行（先看这张表再用）
+## 2. 接通视频制作环境
 
-| 类别 | 会不会动数据/花钱 | 出现在 MCP 菜单 | 例子 |
-|---|---|---|---|
-| 只读（`read`） | 否 | ✅ `readOnlyHint=true` | `core.threads.get`、`growth.video.production.status` |
-| 回执（`receipt`） | 否 | ✅ | `core.threads.events`、`growth.video.delivery.inspect` |
-| 预览（`preview`） | 否（本地校验/出计划） | ✅ | `growth.service.inquiry.preview`、`growth.video.production.plan` |
-| 执行（`execute`） | **是**（服务端过程 + 幂等键 + 围栏/审批） | 仅在启用且过审后出现 | `growth.service.inquiry.execute`（本仓当前**禁用**） |
+用户已有授权实例时，在工作台运行环境设置实际 `WORKLOOM_BASE_URL` 和该工作区的 `WORKLOOM_ACCESS_TOKEN`，然后执行下方的服务与模型目录检查。远程实例须使用 HTTPS。需要从源码启动独立本机实例时，先完成以下步骤。
 
-**视频的执行不在只读 MCP 里**。一句话导演任务使用固定、认证的服务 CLI：
-`scripts/workloom-director.mjs plan|start|job|versions|feedback`，详见 [导演 V2 手册](director-studio-v2.md)。
-`plan` 强制 `mode=plan`，只调用真实文字模型；`start` 的默认制作模式仍受本人素材、预算和正式脚本资格约束。
-专业旧流程继续走 `scripts/tools/route-video.mts` → `scripts/tools/full-chain-film.mts`。
-`growth.video.production.plan` 只给"建议命令 + 前置检查"，**不替你执行、不花钱**——这是产品所有者口径。
+### 源码启动与真实工位
+
+1. 安装锁定依赖。在仓库根运行 `pnpm install --frozen-lockfile`。锁定的私有 UI 制品若返回 401、403 或 404，使用 [受控安装入口](../scripts/ci/install-private-ui.mjs)，通过运行环境注入有权读取该制品的 `WORKLOOM_UI_RELEASE_READ_TOKEN`。普通 GitHub 克隆权限与私有 UI 制品权限分开。
+
+   ```bash
+   ui_setup_dir=$(mktemp -d)
+   node scripts/ci/install-private-ui.mjs --repo . \
+     --store-dir "$ui_setup_dir/store" --staging-root "$ui_setup_dir" \
+     --archive "$ui_setup_dir/workloom-ui.tgz" --report "$ui_setup_dir/ui-install.json"
+   export npm_config_store_dir="$ui_setup_dir/store"
+   ```
+
+   看到 `frozenInstallPassed=true` 后继续。后续使用同一 pnpm store，缓存和原始私有制品保留在仓外受限目录。Store 配置见 [pnpm 10 文档](https://pnpm.io/10.x/settings#storedir)。
+
+2. 准备专用 PostgreSQL 和 pgvector。只在空白测试实例上使用仓库的 [Compose 配置](../docker-compose.yml) 与 [本地环境模板](../.env.example)。已有数据库时使用专用库，核对 owner、app、gateway 三条连接串和两个角色密码都属于该实例。以下命令会初始化演示数据，执行前先核对库名及端口。
+
+   ```bash
+   test -f .env || cp .env.example .env
+   # 使用仓库 Compose 时，先启动并等 postgres 变为 healthy
+   docker compose up -d postgres
+   docker compose ps postgres
+   pnpm db:migrate
+   pnpm db:seed
+   ```
+
+3. 先用模拟文字模型验证本地安装。下例只用于专用本机实例，保持供应商凭据未注入。已连接的生产实例跳过此步骤。
+
+   ```bash
+   WORKLOOM_PRODUCT_ID=workloom-ai-growth SERVER_HOST=127.0.0.1 SERVER_PORT=8787 \
+     LLM_PROVIDER=mock pnpm -C apps/server start
+   ```
+
+4. 准备真实制作时，按 [环境模板](../.env.example) 和部署方配置，将文字模型供应商、模型 ID、基址和密钥，及图片/视频供应商密钥和模型/端点 ID 注入服务进程。为新作业设置独立的 `HR_WORK_DIR` 和 `WORKLOOM_MEDIA_DIR`，准备可用 FFmpeg/FFprobe、实际字体和有使用权的本地曲库。模型、端点和配额以本次实例与供应商账户为准。停止刚才启动的模拟服务后，再选择下面的独立源码会话或已授权服务入口。
+
+   | 运行环境 | 需要核对的配置 |
+   |---|---|
+   | 真实文字方案 | 服务进程的 `LLM_PROVIDER`、`LLM_MODEL`、`LLM_BASE_URL`、`LLM_API_KEY` 使用当前授权路由。模板默认 `mock`，制作前切换并核对实际响应模型 |
+   | 方舟媒体服务 | `VOLCENGINE_ARK_API_KEY`；需要覆盖模型时分别使用 `SEEDREAM_MODEL`、`SEEDANCE_MODEL`；自定义 API 基址看 `SEEDREAM_ENDPOINT`、`SEEDANCE_ENDPOINT` |
+   | 本地正式制片 CLI | 按本次运行的 `--keys-file` 和进程环境提供已授权的供应商配置；`pnpm video:doctor` 检查选中的本地媒体工具和配置存在性 |
+
+### 独立本机源码会话
+
+仅在自己管理、初始化了本节演示数据且确实授权使用该种子成员的新实例上使用下列命令。服务只绑定 `127.0.0.1`。在同一终端会话内设置实例身份并启动服务。示例假设 8787 空闲，真实模型和媒体凭据已由授权环境注入。选择其它空闲端口时同步修改 `SERVER_PORT` 和 `WORKLOOM_BASE_URL`。
+
+```bash
+export NODE_ENV=production SERVER_HOST=127.0.0.1 SERVER_PORT=8787
+export WORKLOOM_BASE_URL=http://127.0.0.1:8787 WORKLOOM_PRODUCT_ID=workloom-ai-growth
+export WORKLOOM_DEV_AUTO_LOGIN=0 WORKLOOM_SCHEDULER_MS=0
+export WORKLOOM_DESKTOP_WORKSPACE=geo-growth WORKLOOM_DESKTOP_MEMBER=MEM-G01
+export WORKLOOM_SOURCE_TENANT_ID=tenant-demo WORKLOOM_SOURCE_WORKSPACE_ID=ws-geo
+export HR_WORK_DIR="$PWD/.vm-work-source" WORKLOOM_MEDIA_DIR="$PWD/.vm-work-source/media"
+export WORKLOOM_DESKTOP_INSTANCE_ID="$(node -p 'crypto.randomUUID()')"
+export WORKLOOM_DESKTOP_LOGIN_KEY="$(openssl rand -hex 32)"
+export JWT_SECRET="$(openssl rand -hex 32)"
+pnpm -C apps/server start &
+workloom_source_pid=$!
+```
+
+等下方 `/health` 返回正确产品和实例身份再继续。用同一会话运行以下只读命令。源码会话入口使用正式本机登录校验产品、实例、成员及其工作区，仅向选中的 CLI 子进程传递成员令牌。普通已授权实例跳过本节，通过部署方正常流程取得自己的 `WORKLOOM_ACCESS_TOKEN`。
+
+```bash
+printf '%s' '{"kind":"video"}' | node scripts/workloom-source-session.mjs agent -- \
+  invoke growth.video.gen.catalog --input-file -
+```
+
+后面的 `node scripts/workloom-agent.mjs …`（需认证时）和 `node scripts/workloom-director.mjs …`，在此独立源码会话中分别改为 `node scripts/workloom-source-session.mjs agent -- …` 和 `node scripts/workloom-source-session.mjs director -- …`。使用服务项目渲染 CLI 时，对应子命令为 `render`。结束时在原终端用 `jobs -l` 找到 `workloom_source_pid` 对应作业，将其调回前台并按 Ctrl-C，再退出该终端。续跑时保留作业目录、数据库与原受理回执，通过已授权身份重新连接。临时凭据留在该会话环境。
+
+### 核对已连接的实例
+
+```bash
+# 此值仅用于实际在该端口运行的本机源码服务；授权实例用其实际地址
+export WORKLOOM_BASE_URL=http://127.0.0.1:8787
+curl --fail --silent --show-error "$WORKLOOM_BASE_URL/health"
+# 独立源码会话按上节替换入口；其他实例由受控运行环境注入成员令牌
+printf '%s' '{"kind":"image"}' \
+  | node scripts/workloom-agent.mjs invoke growth.video.gen.catalog --input-file -
+printf '%s' '{"kind":"video"}' \
+  | node scripts/workloom-agent.mjs invoke growth.video.gen.catalog --input-file -
+pnpm video:doctor
+```
+
+核对 `/health` 的 `ok`、`productId` 和实际源码实例 ID，检查实际模型、生成方式与时长是否列在目录。必要时在目录输入中加 `"includeUnavailable":true` 查原因。目录只检查运行时接线与配置，余额、权限、资格和实际响应分别核对。只有命中正确实例和工作区、素材用途与预算均获授权时，才继续 [视频工作台指南的制作步骤](ai-video-workbench-guide.md#3-选择正式入口分清方案前期和渲染)。
+
+运行 [RDAS 生产验收](../scripts/acceptance/README.md) 时，为每个被测提交指定独立的 `--evidence-root`，并把 `--out` 放在该根目录内。已受理或状态未知的生成任务按原项目、原目录和任务号续查。提交更新或另建验收证据目录时仍须保留原回执。
+
+| 调用方式 | 作用 | 前置 |
+|---|---|---|
+| 通用 stdio MCP 或 `workloom-agent.mjs` | 读指南、能力、项目状态和回执，运行免费导演预览 | 本机 Node。服务端只读项目能力还需成员授权 |
+| `workloom-director.mjs plan` | 在当前项目范围发起真实文字导演方案 | 运行中的服务、成员令牌、真实文字模型，可能产生文字模型费用 |
+| 服务 CLI、视频工作台或正式制片 CLI | 按当前正式方案和授权生成媒体、制作与交付 | 当前项目、正式镜头与资格、素材使用权、图片/视频供应商、预算及后期环境 |
+
+通过 MCP 读状态和回执，通过正式制作入口执行。一句话导演使用 `scripts/workloom-director.mjs plan|job|versions|render|feedback`。专业流程使用正式前期档案、`scripts/tools/route-video.mts` 和 `scripts/tools/full-chain-film.mts`，具体见 [导演 V2 手册](director-studio-v2.md)和[视频工作台指南](ai-video-workbench-guide.md)。
 
 ---
 
 ## 3. Codex 接入
 
-Codex 支持本地 STDIO MCP。把下面这段加进 Codex 的 `config.toml`（`~/.codex/config.toml`），
-**命令指向本仓**的 MCP 入口即可（多个仓可各配一条，用不同名字）：
+直接在仓库根打开 Codex 就可用终端调用上述 CLI。需要让工具出现在客户端工具列表时，选择配置本地 STDIO MCP。用户配置放在 `~/.codex/config.toml`，受信任的项目也可以用项目级 `.codex/config.toml`。用本机实际绝对路径替换示例，重新打开会话并核对工具回执。配置字段见 [OpenAI 官方 MCP 文档](https://learn.chatgpt.com/docs/extend/mcp)。
 
 ```toml
-[mcp_servers.workloom-growth]
-command = "node"
-args = ["/abs/path/to/WorkLoom-growth/scripts/workloom-agent-mcp.mjs"]
-cwd = "/abs/path/to/WorkLoom-growth"
+[mcp_servers.workloom_growthtest]
+command = "/abs/path/to/node"
+args = ["/abs/path/to/workloom-growthtest/scripts/workloom-agent-mcp.mjs"]
+cwd = "/abs/path/to/workloom-growthtest"
 startup_timeout_sec = 60
-
-[mcp_servers.workloom-growth.env]
-WORKLOOM_PRODUCT_ROOT = "/abs/path/to/WorkLoom-growth"
-# 只读能力可不配下面两项；要用服务端过程时按需配置（**不要写进仓库/日志**）
-# WORKLOOM_BASE_URL = "http://127.0.0.1:4295"      # 本机回环；远程必须 HTTPS
-# WORKLOOM_ACCESS_TOKEN = "<B 端成员令牌>"          # 远程地址时必须
-# WORKLOOM_C_TOKEN = "<C 端令牌>"                   # 仅 C 端能力需要，与 B 端令牌不可互换
+# 仅需读取服务项目时启用，值由 Codex 启动环境注入
+# env_vars = ["WORKLOOM_BASE_URL", "WORKLOOM_ACCESS_TOKEN"]
 ```
 
-配置依据 [Codex 官方 MCP 文档](https://learn.chatgpt.com/docs/extend/mcp)。2026-10-02 已用实际 Codex CLI 的临时配置发现工具并调用
-`growth.video.director.preview`；没有修改用户全局配置。桌面应用与 CLI 共用 MCP 配置，桌面聊天 UI 本次未另行操作。
+本地目录的静态工具通常无需额外环境变量。源码和打包服务的端口可以不同，服务调用要显式使用实际 `WORKLOOM_BASE_URL`。真实成员令牌只注入运行环境。`env_vars` 只写变量名。仅提供托管远程工具的 AI 工作台需要该平台明确配置的服务连接，不能直接访问用户机器的 stdio 进程。配置与启动排查以 [OpenAI 官方 MCP 文档](https://learn.chatgpt.com/docs/extend/mcp) 为准。
+
+只接只读工具时，也可以选择用 Codex CLI 注册；命令同样要使用本机绝对路径。若已用上面的配置注册同名服务器，只需执行 `codex mcp list`。
+
+```bash
+codex mcp add workloom_growthtest -- /abs/path/to/node /abs/path/to/workloom-growthtest/scripts/workloom-agent-mcp.mjs
+codex mcp list
+```
+
+可以在新会话把这段话直接交给工作台：
+
+> 在当前 GitHub 检出根目录读取 AGENTS.md 指向的规则与视频指南。先核对仓库、提交、能力、服务和素材。保留我的原话与固定要求，使用正式入口规划、制作和续跑。付费前核对授权、资格和额度。交付时列出实际可播放文件、封面、字幕、清单和核验结果。遇到阻断，说明具体阶段、已取得的回执、是否发出生成请求及恢复入口。
 
 ---
 
@@ -96,9 +186,9 @@ WORKLOOM_PRODUCT_ROOT = "/abs/path/to/WorkLoom-growth"
 
 按 [DSH 官方扩展手册](https://github.com/deepseek-ai/deepseek-harness/blob/HEAD/docs/cookbook/extension-cookbook.zh.md) 配置工作区和工具插件：
 
-1. 在 DSH 里把本仓目录设为工作区；
-2. 让它读 `bundles/ai-video/README.md`（§0–§6 是给 Agent 的 runbook）；
-3. 一句话导演用固定 CLI `node scripts/workloom-director.mjs plan --input-file intent.json`；需要专业旧流程时再用 `route-video.mts` 与 `full-chain-film.mts`。
+1. 在 DSH 里把本仓目录设为工作区。
+2. 让它读根目录 `AGENTS.md` 指向的规则及 [视频工作台指南](ai-video-workbench-guide.md)。
+3. 在有真实文字模型权限的实例，用 `node scripts/workloom-director.mjs plan --input-file intent.json` 创建方案。独立源码会话使用第 2 节的成员校验入口。
 
 ### 4.2 桌面端接入 · 路线 B（把本仓 MCP 挂成 DSH 插件，能力进菜单）
 
@@ -109,13 +199,11 @@ WORKLOOM_PRODUCT_ROOT = "/abs/path/to/WorkLoom-growth"
 - id: mcp-workloom
   name: '@deepseek-ai/dsh-mcp-client'
   config:
-    serverName: workloom-growth
+    serverName: workloom_growthtest
     transport: stdio
     command: /absolute/path/to/node
-    args: ['/abs/path/to/WorkLoom-growth/scripts/workloom-agent-mcp.mjs']
-    cwd: /abs/path/to/WorkLoom-growth
-    env:
-      WORKLOOM_PRODUCT_ROOT: /abs/path/to/WorkLoom-growth
+    args: ['/abs/path/to/workloom-growthtest/scripts/workloom-agent-mcp.mjs']
+    cwd: /abs/path/to/workloom-growthtest
     failOnStartupError: true
     toolCallTimeoutMs: 60000
 ```
@@ -126,9 +214,9 @@ WORKLOOM_PRODUCT_ROOT = "/abs/path/to/WorkLoom-growth"
 
 ---
 
-## 5. 能力速查：视频 6 条 + 仓库通用 4 条（DSH/Codex 通用）
+## 5. 视频与仓库能力速查
 
-### 导演 V2（新增 5 条）
+### 导演 V2
 
 | 能力 | 用途 | 数据模式 |
 |---|---|---|
@@ -143,16 +231,18 @@ printf '%s' '{"intent":"雨后民宿，抖音、小红书、视频号各一版�
   | node scripts/workloom-agent.mjs invoke growth.video.director.preview --input-file -
 ```
 
-### 5.0 视频链路（6 条）
+### 5.0 视频链路
 
 | 能力 | 何时用 | 备注 |
 |---|---|---|
+| `growth.video.workbench.guide` | 开工前读取本仓完整制作指南 | 返回正文、仓库身份和摘要 |
 | `growth.video.route.record` | 出片前：确认本项目的分流结论 | 读 `work/route.json`；没有就让 Agent 先跑分流 |
 | `growth.video.production.plan` | 出片前：拿"建议命令 + 检查清单" | **预览**：不执行、不花钱 |
 | `growth.video.gen.catalog` | 选模型/看限额 | 服务端只读 |
 | `growth.video.production.shots` | 看项目镜头与生产资格 | 服务端只读 |
 | `growth.video.production.status` | 跑片过程中/跑完后：看卡在哪一步 | 读 `logs/<project>/stages.jsonl`，含渲染台账 |
 | `growth.video.delivery.inspect` | 交付前：核验清单所列文件 | 缺件/越界会如实列出 |
+| `growth.video.post.quality` | 交付前：读取请求层及当前媒体的技术证据 | `complete` 和艺术质量分开 |
 
 典型对话（DSH 里）：
 
@@ -173,15 +263,14 @@ printf '%s' '{"intent":"雨后民宿，抖音、小红书、视频号各一版�
 
 ## 6. 安全与排错
 
-- **令牌三类**：`WORKLOOM_ACCESS_TOKEN`（B 端成员，远程地址必需）、`WORKLOOM_C_TOKEN`（C 端，单独）、
-  本地开发可用 `auth.loginAs` 演示身份；**令牌只经环境变量**，不得写进仓库、命令行参数、日志或提示词；
-- **地址**：默认 `127.0.0.1:8787+portOffset`（本仓 `product.manifest.json`）；**非回环必须 HTTPS**；
+- **令牌**：视频服务 CLI 使用当前工作区 `WORKLOOM_ACCESS_TOKEN`。C 端的 `WORKLOOM_C_TOKEN` 有独立用途；演示身份只用于本机开发。运行时注入秘密，避免写进仓库、参数、日志或提示词。
+- **地址**：未显式配置时，CLI 会按 `product.manifest.json` 的桌面偏移推算本机地址。源码服务按 `SERVER_PORT` 启动，连接时以实际服务地址为准。非回环地址必须 HTTPS。
 - **禁用能力**：`enabled=false` 的能力会从 MCP `tools/list` 消失，调用返回 `DISABLED` + 原因；
 - **错误码**：清单/契约类错误返回 `{"error":{"code":...}}`；本地能力自身抛错会显示为 `INTERNAL_ERROR` + 可读原因
   （例如"路径监狱""超过读取上限"）；
 - **路径监狱**：视频只读能力默认只允许**本仓相对路径**；仓外产物根需运行者显式设
   `WORKLOOM_VIDEO_ARTIFACT_ROOT`；绝对路径与 `../` 逃逸一律拒绝；
-- **不上行**：这些能力只读本地文件或调服务端只读过程，不把客户数据发给模型供应商。
+- **网络范围**：本节的只读能力读取本地文件或当前实例。文字方案和媒体生成会将已授权的相应输入发送给所选供应商。
 
 ---
 
@@ -190,7 +279,7 @@ printf '%s' '{"intent":"雨后民宿，抖音、小红书、视频号各一版�
 - 入口：`scripts/AGENT-CAPABILITIES.md`（基座受控资产，随 base-sync 下发）+ `scripts/workloom-agent.mjs`
   + `scripts/workloom-agent-mcp.mjs` + `scripts/agent-capabilities.{mjs,core.json,test.mjs}`；
 - 仓库通用只读模块：`bundles/geo-growth/capabilities/repo.mjs`（4 条：`repo.status` / `repo.docs` / `bundle.summary` / `repo.readiness`，只读/预览；路径监狱 + 8MB/2 万行上限，不回显密钥值）；
-- 视频能力模块：`bundles/geo-growth/capabilities/video.mjs`（只读/预览；本仓 6 条视频能力，见 §5）；
+- 视频能力清单：`bundles/geo-growth/agent-capabilities.json`，在 `list` 中读取当前登记条目；
 - 导演预览模块：`bundles/geo-growth/capabilities/director.mjs`，其余四条导演只读能力调用固定服务端过程；
 - 认证执行 CLI：`scripts/workloom-director.mjs`，令牌只放 Authorization 头，`plan` 强制文字方案，输入与地址均校验；
 - 自检：`node --test scripts/agent-capabilities.test.mjs`（清单驱动的断言，基座与行业仓共用同一份）。

@@ -22,7 +22,7 @@ test('actual plugin MCP instructions, read-only tool and Markdown resource all e
   const response = await call(3, 'tools/call', { name: tool.name, arguments: {} });
   const guide = JSON.parse(response.result.content[0].text);
   assert.equal(guide.markdown, bytes.toString('utf8')); assert.equal(guide.sha256, digest);
-  assert.equal(guide.repository, 'workloom-ai/workloom-growthtest');
+  assert.equal(guide.repository, 'geniusdapeng-collab/workloom-growthtest');
   const resource = (await call(4, 'resources/list')).result.resources.find(item => item.uri === 'workloom://guides/video');
   assert.equal(resource.mimeType, 'text/markdown');
   const read = await call(5, 'resources/read', { uri: resource.uri });

@@ -9,8 +9,12 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { runInNewContext } from "node:vm";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { buildCharacterReleaseContract } from "../../packages/video-studio/src/character-release-contract.js";
+import { appendCinematicContract, buildCinematicContract } from "../../packages/video-studio/src/cinematic-contract.js";
+import { dialogueLines, exactDialogueClause, noSpeechClause, speechLanguageClause, speechNegativeTerms } from "../../packages/video-studio/src/dialogue-contract.js";
+import { PLAUSIBILITY_POLICY_VERSION } from "../../packages/video-studio/src/plausibility-review.js";
 import { REAL_PERSON_ASSET_SCHEMA } from "../../packages/video-studio/src/real-person-asset.js";
 import { assertFilmStageCoverage } from "../../packages/video-studio/src/film-worker-runtime.js";
+import { REALISM_CLAUSE, REALISM_NEGATIVE_TERMS } from "../../packages/video-studio/src/shot-spec.js";
 import { adoptCompletedOriginalRenders, freezeOriginalSubmission, issueOriginalRenderReceipt } from "./film-standard-post.mjs";
 
 const REPO = fileURLToPath(new URL("../../", import.meta.url));
@@ -41,11 +45,10 @@ const compiled = ts.transpileModule(declarations.map(node => node.getFullText(pa
   { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
 const materialStart = source.indexOf('if (STAGES.has("material-gen")) {');
 const videoPreflightEnd = source.indexOf('  /**\n   * 参考图口径（', materialStart);
-const mediaDeclaration = parsed.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === "assertOriginalRenderMedia");
-const adoptionDeclaration = parsed.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === "recordAdoptedOriginal");
-if (materialStart < 0 || videoPreflightEnd <= materialStart || !mediaDeclaration || !adoptionDeclaration) throw new Error("MATERIAL_USE_FIXTURE_INVALID: actual material generation/preflight blocks missing");
-const materialPreflightCompiled = ts.transpileModule('(async () => {\n' + mediaDeclaration.getFullText(parsed)
-  + '\n' + adoptionDeclaration.getFullText(parsed)
+const materialNames = new Set(["assertOriginalRenderMedia", "recordAdoptedOriginal", "runPlausibilityGate"]);
+const materialDeclarations = parsed.statements.filter(node => ts.isFunctionDeclaration(node) && node.name && materialNames.has(node.name.text));
+if (materialStart < 0 || videoPreflightEnd <= materialStart || materialDeclarations.length !== materialNames.size) throw new Error("MATERIAL_USE_FIXTURE_INVALID: actual material generation/preflight blocks missing");
+const materialPreflightCompiled = ts.transpileModule('(async () => {\n' + materialDeclarations.map(node => node.getFullText(parsed)).join("\n")
   + '\n' + source.slice(materialStart, videoPreflightEnd) + '\n}\n})()',
   { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
 const roots: string[] = [];
@@ -186,7 +189,7 @@ describe("same-run material success enters the issued-original state before new 
     }
     const pendingShots = () => shots.filter(shot => !completed.has(shot.shotId));
     const context = {
-      STAGES: new Set(["material-gen", "videos"]), DRY_RUN: false, SOURCE_SIZE: { width: 1080, height: 1920 },
+      STAGES: new Set(["material-gen", "videos"]), DRY_RUN: false, PRERENDER_REQUESTED: true, SOURCE_SIZE: { width: 1080, height: 1920 },
       FIRST_PASS_ORDER: shots, shots, completedOriginals: originals, completedByShot: completed,
       WORK_DIR: productionRoot, PROJECT: projectId, LOG_DIR: logDir, CLIP_DIR: clipDir, PROMPT_DIR: promptDir, PLATE_DIR: plateDir,
       sourceFileHash: submitted.sha256, WORKER_RUNTIME: null, ASPECT: "9:16", SOURCE_RESOLUTION: "1080p", FPS: 24,
@@ -197,6 +200,10 @@ describe("same-run material success enters the issued-original state before new 
       generatedShots: () => pendingShots().filter(shot => !shot.material), promptShots: () => pendingShots().filter(shot => !shot.material), assetShots: () => [],
       readMaterialSpec: () => ({ photo, usage: "generation-reference", focus: { x: 0.5, y: 0.5 } }),
       buildMaterialScenePrompt: () => "9:16 实景依据 构建一段 不得复刻参考图的构图 贴图式运动 画面全程静止 ".repeat(20),
+      appendCinematicContract, buildCinematicContract, REALISM_CLAUSE, REALISM_NEGATIVE_TERMS,
+      dialogueLines, exactDialogueClause, noSpeechClause, speechLanguageClause, speechNegativeTerms, FILM_SPEECH_LANGUAGE: "zh",
+      ENV: { LLM_PROVIDER: "mock" }, PLAUSIBILITY_POLICY_VERSION, resolveProducerLlm: () => null,
+      reviewPlausibility: () => { throw new Error("UNEXPECTED_MODEL_REVIEW"); },
       run: (_binary: string, args: string[]) => writeFileSync(args.at(-1)!, Buffer.alloc(51_000, 5)),
       rememberInputs: () => {}, sha256FileSync: (path: string) => hash(readFileSync(path)),
       preflightSubmitGuard: () => { if (options.fault === "authorization") throw new Error("PRERENDER_AUTHORIZATION_DENIED_FIXTURE"); },

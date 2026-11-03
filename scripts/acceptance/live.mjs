@@ -51,7 +51,7 @@ import { startStubProvider } from "./lib/live/stub-provider.mjs";
 import { assertSafeTaskId } from "./lib/live/media.mjs";
 import { verifyExpectations } from "./lib/live/verification.mjs";
 import { buildLiveChecks } from "./lib/live/checks.mjs";
-import { recordEvidenceRun, writeAcceptanceItems } from "../delivery/evidence.mjs";
+import { INDEX_SCHEMA, recordEvidenceRun, revisionOf, writeAcceptanceItems } from "../delivery/evidence.mjs";
 
 const RUN_ID = `live-${randomUUID()}`;
 const RUN_STARTED_AT = new Date().toISOString();
@@ -99,13 +99,33 @@ const KEYS_FROM_CLIENT = !has("--no-keys-from-client");
 /** 自动发现封存凭据（默认开；--no-auto-keys 关闭） */
 const AUTO_KEYS = !has("--no-auto-keys");
 
+function acquireRunLock(path, message) {
+  try { mkdirSync(path); }
+  catch (error) { if (error.code === "EEXIST") throw new Error(message); throw error; }
+  process.on("exit", () => rmSync(path, { recursive: true, force: true }));
+}
+
+mkdirSync(EVIDENCE_ROOT, { recursive: true });
+// Different output directories can still share one index. Hold its lock until
+// evidence is written so two live runs cannot race past the same precheck.
+acquireRunLock(join(EVIDENCE_ROOT, ".live-run-lock"), "live 证据根已有运行或未清理的运行锁；请等待原作业或使用独立 --evidence-root，尚未调用模型");
+const { commit: evidenceCommit } = revisionOf(REPO_ROOT, { ignorePaths: [EVIDENCE_ROOT] });
+const indexPath = join(EVIDENCE_ROOT, "evidence-index.json");
+const indexStat = lstatSync(indexPath, { throwIfNoEntry: false });
+if (indexStat) {
+  const invalidIndex = "live evidence-index 无法读取或格式无效；请保留原证据并指定独立 --evidence-root，尚未调用模型";
+  if (!indexStat.isFile()) throw new Error(invalidIndex);
+  let index;
+  try { index = JSON.parse(readFileSync(indexPath, "utf8")); }
+  catch { throw new Error(invalidIndex); }
+  if (index?.schema !== INDEX_SCHEMA || !Array.isArray(index.runs) || !Array.isArray(index.artifacts)) throw new Error(invalidIndex);
+  if (index.commit !== evidenceCommit) throw new Error("不能混写不同提交的 evidence-index；请为当前提交指定独立 --evidence-root，并将 --out 设在其下，尚未调用模型");
+}
+mkdirSync(dirname(OUT_DIR), { recursive: true });
+acquireRunLock(`${OUT_DIR}.run-lock`, "live 输出目录已有运行或未清理的运行锁；尚未调用模型，禁止并发覆盖证据");
 mkdirSync(join(OUT_DIR, "artifacts"), { recursive: true });
 mkdirSync(join(OUT_DIR, "receipts"), { recursive: true });
 mkdirSync(join(OUT_DIR, "transcripts"), { recursive: true });
-const outputLock = `${OUT_DIR}.run-lock`;
-try { mkdirSync(outputLock); }
-catch (error) { if (error.code === "EEXIST") throw new Error("live 输出目录已有运行或未清理的运行锁；尚未调用模型，禁止并发覆盖证据"); throw error; }
-process.on("exit", () => rmSync(outputLock, { recursive: true, force: true }));
 
 const { profile, warnings: profileWarnings } = loadProfile(REPO_ROOT, args.profilePath);
 const liveProfile = profile.live ?? {};
@@ -311,6 +331,20 @@ const gitInfo = (() => {
 const fingerprint = fingerprintEnvironment({ repoRoot: REPO_ROOT, env: environment, profile, git: gitInfo });
 fingerprint.targetProbe = probeResult;
 
+// A production probe must admit paid media before reservation or provider I/O.
+let productionMediaBlock = null;
+if (!SELFTEST && environment.isProduction) {
+  const health = probeResult.checks.find((check) => check.name === "server.health");
+  if (!profile.environment?.target?.apiUrl) {
+    productionMediaBlock = "生产媒体任务需要显式声明目标 API 地址，尚未调用供应商";
+  } else if (!probeResult.ok || health?.json?.ok !== true) {
+    productionMediaBlock = "生产目标健康探测未通过，尚未调用供应商";
+  } else if (environment.kind === "client-runtime" &&
+    (!fingerprint.clientRuntimeVersion || fingerprint.clientInstallState?.status !== "complete" || fingerprint.clientInstallState.phase !== "ready")) {
+    productionMediaBlock = "客户端运行时身份未验证：缺少 VERSION 或已完成的安装状态，尚未调用供应商";
+  }
+}
+
 /* ---------------------------- 执行 ---------------------------- */
 const modelById = new Map(resolvedModels.map((m) => [m.id, m]));
 const results = [];
@@ -320,6 +354,9 @@ async function runTask(task) {
   const base = { id: task.id, title: task.title, kind: task.kind, chain: task.chain ?? null, criticality: task.criticality ?? "P1", model: task.model ?? null, selftest: SELFTEST };
   if (task._blocked) return { ...base, status: "blocked", reason: task._blocked, ms: 0 };
   if (task._skip) return { ...base, status: "skipped", reason: task._skip, ms: 0 };
+  if (productionMediaBlock && (task.kind === "image" || task.kind === "video")) {
+    return { ...base, status: "blocked", called: false, reason: productionMediaBlock, ms: 0 };
+  }
   const resolved = task.model ? modelById.get(task.model) : resolvedModels.find((m) => m.kind === (task.kind === "product" ? "llm" : task.kind));
   const chain = task.chain ?? resolved?.adapter ?? "model-gateway";
   let reserved = null;

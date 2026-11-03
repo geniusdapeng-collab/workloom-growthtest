@@ -38,6 +38,7 @@ export * from "./continuity.js";
 export * from "./gate-ledger.js";
 export * from "./plate-prompt.js";
 export * from "./plate-cache.js";
+export * from "./image-data-url.js";
 export * from "./narration.js";
 export * from "./pronunciation.js";
 export * from "./prompt-language.js";
