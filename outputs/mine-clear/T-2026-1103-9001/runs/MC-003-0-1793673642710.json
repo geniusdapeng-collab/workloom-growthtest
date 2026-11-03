@@ -1,0 +1,39 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-003-0-1793673642710",
+  "command": "node node_modules/vitest/vitest.mjs run apps/server/src/video/gen/provider-polling.test.ts apps/server/src/video/gen/domestic-provider-polling.test.ts --maxWorkers=2",
+  "exec": {
+    "file": "node",
+    "args": [
+      "node_modules/vitest/vitest.mjs",
+      "run",
+      "apps/server/src/video/gen/provider-polling.test.ts",
+      "apps/server/src/video/gen/domestic-provider-polling.test.ts",
+      "--maxWorkers=2"
+    ]
+  },
+  "actor": "/root/general_audit",
+  "role": "acceptance",
+  "subject": {
+    "card_id": "MC-003",
+    "assertion_index": 0
+  },
+  "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-03T02:40:42.710Z",
+  "finished_at": "2026-11-03T02:40:43.263Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-003-0-1793673642710.txt",
+      "sha256": "4be48d12c1ce19487689674aa2a2fdd146d82122999a1aea54a4048a13b14a20",
+      "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+    }
+  ]
+}

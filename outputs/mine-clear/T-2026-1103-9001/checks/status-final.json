@@ -1,0 +1,19 @@
+{
+  "task_id": "T-2026-1103-9001",
+  "total": 21,
+  "problem": 21,
+  "fix": 0,
+  "by_state": {
+    "verified": 21
+  },
+  "by_severity": {
+    "P1": 18,
+    "P0": 3
+  },
+  "by_batch": {
+    "0": 2,
+    "1": 2,
+    "2": 17
+  },
+  "unclosed": []
+}

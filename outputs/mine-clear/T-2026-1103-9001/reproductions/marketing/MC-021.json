@@ -1,0 +1,76 @@
+{
+  "id": "MC-021",
+  "severity": "P1",
+  "baseline": "c028118de87f80b4ff0726c758b1ca0d964b9a63",
+  "fixed_by": "/root/marketing_audit",
+  "title": "并发宿主定妆照桥互读索引、乱序卸载且渲染解析包装累积",
+  "evidence_level": "A+B",
+  "fix_commit": "81cbe52a7eef57d2bdc6518d41868ab79fc0a102",
+  "root_causes": [
+    {
+      "file": "packages/video-studio/src/vendor-compat.ts",
+      "line": 181,
+      "sha256": "f2a32ab61546688061b6d639d9fa015e4c3ba72f89b6fade97cd7fe79822cd4e",
+      "detail": "每次安装的闭包携带当前项目resolveIndex，但全局重写Renderer.render、manifest、convert、Core.buildPayload；后装包装调用先装闭包，乱序还原还会拆别人或残留旧包装。"
+    },
+    {
+      "file": "packages/video-studio/src/vendor-compat.ts",
+      "line": 114,
+      "sha256": "f2a32ab61546688061b6d639d9fa015e4c3ba72f89b6fade97cd7fe79822cd4e",
+      "detail": "_parseCharacterRef 每安装都包一层；宿主不持释放函数，无上限累积。"
+    },
+    {
+      "file": "apps/server/src/video/studio-worker.ts",
+      "line": 627,
+      "sha256": "7b90196a5d3deecd6254000c44dd13accf38e8493fb203f73f8ca83e945bc22a",
+      "detail": "每次startRun在全局安装本项目索引，finally无条件还原自己的原型快照；非片型+HR_DEFER_RENDER=0实际到vendor Layer3。"
+    }
+  ],
+  "fix_plan": "同一进程只安装一组方法；AsyncLocalStorage按运行分派索引、绑定快照与日志；引用计数保护并发用户并恢复原型；解析桥自身也只包装一次、释放幂等。现有精确文件、四角度、角色筛选、校验和发出字节合同保留。宿主只在已获项目权限与G1通过后的vendor预生产函数周围进入作用域。",
+  "assertion": "packages/video-studio/src/vendor-portrait-binding-concurrency.test.ts",
+  "additional_assertions": [
+    "packages/video-studio/src/vendor-compat.test.ts",
+    "packages/video-studio/src/portrait-binding.test.ts",
+    "apps/server/src/video/studio-worker.test.ts"
+  ],
+  "runs": [
+    {
+      "log": "portrait-bridge-concurrency-red.log",
+      "sha256": "249b370cac13f6d3eb98d7d170c1064f1ffc3cb7ad3d5993acdacc324d8ed982",
+      "exit_code": 1,
+      "files": 1,
+      "failed": 2,
+      "phase": "baseline host installation lifecycle reproduced"
+    },
+    {
+      "log": "portrait-parser-concurrency-red.log",
+      "sha256": "ed59ecee289868c808d0aba7f3d33c250c65c96b6545b5ebe1c6008dccf158c5",
+      "exit_code": 1,
+      "files": 1,
+      "failed": 2,
+      "phase": "portrait scope fixed but parser lifecycle still reproduced"
+    },
+    {
+      "log": "portrait-bridge-concurrency-final-green.log",
+      "sha256": "0bce685d99ddd4e04b28e4a4f16ab7ca8c74759ade545a030e04aea66f92aaa8",
+      "exit_code": 0,
+      "files": 3,
+      "passed": 128
+    },
+    {
+      "log": "portrait-bridge-video-typecheck.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exit_code": 0
+    },
+    {
+      "log": "portrait-binding-host-frozen-green.log",
+      "source_commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+      "sha256": "b984fe75b65995b248b80610f6dd3af8ec97d4b899f12c82a7b5206d9aafc912",
+      "exit_code": 0,
+      "files": 2,
+      "passed": 158
+    }
+  ],
+  "limitations": "真实Node CJS、真实Renderer.render/磁盘清单/原Core验证和请求体构建；仅替换最终callApi。未付费出图或渲染，未引入自动图片选择合同。默认defer路径不因此变更。",
+  "host_wiring_commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+}

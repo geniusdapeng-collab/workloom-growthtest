@@ -1,0 +1,41 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-021-0-1793673319348",
+  "command": "node node_modules/vitest/vitest.mjs run packages/video-studio/src/vendor-portrait-binding-concurrency.test.ts packages/video-studio/src/vendor-compat.test.ts packages/video-studio/src/portrait-binding.test.ts apps/server/src/video/studio-worker.test.ts --maxWorkers=2",
+  "exec": {
+    "file": "node",
+    "args": [
+      "node_modules/vitest/vitest.mjs",
+      "run",
+      "packages/video-studio/src/vendor-portrait-binding-concurrency.test.ts",
+      "packages/video-studio/src/vendor-compat.test.ts",
+      "packages/video-studio/src/portrait-binding.test.ts",
+      "apps/server/src/video/studio-worker.test.ts",
+      "--maxWorkers=2"
+    ]
+  },
+  "actor": "/root/marketing_audit",
+  "role": "repair",
+  "subject": {
+    "card_id": "MC-021",
+    "assertion_index": 0
+  },
+  "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-03T02:35:19.348Z",
+  "finished_at": "2026-11-03T02:35:26.273Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-021-0-1793673319348.txt",
+      "sha256": "2c993e99600e5c2232af01918f8d36d4e629911e6397a5bf819a7a5866d340b2",
+      "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+    }
+  ]
+}

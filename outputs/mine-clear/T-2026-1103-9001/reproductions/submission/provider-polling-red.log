@@ -1,0 +1,732 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts (44 tests | 42 failed) 24ms
+     × HTTP 401 is a failed lookup, not a provider task failure 12ms
+     × HTTP 403 is a failed lookup, not a provider task failure 1ms
+     × HTTP 404 is a failed lookup, not a provider task failure 0ms
+     × HTTP 429 is a failed lookup, not a provider task failure 0ms
+     × HTTP 500 is a failed lookup, not a provider task failure 0ms
+     × HTTP 503 is a failed lookup, not a provider task failure 0ms
+     × unverified lookup body not-json cannot become a terminal result 1ms
+     × unverified lookup body null cannot become a terminal result 0ms
+     × unverified lookup body [] cannot become a terminal result 0ms
+     × unverified lookup body {} cannot become a terminal result 0ms
+     × unverified lookup body {"status":"unexpected-new-state"} cannot become a terminal result 0ms
+     × treats task IDs as one opaque URL component 1ms
+     × HTTP 401 is a failed lookup, not a provider task failure 0ms
+     × HTTP 403 is a failed lookup, not a provider task failure 0ms
+     × HTTP 404 is a failed lookup, not a provider task failure 0ms
+     × HTTP 429 is a failed lookup, not a provider task failure 0ms
+     × HTTP 500 is a failed lookup, not a provider task failure 0ms
+     × HTTP 503 is a failed lookup, not a provider task failure 0ms
+     × unverified lookup body not-json cannot become a terminal result 0ms
+     × unverified lookup body null cannot become a terminal result 0ms
+     × unverified lookup body [] cannot become a terminal result 0ms
+     × unverified lookup body {} cannot become a terminal result 0ms
+     × unverified lookup body {"status":"unexpected-new-state"} cannot become a terminal result 0ms
+     × treats task IDs as one opaque URL component 0ms
+     × HTTP 401 is a failed lookup, not a provider task failure 0ms
+     × HTTP 403 is a failed lookup, not a provider task failure 0ms
+     × HTTP 404 is a failed lookup, not a provider task failure 0ms
+     × HTTP 429 is a failed lookup, not a provider task failure 0ms
+     × HTTP 500 is a failed lookup, not a provider task failure 0ms
+     × HTTP 503 is a failed lookup, not a provider task failure 0ms
+     × unverified lookup body not-json cannot become a terminal result 0ms
+     × unverified lookup body null cannot become a terminal result 0ms
+     × unverified lookup body [] cannot become a terminal result 0ms
+     × unverified lookup body {} cannot become a terminal result 0ms
+     × unverified lookup body {"status":"unexpected-new-state"} cannot become a terminal result 0ms
+     × treats task IDs as one opaque URL component 0ms
+     × Ark expired is a real provider terminal failure 0ms
+     × MuAPI cancelled is a real provider terminal failure 0ms
+     × Ark success without a media URI remains unverified 0ms
+     × Higgsfield success without a media URI remains unverified 0ms
+     × MuAPI success without a media URI remains unverified 0ms
+     × Ark keeps the provider-reported video duration without inferring seconds from token usage 0ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 42 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > Ark polling preserves an already accepted task > HTTP 401 is a failed lookup, not a provider task failure
+AssertionError: promise resolved "{ status: 'failed', …(1) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "error": "Seedance 查询失败：HTTP 401 query unavailable",
++   "status": "failed",
+  }
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:15:47
+     13|   it.each([401, 403, 404, 429, 500, 503])("HTTP %s is a failed lookup,…
+     14|     vi.stubGlobal("fetch", vi.fn(async () => new Response("query unava…
+     15|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     16|     expect(fetch).toHaveBeenCalledTimes(1);
+     17|     expect(vi.mocked(fetch).mock.calls[0]?.[1]?.method).toBe("GET");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/42]⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > Ark polling preserves an already accepted task > HTTP 403 is a failed lookup, not a provider task failure
+AssertionError: promise resolved "{ status: 'failed', …(1) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "error": "Seedance 查询失败：HTTP 403 query unavailable",
++   "status": "failed",
+  }
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:15:47
+     13|   it.each([401, 403, 404, 429, 500, 503])("HTTP %s is a failed lookup,…
+     14|     vi.stubGlobal("fetch", vi.fn(async () => new Response("query unava…
+     15|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     16|     expect(fetch).toHaveBeenCalledTimes(1);
+     17|     expect(vi.mocked(fetch).mock.calls[0]?.[1]?.method).toBe("GET");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/42]⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > Ark polling preserves an already accepted task > HTTP 404 is a failed lookup, not a provider task failure
+AssertionError: promise resolved "{ status: 'failed', …(1) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "error": "Seedance 查询失败：HTTP 404 query unavailable",
++   "status": "failed",
+  }
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:15:47
+     13|   it.each([401, 403, 404, 429, 500, 503])("HTTP %s is a failed lookup,…
+     14|     vi.stubGlobal("fetch", vi.fn(async () => new Response("query unava…
+     15|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     16|     expect(fetch).toHaveBeenCalledTimes(1);
+     17|     expect(vi.mocked(fetch).mock.calls[0]?.[1]?.method).toBe("GET");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/42]⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > Ark polling preserves an already accepted task > HTTP 429 is a failed lookup, not a provider task failure
+AssertionError: promise resolved "{ status: 'failed', …(1) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "error": "Seedance 查询失败：HTTP 429 query unavailable",
++   "status": "failed",
+  }
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:15:47
+     13|   it.each([401, 403, 404, 429, 500, 503])("HTTP %s is a failed lookup,…
+     14|     vi.stubGlobal("fetch", vi.fn(async () => new Response("query unava…
+     15|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     16|     expect(fetch).toHaveBeenCalledTimes(1);
+     17|     expect(vi.mocked(fetch).mock.calls[0]?.[1]?.method).toBe("GET");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/42]⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > Ark polling preserves an already accepted task > HTTP 500 is a failed lookup, not a provider task failure
+AssertionError: promise resolved "{ status: 'failed', …(1) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "error": "Seedance 查询失败：HTTP 500 query unavailable",
++   "status": "failed",
+  }
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:15:47
+     13|   it.each([401, 403, 404, 429, 500, 503])("HTTP %s is a failed lookup,…
+     14|     vi.stubGlobal("fetch", vi.fn(async () => new Response("query unava…
+     15|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     16|     expect(fetch).toHaveBeenCalledTimes(1);
+     17|     expect(vi.mocked(fetch).mock.calls[0]?.[1]?.method).toBe("GET");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/42]⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > Ark polling preserves an already accepted task > HTTP 503 is a failed lookup, not a provider task failure
+AssertionError: promise resolved "{ status: 'failed', …(1) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "error": "Seedance 查询失败：HTTP 503 query unavailable",
++   "status": "failed",
+  }
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:15:47
+     13|   it.each([401, 403, 404, 429, 500, 503])("HTTP %s is a failed lookup,…
+     14|     vi.stubGlobal("fetch", vi.fn(async () => new Response("query unava…
+     15|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     16|     expect(fetch).toHaveBeenCalledTimes(1);
+     17|     expect(vi.mocked(fetch).mock.calls[0]?.[1]?.method).toBe("GET");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/42]⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > Ark polling preserves an already accepted task > unverified lookup body not-json cannot become a terminal result
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > Ark polling preserves an already accepted task > unverified lookup body null cannot become a terminal result
+AssertionError: expected TypeError: Cannot read properties of null… to match object { name: 'ProviderError', …(2) }
+
+- Expected
++ Received
+
+- {
+-   "acceptance": "unknown",
+-   "fallbackAllowed": false,
+-   "name": "ProviderError",
++ TypeError {
++   "message": "Cannot read properties of null (reading 'status')",
+  }
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:22:47
+     20|   it.each(["not-json", "null", "[]", "{}", '{"status":"unexpected-new-…
+     21|     vi.stubGlobal("fetch", vi.fn(async () => new Response(text, { stat…
+     22|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     23|   });
+     24|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/42]⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > Ark polling preserves an already accepted task > unverified lookup body [] cannot become a terminal result
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > Ark polling preserves an already accepted task > unverified lookup body {} cannot become a terminal result
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > Ark polling preserves an already accepted task > unverified lookup body {"status":"unexpected-new-state"} cannot become a terminal result
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > Higgsfield polling preserves an already accepted task > unverified lookup body [] cannot become a terminal result
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > Higgsfield polling preserves an already accepted task > unverified lookup body {} cannot become a terminal result
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > Higgsfield polling preserves an already accepted task > unverified lookup body {"status":"unexpected-new-state"} cannot become a terminal result
+AssertionError: promise resolved "{ status: 'submitted' }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "status": "submitted",
+  }
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:22:47
+     20|   it.each(["not-json", "null", "[]", "{}", '{"status":"unexpected-new-…
+     21|     vi.stubGlobal("fetch", vi.fn(async () => new Response(text, { stat…
+     22|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     23|   });
+     24|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/42]⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > Ark polling preserves an already accepted task > treats task IDs as one opaque URL component
+AssertionError: expected 'https://ark.cn-beijing.volces.com/api…' to contain 'task%2Fpart%3Fkey%3Dvalue%23fragment'
+
+Expected: "task%2Fpart%3Fkey%3Dvalue%23fragment"
+Received: "https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks/task/part?key=value#fragment"
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:30:21
+     28|     await make().poll("task/part?key=value#fragment");
+     29|     expect(seen).toHaveLength(1);
+     30|     expect(seen[0]).toContain("task%2Fpart%3Fkey%3Dvalue%23fragment");
+       |                     ^
+     31|     expect(new URL(seen[0]!).search).toBe("");
+     32|     expect(new URL(seen[0]!).hash).toBe("");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/42]⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > Higgsfield polling preserves an already accepted task > HTTP 401 is a failed lookup, not a provider task failure
+AssertionError: promise resolved "{ status: 'failed', …(1) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "error": "Higgsfield 查询失败：HTTP 401 query unavailable",
++   "status": "failed",
+  }
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:15:47
+     13|   it.each([401, 403, 404, 429, 500, 503])("HTTP %s is a failed lookup,…
+     14|     vi.stubGlobal("fetch", vi.fn(async () => new Response("query unava…
+     15|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     16|     expect(fetch).toHaveBeenCalledTimes(1);
+     17|     expect(vi.mocked(fetch).mock.calls[0]?.[1]?.method).toBe("GET");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/42]⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > Higgsfield polling preserves an already accepted task > HTTP 403 is a failed lookup, not a provider task failure
+AssertionError: promise resolved "{ status: 'failed', …(1) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "error": "Higgsfield 查询失败：HTTP 403 query unavailable",
++   "status": "failed",
+  }
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:15:47
+     13|   it.each([401, 403, 404, 429, 500, 503])("HTTP %s is a failed lookup,…
+     14|     vi.stubGlobal("fetch", vi.fn(async () => new Response("query unava…
+     15|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     16|     expect(fetch).toHaveBeenCalledTimes(1);
+     17|     expect(vi.mocked(fetch).mock.calls[0]?.[1]?.method).toBe("GET");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/42]⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > Higgsfield polling preserves an already accepted task > HTTP 404 is a failed lookup, not a provider task failure
+AssertionError: promise resolved "{ status: 'failed', …(1) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "error": "Higgsfield 查询失败：HTTP 404 query unavailable",
++   "status": "failed",
+  }
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:15:47
+     13|   it.each([401, 403, 404, 429, 500, 503])("HTTP %s is a failed lookup,…
+     14|     vi.stubGlobal("fetch", vi.fn(async () => new Response("query unava…
+     15|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     16|     expect(fetch).toHaveBeenCalledTimes(1);
+     17|     expect(vi.mocked(fetch).mock.calls[0]?.[1]?.method).toBe("GET");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/42]⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > Higgsfield polling preserves an already accepted task > HTTP 429 is a failed lookup, not a provider task failure
+AssertionError: promise resolved "{ status: 'failed', …(1) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "error": "Higgsfield 查询失败：HTTP 429 query unavailable",
++   "status": "failed",
+  }
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:15:47
+     13|   it.each([401, 403, 404, 429, 500, 503])("HTTP %s is a failed lookup,…
+     14|     vi.stubGlobal("fetch", vi.fn(async () => new Response("query unava…
+     15|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     16|     expect(fetch).toHaveBeenCalledTimes(1);
+     17|     expect(vi.mocked(fetch).mock.calls[0]?.[1]?.method).toBe("GET");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/42]⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > Higgsfield polling preserves an already accepted task > HTTP 500 is a failed lookup, not a provider task failure
+AssertionError: promise resolved "{ status: 'failed', …(1) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "error": "Higgsfield 查询失败：HTTP 500 query unavailable",
++   "status": "failed",
+  }
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:15:47
+     13|   it.each([401, 403, 404, 429, 500, 503])("HTTP %s is a failed lookup,…
+     14|     vi.stubGlobal("fetch", vi.fn(async () => new Response("query unava…
+     15|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     16|     expect(fetch).toHaveBeenCalledTimes(1);
+     17|     expect(vi.mocked(fetch).mock.calls[0]?.[1]?.method).toBe("GET");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/42]⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > Higgsfield polling preserves an already accepted task > HTTP 503 is a failed lookup, not a provider task failure
+AssertionError: promise resolved "{ status: 'failed', …(1) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "error": "Higgsfield 查询失败：HTTP 503 query unavailable",
++   "status": "failed",
+  }
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:15:47
+     13|   it.each([401, 403, 404, 429, 500, 503])("HTTP %s is a failed lookup,…
+     14|     vi.stubGlobal("fetch", vi.fn(async () => new Response("query unava…
+     15|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     16|     expect(fetch).toHaveBeenCalledTimes(1);
+     17|     expect(vi.mocked(fetch).mock.calls[0]?.[1]?.method).toBe("GET");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/42]⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > Higgsfield polling preserves an already accepted task > unverified lookup body not-json cannot become a terminal result
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > Higgsfield polling preserves an already accepted task > unverified lookup body null cannot become a terminal result
+AssertionError: expected TypeError: Cannot read properties of null… to match object { name: 'ProviderError', …(2) }
+
+- Expected
++ Received
+
+- {
+-   "acceptance": "unknown",
+-   "fallbackAllowed": false,
+-   "name": "ProviderError",
++ TypeError {
++   "message": "Cannot read properties of null (reading 'video')",
+  }
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:22:47
+     20|   it.each(["not-json", "null", "[]", "{}", '{"status":"unexpected-new-…
+     21|     vi.stubGlobal("fetch", vi.fn(async () => new Response(text, { stat…
+     22|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     23|   });
+     24|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/42]⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > Higgsfield polling preserves an already accepted task > treats task IDs as one opaque URL component
+AssertionError: expected 'https://api.higgsfield.ai/requests/ta…' to contain 'task%2Fpart%3Fkey%3Dvalue%23fragment'
+
+Expected: "task%2Fpart%3Fkey%3Dvalue%23fragment"
+Received: "https://api.higgsfield.ai/requests/task/part?key=value#fragment/status"
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:30:21
+     28|     await make().poll("task/part?key=value#fragment");
+     29|     expect(seen).toHaveLength(1);
+     30|     expect(seen[0]).toContain("task%2Fpart%3Fkey%3Dvalue%23fragment");
+       |                     ^
+     31|     expect(new URL(seen[0]!).search).toBe("");
+     32|     expect(new URL(seen[0]!).hash).toBe("");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/42]⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > MuAPI polling preserves an already accepted task > HTTP 401 is a failed lookup, not a provider task failure
+AssertionError: promise resolved "{ status: 'failed', …(1) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "error": "MuAPI 查询失败：HTTP 401",
++   "status": "failed",
+  }
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:15:47
+     13|   it.each([401, 403, 404, 429, 500, 503])("HTTP %s is a failed lookup,…
+     14|     vi.stubGlobal("fetch", vi.fn(async () => new Response("query unava…
+     15|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     16|     expect(fetch).toHaveBeenCalledTimes(1);
+     17|     expect(vi.mocked(fetch).mock.calls[0]?.[1]?.method).toBe("GET");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/42]⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > MuAPI polling preserves an already accepted task > HTTP 403 is a failed lookup, not a provider task failure
+AssertionError: promise resolved "{ status: 'failed', …(1) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "error": "MuAPI 查询失败：HTTP 403",
++   "status": "failed",
+  }
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:15:47
+     13|   it.each([401, 403, 404, 429, 500, 503])("HTTP %s is a failed lookup,…
+     14|     vi.stubGlobal("fetch", vi.fn(async () => new Response("query unava…
+     15|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     16|     expect(fetch).toHaveBeenCalledTimes(1);
+     17|     expect(vi.mocked(fetch).mock.calls[0]?.[1]?.method).toBe("GET");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/42]⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > MuAPI polling preserves an already accepted task > HTTP 404 is a failed lookup, not a provider task failure
+AssertionError: promise resolved "{ status: 'failed', …(1) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "error": "MuAPI 查询失败：HTTP 404",
++   "status": "failed",
+  }
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:15:47
+     13|   it.each([401, 403, 404, 429, 500, 503])("HTTP %s is a failed lookup,…
+     14|     vi.stubGlobal("fetch", vi.fn(async () => new Response("query unava…
+     15|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     16|     expect(fetch).toHaveBeenCalledTimes(1);
+     17|     expect(vi.mocked(fetch).mock.calls[0]?.[1]?.method).toBe("GET");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/42]⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > MuAPI polling preserves an already accepted task > HTTP 429 is a failed lookup, not a provider task failure
+AssertionError: promise resolved "{ status: 'failed', …(1) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "error": "MuAPI 查询失败：HTTP 429",
++   "status": "failed",
+  }
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:15:47
+     13|   it.each([401, 403, 404, 429, 500, 503])("HTTP %s is a failed lookup,…
+     14|     vi.stubGlobal("fetch", vi.fn(async () => new Response("query unava…
+     15|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     16|     expect(fetch).toHaveBeenCalledTimes(1);
+     17|     expect(vi.mocked(fetch).mock.calls[0]?.[1]?.method).toBe("GET");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/42]⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > MuAPI polling preserves an already accepted task > HTTP 500 is a failed lookup, not a provider task failure
+AssertionError: promise resolved "{ status: 'failed', …(1) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "error": "MuAPI 查询失败：HTTP 500",
++   "status": "failed",
+  }
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:15:47
+     13|   it.each([401, 403, 404, 429, 500, 503])("HTTP %s is a failed lookup,…
+     14|     vi.stubGlobal("fetch", vi.fn(async () => new Response("query unava…
+     15|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     16|     expect(fetch).toHaveBeenCalledTimes(1);
+     17|     expect(vi.mocked(fetch).mock.calls[0]?.[1]?.method).toBe("GET");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/42]⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > MuAPI polling preserves an already accepted task > HTTP 503 is a failed lookup, not a provider task failure
+AssertionError: promise resolved "{ status: 'failed', …(1) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "error": "MuAPI 查询失败：HTTP 503",
++   "status": "failed",
+  }
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:15:47
+     13|   it.each([401, 403, 404, 429, 500, 503])("HTTP %s is a failed lookup,…
+     14|     vi.stubGlobal("fetch", vi.fn(async () => new Response("query unava…
+     15|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     16|     expect(fetch).toHaveBeenCalledTimes(1);
+     17|     expect(vi.mocked(fetch).mock.calls[0]?.[1]?.method).toBe("GET");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/42]⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > MuAPI polling preserves an already accepted task > unverified lookup body not-json cannot become a terminal result
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > MuAPI polling preserves an already accepted task > unverified lookup body null cannot become a terminal result
+AssertionError: expected TypeError: Cannot read properties of null… to match object { name: 'ProviderError', …(2) }
+
+- Expected
++ Received
+
+- {
+-   "acceptance": "unknown",
+-   "fallbackAllowed": false,
+-   "name": "ProviderError",
++ TypeError {
++   "message": "Cannot read properties of null (reading 'url')",
+  }
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:22:47
+     20|   it.each(["not-json", "null", "[]", "{}", '{"status":"unexpected-new-…
+     21|     vi.stubGlobal("fetch", vi.fn(async () => new Response(text, { stat…
+     22|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     23|   });
+     24|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/42]⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > MuAPI polling preserves an already accepted task > unverified lookup body [] cannot become a terminal result
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > MuAPI polling preserves an already accepted task > unverified lookup body {} cannot become a terminal result
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > MuAPI polling preserves an already accepted task > unverified lookup body {"status":"unexpected-new-state"} cannot become a terminal result
+AssertionError: promise resolved "{ status: 'running' }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "status": "running",
+  }
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:22:47
+     20|   it.each(["not-json", "null", "[]", "{}", '{"status":"unexpected-new-…
+     21|     vi.stubGlobal("fetch", vi.fn(async () => new Response(text, { stat…
+     22|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     23|   });
+     24|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/42]⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > MuAPI polling preserves an already accepted task > treats task IDs as one opaque URL component
+AssertionError: expected 'https://api.muapi.ai/api/v1/predictio…' to contain 'task%2Fpart%3Fkey%3Dvalue%23fragment'
+
+Expected: "task%2Fpart%3Fkey%3Dvalue%23fragment"
+Received: "https://api.muapi.ai/api/v1/predictions/task/part?key=value#fragment/result"
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:30:21
+     28|     await make().poll("task/part?key=value#fragment");
+     29|     expect(seen).toHaveLength(1);
+     30|     expect(seen[0]).toContain("task%2Fpart%3Fkey%3Dvalue%23fragment");
+       |                     ^
+     31|     expect(new URL(seen[0]!).search).toBe("");
+     32|     expect(new URL(seen[0]!).hash).toBe("");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[26/42]⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > documented provider terminal states and complete media results > Ark expired is a real provider terminal failure
+AssertionError: expected { status: 'submitted' } to match object { status: 'failed' }
+
+- Expected
++ Received
+
+  {
+-   "status": "failed",
++   "status": "submitted",
+  }
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:44:47
+     42|   ] as const)("%s is a real provider terminal failure", async (_label,…
+     43|     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringi…
+     44|     await expect(make().poll("accepted-task")).resolves.toMatchObject(…
+       |                                               ^
+     45|   });
+     46|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[27/42]⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > documented provider terminal states and complete media results > MuAPI cancelled is a real provider terminal failure
+AssertionError: expected { status: 'running' } to match object { status: 'failed' }
+
+- Expected
++ Received
+
+  {
+-   "status": "failed",
++   "status": "running",
+  }
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:44:47
+     42|   ] as const)("%s is a real provider terminal failure", async (_label,…
+     43|     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringi…
+     44|     await expect(make().poll("accepted-task")).resolves.toMatchObject(…
+       |                                               ^
+     45|   });
+     46|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[28/42]⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > documented provider terminal states and complete media results > Ark success without a media URI remains unverified
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > documented provider terminal states and complete media results > Higgsfield success without a media URI remains unverified
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > documented provider terminal states and complete media results > MuAPI success without a media URI remains unverified
+AssertionError: promise resolved "{ status: 'succeeded', uri: undefined }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "status": "succeeded",
++   "uri": undefined,
+  }
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:53:47
+     51|   ] as const)("%s success without a media URI remains unverified", asy…
+     52|     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringi…
+     53|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     54|   });
+     55|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[29/42]⎯
+
+ FAIL  apps/server/src/video/gen/provider-polling.test.ts > documented provider terminal states and complete media results > Ark keeps the provider-reported video duration without inferring seconds from token usage
+AssertionError: expected { status: 'succeeded', …(1) } to deeply equal { status: 'succeeded', …(2) }
+
+- Expected
++ Received
+
+  {
+-   "actualUnits": 7,
+    "status": "succeeded",
+    "uri": "https://cdn.example.test/real.mp4",
+  }
+
+ ❯ apps/server/src/video/gen/provider-polling.test.ts:59:86
+     57|     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringi…
+     58|       usage: { completion_tokens: 109586 }, content: { video_url: "htt…
+     59|     await expect(new ArkVideoProvider({ apiKey: "test-only" }).poll("a…
+       |                                                                                      ^
+     60|   });
+     61| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[30/42]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  42 failed | 2 passed (44)
+   Start at  09:17:13
+   Duration  281ms (transform 96ms, setup 0ms, import 149ms, tests 24ms, environment 0ms)
+

@@ -1,0 +1,36 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2
+
+ ❯ packages/video-studio/src/routed-generation.test.ts (8 tests | 1 failed) 218ms
+     × attributes real concurrent vendor calls to each run after a later run starts and an earlier one exits 6ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/video-studio/src/routed-generation.test.ts > video adapter canonical dispatch > attributes real concurrent vendor calls to each run after a later run starts and an earlier one exits
+AssertionError: expected [ +0, 1 ] to deeply equal [ 1, 1 ]
+
+- Expected
++ Received
+
+  [
+-   1,
++   0,
+    1,
+  ]
+
+ ❯ packages/video-studio/src/routed-generation.test.ts:163:54
+    161|     startB();
+    162|     const resultB = await runB;
+    163|     expect([a.stats.totalCalls, b.stats.totalCalls]).toEqual([1, 1]);
+       |                                                      ^
+    164|     expect([resultA.success, resultB.success]).toEqual([true, true]);
+    165|     expect(bodies.map((body) => body.thinking)).toEqual([{ type: "enab…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 7 passed (8)
+   Start at  10:26:02
+   Duration  466ms (transform 93ms, setup 0ms, import 178ms, tests 218ms, environment 0ms)
+

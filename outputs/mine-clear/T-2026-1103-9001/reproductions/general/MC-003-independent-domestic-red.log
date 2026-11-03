@@ -1,0 +1,262 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2
+
+ ❯ apps/server/src/video/gen/domestic-provider-polling.test.ts (15 tests | 15 failed) 21ms
+     × HTTP 403 cannot declare the accepted generation failed 14ms
+     × HTTP 503 cannot declare the accepted generation failed 1ms
+     × invalid task body null cannot invent a terminal or progress state 1ms
+     × invalid task body {} cannot invent a terminal or progress state 0ms
+     × invalid task body not-json cannot invent a terminal or progress state 0ms
+     × HTTP 403 cannot declare the accepted generation failed 0ms
+     × HTTP 503 cannot declare the accepted generation failed 0ms
+     × invalid task body null cannot invent a terminal or progress state 0ms
+     × invalid task body {} cannot invent a terminal or progress state 0ms
+     × invalid task body not-json cannot invent a terminal or progress state 0ms
+     × HTTP 403 cannot declare the accepted generation failed 0ms
+     × HTTP 503 cannot declare the accepted generation failed 0ms
+     × invalid task body null cannot invent a terminal or progress state 0ms
+     × invalid task body {} cannot invent a terminal or progress state 0ms
+     × invalid task body not-json cannot invent a terminal or progress state 0ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 15 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/server/src/video/gen/domestic-provider-polling.test.ts > legacy Seedance preserves an accepted task after an unverified lookup > HTTP 403 cannot declare the accepted generation failed
+AssertionError: promise resolved "{ status: 'failed', …(1) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "error": "Seedance 查询失败：HTTP 403",
++   "status": "failed",
+  }
+
+ ❯ apps/server/src/video/gen/domestic-provider-polling.test.ts:20:47
+     18|   it.each([403, 503])("HTTP %s cannot declare the accepted generation …
+     19|     vi.stubGlobal("fetch", vi.fn(async () => new Response("lookup unav…
+     20|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     21|     expect(fetch).toHaveBeenCalledTimes(1);
+     22|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/15]⎯
+
+ FAIL  apps/server/src/video/gen/domestic-provider-polling.test.ts > legacy Seedance preserves an accepted task after an unverified lookup > HTTP 503 cannot declare the accepted generation failed
+AssertionError: promise resolved "{ status: 'failed', …(1) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "error": "Seedance 查询失败：HTTP 503",
++   "status": "failed",
+  }
+
+ ❯ apps/server/src/video/gen/domestic-provider-polling.test.ts:20:47
+     18|   it.each([403, 503])("HTTP %s cannot declare the accepted generation …
+     19|     vi.stubGlobal("fetch", vi.fn(async () => new Response("lookup unav…
+     20|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     21|     expect(fetch).toHaveBeenCalledTimes(1);
+     22|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/15]⎯
+
+ FAIL  apps/server/src/video/gen/domestic-provider-polling.test.ts > legacy Seedance preserves an accepted task after an unverified lookup > invalid task body null cannot invent a terminal or progress state
+AssertionError: expected TypeError: Cannot read properties of null… to match object { acceptance: 'unknown', …(1) }
+
+- Expected
++ Received
+
+- {
+-   "acceptance": "unknown",
+-   "fallbackAllowed": false,
++ TypeError {
++   "message": "Cannot read properties of null (reading 'status')",
+  }
+
+ ❯ apps/server/src/video/gen/domestic-provider-polling.test.ts:26:47
+     24|   it.each(["null", "{}", "not-json"])("invalid task body %s cannot inv…
+     25|     vi.stubGlobal("fetch", vi.fn(async () => new Response(body)));
+     26|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     27|     expect(fetch).toHaveBeenCalledTimes(1);
+     28|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/15]⎯
+
+ FAIL  apps/server/src/video/gen/domestic-provider-polling.test.ts > legacy Seedance preserves an accepted task after an unverified lookup > invalid task body {} cannot invent a terminal or progress state
+ FAIL  apps/server/src/video/gen/domestic-provider-polling.test.ts > configured Kling preserves an accepted task after an unverified lookup > invalid task body {} cannot invent a terminal or progress state
+ FAIL  apps/server/src/video/gen/domestic-provider-polling.test.ts > configured Jimeng preserves an accepted task after an unverified lookup > invalid task body {} cannot invent a terminal or progress state
+AssertionError: promise resolved "{ status: 'running' }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "status": "running",
+  }
+
+ ❯ apps/server/src/video/gen/domestic-provider-polling.test.ts:26:47
+     24|   it.each(["null", "{}", "not-json"])("invalid task body %s cannot inv…
+     25|     vi.stubGlobal("fetch", vi.fn(async () => new Response(body)));
+     26|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     27|     expect(fetch).toHaveBeenCalledTimes(1);
+     28|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/15]⎯
+
+ FAIL  apps/server/src/video/gen/domestic-provider-polling.test.ts > legacy Seedance preserves an accepted task after an unverified lookup > invalid task body not-json cannot invent a terminal or progress state
+ FAIL  apps/server/src/video/gen/domestic-provider-polling.test.ts > configured Kling preserves an accepted task after an unverified lookup > invalid task body not-json cannot invent a terminal or progress state
+ FAIL  apps/server/src/video/gen/domestic-provider-polling.test.ts > configured Jimeng preserves an accepted task after an unverified lookup > invalid task body not-json cannot invent a terminal or progress state
+AssertionError: expected SyntaxError: Unexpected token 'o', "not-j… to match object { acceptance: 'unknown', …(1) }
+
+- Expected
++ Received
+
+- {
+-   "acceptance": "unknown",
+-   "fallbackAllowed": false,
++ SyntaxError {
++   "message": "Unexpected token 'o', \"not-json\" is not valid JSON",
+  }
+
+ ❯ apps/server/src/video/gen/domestic-provider-polling.test.ts:26:47
+     24|   it.each(["null", "{}", "not-json"])("invalid task body %s cannot inv…
+     25|     vi.stubGlobal("fetch", vi.fn(async () => new Response(body)));
+     26|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     27|     expect(fetch).toHaveBeenCalledTimes(1);
+     28|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/15]⎯
+
+ FAIL  apps/server/src/video/gen/domestic-provider-polling.test.ts > configured Kling preserves an accepted task after an unverified lookup > HTTP 403 cannot declare the accepted generation failed
+AssertionError: promise resolved "{ status: 'failed', …(1) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "error": "Kling 查询失败：HTTP 403",
++   "status": "failed",
+  }
+
+ ❯ apps/server/src/video/gen/domestic-provider-polling.test.ts:20:47
+     18|   it.each([403, 503])("HTTP %s cannot declare the accepted generation …
+     19|     vi.stubGlobal("fetch", vi.fn(async () => new Response("lookup unav…
+     20|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     21|     expect(fetch).toHaveBeenCalledTimes(1);
+     22|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/15]⎯
+
+ FAIL  apps/server/src/video/gen/domestic-provider-polling.test.ts > configured Kling preserves an accepted task after an unverified lookup > HTTP 503 cannot declare the accepted generation failed
+AssertionError: promise resolved "{ status: 'failed', …(1) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "error": "Kling 查询失败：HTTP 503",
++   "status": "failed",
+  }
+
+ ❯ apps/server/src/video/gen/domestic-provider-polling.test.ts:20:47
+     18|   it.each([403, 503])("HTTP %s cannot declare the accepted generation …
+     19|     vi.stubGlobal("fetch", vi.fn(async () => new Response("lookup unav…
+     20|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     21|     expect(fetch).toHaveBeenCalledTimes(1);
+     22|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/15]⎯
+
+ FAIL  apps/server/src/video/gen/domestic-provider-polling.test.ts > configured Kling preserves an accepted task after an unverified lookup > invalid task body null cannot invent a terminal or progress state
+ FAIL  apps/server/src/video/gen/domestic-provider-polling.test.ts > configured Jimeng preserves an accepted task after an unverified lookup > invalid task body null cannot invent a terminal or progress state
+AssertionError: expected TypeError: Cannot read properties of null… to match object { acceptance: 'unknown', …(1) }
+
+- Expected
++ Received
+
+- {
+-   "acceptance": "unknown",
+-   "fallbackAllowed": false,
++ TypeError {
++   "message": "Cannot read properties of null (reading 'data')",
+  }
+
+ ❯ apps/server/src/video/gen/domestic-provider-polling.test.ts:26:47
+     24|   it.each(["null", "{}", "not-json"])("invalid task body %s cannot inv…
+     25|     vi.stubGlobal("fetch", vi.fn(async () => new Response(body)));
+     26|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     27|     expect(fetch).toHaveBeenCalledTimes(1);
+     28|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/15]⎯
+
+ FAIL  apps/server/src/video/gen/domestic-provider-polling.test.ts > configured Jimeng preserves an accepted task after an unverified lookup > HTTP 403 cannot declare the accepted generation failed
+AssertionError: promise resolved "{ status: 'failed', …(1) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "error": "Jimeng 查询失败：HTTP 403",
++   "status": "failed",
+  }
+
+ ❯ apps/server/src/video/gen/domestic-provider-polling.test.ts:20:47
+     18|   it.each([403, 503])("HTTP %s cannot declare the accepted generation …
+     19|     vi.stubGlobal("fetch", vi.fn(async () => new Response("lookup unav…
+     20|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     21|     expect(fetch).toHaveBeenCalledTimes(1);
+     22|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/15]⎯
+
+ FAIL  apps/server/src/video/gen/domestic-provider-polling.test.ts > configured Jimeng preserves an accepted task after an unverified lookup > HTTP 503 cannot declare the accepted generation failed
+AssertionError: promise resolved "{ status: 'failed', …(1) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "error": "Jimeng 查询失败：HTTP 503",
++   "status": "failed",
+  }
+
+ ❯ apps/server/src/video/gen/domestic-provider-polling.test.ts:20:47
+     18|   it.each([403, 503])("HTTP %s cannot declare the accepted generation …
+     19|     vi.stubGlobal("fetch", vi.fn(async () => new Response("lookup unav…
+     20|     await expect(make().poll("accepted-task")).rejects.toMatchObject({…
+       |                                               ^
+     21|     expect(fetch).toHaveBeenCalledTimes(1);
+     22|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/15]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  15 failed (15)
+   Start at  09:44:42
+   Duration  334ms (transform 131ms, setup 0ms, import 224ms, tests 21ms, environment 0ms)
+

@@ -1,0 +1,62 @@
+{
+  "id": "MC-017",
+  "title": "Dossier hero image download follows public URLs into private network targets",
+  "severity": "P0",
+  "baseline": "c028118de87f80b4ff0726c758b1ca0d964b9a63",
+  "root_causes": [
+    {
+      "file": "apps/server/src/video/media/products.ts",
+      "lines": "169-179",
+      "detail": "Only literal HTTP prefix tested; native fetch follows redirects without DNS or address checks; full response buffered before cap"
+    },
+    {
+      "file": "apps/server/src/video/media/products.ts",
+      "lines": "276-281",
+      "detail": "Manifest image URL reaches this downloader during product projection"
+    }
+  ],
+  "assertion": "apps/server/src/video/media/products-source-safety.test.ts",
+  "fix_commit": "5b2f24977186d111ca3837bd56d07781b3c5c881",
+  "fixed_by": "/root/marketing_audit",
+  "evidence_level": "A+B",
+  "runs": [
+    {
+      "log": "hero-source-red.log",
+      "exit_code": 1,
+      "failed": 2,
+      "sha256": "881ce96f8d0818ed2fc3683b5b1b29b4f1498420447ea693b0aac55aa488385e"
+    },
+    {
+      "log": "hero-source-green.log",
+      "exit_code": 0,
+      "passed": 79,
+      "files": 2,
+      "sha256": "3a5dddc9431d00b2bc740c8c18e0fefd6c290ffcb336ffb715d3405a3921581f"
+    },
+    {
+      "log": "hero-source-server-typecheck.log",
+      "exit_code": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "hero-source-media-pg.log",
+      "exit_code": 0,
+      "passed": 20,
+      "files": 1,
+      "sha256": "fc859491899d7890ab4919438417c6bf6029450a9d9285c673b1f7bd8280d32e"
+    },
+    {
+      "log": "marketing-round2-green.log",
+      "exit_code": 0,
+      "passed": 171,
+      "files": 9,
+      "sha256": "03a38f46fe20de5c8f0a69ff152951d2bcd6304ee8869e7a502efcd82c4a1e09"
+    },
+    {
+      "log": "hero-source-secret-scan.log",
+      "exit_code": 0,
+      "sha256": "87edd42b37a505b3ed9fc9a17a031a842c3721f76ab4fe043e486875326b5d02"
+    }
+  ],
+  "limitations": "Public hostname/socket mappings are explicit test transports to isolated real local HTTP; actual redirect/timeout/stream and socket behavior executed. No access to real private services. Existing source address rules retained; no product image selection contract change."
+}

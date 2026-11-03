@@ -1,0 +1,29 @@
+✔ only accepted task IDs count, once across retries, resume and cached observations (7.660833ms)
+✔ cached-only acceptance remains recorded and contradictory shot assignment is exposed (0.551ms)
+✔ post-stage failures are counted without turning skipped, cached or unknown statuses into retries (0.27375ms)
+✔ malformed histories and invalid task IDs fail closed (0.272708ms)
+✔ explicit resume uses GET only and validates provider metadata (14.357542ms)
+✔ acceptance is persisted before first poll and automatic continuation sends no POST (1.99725ms)
+✔ read-only continuation preserves the first accepted journal bytes and timestamp (1.451625ms)
+✔ a denied beforeSubmit gate causes zero I/O and creates no unknown-outcome journal (0.69675ms)
+✔ an accepted task resumes without a new-submit gate; its local input binding remains verifiable (1.082375ms)
+✔ explicit provider recovery retrieves bytes without claiming that its new prompt was submitted (0.920209ms)
+✔ four failed GETs preserve the task and recovery cannot pay twice (1.064291ms)
+✔ unknown POST outcome blocks subsequent submissions until provider ID is supplied (0.778709ms)
+✔ two concurrent processes cannot submit the same shot twice (1.339959ms)
+✔ resume rejects each mismatched or missing provider specification without POST (2.957125ms)
+✔ failed, cancelled, expired and malformed success cannot be approved (4.067708ms)
+✔ poll HTTP permissions fail closed while transient HTTP can recover (0.832333ms)
+✔ pending timeout keeps accepted task for later recovery (0.813792ms)
+✔ changed request and conflicting task map cannot reuse or create a task (0.732708ms)
+✔ unwritable journal fails before paid POST (0.552792ms)
+✔ mapping validates empty, duplicate, unknown, traversal and malformed input (1.073625ms)
+✔ Codex production status does not count cached or resumed verification as paid submission (7.793166ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 101.322541

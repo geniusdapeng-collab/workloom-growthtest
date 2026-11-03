@@ -1,0 +1,60 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2
+
+stdout | apps/server/src/video/studio-worker.test.ts > 预生产原始结果与诚实终态 > 并发预生产只归档当前运行日志，结束顺序不影响另一个工作区
+[studio-worker] run 日志开始落盘：/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/studio-result-UuqBZD/logs/VID-log-a-1.log
+
+stdout | apps/server/src/video/studio-worker.test.ts > 预生产原始结果与诚实终态 > 并发预生产只归档当前运行日志，结束顺序不影响另一个工作区
+run-a-private-before
+
+stdout | apps/server/src/video/studio-worker.test.ts > 预生产原始结果与诚实终态 > 并发预生产只归档当前运行日志，结束顺序不影响另一个工作区
+[studio-worker] run 日志开始落盘：/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/studio-result-UuqBZD/logs/VID-log-b-2.log
+
+stdout | apps/server/src/video/studio-worker.test.ts > 预生产原始结果与诚实终态 > 并发预生产只归档当前运行日志，结束顺序不影响另一个工作区
+run-b-private-before
+
+stdout | apps/server/src/video/studio-worker.test.ts > 预生产原始结果与诚实终态 > 并发预生产只归档当前运行日志，结束顺序不影响另一个工作区
+unscoped-server-log
+
+stderr | apps/server/src/video/studio-worker.test.ts > 预生产原始结果与诚实终态 > 并发预生产只归档当前运行日志，结束顺序不影响另一个工作区
+run-a-private-after
+
+stderr | apps/server/src/video/studio-worker.test.ts > 预生产原始结果与诚实终态 > 并发预生产只归档当前运行日志，结束顺序不影响另一个工作区
+run-b-private-after
+
+ ❯ apps/server/src/video/studio-worker.test.ts (157 tests | 1 failed | 156 skipped) 189ms
+     × 并发预生产只归档当前运行日志，结束顺序不影响另一个工作区 120ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/server/src/video/studio-worker.test.ts > 预生产原始结果与诚实终态 > 并发预生产只归档当前运行日志，结束顺序不影响另一个工作区
+AssertionError: expected '[2026-11-03T02:15:28.488Z] LOG [studi…' not to match /run-b-private|unscoped-server-log/
+
+- Expected:
+/run-b-private|unscoped-server-log/
+
++ Received:
+"[2026-11-03T02:15:28.488Z] LOG [studio-worker] run 日志开始落盘：/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/studio-result-UuqBZD/logs/VID-log-a-1.log
+[2026-11-03T02:15:28.492Z] LOG run-a-private-before
+[2026-11-03T02:15:28.493Z] LOG [studio-worker] run 日志开始落盘：/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/studio-result-UuqBZD/logs/VID-log-b-2.log
+[2026-11-03T02:15:28.495Z] LOG run-b-private-before
+[2026-11-03T02:15:28.495Z] LOG unscoped-server-log
+[2026-11-03T02:15:28.495Z] WARN run-a-private-after
+"
+
+ ❯ apps/server/src/video/studio-worker.test.ts:270:22
+    268|     expect(logA).toContain("run-a-private-before");
+    269|     expect(logA).toContain("run-a-private-after");
+    270|     expect(logA).not.toMatch(/run-b-private|unscoped-server-log/);
+       |                      ^
+    271|     expect(logB).toContain("run-b-private-before");
+    272|     expect(logB).toContain("run-b-private-after");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 156 skipped (157)
+   Start at  10:15:27
+   Duration  895ms (transform 539ms, setup 0ms, import 637ms, tests 189ms, environment 0ms)
+

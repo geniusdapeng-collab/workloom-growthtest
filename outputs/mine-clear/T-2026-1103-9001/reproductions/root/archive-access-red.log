@@ -1,0 +1,124 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2
+
+ ❯ packages/video-studio/src/archive/store.test.ts (18 tests | 6 failed) 35ms
+     × 拒绝目录组件 ".."，不能逃出工作区 5ms
+     × 拒绝目录组件 "."，不能逃出工作区 1ms
+     × 拒绝目录组件 "../ws-victim"，不能逃出工作区 1ms
+     × 拒绝目录组件 "VID/other"，不能逃出工作区 1ms
+     × 拒绝目录组件 "VID\\other"，不能逃出工作区 1ms
+     × 拒绝目录组件 ""，不能逃出工作区 1ms
+ ❯ apps/server/src/video/archive-access.test.ts (3 tests | 2 failed) 12ms
+     × 路径逃逸不能读到另一个工作区的档案 8ms
+     × 项目不可见时不读取任何磁盘档案 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/server/src/video/archive-access.test.ts > 制片档案读取先核验项目权限 > 路径逃逸不能读到另一个工作区的档案
+AssertionError: promise resolved "{ …(10) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "archiveExists": true,
++   "archiveRoot": "/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/archive-access-f8S4R6/archive/ws-victim/VID-secret",
++   "breakpoints": [],
++   "contextBundle": {
++     "privateCustomerIntent": "victim-only",
++   },
++   "findings": [],
++   "manifest": {
++     "createdAt": "2026-11-03T01:16:21.550Z",
++     "ledger": {},
++     "pipelineKind": "narrative",
++     "pipelineKindHistory": [
++       {
++         "at": "2026-11-03T01:16:21.550Z",
++         "kind": "narrative",
++       },
++     ],
++     "projectId": "VID-secret",
++     "schemaVersion": "production-archive/v1",
++     "updatedAt": "2026-11-03T01:16:21.550Z",
++     "workspaceId": "ws-victim",
++   },
++   "pendingApprovalId": null,
++   "projectId": "../ws-victim/VID-secret",
++   "recentEvents": [],
++   "stages": [],
+  }
+
+ ❯ apps/server/src/video/archive-access.test.ts:32:71
+     30|     await victim.ensure();
+     31|     await victim.writeJsonAtomic("context-bundle.json", { privateCusto…
+     32|     await expect(readArchiveSummary(scope, "../ws-victim/VID-secret"))…
+       |                                                                       ^
+     33|   });
+     34|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  apps/server/src/video/archive-access.test.ts > 制片档案读取先核验项目权限 > 项目不可见时不读取任何磁盘档案
+AssertionError: promise resolved "{ projectId: 'VID-not-visible', …(9) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "archiveExists": false,
++   "archiveRoot": "/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/archive-access-EmL7pw/archive/ws-reader/VID-not-visible",
++   "breakpoints": [],
++   "contextBundle": null,
++   "findings": [],
++   "manifest": null,
++   "pendingApprovalId": null,
++   "projectId": "VID-not-visible",
++   "recentEvents": [],
++   "stages": [],
+  }
+
+ ❯ apps/server/src/video/archive-access.test.ts:37:63
+     35|   it("项目不可见时不读取任何磁盘档案", async () => {
+     36|     const read = vi.spyOn(ArchiveStore.prototype, "readManifest");
+     37|     await expect(readArchiveSummary(scope, "VID-not-visible")).rejects…
+       |                                                               ^
+     38|     expect(read).not.toHaveBeenCalled();
+     39|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  packages/video-studio/src/archive/store.test.ts > ArchiveStore > 拒绝目录组件 ".."，不能逃出工作区
+ FAIL  packages/video-studio/src/archive/store.test.ts > ArchiveStore > 拒绝目录组件 "."，不能逃出工作区
+ FAIL  packages/video-studio/src/archive/store.test.ts > ArchiveStore > 拒绝目录组件 "../ws-victim"，不能逃出工作区
+ FAIL  packages/video-studio/src/archive/store.test.ts > ArchiveStore > 拒绝目录组件 "VID/other"，不能逃出工作区
+ FAIL  packages/video-studio/src/archive/store.test.ts > ArchiveStore > 拒绝目录组件 "VID\\other"，不能逃出工作区
+ FAIL  packages/video-studio/src/archive/store.test.ts > ArchiveStore > 拒绝目录组件 ""，不能逃出工作区
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ packages/video-studio/src/archive/store.test.ts:25:60
+     23| describe("ArchiveStore", () => {
+     24|   it.each(["..", ".", "../ws-victim", "VID/other", "VID\\other", ""])(…
+     25|     expect(() => new ArchiveStore(workDir, "ws-test", id)).toThrow("AR…
+       |                                                            ^
+     26|     expect(() => new ArchiveStore(workDir, id, "VID-safe")).toThrow("A…
+     27|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  8 failed | 13 passed (21)
+   Start at  09:16:20
+   Duration  708ms (transform 479ms, setup 0ms, import 649ms, tests 46ms, environment 0ms)
+

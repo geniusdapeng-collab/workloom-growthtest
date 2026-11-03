@@ -1,0 +1,39 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-017-0-1793673315149",
+  "command": "RUN_DB_TESTS=1 node node_modules/vitest/vitest.mjs run apps/server/src/video/media/products-source-safety.test.ts apps/server/src/video/media/media.pg.test.ts --maxWorkers=2",
+  "exec": {
+    "file": "node",
+    "args": [
+      "node_modules/vitest/vitest.mjs",
+      "run",
+      "apps/server/src/video/media/products-source-safety.test.ts",
+      "apps/server/src/video/media/media.pg.test.ts",
+      "--maxWorkers=2"
+    ]
+  },
+  "actor": "/root/marketing_audit",
+  "role": "repair",
+  "subject": {
+    "card_id": "MC-017",
+    "assertion_index": 0
+  },
+  "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-03T02:35:15.149Z",
+  "finished_at": "2026-11-03T02:35:19.135Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-017-0-1793673315149.txt",
+      "sha256": "93a1109cccff2840b75b3d05180b30a8b50bf14740fe93459249c64092fc47aa",
+      "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+    }
+  ]
+}

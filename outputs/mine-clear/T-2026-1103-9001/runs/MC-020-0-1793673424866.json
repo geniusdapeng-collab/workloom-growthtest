@@ -1,0 +1,39 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-020-0-1793673424866",
+  "command": "node node_modules/vitest/vitest.mjs run packages/video-studio/src/routed-generation.test.ts apps/server/src/video/studio-worker.test.ts --maxWorkers=2",
+  "exec": {
+    "file": "node",
+    "args": [
+      "node_modules/vitest/vitest.mjs",
+      "run",
+      "packages/video-studio/src/routed-generation.test.ts",
+      "apps/server/src/video/studio-worker.test.ts",
+      "--maxWorkers=2"
+    ]
+  },
+  "actor": "/root",
+  "role": "repair",
+  "subject": {
+    "card_id": "MC-020",
+    "assertion_index": 0
+  },
+  "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-03T02:37:04.866Z",
+  "finished_at": "2026-11-03T02:37:06.444Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-020-0-1793673424866.txt",
+      "sha256": "78a83c6cdd8e301bd51b75232ee76677a12df61e23eba6f698378d886babbc7f",
+      "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+    }
+  ]
+}

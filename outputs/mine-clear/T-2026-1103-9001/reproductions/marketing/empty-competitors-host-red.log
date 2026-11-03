@@ -1,0 +1,39 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2/apps/server
+
+ ❯ src/video/marketing-authority.test.ts (24 tests | 1 failed | 23 skipped) 196ms
+     × 没有竞品证据时不把己方卖点补集当成竞争差异事实交给创作 191ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/video/marketing-authority.test.ts > 营销事实宿主完整执行 > 没有竞品证据时不把己方卖点补集当成竞争差异事实交给创作
+AssertionError: expected { our_opening: [ '风量 9 档' ], …(2) } to deeply equal { our_opening: [], …(2) }
+
+- Expected
++ Received
+
+  {
+    "crowded_points": [],
+-   "our_opening": [],
++   "our_opening": [
++     "风量 9 档",
++   ],
+    "weakness_openings": [],
+  }
+
+ ❯ src/video/marketing-authority.test.ts:121:53
+    119|     expect(prepared.raw.A3.competitors).toEqual([]);
+    120|     expect(prepared.bundle.restrictions).toContain("没有可核实竞品证据：禁止对比、竞品弱…
+    121|     expect(prepared.bundle.dossier.differentiation).toEqual({ our_open…
+       |                                                     ^
+    122|     expect((prepared.bundle.cards.theme_card as { differentiation_spac…
+    123|     expect((prepared.bundle.cards.insight_card as { market_position: {…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 23 skipped (24)
+   Start at  09:29:44
+   Duration  945ms (transform 507ms, setup 0ms, import 674ms, tests 196ms, environment 0ms)
+

@@ -1,0 +1,63 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2
+
+ ❯ packages/video-studio/src/vendor-runtime-agent-config-independent.test.ts (2 tests | 2 failed) 395ms
+     × constructs the checker with the updated model when health monitor is set after=false 230ms
+     × constructs the checker with the updated model when health monitor is set after=true 164ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/video-studio/src/vendor-runtime-agent-config-independent.test.ts > independent Phase3.5 runtime model propagation > constructs the checker with the updated model when health monitor is set after=false
+AssertionError: expected [ { llmModel: 'old-model', …(1) } ] to deeply equal [ { llmModel: 'current-model', …(1) } ]
+
+- Expected
++ Received
+
+  [
+    {
+      "deadline": 1793671888777,
+-     "llmModel": "current-model",
++     "llmModel": "old-model",
+    },
+  ]
+
+ ❯ packages/video-studio/src/vendor-runtime-agent-config-independent.test.ts:51:31
+     49|   it.each([false, true])("constructs the checker with the updated mode…
+     50|     const observation = observePhase35(healthAfterUpdate);
+     51|     expect(observation.calls).toEqual([{ llmModel: "current-model", de…
+       |                               ^
+     52|   });
+     53| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  packages/video-studio/src/vendor-runtime-agent-config-independent.test.ts > independent Phase3.5 runtime model propagation > constructs the checker with the updated model when health monitor is set after=true
+AssertionError: expected [ { llmModel: 'old-model', …(1) } ] to deeply equal [ { llmModel: 'current-model', …(1) } ]
+
+- Expected
++ Received
+
+  [
+    {
+      "deadline": 1793671888945,
+-     "llmModel": "current-model",
++     "llmModel": "old-model",
+    },
+  ]
+
+ ❯ packages/video-studio/src/vendor-runtime-agent-config-independent.test.ts:51:31
+     49|   it.each([false, true])("constructs the checker with the updated mode…
+     50|     const observation = observePhase35(healthAfterUpdate);
+     51|     expect(observation.calls).toEqual([{ llmModel: "current-model", de…
+       |                               ^
+     52|   });
+     53| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+   Start at  10:03:08
+   Duration  488ms (transform 18ms, setup 0ms, import 24ms, tests 395ms, environment 0ms)
+

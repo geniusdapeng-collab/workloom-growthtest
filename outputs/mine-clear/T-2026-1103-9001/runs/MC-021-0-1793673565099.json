@@ -1,0 +1,41 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-021-0-1793673565099",
+  "command": "node node_modules/vitest/vitest.mjs run packages/video-studio/src/vendor-portrait-binding-concurrency.test.ts packages/video-studio/src/vendor-compat.test.ts packages/video-studio/src/portrait-binding.test.ts apps/server/src/video/studio-worker.test.ts --maxWorkers=2",
+  "exec": {
+    "file": "node",
+    "args": [
+      "node_modules/vitest/vitest.mjs",
+      "run",
+      "packages/video-studio/src/vendor-portrait-binding-concurrency.test.ts",
+      "packages/video-studio/src/vendor-compat.test.ts",
+      "packages/video-studio/src/portrait-binding.test.ts",
+      "apps/server/src/video/studio-worker.test.ts",
+      "--maxWorkers=2"
+    ]
+  },
+  "actor": "/root/submission_audit",
+  "role": "acceptance",
+  "subject": {
+    "card_id": "MC-021",
+    "assertion_index": 0
+  },
+  "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-03T02:39:25.099Z",
+  "finished_at": "2026-11-03T02:39:31.482Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-021-0-1793673565099.txt",
+      "sha256": "39665c8febebdbd48a9b788098022f7e69722f94b3694f9968da31e9ba03d359",
+      "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+    }
+  ]
+}

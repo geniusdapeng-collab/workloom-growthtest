@@ -1,0 +1,33 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2
+
+ ❯ apps/server/src/video/marketing-source-attribution-independent.test.ts (2 tests | 1 failed) 6ms
+     × does not transfer a source-A angle claim onto a source-B image through the shared final-URL alias 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/server/src/video/marketing-source-attribution-independent.test.ts > snapshot-specific image attribution with a shared final URL > does not transfer a source-A angle claim onto a source-B image through the shared final-URL alias
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ apps/server/src/video/marketing-source-attribution-independent.test.ts:25:83
+     23|   });
+     24|   it("does not transfer a source-A angle claim onto a source-B image t…
+     25|     expect(() => validateStageFacts("A1", extraction(rightImage), [lef…
+       |                                                                                   ^
+     26|   });
+     27| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  10:09:23
+   Duration  183ms (transform 57ms, setup 0ms, import 106ms, tests 6ms, environment 0ms)
+

@@ -1,0 +1,38 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-010-0-1793673815197",
+  "command": "RUN_DB_TESTS=1 node node_modules/vitest/vitest.mjs run apps/server/src/video/pipeline-control-concurrency.pg.test.ts --maxWorkers=2",
+  "exec": {
+    "file": "node",
+    "args": [
+      "node_modules/vitest/vitest.mjs",
+      "run",
+      "apps/server/src/video/pipeline-control-concurrency.pg.test.ts",
+      "--maxWorkers=2"
+    ]
+  },
+  "actor": "/root/marketing_audit",
+  "role": "acceptance",
+  "subject": {
+    "card_id": "MC-010",
+    "assertion_index": 0
+  },
+  "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-03T02:43:35.198Z",
+  "finished_at": "2026-11-03T02:43:36.235Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-010-0-1793673815197.txt",
+      "sha256": "9f12dd7bba36ef2e0fca996db482d52b09dd1363f5b37ca17e01a7f6a2766016",
+      "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+    }
+  ]
+}

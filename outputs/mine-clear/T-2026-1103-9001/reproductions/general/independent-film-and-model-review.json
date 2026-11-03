@@ -1,0 +1,136 @@
+{
+  "task": "T-2026-1103-9001",
+  "actor": "general-audit",
+  "role": "independent-review",
+  "cards": {
+    "MC-016": {
+      "repairCommits": [
+        "f1e9dd33523bfb6558f153a5ba1c56f02e2a10f6",
+        "0a692c86dc70bae769aa4bc14c94446e0be361ba"
+      ],
+      "readScope": [
+        {
+          "path": "apps/server/src/video/film-worker.ts",
+          "lines": 1438,
+          "sha256": "2dc111c29796808f0b42bf1071130de8c79784193f706a4f180bc3db26e2beda",
+          "level": "A",
+          "read": "full",
+          "scope": "independent-film-ledger"
+        },
+        {
+          "path": "apps/server/src/video/film-ledger.ts",
+          "lines": 596,
+          "sha256": "a2a7cb3dec8b2614acc77c0b6da9c7c94975b4cfa5206c1714f47778102ae916",
+          "level": "A",
+          "read": "full",
+          "scope": "independent-film-ledger"
+        },
+        {
+          "path": "apps/server/src/video/film-provider-receipt.pg.test.ts",
+          "lines": 185,
+          "sha256": "b8f740f6cf12b0043b1a90a8018892f161a897459880143c564eea08833fc80c",
+          "level": "A",
+          "read": "full",
+          "scope": "independent-film-ledger"
+        },
+        {
+          "path": "packages/db/migrations/0046_registered_film_workers.sql",
+          "lines": 264,
+          "sha256": "ba9d4fbcec17d033f60eafce92b847dc7154a4fd14a159ad64b50bb32024e065",
+          "level": "A",
+          "read": "full",
+          "scope": "independent-film-ledger"
+        },
+        {
+          "path": "packages/db/migrations/0060_film_provider_receipts.sql",
+          "lines": 20,
+          "sha256": "a3cf98f7a537176a76553fe00d04b130b54f33409efc6ea25590fd90c2e320cc",
+          "level": "A",
+          "read": "full",
+          "scope": "independent-film-ledger"
+        }
+      ],
+      "red": {
+        "tests": 1,
+        "failed": 1,
+        "scenario": "Acknowledge accepted provider task only after cancellation committed unknown, then throw on its first acceptance UPDATE; PG unknown kept only deadline evidence.",
+        "log": {
+          "path": "MC-016-late-write-independent-red.log",
+          "sha256": "5a1df0f480db6dc50f648c2d26230ffbbc6525323db5af2a31a35066ab2ef3a7"
+        }
+      },
+      "green": {
+        "suites": 4,
+        "passed": 144,
+        "skipped": 0,
+        "failed": 0,
+        "includesFilmReceiptCases": 8,
+        "log": {
+          "path": "MC-016-late-write-independent-final.log",
+          "sha256": "eb52f99f5400044d661d5eee8a3cd323b54a2553a65d153d28bd1e9fbb7552c8"
+        }
+      },
+      "result": "Independent PostgreSQL app role and actual parent handler. Same task/request bound to same owner; unknown never reopens, one provider submit and zero poll after cancellation/write fault.",
+      "limit": "Provider POST and poll stubs; proves DB and parent handler behavior, not live vendor media/cost. Both DB writes failing still require manual provider reconciliation."
+    },
+    "MC-020": {
+      "repairCommits": [
+        "41d19a1e89ec166d76103c1b4b7a079955fc37e3"
+      ],
+      "readScope": [
+        {
+          "path": "packages/video-studio/src/llm-adapter.ts",
+          "lines": 505,
+          "sha256": "235a42381a78e61b3f5cc4d4999713e9fa86bff77471162475268ac75e0a2663",
+          "level": "A",
+          "read": "full",
+          "scope": "independent-vendor-model-routing"
+        },
+        {
+          "path": "packages/video-studio/src/routed-generation.test.ts",
+          "lines": 197,
+          "sha256": "cfd9331153ba1801d108b91f2394dfa6d85cb811929ae2a0cf7fa0a4ecd61fc0",
+          "level": "A",
+          "read": "full",
+          "scope": "independent-vendor-model-routing"
+        },
+        {
+          "path": "vendor/supermickey/systems/llm-reasoning-engine.js",
+          "lines": 529,
+          "sha256": "a1fd1cb59c8991dfdaee406113f51859c145f6689be1a13499ac4be97c0231e0",
+          "level": "A",
+          "read": "full",
+          "scope": "independent-vendor-model-routing"
+        }
+      ],
+      "hostIntegration": {
+        "path": "apps/server/src/video/studio-worker.ts",
+        "read": "targeted actual run assembly + model router scope",
+        "anchors": [
+          "WorkloomLLMEngine.fromEnv",
+          "GatewayEventSink(getGatewayPool(), scope",
+          "withVendorEngineBridge(llm"
+        ]
+      },
+      "green": {
+        "suites": 1,
+        "passed": 9,
+        "failed": 0,
+        "skipped": 0,
+        "log": {
+          "path": "MC-020-independent-green.log",
+          "sha256": "1f401f109e8e055bf463ee079f2ad714b6c3e47eeb0f86f9866cf35c10d26b61"
+        }
+      },
+      "traceProbe": {
+        "exitCode": 0,
+        "result": "alpha 2 own endpoint+trace / beta 2 own endpoint+trace / cli 1 default endpoint+trace; rejected late call sent zero HTTP",
+        "log": {
+          "path": "MC-020-independent-transport-and-trace.log",
+          "sha256": "0cbbf250a6f8ddff8e6bd0c78c819b82eef35d4792791ea4e3c6dd75bcc91544"
+        }
+      },
+      "limit": "Real loopback HTTP and real model router with independent in-memory EventSink fixtures; no paid provider or actual production accounting."
+    }
+  }
+}

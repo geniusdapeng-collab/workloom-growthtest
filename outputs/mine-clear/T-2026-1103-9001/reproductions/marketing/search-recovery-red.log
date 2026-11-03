@@ -1,0 +1,179 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2/apps/server
+
+ ❯ src/video/data-mining-search-recovery.test.ts (9 tests | 8 failed) 128ms
+     × 'api' '500'重试不复用失败空缓存，重建实例=false 7ms
+     × 'api' 'network'重试不复用失败空缓存，重建实例=false 1ms
+     × 'api' 'bad-json'重试不复用失败空缓存，重建实例=true 1ms
+     × 'api' 'error-envelope'重试不复用失败空缓存，重建实例=true 1ms
+     × 'bing' '500'重试不复用失败空缓存，重建实例=false 1ms
+     × 'bing' '500'重试不复用失败空缓存，重建实例=true 1ms
+     × 'so360' '500'重试不复用失败空缓存，重建实例=true 1ms
+     × 真实HTTP超时不会写入12小时空缓存，服务恢复后同查询确实再次出站 112ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/video/data-mining-search-recovery.test.ts > 营销检索短暂失败后的真实恢复 > 'api' '500'重试不复用失败空缓存，重建实例=false
+AssertionError: expected { Object (at, hits) } to be undefined
+
+- Expected:
+undefined
+
++ Received:
+{
+  "at": "2026-11-03T01:33:41.321Z",
+  "hits": [],
+}
+
+ ❯ src/video/data-mining-search-recovery.test.ts:51:76
+     49|     const search = createWebSearch(options);
+     50|     expect(await search(query, 2)).toEqual([]);
+     51|     expect(loadSearchCache(file).entries[searchCacheKey(provider, quer…
+       |                                                                            ^
+     52|     expect(await (restart ? createWebSearch(options) : search)(query, …
+     53|     expect(calls).toBe(2);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  src/video/data-mining-search-recovery.test.ts > 营销检索短暂失败后的真实恢复 > 'api' 'network'重试不复用失败空缓存，重建实例=false
+AssertionError: expected { Object (at, hits) } to be undefined
+
+- Expected:
+undefined
+
++ Received:
+{
+  "at": "2026-11-03T01:33:41.326Z",
+  "hits": [],
+}
+
+ ❯ src/video/data-mining-search-recovery.test.ts:51:76
+     49|     const search = createWebSearch(options);
+     50|     expect(await search(query, 2)).toEqual([]);
+     51|     expect(loadSearchCache(file).entries[searchCacheKey(provider, quer…
+       |                                                                            ^
+     52|     expect(await (restart ? createWebSearch(options) : search)(query, …
+     53|     expect(calls).toBe(2);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  src/video/data-mining-search-recovery.test.ts > 营销检索短暂失败后的真实恢复 > 'api' 'bad-json'重试不复用失败空缓存，重建实例=true
+AssertionError: expected { Object (at, hits) } to be undefined
+
+- Expected:
+undefined
+
++ Received:
+{
+  "at": "2026-11-03T01:33:41.327Z",
+  "hits": [],
+}
+
+ ❯ src/video/data-mining-search-recovery.test.ts:51:76
+     49|     const search = createWebSearch(options);
+     50|     expect(await search(query, 2)).toEqual([]);
+     51|     expect(loadSearchCache(file).entries[searchCacheKey(provider, quer…
+       |                                                                            ^
+     52|     expect(await (restart ? createWebSearch(options) : search)(query, …
+     53|     expect(calls).toBe(2);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  src/video/data-mining-search-recovery.test.ts > 营销检索短暂失败后的真实恢复 > 'api' 'error-envelope'重试不复用失败空缓存，重建实例=true
+AssertionError: expected { Object (at, hits) } to be undefined
+
+- Expected:
+undefined
+
++ Received:
+{
+  "at": "2026-11-03T01:33:41.328Z",
+  "hits": [],
+}
+
+ ❯ src/video/data-mining-search-recovery.test.ts:51:76
+     49|     const search = createWebSearch(options);
+     50|     expect(await search(query, 2)).toEqual([]);
+     51|     expect(loadSearchCache(file).entries[searchCacheKey(provider, quer…
+       |                                                                            ^
+     52|     expect(await (restart ? createWebSearch(options) : search)(query, …
+     53|     expect(calls).toBe(2);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  src/video/data-mining-search-recovery.test.ts > 营销检索短暂失败后的真实恢复 > 'bing' '500'重试不复用失败空缓存，重建实例=false
+AssertionError: expected { Object (at, hits) } to be undefined
+
+- Expected:
+undefined
+
++ Received:
+{
+  "at": "2026-11-03T01:33:41.329Z",
+  "hits": [],
+}
+
+ ❯ src/video/data-mining-search-recovery.test.ts:51:76
+     49|     const search = createWebSearch(options);
+     50|     expect(await search(query, 2)).toEqual([]);
+     51|     expect(loadSearchCache(file).entries[searchCacheKey(provider, quer…
+       |                                                                            ^
+     52|     expect(await (restart ? createWebSearch(options) : search)(query, …
+     53|     expect(calls).toBe(2);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+ FAIL  src/video/data-mining-search-recovery.test.ts > 营销检索短暂失败后的真实恢复 > 'bing' '500'重试不复用失败空缓存，重建实例=true
+ FAIL  src/video/data-mining-search-recovery.test.ts > 营销检索短暂失败后的真实恢复 > 'so360' '500'重试不复用失败空缓存，重建实例=true
+AssertionError: expected { Object (at, hits) } to be undefined
+
+- Expected:
+undefined
+
++ Received:
+{
+  "at": "2026-11-03T01:33:41.330Z",
+  "hits": [],
+}
+
+ ❯ src/video/data-mining-search-recovery.test.ts:51:76
+     49|     const search = createWebSearch(options);
+     50|     expect(await search(query, 2)).toEqual([]);
+     51|     expect(loadSearchCache(file).entries[searchCacheKey(provider, quer…
+       |                                                                            ^
+     52|     expect(await (restart ? createWebSearch(options) : search)(query, …
+     53|     expect(calls).toBe(2);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯
+
+ FAIL  src/video/data-mining-search-recovery.test.ts > 营销检索短暂失败后的真实恢复 > 真实HTTP超时不会写入12小时空缓存，服务恢复后同查询确实再次出站
+AssertionError: expected [] to deeply equal [ { title: '星野 F3 公开规格', …(2) } ]
+
+- Expected
++ Received
+
+- [
+-   {
+-     "snippet": "星野 F3 风量 9 档",
+-     "title": "星野 F3 公开规格",
+-     "url": "https://source.example.com/f3",
+-   },
+- ]
++ []
+
+ ❯ src/video/data-mining-search-recovery.test.ts:72:38
+     70|       expect(await search(query, 2)).toEqual([]);
+     71|       expect(calls).toBe(1);
+     72|       expect(await search(query, 2)).toEqual([expectedHit]);
+       |                                      ^
+     73|       expect(calls).toBe(2);
+     74|     } finally {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/8]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  8 failed | 1 passed (9)
+   Start at  09:33:41
+   Duration  247ms (transform 33ms, setup 0ms, import 51ms, tests 128ms, environment 0ms)
+

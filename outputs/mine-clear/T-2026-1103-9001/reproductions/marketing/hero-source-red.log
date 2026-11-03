@@ -1,0 +1,53 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2/apps/server
+
+ ❯ src/video/media/products-source-safety.test.ts (2 tests | 2 failed) 25ms
+     × 公开图片入口跳向本机时不请求私网目标，也不把私网字节存成商品图 17ms
+     × manifest中的直接本机URL在出站前拒绝 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/video/media/products-source-safety.test.ts > 商品档案主图下载不能穿透来源网络边界 > 公开图片入口跳向本机时不请求私网目标，也不把私网字节存成商品图
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ src/video/media/products-source-safety.test.ts:40:25
+     38|     const file = await target();
+     39|     const downloaded = await fetchDossierHeroImage(publicUrl, file);
+     40|     expect(privateHits).toBe(0);
+       |                         ^
+     41|     expect(downloaded).toBe(false);
+     42|     await expect(readFile(file)).rejects.toMatchObject({ code: "ENOENT…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/video/media/products-source-safety.test.ts > 商品档案主图下载不能穿透来源网络边界 > manifest中的直接本机URL在出站前拒绝
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ src/video/media/products-source-safety.test.ts:48:25
+     46|     const file = await target();
+     47|     const downloaded = await fetchDossierHeroImage(`${origin}/private`…
+     48|     expect(privateHits).toBe(0);
+       |                         ^
+     49|     expect(downloaded).toBe(false);
+     50|     await expect(readFile(file)).rejects.toMatchObject({ code: "ENOENT…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+   Start at  09:51:31
+   Duration  231ms (transform 80ms, setup 0ms, import 134ms, tests 25ms, environment 0ms)
+

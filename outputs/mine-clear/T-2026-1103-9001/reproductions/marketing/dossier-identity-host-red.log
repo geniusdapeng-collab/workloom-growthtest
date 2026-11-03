@@ -1,0 +1,41 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2/apps/server
+
+ ❯ src/video/marketing-authority.test.ts (23 tests | 1 failed | 22 skipped) 178ms
+     × 未进入已审A1主张的品牌、类别、型号仍只是检索线索，不能兜底成档案身份 174ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/video/marketing-authority.test.ts > 营销事实宿主完整执行 > 未进入已审A1主张的品牌、类别、型号仍只是检索线索，不能兜底成档案身份
+AssertionError: expected { Object (name, brand, ...) } to match object { name: '星野 F3', brand: '', …(2) }
+(5 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "brand": "",
+-   "category": "",
+-   "model": "",
++   "brand": "仅供检索品牌",
++   "category": "仅供检索服务",
++   "model": "仅供检索型号",
+    "name": "星野 F3",
+  }
+
+ ❯ src/video/marketing-authority.test.ts:112:46
+    110|     expect(prepared.raw.A1.identity).not.toHaveProperty("category");
+    111|     expect(prepared.raw.A1.identity).not.toHaveProperty("model");
+    112|     expect(prepared.bundle.dossier.identity).toMatchObject({ name: "星野…
+       |                                              ^
+    113|     expect(prepared.bundle.cards.brief_card).toMatchObject({ product: …
+    114|     const persisted = JSON.parse(await readFile(path.join(prepared.sto…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 22 skipped (23)
+   Start at  09:26:44
+   Duration  872ms (transform 467ms, setup 0ms, import 625ms, tests 178ms, environment 0ms)
+

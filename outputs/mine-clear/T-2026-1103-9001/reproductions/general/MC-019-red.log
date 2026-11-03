@@ -1,0 +1,84 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2
+
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+   ⚠️ PRD 生成失败: APPROVAL_STORE_UNAVAILABLE,使用兜底模式
+
+❌ [Layer 1 失败] PROBE_SCRIPT_BOUNDARY_REACHED
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+   ⚠️ PRD 生成失败: PRD_MODEL_UNAVAILABLE,使用兜底模式
+
+❌ [Layer 1 失败] PROBE_SCRIPT_BOUNDARY_REACHED
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+
+❌ [Layer 1 失败] PROBE_SCRIPT_BOUNDARY_REACHED
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+   ⚠️ PRD 生成失败: PRD_MODEL_UNAVAILABLE,使用兜底模式
+
+❌ [Layer 1 失败] PROBE_SCRIPT_BOUNDARY_REACHED
+   ⚠️ PRD 生成失败: APPROVAL_STORE_UNAVAILABLE,使用兜底模式
+
+❌ [Layer 1 失败] PROBE_SCRIPT_BOUNDARY_REACHED
+ ❯ packages/video-studio/src/vendor-prd-approval-failure.test.ts (5 tests | 3 failed) 1350ms
+     × approval-error cannot reach the script/model boundary 381ms
+     × model-error cannot reach the script/model boundary 241ms
+     × an unscoped vendor preview retains its fallback while a host run holds shared bridges 243ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/video-studio/src/vendor-prd-approval-failure.test.ts > host PRD approval must precede downstream model work > approval-error cannot reach the script/model boundary
+ FAIL  packages/video-studio/src/vendor-prd-approval-failure.test.ts > host PRD approval must precede downstream model work > model-error cannot reach the script/model boundary
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ packages/video-studio/src/vendor-prd-approval-failure.test.ts:121:32
+    119|   it.each(["approval-error", "model-error", "rejected"] as const)("%s …
+    120|     const result = probe(scenario);
+    121|     expect(result.scriptCalls).toBe(0);
+       |                                ^
+    122|     expect(result.success).toBe(false);
+    123|     if (scenario === "model-error") expect(result.gates).not.toContain…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  packages/video-studio/src/vendor-prd-approval-failure.test.ts > host PRD approval must precede downstream model work > an unscoped vendor preview retains its fallback while a host run holds shared bridges
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ packages/video-studio/src/vendor-prd-approval-failure.test.ts:141:32
+    139|     const result = probe("parallel-preview");
+    140|     expect(result.previewScriptCalls).toBe(1);
+    141|     expect(result.scriptCalls).toBe(0);
+       |                                ^
+    142|     expect(result.prd?.approved).toBe(false);
+    143|     expect(result.restored).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 2 passed (5)
+   Start at  10:02:55
+   Duration  1.46s (transform 26ms, setup 0ms, import 32ms, tests 1.35s, environment 0ms)
+

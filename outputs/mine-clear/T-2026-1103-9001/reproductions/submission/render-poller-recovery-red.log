@@ -1,0 +1,109 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2
+
+stderr | apps/server/src/video/render-poller.pg.test.ts > render poller persisted recovery and isolation > completion with a failed cost write is reconciled once without polling the provider again
+[render-poller] 成本入账失败 job=RJ-poll-10341b7d：injected cost write failure
+
+ ❯ apps/server/src/video/render-poller.pg.test.ts (12 tests | 5 failed) 176ms
+     × a failed first download is retried from its persisted result without a second generation or completion event 14ms
+     × concurrent batches finalize one job once and cannot duplicate its completion event 91ms
+     × terminal transaction failure releases the gateway client and leaves a retryable job 3ms
+     × completion with a failed cost write is reconciled once without polling the provider again 5ms
+     × a provider that stays queued beyond the configured job age also reaches a scoped failure 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/server/src/video/render-poller.pg.test.ts > render poller persisted recovery and isolation > a failed first download is retried from its persisted result without a second generation or completion event
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ apps/server/src/video/render-poller.pg.test.ts:109:29
+    107|     const retryFetch = vi.fn(async () => new Response(png, { headers: …
+    108|     const second = await pollRenderJobs(app, gateway, scope, options(p…
+    109|     expect(second.ingested).toBe(1); expect((await job()).asset_id).to…
+       |                             ^
+    110|     expect(poll).toHaveBeenCalledTimes(1); expect(retryFetch).toHaveBe…
+    111|     expect((await actions()).filter(action => action === "render.compl…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  apps/server/src/video/render-poller.pg.test.ts > render poller persisted recovery and isolation > concurrent batches finalize one job once and cannot duplicate its completion event
+AssertionError: expected "vi.fn()" to be called 1 times, but got 2 times
+ ❯ apps/server/src/video/render-poller.pg.test.ts:123:18
+    121|     await new Promise(resolve => setTimeout(resolve, 30)); release();
+    122|     await Promise.all([first, second]);
+    123|     expect(poll).toHaveBeenCalledTimes(1);
+       |                  ^
+    124|     expect((await actions()).filter(action => action === "render.compl…
+    125|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  apps/server/src/video/render-poller.pg.test.ts > render poller persisted recovery and isolation > terminal transaction failure releases the gateway client and leaves a retryable job
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ apps/server/src/video/render-poller.pg.test.ts:135:24
+    133|     try {
+    134|       await expect(pollRenderJobs(app, faultGateway, scope, options(as…
+    135|       expect(released).toBe(true); expect((await job()).status).toBe("…
+       |                        ^
+    136|     } finally { if (!released) client.release(); }
+    137|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  apps/server/src/video/render-poller.pg.test.ts > render poller persisted recovery and isolation > completion with a failed cost write is reconciled once without polling the provider again
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ apps/server/src/video/render-poller.pg.test.ts:153:24
+    151|     await pollRenderJobs(app, gateway, scope, options(poll, { ingest: …
+    152|     const costs = await owner.query("SELECT * FROM budget_ledger WHERE…
+    153|     expect(costs.rows).toHaveLength(1); expect(poll).toHaveBeenCalledT…
+       |                        ^
+    154|     expect((await actions()).filter(action => action === "render.compl…
+    155|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  apps/server/src/video/render-poller.pg.test.ts > render poller persisted recovery and isolation > a provider that stays queued beyond the configured job age also reaches a scoped failure
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ apps/server/src/video/render-poller.pg.test.ts:160:27
+    158|     await owner.query("UPDATE render_jobs SET created_at=now()-interva…
+    159|     const report = await pollRenderJobs(app, gateway, scope, options(a…
+    160|     expect(report.failed).toBe(1); expect((await job()).status).toBe("…
+       |                           ^
+    161|     expect(await actions()).toEqual(["render.failed"]);
+    162|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 7 passed (12)
+   Start at  09:30:09
+   Duration  1.16s (transform 521ms, setup 0ms, import 895ms, tests 176ms, environment 0ms)
+

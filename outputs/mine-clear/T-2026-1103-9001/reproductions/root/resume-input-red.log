@@ -1,0 +1,161 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2
+
+ ❯ apps/server/src/video/archive-resume-input.test.ts (6 tests | 6 failed) 23ms
+     × 保留末尾需求、原始metadata和已选无片型，不让加工brief重新选型 8ms
+     × 显式续跑文案仍保留原metadata 3ms
+     × legacy输入不可安全恢复时不以默认参数启动 3ms
+     × version输入不可安全恢复时不以默认参数启动 2ms
+     × identity输入不可安全恢复时不以默认参数启动 4ms
+     × director输入不可安全恢复时不以默认参数启动 2ms
+stdout | apps/server/src/video/studio-worker.test.ts > 预生产原始结果与诚实终态 > 执行前输入快照保留原始需求与metadata供恢复，不能只保存加工正文
+[studio-worker] run 日志开始落盘：/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/studio-result-pAmB1U/logs/VID-resume-source-1.log
+
+ ❯ apps/server/src/video/studio-worker.test.ts (156 tests | 1 failed) 553ms
+     × 执行前输入快照保留原始需求与metadata供恢复，不能只保存加工正文 21ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/server/src/video/archive-resume-input.test.ts > 档案恢复使用原始完整输入而非项目标题 > 保留末尾需求、原始metadata和已选无片型，不让加工brief重新选型
+AssertionError: expected "vi.fn()" to be called with arguments: [ ObjectContaining{…} ]
+
+Received:
+
+  1st vi.fn() call:
+
+  [
+-   ObjectContaining {
+-     "intent": "拍摄山间风景。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。末尾必须保留一朵紫色花。",
++   {
++     "intent": "拍摄山间风景。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然环境。保留原始动作顺序和自然",
+      "isMarketing": false,
+-     "metadata": {
+-       "aspectRatio": "16:9",
+-       "brief": {
+-         "audience": "游客",
+-         "product": "企业负责人",
+-       },
+-       "noMusic": true,
+-     },
+-     "rawIntent": "原始用户风景需求",
+-     "selectedScenePolicy": ObjectContaining {
+-       "decision": ObjectContaining {
+-         "id": null,
+-       },
+-       "policy": null,
+-     },
++     "projectId": "VID-input",
+    },
+  ]
+
+
+Number of calls: 1
+
+ ❯ apps/server/src/video/archive-resume-input.test.ts:49:22
+     47|     const result = await resumeProject(scope, { projectId, startRun, a…
+     48|     expect(result.kind).toBe("resumed");
+     49|     expect(startRun).toHaveBeenCalledWith(expect.objectContaining({ in…
+       |                      ^
+     50|       selectedScenePolicy: expect.objectContaining({ policy: null, dec…
+     51|     }));
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+ FAIL  apps/server/src/video/archive-resume-input.test.ts > 档案恢复使用原始完整输入而非项目标题 > 显式续跑文案仍保留原metadata
+AssertionError: expected "vi.fn()" to be called with arguments: [ ObjectContaining{…} ]
+
+Received:
+
+  1st vi.fn() call:
+
+  [
+-   ObjectContaining {
++   {
+      "intent": "保留紫花，改为日落",
+-     "metadata": {
+-       "aspectRatio": "16:9",
+-       "brief": {
+-         "audience": "游客",
+-         "product": "企业负责人",
+-       },
+-       "noMusic": true,
+-     },
+-     "rawIntent": "保留紫花，改为日落",
++     "isMarketing": false,
++     "projectId": "VID-input",
+    },
+  ]
+
+
+Number of calls: 1
+
+ ❯ apps/server/src/video/archive-resume-input.test.ts:58:22
+     56|     const startRun = vi.fn().mockReturnValue("RUN-edited");
+     57|     await resumeProject(scope, { projectId, intent: "保留紫花，改为日落", start…
+     58|     expect(startRun).toHaveBeenCalledWith(expect.objectContaining({ in…
+       |                      ^
+     59|   });
+     60|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯
+
+ FAIL  apps/server/src/video/archive-resume-input.test.ts > 档案恢复使用原始完整输入而非项目标题 > legacy输入不可安全恢复时不以默认参数启动
+ FAIL  apps/server/src/video/archive-resume-input.test.ts > 档案恢复使用原始完整输入而非项目标题 > version输入不可安全恢复时不以默认参数启动
+ FAIL  apps/server/src/video/archive-resume-input.test.ts > 档案恢复使用原始完整输入而非项目标题 > identity输入不可安全恢复时不以默认参数启动
+ FAIL  apps/server/src/video/archive-resume-input.test.ts > 档案恢复使用原始完整输入而非项目标题 > director输入不可安全恢复时不以默认参数启动
+AssertionError: expected 'resumed' to be 'noaction' // Object.is equality
+
+Expected: "noaction"
+Received: "resumed"
+
+ ❯ apps/server/src/video/archive-resume-input.test.ts:69:25
+     67|     const startRun = vi.fn().mockReturnValue("RUN-unsafe");
+     68|     const result = await resumeProject(scope, { projectId, fromStage: …
+     69|     expect(result.kind).toBe("noaction");
+       |                         ^
+     70|     expect(startRun).not.toHaveBeenCalled();
+     71|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/7]⎯
+
+ FAIL  apps/server/src/video/studio-worker.test.ts > 预生产原始结果与诚实终态 > 执行前输入快照保留原始需求与metadata供恢复，不能只保存加工正文
+AssertionError: expected undefined to match object { …(9) }
+
+- Expected:
+{
+  "intent": "山间风景。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。保留紫色花与自然光。",
+  "isMarketing": false,
+  "metadata": {
+    "aspectRatio": "16:9",
+    "brief": {
+      "audience": "游客",
+    },
+    "noMusic": true,
+  },
+  "projectId": "VID-resume-source-1",
+  "rawIntent": "用户原话",
+  "requiresDelegation": false,
+  "schemaVersion": "workloom.studio-resume-input/v1",
+  "tenantId": "tenant-test",
+  "workspaceId": "ws-test",
+}
+
++ Received:
+undefined
+
+ ❯ apps/server/src/video/studio-worker.test.ts:242:37
+    240|     const file = path.join(doubles.workDir, "archive", scope.workspace…
+    241|     const saved = JSON.parse(await readFile(file, "utf8"));
+    242|     expect(saved.input.resumeInput).toMatchObject({ schemaVersion: "wo…
+       |                                     ^
+    243|       intent, rawIntent: "用户原话", metadata, isMarketing: false, require…
+    244|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/7]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  7 failed | 155 passed (162)
+   Start at  09:54:38
+   Duration  1.32s (transform 1.09s, setup 0ms, import 1.38s, tests 576ms, environment 0ms)
+

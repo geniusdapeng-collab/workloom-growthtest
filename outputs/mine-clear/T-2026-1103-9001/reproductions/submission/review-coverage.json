@@ -1,0 +1,501 @@
+{
+  "task": "T-2026-1103-9001",
+  "actor": "/root/submission_audit",
+  "baseline": "c028118de87f80b4ff0726c758b1ca0d964b9a63",
+  "scope": "actual generation submission, provider/poller/ingest/result/cancel/recovery boundaries; root owns archive/control durable; expanded direct dependencies tracked as read",
+  "files": [
+    {
+      "path": "apps/server/src/video/director-worker.ts",
+      "lines": 267,
+      "level": "A",
+      "complete": true,
+      "category": "core",
+      "sha256": "76724e3337c0bd8e5950c9e3789f3d795c962bbbb2604b56ea0d4b43c7dbb6b8"
+    },
+    {
+      "path": "apps/server/src/video/film-worker.ts",
+      "lines": 1438,
+      "level": "A",
+      "complete": true,
+      "category": "core",
+      "sha256": "2dc111c29796808f0b42bf1071130de8c79784193f706a4f180bc3db26e2beda"
+    },
+    {
+      "path": "apps/server/src/video/gen/catalog.ts",
+      "lines": 193,
+      "level": "A",
+      "complete": true,
+      "category": "core",
+      "sha256": "08cb1723c15d58eaad81bb594936f604c043a58dcbfc1a00ae9056eefa47368d"
+    },
+    {
+      "path": "apps/server/src/video/gen/compiled-request.test.ts",
+      "lines": 63,
+      "level": "A",
+      "complete": true,
+      "category": "core",
+      "sha256": "1eaa4d456329f593bb9c95bdb475a33e67ea7c1910d6f94a7835d1e5ad1f4ca0"
+    },
+    {
+      "path": "apps/server/src/video/gen/compiled-request.ts",
+      "lines": 154,
+      "level": "A",
+      "complete": true,
+      "category": "core",
+      "sha256": "8eef97897d6da113c56f2543098c0f27f0fbda171443869db29095ff965f181a"
+    },
+    {
+      "path": "apps/server/src/video/gen/cost.ts",
+      "lines": 149,
+      "level": "A",
+      "complete": true,
+      "category": "core",
+      "sha256": "917f72908053925e579d939f34b51d693ab24d6c3280fe98083ef97846f5f930"
+    },
+    {
+      "path": "apps/server/src/video/gen/db.ts",
+      "lines": 33,
+      "level": "A",
+      "complete": true,
+      "category": "core",
+      "sha256": "44ff4a9c803a4899e8f9239cc9ffc0c345e17811e91cbbe6a9ec1e61e7243e9c"
+    },
+    {
+      "path": "apps/server/src/video/gen/gen.test.ts",
+      "lines": 465,
+      "level": "A",
+      "complete": true,
+      "category": "core",
+      "sha256": "93ee7b8d2d526fb75b5a69e4dbb54b5da396d9c018e7d7ba291bd605e54ac7bb"
+    },
+    {
+      "path": "apps/server/src/video/gen/ingest.ts",
+      "lines": 274,
+      "level": "A",
+      "complete": true,
+      "category": "core",
+      "sha256": "1e6445bae0eee9bef061ba64007ef41ed60511c50bd09685ab226c70c7cadf91"
+    },
+    {
+      "path": "apps/server/src/video/gen/params.ts",
+      "lines": 27,
+      "level": "A",
+      "complete": true,
+      "category": "core",
+      "sha256": "1750ff6c40d90a40e130dfd05109524259043044e5397312462366156915edbf"
+    },
+    {
+      "path": "apps/server/src/video/gen/providers.ts",
+      "lines": 337,
+      "level": "A",
+      "complete": true,
+      "category": "core",
+      "sha256": "1910893a24a52e9071c172225a602edad1106179160fdaee82dbdaa29b41e590"
+    },
+    {
+      "path": "apps/server/src/video/gen/publish.ts",
+      "lines": 210,
+      "level": "A",
+      "complete": true,
+      "category": "core",
+      "sha256": "6099efd4a3024afba80c46ffef93bcc2585745a979522b050216608ad156c5ff"
+    },
+    {
+      "path": "apps/server/src/video/gen/submission-ledger.pg.test.ts",
+      "lines": 214,
+      "level": "A",
+      "complete": true,
+      "category": "core",
+      "sha256": "965fc9e996e9e96fa69931d0250920cafdb7669a83ad8cd2b8f663da9edb84a0"
+    },
+    {
+      "path": "apps/server/src/video/gen/submission-ledger.ts",
+      "lines": 231,
+      "level": "A",
+      "complete": true,
+      "category": "core",
+      "sha256": "c4ec9d7df53b103e3e1eb4d5684726fbd26db472e307ae844d908d96e7b14738"
+    },
+    {
+      "path": "apps/server/src/video/gen/submit.test.ts",
+      "lines": 261,
+      "level": "A",
+      "complete": true,
+      "category": "core",
+      "sha256": "fcc8eab976c86c8cb0e53be2bdb0cb36096ece9dcac342b994fe75aba10badea"
+    },
+    {
+      "path": "apps/server/src/video/gen/submit.ts",
+      "lines": 295,
+      "level": "A",
+      "complete": true,
+      "category": "core",
+      "sha256": "389778d71d66154b026faa5a5bd516c9c6130103029eb4881351f8313fb15b3a"
+    },
+    {
+      "path": "apps/server/src/video/gen/types.ts",
+      "lines": 158,
+      "level": "A",
+      "complete": true,
+      "category": "core",
+      "sha256": "f4fa56ca52b82217698ee3cf05facb0b693144a6b59ae4ab081c06d6d0520b95"
+    },
+    {
+      "path": "apps/server/src/video/render-poller.ts",
+      "lines": 489,
+      "level": "A",
+      "complete": true,
+      "category": "core",
+      "sha256": "09495ef3535113f270c592bd3c1e25afad2908e80077f5198d5ca16a3a0e6bce"
+    },
+    {
+      "path": "packages/video-studio/src/film-worker-runtime.ts",
+      "lines": 425,
+      "level": "A",
+      "complete": true,
+      "category": "core",
+      "sha256": "5a684a1bc35426259aafab8c885c178d7595f46ca5f9074df25aa19161faed02"
+    },
+    {
+      "path": "packages/video-studio/src/production-client.ts",
+      "lines": 180,
+      "level": "A",
+      "complete": true,
+      "category": "core",
+      "sha256": "396ee4835feb0687afb7fa6be77da71f5ba003c5e2eb93ba4fcd3e68bf72e19c"
+    },
+    {
+      "path": "apps/server/src/video/gen/provider-polling.test.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 92,
+      "category": "dependency-or-test",
+      "sha256": "e84a6acb0988896ee98ecd1f0ceb8e4dcf316b00adcec6092e708dd5d2b57d04"
+    },
+    {
+      "path": "packages/base/cost-ledger/index.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 307,
+      "category": "dependency-or-test",
+      "sha256": "a701fba68ec8e25e6f43c095cd4424d9c6f476555fefab7d3e5b58a5922aee5c"
+    },
+    {
+      "path": "packages/base/asset-cms/index.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 9,
+      "category": "dependency-or-test",
+      "sha256": "8ba0819eec40e8eba6d5e5e043f6bacf3458ae2d7e82b644f17ca7fdfad5bd3a"
+    },
+    {
+      "path": "AGENTS.md",
+      "level": "A",
+      "complete": true,
+      "lines": 136,
+      "category": "context",
+      "sha256": "a35fa19fba96d1fdcbfbfa15f505215cc6ad77bbff18182562dff888938c1e15"
+    },
+    {
+      "path": "AGENTS.repo.md",
+      "level": "A",
+      "complete": true,
+      "lines": 58,
+      "category": "context",
+      "sha256": "753f2a318589a76a880b467ae80f28c2e41b4826805e8fe82076f7c0278b78a4"
+    },
+    {
+      "path": "WORKLOOM_PRODUCT_CONTEXT.md",
+      "level": "A",
+      "complete": true,
+      "lines": 596,
+      "category": "context",
+      "sha256": "59667533f52d296468d152eb7bc05908fef64decc8e6a5415b48938c79410e51"
+    },
+    {
+      "path": "docs/DEVELOPMENT-PROTOCOL.md",
+      "level": "A",
+      "complete": true,
+      "lines": 307,
+      "category": "context",
+      "sha256": "9864be671721bd8531146f311709a978c88805e309b8755e41a5da6ba6fca39b"
+    },
+    {
+      "path": "docs/AUTOMATIC-RD-DELIVERY.md",
+      "level": "A",
+      "complete": true,
+      "lines": 19,
+      "category": "context",
+      "sha256": "4ea3988f8320e1acf401bd7f005326416600fcc5fcbe2f04055b100902db566a"
+    },
+    {
+      "path": "docs/ai-video-workbench-guide.md",
+      "level": "A",
+      "complete": true,
+      "lines": 267,
+      "category": "context",
+      "sha256": "5ef5424a538adbe39ddbb90afac900d9b3995a8e0dd4b2493686b495659cbcd3"
+    },
+    {
+      "path": "apps/server/src/video/whiteboard/provider.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 279,
+      "category": "dependency-or-test",
+      "sha256": "70bfa536c0b30ec0a90ce8ee81b61e604b32b16272b4f78e51b2f638c6acb192"
+    },
+    {
+      "path": "apps/server/src/video/whiteboard/engine.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 407,
+      "category": "dependency-or-test",
+      "sha256": "a5bd9f0c6e74fb94f970c14d6b27fe60f78ca53dd268bd9fbfa5f00763db87e6"
+    },
+    {
+      "path": "apps/server/src/video/explainer/remotion-provider.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 261,
+      "category": "dependency-or-test",
+      "sha256": "faf1b61bbf9f478230e9d88f520be8dfdbb6d5280461f0782d5e4f1aa2e2da50"
+    },
+    {
+      "path": "packages/base/model-router/gen-pool.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 438,
+      "category": "dependency-or-test",
+      "sha256": "e5c3979f9ad9d27a9741ee16a3e9e042f256f6f1ff43b3d7e0d8b2cc40465ce5"
+    },
+    {
+      "path": "apps/server/src/video/media/columns.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 99,
+      "category": "dependency-or-test",
+      "sha256": "4b9286fbc1d862224fe56d039c673064cd120d9811ea8c25afff6fbe787427f3"
+    },
+    {
+      "path": "apps/server/src/video/media/ffmpeg.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 176,
+      "category": "dependency-or-test",
+      "sha256": "88b30a14b5ee7208299f6f4c01cc5669352b3a68a523a60afd3022fd9bd4c191"
+    },
+    {
+      "path": "packages/base/asset-cms/assets.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 297,
+      "category": "dependency-or-test",
+      "sha256": "57b1d4cfe71a1237a7b65f91dc9a7554665421376256047a47d4b787efe2f18f"
+    },
+    {
+      "path": "packages/db/migrations/0009_video_studio.sql",
+      "level": "A",
+      "complete": true,
+      "lines": 207,
+      "category": "dependency-or-test",
+      "sha256": "c60a4a7eed08dd0013314afc21713e4ded8c5f3d829f4a57057b986d423ff679"
+    },
+    {
+      "path": "packages/db/migrations/0037_video_gen_full.sql",
+      "level": "A",
+      "complete": true,
+      "lines": 30,
+      "category": "dependency-or-test",
+      "sha256": "8041aab3c8c12e63c6c39913e2931465cc0128b8320e8017c3d5544606e32a0a"
+    },
+    {
+      "path": "apps/server/src/video/render-poller.pg.test.ts",
+      "level": "A",
+      "complete": true,
+      "lines": 232,
+      "category": "dependency-or-test",
+      "sha256": "c806619e89dfa17859563dfd8cd2e849e2a6ae7e72e558f462cf94cc7facd060"
+    },
+    {
+      "path": "packages/video-studio/src/production-client.test.ts",
+      "level": "A",
+      "complete": true,
+      "category": "dependency-or-test",
+      "lines": 186,
+      "sha256": "310b4e5f21db8d4cb22a49945c6931da86e46a91400e8c31e28cd92c86d42d4a"
+    },
+    {
+      "path": "apps/server/src/video/film-ledger.ts",
+      "level": "A",
+      "complete": true,
+      "category": "dependency-or-test",
+      "lines": 596,
+      "sha256": "a2a7cb3dec8b2614acc77c0b6da9c7c94975b4cfa5206c1714f47778102ae916"
+    },
+    {
+      "path": "apps/server/src/video/film-ledger.pg.test.ts",
+      "level": "A",
+      "complete": true,
+      "category": "dependency-or-test",
+      "lines": 138,
+      "sha256": "ddb3b57473b6779b4bad4ec81af73aad6db806fb790caf5dcbfb176955284d09"
+    },
+    {
+      "path": "apps/server/src/video/film-worker.test.ts",
+      "level": "A",
+      "complete": true,
+      "category": "dependency-or-test",
+      "lines": 221,
+      "sha256": "1680833e5435b932de3eabef32264e9f72bad42a88d63f9e20dc9e34d16647d2"
+    },
+    {
+      "path": "apps/server/src/video/film-worker-identity.test.ts",
+      "level": "A",
+      "complete": true,
+      "category": "dependency-or-test",
+      "lines": 604,
+      "sha256": "976eb43a2b58419c2434b91f8354bce6c6bc7ef8dadc8798f257b9d36358a2fa"
+    },
+    {
+      "path": "apps/server/src/video/director-jobs.ts",
+      "level": "A",
+      "complete": true,
+      "category": "dependency-or-test",
+      "lines": 128,
+      "sha256": "39c5b9fbc1ff3e6408fffea3d65ec69726780d59d2de2e0338868709cd273471"
+    },
+    {
+      "path": "apps/server/src/video/director-router.ts",
+      "level": "A",
+      "complete": true,
+      "category": "dependency-or-test",
+      "lines": 173,
+      "sha256": "2fcc0be29b39b2a6163ee40b4869b80ac418fe0d8c8a13180be854e9e250d2ef"
+    },
+    {
+      "path": "apps/server/src/video/film-provider-receipt.pg.test.ts",
+      "level": "A",
+      "complete": true,
+      "category": "dependency-or-test",
+      "lines": 185,
+      "sha256": "b8f740f6cf12b0043b1a90a8018892f161a897459880143c564eea08833fc80c"
+    },
+    {
+      "path": "apps/server/src/video/gen/domestic-provider-polling.test.ts",
+      "level": "A",
+      "complete": true,
+      "category": "dependency-or-test",
+      "lines": 89,
+      "sha256": "ccc081f88174574fc04f6bd8bdea56b7525efef3910c9ea2f125995bd1625a3c"
+    },
+    {
+      "path": "packages/base/model-router/router.ts",
+      "level": "A",
+      "complete": true,
+      "category": "dependency-or-test",
+      "lines": 630,
+      "sha256": "7611f442fa6e78e61692d91e442cad18f7a3dfeebe3a91d6c1142edc6917adac"
+    },
+    {
+      "path": "packages/base/model-router/gen-pool.test.ts",
+      "level": "A",
+      "complete": true,
+      "category": "dependency-or-test",
+      "lines": 201,
+      "sha256": "0c565a6558f49b5fe1627b35387c090db0a03d0070c7bddcf5a71fc50a9a16e9"
+    },
+    {
+      "path": "packages/db/migrations/0046_registered_film_workers.sql",
+      "level": "A",
+      "complete": true,
+      "category": "dependency-or-test",
+      "lines": 264,
+      "sha256": "ba9d4fbcec17d033f60eafce92b847dc7154a4fd14a159ad64b50bb32024e065"
+    },
+    {
+      "path": "packages/db/migrations/0060_film_provider_receipts.sql",
+      "level": "A",
+      "complete": true,
+      "category": "dependency-or-test",
+      "lines": 20,
+      "sha256": "a3cf98f7a537176a76553fe00d04b130b54f33409efc6ea25590fd90c2e320cc"
+    },
+    {
+      "path": "scripts/migrate.ts",
+      "level": "A",
+      "complete": true,
+      "category": "dependency-or-test",
+      "lines": 134,
+      "sha256": "3776b4efc5f2622bd0c55353652780290f3267dbd1d4d35b7f919328a473dacc"
+    },
+    {
+      "path": "apps/server/package.json",
+      "level": "A",
+      "complete": true,
+      "category": "dependency-or-test",
+      "lines": 37,
+      "sha256": "e394b4853e18c6b52f3f54090d291b64bc4ea94067915aeab2ca65bcca51750b"
+    },
+    {
+      "path": "apps/server/tsconfig.json",
+      "level": "A",
+      "complete": true,
+      "category": "dependency-or-test",
+      "lines": 8,
+      "sha256": "9222ec437c1c4b8378784ebceca444214102b64598ff2d611cb4f362d576990d"
+    },
+    {
+      "path": "package.json",
+      "level": "A",
+      "complete": true,
+      "category": "dependency-or-test",
+      "lines": 119,
+      "sha256": "4a66bbd746410b86c8c398f6e01779a755ff2090ca3acbb49152fdd36c537773"
+    },
+    {
+      "path": "tsconfig.base.json",
+      "level": "A",
+      "complete": true,
+      "category": "dependency-or-test",
+      "lines": 19,
+      "sha256": "8ed090d95c0a7767fe10b5d9d511dc84cb2356e1d82f787149d1c003d82abb6a"
+    },
+    {
+      "path": "packages/base/workdata/gateway.ts",
+      "category": "dependency-or-test",
+      "level": "C",
+      "complete": false,
+      "readRanges": [
+        "390-520"
+      ],
+      "reason": "Only the called in-transaction event append implementation was read; unrelated public auth/replay paths were not re-audited in this agent scope.",
+      "lines": 456,
+      "sha256": "ec58a342eaade4fdc42a5a60ee53f9cc7481c433d26df5cf2e576b1e1822530a"
+    },
+    {
+      "path": "bundles/ai-video/library/media-catalog/media-catalog.json",
+      "category": "data",
+      "level": "B",
+      "complete": false,
+      "lines": 738,
+      "sha256": "569f9a0f05a8bb66eb48d67b742bd53a3bd64ea213a79cb0f4925c7ecf627d27",
+      "reason": "Parsed the complete JSON metadata and provider/pricing records; did not prose-read every catalog entry.",
+      "modelCount": 22
+    }
+  ],
+  "counts": {
+    "A": 57,
+    "B": 1,
+    "C": 1,
+    "unread": 0,
+    "total": 59
+  },
+  "coreCounts": {
+    "total": 20,
+    "A": 20
+  },
+  "exclusions": [
+    "Creative review internals, full vendor production stages and autonomous input-to-reference selection contracts are outside this agent sub-scope and handled by other audit agents or the prior architecture proposal.",
+    "No paid external LLM/image/video calls were made; supplier state contracts were read from official docs and outbound responses were fixture-bound."
+  ]
+}

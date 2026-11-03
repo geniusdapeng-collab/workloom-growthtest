@@ -1,0 +1,102 @@
+{
+  "id": "MC-013",
+  "title": "短暂检索失败被持久化为12小时空结果阻止恢复",
+  "severity": "P1",
+  "baseline": "c028118de87f80b4ff0726c758b1ca0d964b9a63",
+  "root_causes": [
+    {
+      "file": "apps/server/src/video/data-mining-executor.ts",
+      "lines": "248-272",
+      "detail": "API HTTP失败与异常回正常空命中"
+    },
+    {
+      "file": "apps/server/src/video/data-mining-executor.ts",
+      "lines": "429-438,458-467",
+      "detail": "不区分失败直接写入命中缓存，后续重试被空结果拦住"
+    }
+  ],
+  "assertion": "apps/server/src/video/data-mining-search-recovery.test.ts",
+  "fix_commit": "25f725ed9dbe1a4fe6ecc980a9a418f010e69fd8",
+  "fixed_by": "/root/marketing_audit",
+  "evidence_level": "A+B",
+  "runs": [
+    {
+      "log": "search-recovery-red.log",
+      "exit_code": 1,
+      "failed": 8,
+      "passed": 1,
+      "sha256": "ca2ec028946eaf28aa3c2c298b77b306a607e2422661970d6be1edce4a6966af"
+    },
+    {
+      "log": "search-recovery-green.log",
+      "exit_code": 0,
+      "passed": 31,
+      "files": 3,
+      "sha256": "c44e4e6297fbf99e11ca166699dcb498748b97920bb0a400c3ec598017238074"
+    },
+    {
+      "log": "marketing-full-green.log",
+      "exit_code": 0,
+      "passed": 137,
+      "files": 7,
+      "sha256": "c81c6022c4ec4eb45e1bcf570261697bd1fd9e32c7e7a300f2cb8a640df30e63"
+    },
+    {
+      "log": "marketing-server-typecheck.log",
+      "exit_code": 1,
+      "reason": "并行root pipeline-control-concurrency.pg.test.ts:46 fixture缺contentType，已告知root",
+      "sha256": "cceeb6a298333246dc6d75f473ad31e063a57001f5cba373141089b66f6dd6c4"
+    },
+    {
+      "log": "search-recovery-legacy-red.log",
+      "exit_code": 1,
+      "failed": 1,
+      "skipped": 9,
+      "sha256": "302e7431fb56efd5d93c28e1d4d631d69208908be0f205d00c50f7effe0619fe"
+    },
+    {
+      "log": "search-recovery-legacy-green.log",
+      "exit_code": 0,
+      "passed": 32,
+      "files": 3,
+      "sha256": "9c052bab1af77304bc1c28a08d9616ea00448ef38fd1221e1b8887c9fbd6c3ba"
+    },
+    {
+      "log": "search-protocol-independent-confirm-red.log",
+      "exit_code": 1,
+      "failed": 6,
+      "files": 1,
+      "sha256": "57e3c549315834d323a3e66a380b7f6c003d9c76868a547ee72f0545b3a7e88a"
+    },
+    {
+      "log": "search-protocol-recovery-green.log",
+      "exit_code": 0,
+      "passed": 41,
+      "files": 4,
+      "sha256": "36974505f93516cdac9072fcb21b93b86f4c042c54c4f6858be30ddfa39e69fe"
+    },
+    {
+      "log": "independent-corrections-full-green.log",
+      "exit_code": 0,
+      "passed": 150,
+      "files": 10,
+      "sha256": "8e3fe342d99c51243ddc16867b1b5bc02c4568aaa8634d8b60a1d0561d422867"
+    },
+    {
+      "log": "independent-corrections-server-typecheck.log",
+      "exit_code": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "limitations": "网络500等用fetch协议替身；超时恢复使用原生fetch+真实本地HTTP。正常空结果仍缓存、429仍同实例冷却。无真实公网付费API。",
+  "followup_commits": [
+    "9099f94c477e66af1199ffb3e0b9183336033dce",
+    "24c2467e0a2f81de5ea85b1df78aad4225d6f3bb"
+  ],
+  "legacy_cache_handling": "线上成功空结果记录 emptyProtocolVersion:1；所有未通过新版协议验证的旧空缓存（含旧outcome:success）升级后重新查询，保留旧非空与fixture。",
+  "additional_assertions": [
+    "apps/server/src/video/data-mining-search-recovery-independent.test.ts"
+  ],
+  "protocol_followup": "独验复现：HTML维护/SPA壳、Bing非RSS、API非空全坏rows仍被缓存为空成功。真实API结果要求合法字符串标题和HTTP(S) URL；合法空API/RSS继续缓存；无法判断空HTML时仅返回本轮空结果且不落负缓存。保留成功部分结果、429冷却和原始失败恢复。",
+  "reference": "https://docs.tavily.com/documentation/api-reference/endpoint/search"
+}

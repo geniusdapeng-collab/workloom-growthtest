@@ -1,0 +1,115 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2/apps/server
+
+ ❯ src/video/marketing-source-attribution.test.ts (10 tests | 9 failed) 10ms
+     × 不能把有正文支持的卖点归属给另一个已抓取页面 5ms
+     × 评价text引文不能借另一已抓取页面作为url 1ms
+     × 评价rating引文不能借另一已抓取页面作为url 0ms
+     × 竞品selling-point来源归属必须与引文一致 1ms
+     × 竞品price来源归属必须与引文一致 0ms
+     × 竞品visual来源归属必须与引文一致 0ms
+     × 竞品viral-pattern来源归属必须与引文一致 0ms
+     × 竞品viral-count来源归属必须与引文一致 0ms
+     × 两条真实跳转共享最终URL时，以价格引文选择来源快照，不被Map最后项覆盖 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 9 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/video/marketing-source-attribution.test.ts > 事实引用与下游来源归属保持同一来源 > 不能把有正文支持的卖点归属给另一个已抓取页面
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ src/video/marketing-source-attribution.test.ts:20:72
+     18|       official_selling_points: [{ point: "风量 9 档", source_url: other.f…
+     19|     citations: [citation("/identity/name"), citation("/identity/specs/…
+     20|     expect(() => validateStageFacts("A1", extraction, [first, other]))…
+       |                                                                        ^
+     21|   });
+     22|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/9]⎯
+
+ FAIL  src/video/marketing-source-attribution.test.ts > 事实引用与下游来源归属保持同一来源 > 评价text引文不能借另一已抓取页面作为url
+ FAIL  src/video/marketing-source-attribution.test.ts > 事实引用与下游来源归属保持同一来源 > 评价rating引文不能借另一已抓取页面作为url
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ src/video/marketing-source-attribution.test.ts:29:80
+     27|     const duplicateText = source(other.sourceId, other.requestedUrl);
+     28|     extraction.citations.find(item => !item.pointer.endsWith(`/${field…
+     29|     expect(() => validateStageFacts("A2", extraction, [first, duplicat…
+       |                                                                                ^
+     30|   });
+     31|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/9]⎯
+
+ FAIL  src/video/marketing-source-attribution.test.ts > 事实引用与下游来源归属保持同一来源 > 竞品selling-point来源归属必须与引文一致
+ FAIL  src/video/marketing-source-attribution.test.ts > 事实引用与下游来源归属保持同一来源 > 竞品price来源归属必须与引文一致
+ FAIL  src/video/marketing-source-attribution.test.ts > 事实引用与下游来源归属保持同一来源 > 竞品visual来源归属必须与引文一致
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ src/video/marketing-source-attribution.test.ts:55:8
+     53|     }
+     54|     expect(() => validateStageFacts("A3", { payload: { competitors: [c…
+     55|       .toThrow("MARKETING_CITATION_SOURCE_MISMATCH");
+       |        ^
+     56|   });
+     57|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/9]⎯
+
+ FAIL  src/video/marketing-source-attribution.test.ts > 事实引用与下游来源归属保持同一来源 > 竞品viral-pattern来源归属必须与引文一致
+ FAIL  src/video/marketing-source-attribution.test.ts > 事实引用与下游来源归属保持同一来源 > 竞品viral-count来源归属必须与引文一致
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ src/video/marketing-source-attribution.test.ts:51:10
+     49|       citations.find(item => item.pointer.endsWith(`/${exemptField}`))…
+     50|       expect(() => validateStageFacts("A3", { payload: { competitors: …
+     51|         .toThrow("MARKETING_CITATION_SOURCE_MISMATCH");
+       |          ^
+     52|       return;
+     53|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/9]⎯
+
+ FAIL  src/video/marketing-source-attribution.test.ts > 事实引用与下游来源归属保持同一来源 > 两条真实跳转共享最终URL时，以价格引文选择来源快照，不被Map最后项覆盖
+Error: MARKETING_PRICE_SOURCE_MISMATCH：价格amount引证与source_url不是同一来源
+ ❯ validateStageFacts src/video/marketing-facts.ts:128:19
+    126|           const citation = citations.get(`/identity/prices/${index}/${…
+    127|           if (citation && citation.sourceId !== source.sourceId) {
+    128|             throw new Error(`MARKETING_PRICE_SOURCE_MISMATCH：价格${field…
+       |                   ^
+    129|           }
+    130|         }
+ ❯ src/video/marketing-source-attribution.test.ts:65:19
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/9]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  9 failed | 1 passed (10)
+   Start at  09:20:16
+   Duration  199ms (transform 51ms, setup 0ms, import 102ms, tests 10ms, environment 0ms)
+

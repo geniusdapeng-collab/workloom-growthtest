@@ -1,0 +1,38 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-006-0-1793673393586",
+  "command": "RUN_DB_TESTS=1 node node_modules/vitest/vitest.mjs run apps/server/src/video/render-poller.pg.test.ts --maxWorkers=2",
+  "exec": {
+    "file": "node",
+    "args": [
+      "node_modules/vitest/vitest.mjs",
+      "run",
+      "apps/server/src/video/render-poller.pg.test.ts",
+      "--maxWorkers=2"
+    ]
+  },
+  "actor": "/root/submission_audit",
+  "role": "repair",
+  "subject": {
+    "card_id": "MC-006",
+    "assertion_index": 0
+  },
+  "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-03T02:36:33.586Z",
+  "finished_at": "2026-11-03T02:36:35.042Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-006-0-1793673393586.txt",
+      "sha256": "7e2017d4c897e166f458743db450696cd8c90316555cafa79b04801298a8e49f",
+      "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+    }
+  ]
+}

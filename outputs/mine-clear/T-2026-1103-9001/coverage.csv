@@ -1,0 +1,349 @@
+﻿path,level,lines,changed,sha256,reason
+.github/workflows/ci.yml,A,115,False,8b98dd8c502dfa0a7bd2ecac7c5297bc9f2c9cee179f011c49b970957c5fe23c,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+.github/workflows/workloom-ui-contract.yml,A,93,False,70dc4ca3a3dcd1a0e4c6cbae030be1e33ed466be4306f9e5f094b9456fb3a153,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+AGENTS.md,A,136,False,a35fa19fba96d1fdcbfbfa15f505215cc6ad77bbff18182562dff888938c1e15,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+AGENTS.repo.md,A,58,False,753f2a318589a76a880b467ae80f28c2e41b4826805e8fe82076f7c0278b78a4,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+WORKLOOM_PRODUCT_CONTEXT.md,A,596,False,59667533f52d296468d152eb7bc05908fef64decc8e6a5415b48938c79410e51,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/package.json,A,37,False,e394b4853e18c6b52f3f54090d291b64bc4ea94067915aeab2ca65bcca51750b,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/service/access-authority.ts,B,457,False,e3b4d8b16e3c937fd7101386fb7498f73994cf21adb6bbb550d875e4d4c17148,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+apps/server/src/service/llm.ts,B,125,False,86e2ce3dc4c7923a45396f2c6039cbe4122d53ce367fd47cc96b9eb8e6eb567c,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+apps/server/src/trpc/context.ts,B,197,False,60c5f70cae897c34c789a8c8aa0479552cc110b9ae04dff639f02c0d1e244c89,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+apps/server/src/video/accounting.ts,B,29,False,b2c52a95d67c854adddf94007743ba2c09637429b7e87fb64d111f6894b61b39,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+apps/server/src/video/archive-access.pg.test.ts,A,60,True,b6febddb753dade1ea86ed9a4a2b6f674fba8010783b7c116f4b685698dbaf35,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/archive-access.test.ts,A,56,True,0257162885fecee9dde9d758c869791e06103a154498746ec21002ad993d2715,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/archive-host.test.ts,B,111,False,7386003b7112f77d7ae562fe138ce76327080b538ef78cbf4018e37bab7a215c,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+apps/server/src/video/archive-host.ts,A,314,False,6e13130845e2b3af66033e29a4155ba18ccd145c9ba99a005d753b0b69c56664,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/archive-resume-input.test.ts,A,83,True,2f4b3aff044dc315de186e56b3514190112e8935fca8c6554692adea20393e02,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/archive-resume.test.ts,A,153,False,b8fd05c91570c5ac3aaf7b60ba08f3110c7373cd85ac701b65ff8fae92702a48,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/archive-resume.ts,A,465,True,fcaaba4f09affad8b05d3bda4188281a16cc41a2a2a670bc5799fc4201a72cde,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/archive.pg.test.ts,A,352,True,fad60cd7d77779ff6323ed314a38cf04f520f6493f52c8c144a7edc3af30939a,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/auto-approval.ts,B,141,False,a6a673d783999603af4956811910eea2c343e70e0f885bfaf240bd60238192f1,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+apps/server/src/video/data-mining-executor.test.ts,A,252,False,59442bc3b9c0d7017e3c9e2ee13f9927cc13556e75f5d3bfa683afdb00487428,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/data-mining-executor.ts,A,879,True,162a607ff4f677ccf0755f7a53956af9c5e074b51eba20d4569e3d5ba7562d3a,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/data-mining-pacing.test.ts,A,78,False,67f9267f616220e55f1cebb804f8ed9d631c9b17b6f6543d78b51a739dc6613d,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/data-mining-search-recovery-independent.test.ts,A,28,True,4108d1dc85de80a86936bdb604c8c3729573a5e92170bd145081f2c3d2dc7863,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/data-mining-search-recovery.test.ts,A,135,True,1cabca1802e7a4b7d89ce50a4da3f83a2f531d7c0f62ccb00dd8a371351d3eca,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/deal.ts,B,167,False,b26b103cf41514a1081aa3d7720c33482cc1dd6052b853bb2b3e556cf0a376a1,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+apps/server/src/video/delivery.ts,B,1097,False,8292a794388a011b91bcc57467ea98107b1135252ee6e2183aed54d74f85a399,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+apps/server/src/video/director-jobs.ts,A,128,False,39c5b9fbc1ff3e6408fffea3d65ec69726780d59d2de2e0338868709cd273471,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/director-router.ts,A,173,False,2fcc0be29b39b2a6163ee40b4869b80ac418fe0d8c8a13180be854e9e250d2ef,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/director-sources.ts,B,191,False,4b9da53771439e2abeb2c36312f73457c618626c19b0d64dfca1f1ece0a3e701,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+apps/server/src/video/director-store.ts,B,58,False,438b28e9e4af00ba113a24390417da92e4ed27fb76e102e7d75fa126c7e452c3,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+apps/server/src/video/director-worker.ts,A,267,False,76724e3337c0bd8e5950c9e3789f3d795c962bbbb2604b56ea0d4b43c7dbb6b8,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/explainer/db.ts,B,260,False,3e80d727e157a696b3938d2bd89249c7a370746c499d733be43edd8b7b668c5d,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+apps/server/src/video/explainer/remotion-provider.ts,A,261,False,faf1b61bbf9f478230e9d88f520be8dfdbb6d5280461f0782d5e4f1aa2e2da50,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/explainer/router.ts,B,727,False,7d886ce3b7d39eff93aa140558833489c04bb5ac2fdc2239c754f94ba5b167f5,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+apps/server/src/video/explainer/runs.ts,B,50,False,be2f55e583098958f242e073ed89c4df23365e54e83422b945622eaf45c489ee,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+apps/server/src/video/film-ledger.pg.test.ts,A,138,False,ddb3b57473b6779b4bad4ec81af73aad6db806fb790caf5dcbfb176955284d09,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/film-ledger.ts,A,596,True,a2a7cb3dec8b2614acc77c0b6da9c7c94975b4cfa5206c1714f47778102ae916,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/film-provider-receipt.pg.test.ts,A,185,True,b8f740f6cf12b0043b1a90a8018892f161a897459880143c564eea08833fc80c,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/film-router.ts,B,87,False,be176e9c058e987ae7285335362cc80ad80aec89c1d25c851476b23b94e8fb89,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+apps/server/src/video/film-worker-identity.test.ts,A,604,True,976eb43a2b58419c2434b91f8354bce6c6bc7ef8dadc8798f257b9d36358a2fa,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/film-worker.test.ts,A,221,False,1680833e5435b932de3eabef32264e9f72bad42a88d63f9e20dc9e34d16647d2,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/film-worker.ts,A,1438,True,2dc111c29796808f0b42bf1071130de8c79784193f706a4f180bc3db26e2beda,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/gate-ledger-bridge.ts,B,116,False,87d7233a5e900149cb4aab3becd345ff98053a3bd27de3acdd0a4641457ecf17,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+apps/server/src/video/gate-policy.ts,B,255,False,636902008f2e10a2373c7c7ee9bb56cc2c663e4a49a10bf5683634be55175691,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+apps/server/src/video/gen/catalog.ts,A,193,False,08cb1723c15d58eaad81bb594936f604c043a58dcbfc1a00ae9056eefa47368d,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/gen/compiled-request.test.ts,A,63,False,1eaa4d456329f593bb9c95bdb475a33e67ea7c1910d6f94a7835d1e5ad1f4ca0,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/gen/compiled-request.ts,A,154,False,8eef97897d6da113c56f2543098c0f27f0fbda171443869db29095ff965f181a,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/gen/cost.ts,A,149,False,917f72908053925e579d939f34b51d693ab24d6c3280fe98083ef97846f5f930,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/gen/db.ts,A,33,False,44ff4a9c803a4899e8f9239cc9ffc0c345e17811e91cbbe6a9ec1e61e7243e9c,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/gen/domestic-provider-polling.test.ts,A,89,True,ccc081f88174574fc04f6bd8bdea56b7525efef3910c9ea2f125995bd1625a3c,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/gen/gen.test.ts,A,465,False,93ee7b8d2d526fb75b5a69e4dbb54b5da396d9c018e7d7ba291bd605e54ac7bb,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/gen/ingest.ts,A,274,False,1e6445bae0eee9bef061ba64007ef41ed60511c50bd09685ab226c70c7cadf91,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/gen/params.ts,A,27,False,1750ff6c40d90a40e130dfd05109524259043044e5397312462366156915edbf,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/gen/provider-polling.test.ts,A,92,True,e84a6acb0988896ee98ecd1f0ceb8e4dcf316b00adcec6092e708dd5d2b57d04,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/gen/providers.ts,A,337,True,1910893a24a52e9071c172225a602edad1106179160fdaee82dbdaa29b41e590,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/gen/publish.ts,A,210,False,6099efd4a3024afba80c46ffef93bcc2585745a979522b050216608ad156c5ff,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/gen/submission-ledger.pg.test.ts,A,214,False,965fc9e996e9e96fa69931d0250920cafdb7669a83ad8cd2b8f663da9edb84a0,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/gen/submission-ledger.ts,A,231,False,c4ec9d7df53b103e3e1eb4d5684726fbd26db472e307ae844d908d96e7b14738,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/gen/submit.test.ts,A,261,False,fcc8eab976c86c8cb0e53be2bdb0cb36096ece9dcac342b994fe75aba10badea,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/gen/submit.ts,A,295,False,389778d71d66154b026faa5a5bd516c9c6130103029eb4881351f8313fb15b3a,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/gen/types.ts,A,158,False,f4fa56ca52b82217698ee3cf05facb0b693144a6b59ae4ab081c06d6d0520b95,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/marketing-authority.test.ts,A,231,True,66e1574d02d90ab490407ab94eecac9b0bf4b5c86f1e77cb53d468ffabdc3df8,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/marketing-authority.ts,A,306,True,60313d303539a4f11307d34266bbe3edc07ae69ce920ae2110a76f5b44e34868,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/marketing-dossier-consumption.test.ts,A,70,True,db84e40350e4bb267552d9728cdaa5d648ad5507d91a34b1dfad621744174f29,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/marketing-facts.test.ts,A,157,False,abe2c155a2be36bdb31898e5b4a8100821591d7ee9e1c66cdba769fb78131005,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/marketing-facts.ts,A,252,True,682d50ef9fc1ff7c6a5e092dffa05877067977d2355fa9d1962eecc152020fe8,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/marketing-source-attribution-independent.test.ts,A,27,True,2b1d432e7b00f8fd107f6e5bde1d791cfa1ca4b7cb9c3aad6c0cebd28c555854,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/marketing-source-attribution.test.ts,A,108,True,1c2ff74505831dd4dc97c51bd17fa5763479d3152a13142c5616a5c0dd42e06b,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/marketing-source-fetcher.test.ts,A,85,False,cd6023fef9af24c5d0688a285d865b09af26508b47517c5917b8fab03db913fd,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/marketing-source-fetcher.ts,A,231,True,9ecd1578afaa7d7b372ac9b0f02a8fba4a19d185a369b6adcf092860baee9a1f,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/media/columns.ts,A,99,False,4b9286fbc1d862224fe56d039c673064cd120d9811ea8c25afff6fbe787427f3,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/media/ffmpeg.ts,A,176,False,88b30a14b5ee7208299f6f4c01cc5669352b3a68a523a60afd3022fd9bd4c191,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/media/index.ts,B,480,False,0cf9701900cc9c45d6dcbbc62df3935bd7e154abd309f14459d4a4f68b74da2c,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+apps/server/src/video/media/library.ts,B,718,False,e8d91dde909d94b6b8ecb20e62c96492ff7a2a504e101ac2937651c26e92a1c8,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+apps/server/src/video/media/media.pg.test.ts,C,816,False,862d597104767e22ec7a4a9c70aaa27e5c57307503730c04769e30c1f2497819,仅所列边界或相关区段；其余代码未作逐行审计。
+apps/server/src/video/media/paths.ts,A,45,False,492dd3777fc3a27b4f377c9755c5820bddd2cdd10b599435ad19ae499dc196e1,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/media/products-source-safety.test.ts,A,153,True,ddb62aebcf08123d15a5b7adb6b4173740958fb4e0536083158870b725726a92,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/media/products.ts,A,345,True,fccc9f7aa84acc5225c3f48e89cc0d77ae23c5a2115bff5026415345f8513509,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/media/register-local.ts,A,264,False,7aa54392058e9b7756fc755ebffdd38871bd2e78c9ad79edfbb431fd8001d10f,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/pipeline-control-concurrency.pg.test.ts,A,79,True,d2d7ffc2064aebee69acb1d6efc86a392dd63b418cf1ff4a1ae17fbd61190ec2,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/pipeline-control-plane.pg.test.ts,B,334,False,aa942f58a623c43551e1874ba00d71cff2771a61070d18fd78b66ded192b555e,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+apps/server/src/video/pipeline-control-plane.ts,A,832,True,21052ce554cdd3bdd0adef6b40b672ab5a93426017bf8511f18bc5b68ca6d124,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/platform-routing.ts,A,62,False,9f727f8bf94d102a80f25166200313ecc5c766062a7ccea351fc2a5394defc80,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/production-authority.pg.test.ts,B,393,False,b5296858ec59e064d7ad100649532715d23802cde7834d08173aefea2104d13d,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+apps/server/src/video/production-authority.test.ts,B,364,False,df5d51dd7262c707a572efd9547eeaa8a16b8418e2415d77d4e45ff91e012a16,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+apps/server/src/video/production-authority.ts,B,469,False,d2a7680fe2c7b20f67a599ebbfe50eb66377edd59d4d2db2f417380c26940dce,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+apps/server/src/video/production-router.test.ts,B,152,False,c14227916ce2a6d1f4502fae0cb1cac4ff1807c3c9baf88d9770c31a2a9659c1,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+apps/server/src/video/production-router.ts,B,42,False,4c6dd2ee654dc8e629efaf6bc23d3734927a6a1f6d56ab94a52a7167395b58cf,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+apps/server/src/video/project-compute-budget.ts,B,100,False,569baf94b4f3f05a3097a6ab4229b677403cb739c9b98ab3f0ee41c46f7fc932,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+apps/server/src/video/render-poller.pg.test.ts,A,232,True,c806619e89dfa17859563dfd8cd2e849e2a6ae7e72e558f462cf94cc7facd060,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/render-poller.ts,A,489,True,09495ef3535113f270c592bd3c1e25afad2908e80077f5198d5ca16a3a0e6bce,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/router.ts,B,1583,False,0c15336d7cf8dc9793f08c4e54b8650f79097441d1ea83c04320cf991ffa1e93,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+apps/server/src/video/scene-policy-render-gate.ts,B,179,False,864ffaa4726e667b2f93d2bc1271e2ed8c48ff72d005ff437bf096749021068c,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+apps/server/src/video/scene-policy-routing.ts,A,105,False,7c32ee723debaadd912f1ebda3046b3664120431ea17a366bc1c8869c612a9ae,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/studio-resume-input.ts,A,98,True,3251cda8ae28260796133bfed38f8b5927bad476907a04b9e67ed55c9143c9aa,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/studio-worker.test.ts,A,842,True,075a63665c55192232b89703ce4fedbcb01602288e8ef0b486a7004902b31cc3,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/studio-worker.ts,A,1780,True,4a321bccdca32f10430d577a6e7b3da26093a9757529cacb6f09cc889e524ecb,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/whiteboard/engine.ts,A,407,False,a5bd9f0c6e74fb94f970c14d6b27fe60f78ca53dd268bd9fbfa5f00763db87e6,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/whiteboard/provider.ts,A,279,False,70bfa536c0b30ec0a90ce8ee81b61e604b32b16272b4f78e51b2f638c6acb192,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/server/src/video/whiteboard/router.ts,B,1095,False,81563c2e8809c729647e3f37bbf1c8bea926ee1d9203ba8e5b0fe5941453658f,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+apps/server/tsconfig.json,A,8,False,9222ec437c1c4b8378784ebceca444214102b64598ff2d611cb4f362d576990d,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+apps/web/src/extensions/ai-video/pages/Assets.tsx,B,356,False,f9bbfeb5a7c4599e2cefe1b46f902fad7a9d3cd800ac2199bfc3c0cc44bec967,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+apps/web/src/extensions/ai-video/pages/Studio.tsx,B,533,False,2f959322c9f4cd003f8e02b09a97aa88e81188f611fe12a4bac1ec28f6b93176,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+bundles/ai-video/library/director-system/core.mjs,B,425,False,d104b2ce6ca68907c502279abaa4ab19ef87bc10fc850d84fb44522d838fd3a7,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+bundles/ai-video/library/media-catalog/media-catalog.json,B,738,False,569f9a0f05a8bb66eb48d67b742bd53a3bd64ea213a79cb0f4925c7ecf627d27,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+bundles/ai-video/pipelines/marketing-film.yml,B,90,False,4ba95c0e83538de605126072ce26a462211e4cea3a82c5fcaee8227a71b485b1,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+bundles/ai-video/skills/marketing-brief-parser/SKILL.md,B,66,False,dc302932fb2a3133eca12ac375443f27e6f14e8d019aa9600f0767844fad5dac,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+bundles/ai-video/skills/render-ops/SKILL.md,B,45,False,b34a8a089bcddec4176237bfbd105acc04279f140a39a82556ff5c958a0a0be1,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+bundles/geo-growth/capabilities/video.mjs,B,539,False,edaedf217d771c86290aceb1c50d36b53cabcc4d869af9ef2805aba80ff8b8e7,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+docs/AUTOMATIC-RD-DELIVERY.md,A,19,False,4ea3988f8320e1acf401bd7f005326416600fcc5fcbe2f04055b100902db566a,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+docs/DEVELOPMENT-PROTOCOL.md,A,307,False,9864be671721bd8531146f311709a978c88805e309b8755e41a5da6ba6fca39b,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+docs/MINE-CLEAR-DELIVERY-SPEC.md,B,327,False,3059504359d336b0e48075265d95ef906262e9daf2a2a7904c1125886632b912,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+docs/PIPELINE-CONTROL-PLANE.md,B,131,False,8f95a17ea612a0bc1603c2c929ded759d9df378bafd38f5cea5490d45411c620,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+docs/ai-video-workbench-guide.md,A,267,False,5ef5424a538adbe39ddbb90afac900d9b3995a8e0dd4b2493686b495659cbcd3,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+docs/character-archive-design.md,B,293,False,b515be5ee30605a58a8fd27f34225a83788f9437b9d70c8aa1682995a32e8535,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+docs/character-registry.md,B,106,False,8e78c682a2a710dbf2366724a28e12df01fda272f152d3a4e76c5355a3bbc003,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+docs/desktop-product-rendering-contract.md,B,64,False,f27a6038764668239cd63e2b62489431d2e0612595564d3791ec74cc1094e4d5,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+docs/director-studio-v2.md,B,195,False,af8e0cebbcd0420d13c68969b103eff8ac150dba2dccbb19c77adf079594ae8e,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+docs/native-render-verification.md,B,44,False,546dd196f0e2b5c6887562f6f10cdab77f707203f7cd4edb1ebabb67ccd09a83,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+docs/repairs/T-2026-0927-0029.md,B,113,False,d07052fcc8ca01640ce3669b8bf4d97c13810dcc86179cd211d11f06c5883cad,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+docs/repairs/T-2026-0927-0032.md,B,81,False,583ab649b75fa3a00adbb30db3be87565b32912f9e8f477a2bac4ee0ed769596,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+docs/repairs/T-2026-0927-0034.md,B,51,False,72902c4c06abe45213ac847e95f3c09e903f8e02a1b87d446683e8d12428d5a8,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+package.json,A,119,False,4a66bbd746410b86c8c398f6e01779a755ff2090ca3acbb49152fdd36c537773,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/base/asset-cms/assets.ts,A,297,False,57b1d4cfe71a1237a7b65f91dc9a7554665421376256047a47d4b787efe2f18f,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/base/asset-cms/index.ts,A,9,False,8ba0819eec40e8eba6d5e5e043f6bacf3458ae2d7e82b644f17ca7fdfad5bd3a,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/base/cost-ledger/index.ts,A,307,False,a701fba68ec8e25e6f43c095cd4424d9c6f476555fefab7d3e5b58a5922aee5c,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/base/model-router/gen-pool.test.ts,A,201,False,0c565a6558f49b5fe1627b35387c090db0a03d0070c7bddcf5a71fc50a9a16e9,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/base/model-router/gen-pool.ts,A,438,True,e5c3979f9ad9d27a9741ee16a3e9e042f256f6f1ff43b3d7e0d8b2cc40465ce5,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/base/model-router/providers.ts,B,547,False,e576c3355d9615194812e0ccd041e938bdcf8df733d7b79e735bb84dd6819e73,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/base/model-router/router.ts,A,630,False,7611f442fa6e78e61692d91e442cad18f7a3dfeebe3a91d6c1142edc6917adac,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/base/workdata/events.ts,A,262,False,c2cea423e934037fa4e2802a83ebe69daca1facb1e6876434783d2b13a530ed5,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/base/workdata/gateway.ts,A,456,False,ec58a342eaade4fdc42a5a60ee53f9cc7481c433d26df5cf2e576b1e1822530a,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/db/migrations/0009_video_studio.sql,A,207,False,c60a4a7eed08dd0013314afc21713e4ded8c5f3d829f4a57057b986d423ff679,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/db/migrations/0037_video_gen_full.sql,A,30,False,8041aab3c8c12e63c6c39913e2931465cc0128b8320e8017c3d5544606e32a0a,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/db/migrations/0044_generation_submissions.sql,B,84,False,82dc12eb30c16e4389089181123365843b3195ec5ba91e11202d4c8ec40ccc73,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/db/migrations/0045_production_qualifications.sql,B,82,False,a0cb09addd61ab7f1cb381c58c84d1ac5d8f52ca9492b4fd2787f7447fb4c2a8,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/db/migrations/0046_registered_film_workers.sql,A,264,False,ba9d4fbcec17d033f60eafce92b847dc7154a4fd14a159ad64b50bb32024e065,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/db/migrations/0060_film_provider_receipts.sql,A,20,True,a3cf98f7a537176a76553fe00d04b130b54f33409efc6ea25590fd90c2e320cc,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/db/src/client.ts,A,96,False,67b8b3b34049046cb4449e9e05975cb8549f81acbb856b6e91b425ef20798e7d,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/db/src/index.ts,A,6,False,6161108ee4997a4202d8ee2612b89f931fc910376cb8185a6fb7444318ad9782,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/db/src/schema.ts,B,368,False,7d27b195d4f383f80e98c3029859802dcea89525cdb01a8d31df1e8ddaeafda5,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/shared/src/index.ts,B,9,False,eee90f31785aa9fd46d1c6c4873eb28df8d0e344735eda5bf43dafac9216c48f,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/package.json,B,22,False,085e3c497081cf3dc868dca6774e46a2ec3bb0ff63c279adf4aab7916ee84d10,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/ai-color-policy.ts,B,83,False,9d6b8835404d08b6a554a0e3d0dda482ac787e1b1658e5db308b547de2e43bed,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/archive/context-bundle.test.ts,B,56,False,977263064145eb986a5a42c766d543b4a9d416d47152de3573c3224be2dabeed,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/archive/context-bundle.ts,A,153,False,1c707522e41703128bb89d5a9f131571034bdd9adea1917b9477dca0f1490a45,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/archive/index.ts,B,14,False,62738cfa907b81f8cbf9f906f9c76fd2d5433087c80c88aea9d6a4fe3634ad45,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/archive/logger.ts,B,135,False,124c49385888f24e86858048908ba82b58db017f6f0b95869487be207a7e86cb,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/archive/stage-log.test.ts,B,121,False,901be9a1c59371bd0c6a31801ffbfb84188faa8043a5e8228b75a8b1768fd9fb,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/archive/stage-log.ts,B,153,False,ef51247c4dcdc2ba143e6648472fc6480804c73b5fa3f2b63b827c3a8d9dc8d4,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/archive/stage-runner.test.ts,B,319,False,b8ddc615cbb6d80161d8fb805b15c76de4dbf47830ab599875238c2702760697,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/archive/stage-runner.ts,A,337,False,42fc6a965e5889667b5c84316c20c97b067a4cee059047e16a862ba5f37cbb43,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/archive/store.test.ts,A,160,True,00230f47a184bbf6c3a11186ad59beb000549606ac33656620a4547c2cba7160,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/archive/store.ts,A,307,True,6bdf671ce7c7427e978f64bdf44861e5a7e752c04fb8fbcd375d7f2fbb8e6aea,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/av-sync.ts,B,306,False,ec9c8dc2ec75a4295cc5fad8e3d3be265b9307d668087a14cf09722144bf8f1a,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/beat-verify.ts,B,146,False,5f57f4964ede0df5baaf5f7f0393ad6be45f7308e9fe7acefe07660759995e4b,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/character-archive.test.ts,B,288,False,60d26c5f3c9f0e671df43b09a85ab1cc0aabbe54479cc66ffb7b13d2df64b8e4,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/character-archive.ts,B,544,False,5e0c4275c74ab982263df47105885947d800ea9182811b78e560fe9fbcb5d8d0,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/character-consistency.ts,B,198,False,96da491b29e27562d75b129566d50c21755c87baeadb9e56163df8a2f78fe7ca,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/character-release-contract.integration.test.ts,B,91,False,2a66b7a96585ee00abd0ade05b79b24f753547b08b8ec5bb4dceb14541f7aa1b,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/character-release-contract.test.ts,B,309,False,3048c16346f2956c9793e6f059805dea7165413ca7005830fc5cc150f8f6478a,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/character-release-contract.ts,B,382,False,f44746fa05ebb6886d6fe6381f4d721c96b9480eb7861b9857edd8beab12110a,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/character-release-source.test.ts,B,559,False,0d70f5f2d43f3b55238ada646a19f51eab096e4f5a8a19f1a4515dcb5e986be5,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/character-release-source.ts,B,321,False,55c0ea7274c819c773134503704bf25d4eaba6ea6b506db175020ec7725d056c,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/cinematic-contract.ts,B,94,False,e8df6cecb4883d99498ffea2ffdc1df51f4353c50c12d60632e1013372dfdaa1,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/cinematic-skill-policy.ts,B,281,False,c3cdebaa21e0f2a4af10eaba5fd9299fc9157f1df19b49836757a05605ec464c,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/confirmation.ts,A,74,False,12b4537481efa5bd0927cb43fca3f5c7813fc267bf2b7142ad3352c2a1202a18,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/continuity.ts,B,352,False,cbc71ea8126255b37c50fe67ab23c24a485301bae8ad43e3d225ebb577a590f2,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/cover-assembly.ts,B,281,False,317faf324aa0bfc872b5a78aa4b53ff639d787bd4fee8e7198f25347d76de3f0,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/cover-design.ts,B,859,False,9f6913abbc5047d1c46b7d279bc627b51094d46fffd17a1d970b8ce78e5a7b0b,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/cover-platforms.ts,B,281,False,8bc06295e352018b6a477cc6879aa7189ab1e7150e5bfdaae41573a3d30d538e,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/data-mining-engine.test.ts,A,206,False,4e36ae85e7a2d6518f8418e705b8a6cca1838b53420279c94e13ce7255c9f12f,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/deliver.ts,B,373,False,f8345fd01c937a05bf5a7a660e2d3a8b0c76f8659ee36e82aa3acc3505fb3cd4,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/device-policy.ts,B,217,False,301e77574bca1438c166cba18f01b38c24c41351b5fb9ec36d5a182e72215a6d,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/dialogue-contract.ts,B,236,False,39cbf934d02ca530582d613714a0c167e49de23820a38e56bead7a6ac824d1d3,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/director-planner.ts,B,195,False,b5c772b1105b5e00e729b39c62d2d524c8c96da59e4a2df0a70236646db6c149,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/director-v2.ts,B,24,False,d6c57dc79a0845b4bc7dd71ba2b11090c8ff2d23591f188b08ede79cad1c9578,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/duration-projection-bridge.test.ts,B,236,False,cf03e46e167c46c7761442749653a5b132fcff1c41b8da24f514e313486e2743,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/duration-projection.test.ts,B,181,False,9ac59718b500b1b6cbeb93799d0241254c9bb074131eddc0615e78c9c69b0fcc,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/duration-projection.ts,B,431,False,4f1ae7ff8ed5102a0a4ef7e205181c3de6bd8c0fbffa3a23ec93aed896b70421,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/duration-rules.ts,B,683,False,6da9816265e704d05214b8872304c78288da51422d3d07917347fc5e73a4edfa,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/duration-voice-ceiling.test.ts,B,44,False,ad29de60a8196ed786b802df1de7691539beb4a8c20cc523ba29a6010162e9a4,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/era-profile.ts,B,69,False,93354bfab063c1cc513cf4a869ed603b778123e265a54825f4088786aa3d6802,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/film-completion.mjs,B,49,False,5e45a371b524ceb727f43fbf821009b69c54be938b389e390953df0192bce3f2,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/film-contracts.ts,B,89,False,b43ae278f10a26f8f5ab11926559fff83c4c40cb42d0197cce827e4730e7a75c,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/film-service-client.ts,B,205,False,ef716aac6905588d0dd31c92322a532789288b0c9addaa7c979e7e23f4a05005,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/film-worker-channel.ts,B,387,False,923ef7197c5e4580dfb2712d8b79005f54cd835b8620b2a2a0dcc32de182fa41,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/film-worker-provenance.ts,B,213,False,aab2e57cd04a35f8c4fee3732be85172349b4e4c2e125952c739b8c3f245352d,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/film-worker-runtime.test.ts,B,612,False,7ff32d95da2299c224bc32e691e8d3fb1d5e8b3fe25051eaa0d11c7644a11948,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/film-worker-runtime.ts,A,425,False,5a684a1bc35426259aafab8c885c178d7595f46ca5f9074df25aa19161faed02,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/final-shot-character-qualification.ts,B,504,False,4b022562deb130c1e39ad0b004ef22887d21c0e2c8f1cbd93d00c85b2adf8b2f,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/final-shot-contract.ts,B,116,False,8f74654da0a300405f2d99b25cee974cacf47cbc57e267a37c7e75041b8b4994,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/first-pass.ts,B,172,False,4f948195e2817dc2a54b41c379613c693f105c77684e94c2b9775ab6298b4a1d,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/gate-ledger.ts,B,286,False,637e061307bf1712ba531b7ffcf6c0bc160841b2ba1aa5d41f644db5933de208,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/gates.ts,A,83,False,5c60cc86122dabc625d7ba523fcb2552d134a154bdb3345a7af021be496ea9ca,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/generation-submission.d.mts,B,17,False,cb9ac44905869f820aea537586863758342e960e6a1c955255100041e2045bb3,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/generation-submission.mjs,B,115,False,37a00d7beb795c208b5855436ac9f3c6fc51fa76eba555edfb7e53ccd0985409,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/generation-submission.test.ts,B,102,False,beba2dd8921f3eb667bc16e314377b3a988e952b215c82344dbe2dcb75085266,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/index.ts,A,78,True,7fe7b6d7d2f8995034c6a8a843b9e0318885feb146aad7ae1ba868594bd010a6,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/library-bpm.ts,B,205,False,8226bf20083c056299990ff321f18ec8208b1928e561bacad170603a1138400a,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/likeness-policy.ts,B,40,False,9a5fc9c76ad23697d989c8bc666a036b3e7a622755599c65b22868bb313f9932,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/llm-adapter.ts,A,505,True,235a42381a78e61b3f5cc4d4999713e9fa86bff77471162475268ac75e0a2663,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/llm-config.ts,B,64,False,ce01d0e5fd3ddbb4ae497a03049fab5624020df048207f1c59ab3c56d6236d58,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/local-cover-render.ts,B,480,False,de3655a1d9d582845594ab9b536b2fa0c1f1b9266970f19671beda485489300f,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/marketing-dossier-input.test.ts,A,27,True,22ccd1702beef213ed41b3ffc2823f8337683aad74a6d54a9ef75c22371a055c,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/marketing-dossier-input.ts,A,49,True,e73c175506fbf92351210066c7e706c6aeeda37ddd3993c4a0a78a697f6ab2a4,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/marketing-price-contract.test.ts,A,38,False,eb3110c167845e475f171ad01a34ef86994fecb1e2b8d5a81a52a01a66141ba2,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/marketing-price-contract.ts,A,85,False,b3e2eab4daa8bff5a3c0b000db0f372aa292d559da1854c201e959f34c4ccaab,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/material-policy.ts,B,679,False,2d5da7d008773cb4042380c6955aeefb82aa92bf59f9904901e8382b691624cb,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/micromotion.ts,B,121,False,8857543fd41f5956223bc7cf014b26d146b868143924207138eb590fcbcd1863,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/narration.ts,B,86,False,f858c6541090404fd7e49ad254539ffcc6659ab4efd8fb012ad5cf1a9037893c,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/narrative-aspect-contract.test.ts,B,17,False,bf40b0b039b1a2ad7155053b018304695896ebb906363f0b173c62b229eba2b1,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/narrative-no-person-source.test.ts,B,50,False,5a1a75d20144eaf4864cec855d98bbbfdf4ac78cb348a4ccd7e6f30c6c1d54b5,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/narrative-source-action.test.ts,B,140,False,af69ca3888bb653193bad19bf6356e297a671b642f0d3d57eb67ad37b13bbd1a,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/narrative-speech-contract.test.ts,B,32,False,dd34d45c83d703bdc71b7c93608d1a6dd246f8e846aec7d8be09993697aa6bae,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/opening-hook.ts,B,272,False,3811e845fadb7eb19bedc4aa6d034a7fb3b8d8a85d1c7e64471c931c96804cdb,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/pipeline-control-plane/auto-approval-projection.test.ts,A,36,True,736e833a3ab1fdb3ac81f212492926af3b1cca4ae4ef8a7d654e9c49ba32db9c,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/pipeline-control-plane/compiler.ts,A,460,False,8bb82d455baca3641b09d428fcd0866ce8c159e91170b3c74f59f87bdb2518b1,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/pipeline-control-plane/contracts.ts,A,265,False,756b7e1cd82af30c7ee17c8fc0bebf8f05e2611ce54b4e82556cdb50bf7fcd28,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/pipeline-control-plane/coordinator.ts,A,994,True,f71ffca36161324a9acd3ba7f34d7585dde29a43959c614a56315913475eb041,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/pipeline-control-plane/in-memory-repository.ts,A,275,True,0d9939edcd1420940097cb9ecacb7e3ac3b7b8bc257830abc45ac3548fc8974e,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/pipeline-control-plane/index.ts,A,9,False,9717a013359d110620428a4345f88c6c49d4e48b2d330b86408fd763ce4e92c3,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/pipeline-control-plane/lease.ts,A,44,True,f04836af890dd9055b64ba24d4ca711372dd7e9de762b1c44ff41bce4336f1df,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/pipeline-control-plane/pipeline-control-plane.test.ts,B,576,False,86e2de28f07c3bd5629ad753930df7920a377907c8d4e6235edd60c8a76124c8,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/pipeline-control-plane/projection.ts,A,185,True,0830dd3ad9ecf3cef738a707e7a20c4e896c16c89233608530e4be9623ae16e1,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/pipeline-control-plane/repository.ts,A,64,True,8f8725c72b0ed1308eefb1c3d531b065cc005941db483cd2bcf8ede12ac9c4e1,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/pipeline-control-plane/shadow.ts,A,328,False,f8e81195589b32fa9856ef391e943003be6ee4b7fae74392b364d4923e8fa4bd,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/pipeline-control-plane/state.ts,A,109,False,97125ce8ceafb6d50adae2b7eed34a01aae6b87b7c90635f1a9557d0ac0b9540,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/pipeline-route-negation.test.ts,B,47,False,061234b046025031d4e1bec55fe4d8d65fdf8317623213c135ff845550c1f7df,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/pipeline-router.test.ts,B,278,False,2eabb757a354360dc8feb8dd67979cc4a5849da6d7dc4b55e3aec09fdfa0779a,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/pipeline-router.ts,B,696,False,844f643175296c82a969b606b5f566d07236aad797e13898fc72b8c99737a4a2,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/plate-cache.ts,B,98,False,770ff7429729391693e248cdebed3fb5183e2c7278d17111528949d619778fb2,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/plate-prompt.ts,B,87,False,37947af7696e8169faac9a3def7aab88d12661d86c5cbc887c256d2e4a362032,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/platform-intent.ts,B,307,False,d94ab38ca1b81d46f901ee9703fe932e0ee42835b55a83f25042d957db6c0305,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/plausibility-review.ts,B,342,False,d837584a553ac908d555a5e36af6b10ef1a5363751e390e1766d70ff6ac8b358,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/portrait-agent.ts,B,525,False,b0450c450e0b7d092a12a656cb9d065004242685bba5e709cfe5241382a96adb,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/portrait-binding.ts,B,172,False,6cae7a7e4e720f58b010224f42d9826042663f9189ee46ffc929c9d1195b73f2,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/portrait-decision.ts,B,91,False,6846ad0975cafc89d5efc890e4e842b67c63050a815ea5e99c5cad7160436607,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/portrait-runtime.ts,C,562,False,9f104e885899c9bdadbdee0ec27c276db8c7c572a668d049b8d43e03f47082fb,仅所列边界或相关区段；其余代码未作逐行审计。
+packages/video-studio/src/post-render-acceptance.ts,B,63,False,c6da3647377d526fb1226eb131727b48fd57e8890d8ff56740eb57b4eeebb575,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/producer-gate.ts,B,627,False,0a4b51adb59fa1e7e178c0ac556873f04fec82b8441bf726e061825ef91544f9,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/product-archive.multitype.test.ts,B,110,False,bfdff9d2403a57ab46618e6b29eddfb37b95b31a8b218a5dd4ac7d42ace827b1,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/product-archive.test.ts,B,213,False,722c5507f847dd8a7a8b6ac144eb26159ec24bcb7087ead9989bd6d66666ea96,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/product-archive.ts,A,423,False,48b278c7cca3aeb117fd327010ff484d7315dde3c43b2265f35a63c00442acdc,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/production-client.test.ts,A,186,True,310b4e5f21db8d4cb22a49945c6931da86e46a91400e8c31e28cd92c86d42d4a,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/production-client.ts,A,180,True,396ee4835feb0687afb7fa6be77da71f5ba003c5e2eb93ba4fcd3e68bf72e19c,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/production-lineage.ts,B,183,False,fbe3e78efdacdde15be2ed2d1bdf961a33bd0cb3d40be633f90c845d9c37185c,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/prompt-language.ts,B,302,False,bfe27b2ed42eff09e866561a82a3da4d869711203c5a156d115a2d6fdcc70236,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/prompt-redlines.ts,B,101,False,cb3de2950f27619462911d78614605b0f2fdd54fc067d3ef35363e4fdd8fe04a,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/pronunciation.ts,B,138,False,371fb05ecb46ffdb12b6260fe6d101c763f0b7aee5d8a8036b6134d97ce7ecd2,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/quality-evidence.ts,B,17,False,906d709d72691b07d005f675975eed18d60693a80ed7838b15e8d0a51eefef0c,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/real-person-asset-sync.ts,B,237,False,10e5826cacce9c1da454e6373f8679b0b2791fabc1a6246b2485c58d6029690d,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/real-person-asset.ts,B,235,False,3631c4060895c19365b0bb7b4bc305ebdbb201df61652f7fd3f5707524a4172c,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/render-scripts.ts,B,107,False,9dbe99d17e171d4566fdcabe28edf58423b5a6cfe835f1b7d4bb3b3c01fadd54,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/revise.ts,B,227,False,dd22f865438b8de48fa97ac368eb16d215297f48af41bd8588b2905ca704a3bb,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/revision-executor.ts,B,75,False,e24a44fe3999eb34c315b68bb15b9b9e906046c017b9ccd3a3efc69c4d4a560b,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/rhythm-plan.ts,B,150,False,21ee0c2b6dcff49115a184552842de53dbda1457c3099156466859a28acbfb5f,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/route-preflight.ts,B,191,False,dd73e7513efd282268c5e7a08f12bd6dafcd11837a9f773490c43122cd0987c8,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/routed-adapter.test.ts,B,314,False,006562eb27e157e8c7161934eeb06549335f53dd9d742c8cbaa5339180305ad2,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/routed-generation.test.ts,A,197,True,cfd9331153ba1801d108b91f2394dfa6d85cb811929ae2a0cf7fa0a4ecd61fc0,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/runtime-root.ts,A,16,False,dfdafa3f2d2f7805c967900e8e7bb0ce36c12202b38849056565c4f45c94488b,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/scene-bible.ts,B,361,False,46d77d82ff8f198ddebee7db8335523dbf44f472b4fef9cee48a9a31c1bf9c0c,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/scene-policy.ts,B,338,False,52774e6c4639b24689c02a54188e79d89d0c3b83a780254b58f35012fd2a58cc,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/sfx-synth.ts,B,271,False,ce1e278ae2a041a322d01be24472e92d1d12004e6427b3af88d7a7dccc563ba1,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/shot-intent.ts,B,17,False,685fb47fa53b0f2f271b4a57810ad70379c0c971af3b771d7c0008b8260f4dd5,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/shot-order.ts,B,83,False,f9d99967edba92cf11c1965d8f6d8790605e6218b95cbff77791a4f7953b069c,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/shot-spec.ts,B,973,False,13211f885c496a55d4ceaf2cb95d607f351ea69486da2a717a0a8a05af8ff031,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/stage-registry.ts,B,373,False,4c7b2a1e01d8d2b38713665e58c21c5abd8f76c0895f257b58b620b1668be80a,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/standard-post-contract.ts,B,251,False,352d414d4abd50546de9c4d18d329121f216a2065f1926ab976c43d293f9d3dd,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/studio-bridge-concurrency.test.ts,B,95,False,6b20b756fce496d7135fae0f7340d60d8f9611a99d28b36fe39118ef520aad4a,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/studio-marketing-input.test.ts,A,67,True,9490f244bbf2838ac026bcf8f1e0c8c9fa98d006a39406ca22f71c6c94d6a638,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/studio.test.ts,B,393,False,fcd07e13ea89ccaff0d34f342f2f7e234cb49bbdcd6964e940bfdbc65105992b,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/studio.ts,A,729,True,44d72847197f9a9bd0b36b5860dfabb6808babb7ad481313f62f9f1738ade4c5,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/uhd-delivery.ts,B,155,False,27879578a7a3f35474b7d872afb2244da3d0be4af26b3a176e53aa3e34226597,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+packages/video-studio/src/vendor-compat.test.ts,C,4180,False,58b2622e2febc050818bf6321ac46d90dc418b4820536a85c644c2364389159f,仅所列边界或相关区段；其余代码未作逐行审计。
+packages/video-studio/src/vendor-compat.ts,A,8006,True,8bf749e807700b409c1540644b45e8e446362977e03b5a33cae475ccf85a0cbe,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/vendor-discovery-await.test.ts,A,109,True,175458a19dac47d3566c0d3405cda626ad2050c69c08781c9655652e7927808c,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/vendor-portrait-binding-concurrency.test.ts,A,133,True,89b8f95c41d28069f4ed88fd6b92eca5eb6d0bc24b67d7def3fc32dcfecaf1cd,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/vendor-prd-approval-failure.test.ts,A,151,True,462665023bc0530724d84198396352af01c204ae628d939a39fb74b00ce3985d,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/vendor-runtime-agent-config-independent.test.ts,A,53,True,fbd6a8a9ee492f8bcd2e33e3fae655381f665e00b8fd7a788f417427ca2352aa,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/src/vendor-runtime-agent-config.test.ts,A,79,True,ec8e8b435df216b662d705c312804af253c8bc64ed7532215e02d2b52ae35d0e,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+packages/video-studio/tsconfig.json,A,8,False,9222ec437c1c4b8378784ebceca444214102b64598ff2d611cb4f362d576990d,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+scripts/migrate.ts,A,134,False,3776b4efc5f2622bd0c55353652780290f3267dbd1d4d35b7f919328a473dacc,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+scripts/product-runtime-assets.mjs,A,197,False,6f0e855135569d35da20848ece9141823b14480f2b68b3a422ea066d93303066,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+scripts/runtime-payload-probe.mts,A,24,False,f89d86437ba7e07a6923f87eb635f3426ecddf6848968f2dbe9b98ea2062b880,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+scripts/tools/film-audio-policy.mjs,B,144,False,7e02392e33231304d1b441da681db6afcbebba3eb71b1a38a05ed5b54f3dc32e,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+scripts/tools/film-publication-policy.mjs,B,29,False,ff802559101629169a6ac2f39da71feff66449d53144a6b3c5f09af999c2e92d,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+scripts/tools/film-render-ledger.mjs,B,99,False,ee472ff2f68ae58dd436509815a6368727cb773a073c6052d19e6120713772ef,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+scripts/tools/film-render-ledger.test.mjs,B,56,False,75fd09fd6cc9d17802857d19151549d053c5cde674d9b3211d5ec373f552db11,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+scripts/tools/film-render-task.mjs,B,121,False,cf3748d69e9ff374b75f539375f431ff61aa9004c7157d288d27db0cc2a30ce3,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+scripts/tools/film-render-task.test.mjs,B,198,False,7f0eb71ab5aec4ded33eb058f9070c3727dcf91bc0816b000d6695bcb3ac8e25,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+scripts/tools/film-standard-post.mts,B,835,False,b5fc7c91fffc8fed21489ec12b0e29c62f0210347d286210a9589f60c91f782e,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+scripts/tools/film-voice-artifact.ts,B,115,False,4b5f4e95de1ba2d1f34bfc0dbaeb6ed1040a552c80fb83c32071b1cc57cbe1f5,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+scripts/tools/full-chain-film.mts,B,6846,False,7ddb0cc5413107880ffaf8b72e9dfc02ed1c994b9afc7e973bac89248b0f7e8b,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+scripts/tools/generation-quality.mjs,B,365,False,1484cfb8f2fae9f2506300133cdabf614f832f81f7d50357f08c941d84d3b4cf,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+scripts/tools/lib/ai-production-defaults.ts,B,35,False,e3f5e23443364e3de14ac8d4cf5390a0f25d7fab55eb9a6236ffc466a81ddd48,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+scripts/tools/render-project.mts,B,594,False,d0fcbf0bfcf42739b013517904293a1ae95b014cc415be0bf645467ec049a7e0,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+scripts/tools/rhythm-edit.mts,B,152,False,340b73f857832907b67e40eb31a2af7ff779ee02db8c92ffe1fc3b67173ebdca,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+tsconfig.base.json,A,19,False,8ed090d95c0a7767fe10b5d9d511dc84cb2356e1d82f787149d1c003d82abb6a,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/LICENSE,A,190,False,8ec97162de009d12715c71977efe0bcd7aa91b3e577b12ce70c0491052104f95,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/config/production-profile.js,A,146,False,a3061fd9d8b21e236c092d49315c24f2c0d4cda15873e81dac05e1491999b9bc,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/competitor-scout.js,A,200,False,a4e8c92172890c1076bf4fba6626cc6709f7191c5b8d82e7586e6d2ce584978e,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/cross-verifier.js,A,184,False,083116bb4b9113d3fd0f76bc4d0215ddf74756c81b93b8fbace3555635d3d055,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/dossier-binder.js,A,149,False,c8d3ea0e94ec2742f83d4f7fa940fa54aef2b905d3506e911c9badf866d496d9,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/product-info-collector.js,A,285,False,de479bd1f9e702968791faabe6938baca138ed991734ca96c2fb92df026bafb3,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/review-miner.js,A,283,False,19880ec8c72be34ad11aa5cfc800af198b365821601f37e2e62bbf9ab5ea003b,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/data-mining-engine/card-consumers.js,A,133,False,fd02bd7d971e8d5dcaec2498fd3cf47a96a994f17a337fee346e801410741a9f,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/data-mining-engine/contracts/confirmation-sheet.js,A,81,False,c23fe0dfe12feb2f5782512ca8e292cdac40bcd4692fb8d7384478dc9f61c414,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/data-mining-engine/contracts/dossier-schema.js,A,184,False,76f967520bbd6640ea93678c38a97c6f24463167a1f482571b9ce5e76e7a61fe,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/data-mining-engine/contracts/summary-cards.js,A,185,False,5fd20d336d229477dd0660b6de776556f3c0875c29497bba402eeb7df4b1ed7b,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/data-mining-engine/index.js,A,280,False,fdfb26ca8a788478ca03a502777208b0e43f0f3f86a00c46ebc2db04a231e172,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/data-mining-engine/pipeline/dossier-store.js,A,137,False,cbec8551f5bd01f035f6bfd463565c17ff702831cb9a2742249ad12b06ec37f2,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/data-mining-engine/pipeline/evidence-ledger.js,A,152,False,b04b1da20c705024c55169b754de2478c07efb222a6f120f9dabe0154bdd9064,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/data-mining-engine/pipeline/handoff-validator.js,A,136,False,3f6d8aed6e43f3d8ae3d89c359f20076580a9f29aa3482d8cf03845fb3eadbb1,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/data-mining-engine/pipeline/message-envelope.js,A,122,False,e51f52a9a48660b0665f4488ee8c3de98bca27f6b0668d8c5c9c66028a0375e7,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/duration-constraint/duration-constraint-manager.js,A,177,False,f69c1a427812fbe1b12fc027a3bef316c635ebf9da3c57fe4898f12107a2275f,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/field-quality/field-check-agent.js,A,784,False,e5ba6cc6252fb478c90b20eba771eb1e4f8efe200f2e7cc30db601747d737105,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/field-quality/field-quality-pipeline.js,A,309,False,46b81198f761f14a93b8dd1367be0ff644e176097ae8c58b54f014c979807ca0,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/field-quality/field-repair-agent.js,A,977,False,eecf64c3294efcd714de6f76d0a4658b134c04ed38f7a6ce2a3b665ba4646177,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/field-quality/index.js,A,31,False,2f0949b92933b836f40631e465bd329f551e5ccd5fb1f34328ab5927213f17ad,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/field-quality/json-salvage.js,A,110,False,2f35e1c01b5d59426aa7ee8d9ccf201026489c04f48e950d27c26bad96245ad1,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/production-engine/agents/base-agent.js,A,439,False,150d39846cb20be3b8d79701a16e5f9ade6edffce08746c76dacd44a11cf8f09,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/production-engine/phases/phase-1-scene-design.js,A,212,False,a2484d2914b2db1c2d154f69b83521d7d668d6e3e47c3d70f6dce39ec164c48b,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/production-engine/phases/phase-2-visual-audio.js,A,154,False,5cc80e7c18e191b1d551912dda6bef2a2b1f0975749990ab3b42b17b862d14c2,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/production-engine/phases/phase-3-5-field-quality.js,A,86,False,52a608ee1172a0d6778d499e3890ff10f0b2df8533f9e43327b189f0e8c0ceb7,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/production-engine/phases/phase-3-prompt-fusion.js,A,316,False,0dac2c1372ac8c4c58d319c14fbc1e6df610ed38954d1f417dded59e9f4399b7,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/production-engine/phases/phase-executor.js,A,62,False,04f4dbc3947ab1ceea8829d2b286222a42586a96beda700fccd0c4c1ea3480d6,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/production-engine/production-engine.js,A,1825,False,6c5feb471b10eede541d637cfc3b75cd7e46f71c3a367a9c22eba01bdcc01e37,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/production-engine/utils/rule-fallback.js,A,116,False,0ef82303384b09471ba32f9173af0cf599402fedafd72825f7ae11e4e91d47c6,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/rendering-engine/rendering-engine.js,C,529,False,c91e4b867fc59a512e5a7a64d696afaed03e12851ddfeab29591e3781d7b1ce7,仅所列边界或相关区段；其余代码未作逐行审计。
+vendor/supermickey/hyperreality-system/engines/requirement-discovery-engine.js,A,1009,False,9732b1debc526cc2dce0ab2cf1c7e8044bf0a780cff1c6bb9b66aac6978e1fad,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/script-engine/core/adapter.js,A,572,False,5bd3b1d873de29fc724b4eb3ffcae14b432cc043defbd30859d5c4a6171c227c,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/script-engine/core/boundary-prompt-templates.js,A,240,False,7c472fe4a7be6a200338eefaf0fc12c781f4f3895e32f998ce67f2010aa7c1db,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/script-engine/core/creative-intensity-engine.js,A,836,False,88a892f83abe6264698b9e17c9925edc47901f9fa6973006e57259360dcfe0ef,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/script-engine/core/intent-parser.js,A,399,False,74d8cad8eb44ae514ef5578a947ae81b97d54eb92e3a3c08669f20d79c02125b,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/script-engine/core/profile-resolver.js,A,165,False,a7bfbe10b219e5fa0bba71ae0203ac4188787a6eebb7b4d9176d68e768314f33,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/script-engine/core/requirement-list-builder.js,A,1113,False,e965e7223ee11e8dbcc96a9fcc71296414bf9dedfaad4e5797298cd8c981350d,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/script-engine/core/scene-type-normalizer.js,A,185,False,8dd9416aaa8cd29d6e6606b2881c16a9721241e9ed5a8bded8f4752db5ed18a3,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/script-engine/core/script-blueprint.js,A,152,False,d8aea579823f5dc3203ab8e0a7b08fae188892edb05cb119a576cb76bf6672e1,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/script-engine/core/script-generator.js,A,1378,False,289d926c8220b97cd0eb3d762684325eb00732789053dee11e993ef447d8726e,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/script-engine/core/script-validator.js,A,751,False,79a5587409f7ba3b8c01ef75e1a983fb49ba34b7a93c6e11959ecccc5a752388,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/script-engine/index.js,A,301,False,40b7cc50549f5da253d56757c7b549b7b79de04a456e592d8c2b7e118d3c89c2,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/engines/truth-check-bridge.js,B,202,False,bbbb0f7e509c86c7c3a98d7781eee7665f819ba3e7c036284a373789bb40cb7d,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+vendor/supermickey/hyperreality-system/index.js,A,4126,True,c8719217200cca1c36dc4743455323d9290198950c929620cf698a055a121109,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/package.json,A,31,False,e4f7e60c3c0e30215c4937504cc9d4500a73c5ddb94fd32f8bf731f1ae1c8e6c,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。
+vendor/supermickey/hyperreality-system/skills/marketing-brief/index.js,B,132,False,30b5d185dce1baf8601087036bbc4ae3b894039ab901299d1e2f2dbdaf4f1dca,Git 树、字节散列、导入/引用机检；没有全文精读结论。
+vendor/supermickey/scripts/render-submitter-core.js,C,477,False,07dba0fadb4a8ad0a60026d50b1d0cd18f11934b2ca0f68162428f290b0b7cd0,仅所列边界或相关区段；其余代码未作逐行审计。
+vendor/supermickey/systems/llm-reasoning-engine.js,A,529,False,a1fd1cb59c8991dfdaee406113f51859c145f6689be1a13499ac4be97c0231e0,按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。

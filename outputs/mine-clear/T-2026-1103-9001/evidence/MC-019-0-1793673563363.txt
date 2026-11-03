@@ -1,0 +1,36 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2
+
+
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+   Start at  10:39:23
+   Duration  1.33s (transform 11ms, setup 0ms, import 17ms, tests 1.26s, environment 0ms)
+
+
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+   ⚠️ PRD 生成失败: PRD_MODEL_UNAVAILABLE,使用兜底模式
+
+❌ [系统错误] HOST_PRD_UNVERIFIED: 未生成并核实本次 PRD，停止后续剧本、定妆照及生成调用
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+
+❌ [Layer 1 失败] PROBE_SCRIPT_BOUNDARY_REACHED
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+   ⚠️ PRD 生成失败: PRD_MODEL_UNAVAILABLE,使用兜底模式
+
+❌ [Layer 1 失败] PROBE_SCRIPT_BOUNDARY_REACHED
+
+exit_code=0 signal=none error=none
+assertion_validation={"ok":true,"errors":[]}

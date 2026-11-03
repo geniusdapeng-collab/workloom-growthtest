@@ -1,0 +1,161 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2
+
+ ❯ apps/server/src/video/render-poller.pg.test.ts (9 tests | 8 failed) 164ms
+     × running progress is written with real app-role RLS, rather than a zero-row bare update 29ms
+     × missing-provider timeout persists a scoped terminal row and its failure event 2ms
+     × a nonmock accepted task cannot become mock:// success after provider credentials disappear 15ms
+     × a real task ID beginning mock- still uses the real provider and a truthful receipt 5ms
+     × a simulated row uses its persisted mock flag even when its task ID has no prefix 2ms
+     × a failed first download is retried from its persisted result without a second generation or completion event 12ms
+     × concurrent batches finalize one job once and cannot duplicate its completion event 91ms
+     × terminal transaction failure releases the gateway client and leaves a retryable job 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/server/src/video/render-poller.pg.test.ts > render poller persisted recovery and isolation > running progress is written with real app-role RLS, rather than a zero-row bare update
+AssertionError: expected 'submitted' to be 'rendering' // Object.is equality
+
+Expected: "rendering"
+Received: "submitted"
+
+ ❯ apps/server/src/video/render-poller.pg.test.ts:45:34
+     43|     const report = await pollRenderJobs(app, gateway, scope, options(a…
+     44|     expect(report.running).toBe(1);
+     45|     expect((await job()).status).toBe("rendering");
+       |                                  ^
+     46|   });
+     47|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  apps/server/src/video/render-poller.pg.test.ts > render poller persisted recovery and isolation > missing-provider timeout persists a scoped terminal row and its failure event
+AssertionError: expected 'submitted' to be 'failed' // Object.is equality
+
+Expected: "failed"
+Received: "submitted"
+
+ ❯ apps/server/src/video/render-poller.pg.test.ts:52:34
+     50|     const report = await pollRenderJobs(app, gateway, scope, { pool: n…
+     51|     expect(report.failed).toBe(1);
+     52|     expect((await job()).status).toBe("failed");
+       |                                  ^
+     53|     expect(await actions()).toEqual(["render.failed"]);
+     54|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  apps/server/src/video/render-poller.pg.test.ts > render poller persisted recovery and isolation > a nonmock accepted task cannot become mock:// success after provider credentials disappear
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ apps/server/src/video/render-poller.pg.test.ts:68:25
+     66|     const fetch = vi.fn(async () => { throw new Error("no outbound req…
+     67|     const report = await pollRenderJobs(app, gateway, scope, { ingest:…
+     68|     expect(report.done).toBe(0); expect((await job()).result_url).toBe…
+       |                         ^
+     69|     expect(await actions()).toEqual([]); expect(fetch).not.toHaveBeenC…
+     70|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  apps/server/src/video/render-poller.pg.test.ts > render poller persisted recovery and isolation > a real task ID beginning mock- still uses the real provider and a truthful receipt
+AssertionError: expected "vi.fn()" to be called with arguments: [ 'mock-prefix-real-task' ]
+
+Number of calls: 0
+
+ ❯ apps/server/src/video/render-poller.pg.test.ts:76:18
+     74|     const poll = vi.fn(async () => ({ status: "succeeded" as const, ur…
+     75|     await pollRenderJobs(app, gateway, scope, options(poll, { ingest: …
+     76|     expect(poll).toHaveBeenCalledWith("mock-prefix-real-task");
+       |                  ^
+     77|     expect((await job()).result_url).toBe(uri);
+     78|     const event = (await owner.query(`SELECT payload FROM biz_events W…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  apps/server/src/video/render-poller.pg.test.ts > render poller persisted recovery and isolation > a simulated row uses its persisted mock flag even when its task ID has no prefix
+AssertionError: expected "vi.fn()" to not be called at all, but actually been called 1 times
+
+Received:
+
+  1st vi.fn() call:
+
+    Array [
+      "accepted-task",
+    ]
+
+
+Number of calls: 1
+
+ ❯ apps/server/src/video/render-poller.pg.test.ts:87:22
+     85|     const poll = vi.fn(async () => { throw new Error("real provider mu…
+     86|     const report = await pollRenderJobs(app, gateway, scope, options(p…
+     87|     expect(poll).not.toHaveBeenCalled(); expect(report.done).toBe(1);
+       |                      ^
+     88|     const event = (await owner.query(`SELECT payload FROM biz_events W…
+     89|       AND payload->'decision'->>'action'='render.complete'`, [scope.wo…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+ FAIL  apps/server/src/video/render-poller.pg.test.ts > render poller persisted recovery and isolation > a failed first download is retried from its persisted result without a second generation or completion event
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ apps/server/src/video/render-poller.pg.test.ts:102:29
+    100|     const retryFetch = vi.fn(async () => new Response(png, { headers: …
+    101|     const second = await pollRenderJobs(app, gateway, scope, options(p…
+    102|     expect(second.ingested).toBe(1); expect((await job()).asset_id).to…
+       |                             ^
+    103|     expect(poll).toHaveBeenCalledTimes(1); expect(retryFetch).toHaveBe…
+    104|     expect((await actions()).filter(action => action === "render.compl…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯
+
+ FAIL  apps/server/src/video/render-poller.pg.test.ts > render poller persisted recovery and isolation > concurrent batches finalize one job once and cannot duplicate its completion event
+AssertionError: expected "vi.fn()" to be called 1 times, but got 2 times
+ ❯ apps/server/src/video/render-poller.pg.test.ts:116:18
+    114|     await new Promise(resolve => setTimeout(resolve, 30)); release();
+    115|     await Promise.all([first, second]);
+    116|     expect(poll).toHaveBeenCalledTimes(1);
+       |                  ^
+    117|     expect((await actions()).filter(action => action === "render.compl…
+    118|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/8]⎯
+
+ FAIL  apps/server/src/video/render-poller.pg.test.ts > render poller persisted recovery and isolation > terminal transaction failure releases the gateway client and leaves a retryable job
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ apps/server/src/video/render-poller.pg.test.ts:128:24
+    126|     try {
+    127|       await expect(pollRenderJobs(app, faultGateway, scope, options(as…
+    128|       expect(released).toBe(true); expect((await job()).status).toBe("…
+       |                        ^
+    129|     } finally { if (!released) client.release(); }
+    130|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/8]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  8 failed | 1 passed (9)
+   Start at  09:25:19
+   Duration  1.12s (transform 515ms, setup 0ms, import 879ms, tests 164ms, environment 0ms)
+
