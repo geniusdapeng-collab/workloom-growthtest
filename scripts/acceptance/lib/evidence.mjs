@@ -4,6 +4,7 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { hashBytes, ITEM_SCHEMA, INDEX_SCHEMA, revisionOf, verifyAcceptanceItem, verifyArtifact, verifyRun } from "../../delivery/evidence.mjs";
 import { DEEPSEEK_GATEWAY_CNY_PER_1K, LIVE_BUDGET_CAPS } from "./live/budget.mjs";
+import { DSH_DEEPSEEK_DEFAULTS } from "./live/providers.mjs";
 import { verifyRegressionSummary } from "./regression-evidence.mjs";
 
 const EXECUTOR_CHECKLIST = fileURLToPath(new URL("../../../docs/acceptance/checklist.v3.json", import.meta.url));
@@ -252,7 +253,9 @@ export function validateProductionFiles(context, live) {
         if (task?.chain !== "model-gateway" || receipt?.kind !== "model-gateway" || receipt.requestHash !== reservation.llmRequestHash
           || receipt.contextTokens !== reservation.tokens || receipt.tokens !== reservation.settlement?.tokens
           || typeof receipt.id !== "string" || !receipt.id.trim() || !/^[a-f0-9]{64}$/u.test(receipt.responseHash ?? "")
-          || receipt.requestedModel !== receipt.model || receipt.finishReason !== "stop" || receipt.usageComplete !== true
+          || receipt.requestedModel !== DSH_DEEPSEEK_DEFAULTS.model || receipt.model !== receipt.requestedModel
+          || receipt.endpoint !== `${DSH_DEEPSEEK_DEFAULTS.openAiBaseURL}/chat/completions`
+          || receipt.finishReason !== "stop" || receipt.usageComplete !== true
           || ![receipt.inputTokens, receipt.outputTokens, receipt.inputTokenEstimate, receipt.outputCeiling, receipt.maxOutputTokens].every(value => Number.isSafeInteger(value) && value >= 0)
           || receipt.outputCeiling < 1 || receipt.outputCeiling !== Math.min(receipt.maxOutputTokens, receipt.contextTokens - receipt.inputTokenEstimate)
           || receipt.outputTokens > receipt.outputCeiling || receipt.inputTokens + receipt.outputTokens !== receipt.tokens

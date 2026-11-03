@@ -321,7 +321,7 @@ function fullAcceptance({ boundedGateway = false } = {}) {
     liveTask.chain = "model-gateway";
     liveTask.usage = { inputTokens: 2, outputTokens: 3 };
     Object.assign(liveTask.receipt, {
-      model: "deepseek-v4.1-flash", requestedModel: "deepseek-v4.1-flash", endpoint: "https://api.deepseek.com/chat/completions",
+      model: "deepseek-flash", requestedModel: "deepseek-flash", endpoint: "https://api.deepseek.com/chat/completions",
       contextTokens, maxOutputTokens: 393_216, inputTokenEstimate: 16, outputCeiling: 393_216, requestHash,
       responseHash: sha("synthetic gateway response"), tokens: 5, ...liveTask.usage, finishReason: "stop", usageComplete: true,
     });
@@ -510,6 +510,23 @@ test("G05 bounded gateway rejects an earlier over-admission even if actual usage
   });
   rebindAcceptance(f);
   assert.notEqual(cli(report, f.dir, ["--root", f.root]).status, 0);
+});
+
+for (const [field, mutate] of [
+  ["model", (receipt) => { receipt.model = receipt.requestedModel = "deepseek-v4.1-flash"; }],
+  ["endpoint", (receipt) => { receipt.endpoint = "https://proxy.fixture.invalid/chat/completions"; }],
+]) test(`G05 bounded gateway rejects a rebound receipt with a different ${field}`, () => {
+  const f = fullAcceptance({ boundedGateway: true });
+  for (const path of ["live/live-report.json", "live/receipts/fixture-task.json", "live/transcripts/fixture-task.json"]) {
+    const file = join(f.root, path);
+    const value = JSON.parse(readFileSync(file));
+    mutate(value.tasks?.[0]?.receipt ?? value.receipt);
+    json(file, value);
+  }
+  rebindAcceptance(f);
+  assert.notEqual(cli(report, f.dir, ["--root", f.root]).status, 0);
+  const summary = JSON.parse(readFileSync(join(f.root, "report-summary.json")));
+  assert.ok(summary.validationErrors.includes("fixture-task 网关请求/供应商计量与预算账本不一致"));
 });
 
 test("G05 measured zero-output video reservation reconciles zero actual clips (synthetic arithmetic control)", () => {
