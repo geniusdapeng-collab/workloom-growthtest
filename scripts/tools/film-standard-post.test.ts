@@ -317,11 +317,12 @@ test("a missing previously issued original fails instead of silently entering a 
   assert.equal(existsSync(f.receipt), true);
 }));
 
-async function unusualCompletedFixture(options: { audio?: boolean; nominalSeconds?: number; videoFrames?: number; tailMarker?: boolean; providerCanvas?: boolean } = {}) {
+async function unusualCompletedFixture(options: { audio?: boolean; nominalSeconds?: number; videoFrames?: number; tailMarker?: boolean; providerCanvas?: boolean; dialogue?: boolean } = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "standard-raw-completed-"))), projectId = "MOCK-RAW-COMPLETED";
   const nominalSeconds = options.nominalSeconds ?? 10, videoFrames = options.videoFrames ?? 241, actualSeconds = videoFrames / 24;
   const bytes = Buffer.from(JSON.stringify({ projectId, title: "原片后期", durationSeconds: nominalSeconds, aspect: "9:16", resolution: options.providerCanvas ? "provider-original" : "720p", fps: 24,
-    shots: [{ shotId: "S1", duration: nominalSeconds, scene: "已生成的原镜头", action: "保留原镜头", dialogue: [{ speaker: "原片", text: options.audio ? "原片原声" : "原片无声" }] }] }));
+    shots: [{ shotId: "S1", duration: nominalSeconds, scene: "已生成的原镜头", action: "保留原镜头",
+      dialogue: options.dialogue === false ? [] : [{ speaker: "原片", text: options.audio ? "原片原声" : "原片无声" }] }] }));
   const submitted = await freezeOriginalSubmission({ productionRoot: root, projectId, bytes });
   const clips = join(root, "clips", projectId); mkdirSync(clips, { recursive: true });
   const sourceFilter = options.providerCanvas ? "color=c=blue:s=144x256:r=24" : "color=c=black:s=162x122:r=24";
@@ -545,8 +546,12 @@ test.each(["sidecar", "burn", "danmaku", "softmux"])("whole normal CLI stops aft
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 }, 240_000);
 
-test("whole normal CLI completes all official post stages with current technical QA and no source artistic or model review", async () => {
-  const f = await unusualCompletedFixture({ audio: true });
+test.each([
+  { mode: "burn", dialogue: true },
+  { mode: "burn", dialogue: false },
+  { mode: "sidecar", dialogue: false },
+])("whole normal CLI completes all official post stages with current technical QA (mode=$mode, dialogue=$dialogue)", async ({ mode, dialogue }) => {
+  const f = await unusualCompletedFixture({ audio: true, dialogue });
   try {
     const shots = join(f.root, "source.json"), denyNetwork = join(f.root, "deny-network.mjs"), binary = join(f.root, "no-quality-ffmpeg.mjs"), commands = join(f.root, "commands.jsonl");
     writeFileSync(shots, f.bytes);
@@ -555,7 +560,8 @@ test("whole normal CLI completes all official post stages with current technical
     writeFileSync(binary, `#!${process.execPath}\nimport {spawnSync} from 'node:child_process';\nimport fs from 'node:fs';\nconst args=process.argv.slice(2);\nfs.appendFileSync(${JSON.stringify(commands)},JSON.stringify(args)+'\\n');\nif(args.some(arg=>/edgedetect|blurdetect|bbox=/.test(arg))){process.stderr.write('forbidden source artistic review');process.exit(87); }\nconst result=spawnSync(${JSON.stringify(actualFfmpeg)},args,{stdio:'inherit'});\nif(result.error){process.stderr.write(result.error.message);process.exit(52); }\nprocess.exit(result.status??53);\n`); chmodSync(binary, 0o755);
     const output = join(f.root, "delivery");
     const result = spawnSync(process.execPath, ["--import", "tsx", "--import", denyNetwork, cli, "--shots", shots,
-      "--work-dir", f.root, "--out", output, "--keys-file", join(f.root, "nonexistent.env"), "--stages", "voice,compose,color,subtitle,danmaku,bgm,cover,mux,master,deliver"],
+      "--work-dir", f.root, "--out", output, "--keys-file", join(f.root, "nonexistent.env"), "--stages", "voice,compose,color,subtitle,danmaku,bgm,cover,mux,master,deliver",
+      ...(mode === "sidecar" ? ["--subtitle-mode", mode] : [])],
     { cwd: repo, encoding: "utf8", timeout: 240_000, env: { ...process.env, FILM_WORKER_MODE: "", WL_FFMPEG: binary, WL_FFPROBE: ffprobe,
       WORKLOOM_POST_FFMPEG_PATH: binary, WORKLOOM_POST_FFPROBE_PATH: ffprobe,
       WORKLOOM_COLOR_FFMPEG_PATH: binary, WORKLOOM_COLOR_FFPROBE_PATH: ffprobe,
@@ -569,8 +575,16 @@ test("whole normal CLI completes all official post stages with current technical
     for (const stage of ["compose", "color", "subtitle", "danmaku", "bgm", "cover", "mux", "master", "deliver"]) {
       assert.equal(records.some(row => row.stage === stage && row.ok === true), true, stage);
     }
+    const mux = records.find(row => row.stage === "mux");
+    assert.deepEqual(mux?.evidence,
+      { mode, applicable: false, reason: mode === "burn" ? "burn-only-subtitle-mode" : "no-authored-dialogue" });
+    assert.equal(mux?.lineage?.status, "not_applicable");
+    const subtitle = records.find(row => row.stage === "subtitle");
+    assert.equal(subtitle?.invoked, dialogue);
+    assert.equal(subtitle?.lineage?.status, dialogue ? "passed" : "not_applicable");
     const pointer = JSON.parse(readFileSync(join(output, "current.json"), "utf8"));
     const manifest = JSON.parse(readFileSync(join(pointer.releaseDir, `${f.projectId}-delivery-manifest.json`), "utf8"));
+    assert.deepEqual(manifest.subtitles, { sidecarDir: null, softsub: null, burned: dialogue });
     assert.equal(manifest.variants.length, 3);
     assertDefaultAiColors(manifest, records);
     assert.equal(manifest.distinctness.status, "not-reviewed");

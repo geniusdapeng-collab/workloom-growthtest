@@ -8,6 +8,7 @@ import type { ProducerGateOptions, ProducerVerdict } from "./producer-gate.js";
 import { POST_RENDER_STAGES } from "./post-render-acceptance.js";
 import { assertFilmVideoSubmissionReceipt, type FilmVideoReferenceInput, type FilmVideoSubmissionReceipt } from "./film-worker-provenance.js";
 import { adaptCharacterVisualVerdict, characterReleaseHash, type CharacterIdentityEvidence, type CharacterIdentityReviewRequest } from "./character-release-contract.js";
+import { dialogueLines } from "./dialogue-contract.js";
 
 export const FILM_CLI_STAGES = Object.freeze(["cine-kb", "continuity", "micromotion", "spec", "plates", "material-gen", "videos", "voice", "compose", "color", "subtitle", "danmaku", "bgm", "sfx", "cover", "mux", "master", "deliver", "revise"]);
 const valueOptions = new Set(["aspect", "resolution", "quality", "platform", "fps", "max-attempts", "xfade", "cut-transition", "cut-transition-duration", "cut-transition-at", "subtitle-mode", "subtitle-lang", "cover-platform", "cover-hero", "cover-hook", "theme", "account", "only", "review-policy", "route-kind", "assembly-mode", "assembly-reason", "revise-note", "revision-context", "narration-profile", "enhance-kind", "opening-title"]);
@@ -72,8 +73,13 @@ export function assertFilmStageCoverage(stages: string[], options: Record<string
         : stage === "material-gen" ? material(shot)
           : stage === "voice" ? ((shot.dialogue ?? []) as Record<string, unknown>[]).map((entry) => String(entry.text ?? "")).filter(Boolean).join(" ").length > 0
             : true;
+  const hasAuthoredDialogue = [...selected.values()].some(shot => dialogueLines(shot).length > 0);
+  const subtitleMode = normalized["subtitle-mode"] ?? "burn";
+  const hasOpeningTitle = subtitleMode !== "sidecar" && normalized["no-title-card"] !== true
+    && Boolean(String(normalized["opening-title"] ?? "").trim());
   const globalNotApplicable = (stage: string): boolean =>
-    stage === "mux" && normalized["subtitle-mode"] === "burn"
+    stage === "mux" && (subtitleMode === "burn" || !hasAuthoredDialogue)
+    || stage === "subtitle" && !hasAuthoredDialogue && !hasOpeningTitle
     || stage === "danmaku" && normalized["no-danmaku"] === true
     || stage === "revise" && !String(normalized["revise-note"] ?? "").trim();
   const latest = new Map<string, Record<string, unknown>>();
