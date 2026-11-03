@@ -230,6 +230,55 @@ async function archiveOutput(projectId: string, attempt: number) {
 }
 
 describe("预生产原始结果与诚实终态", () => {
+  it("并发预生产只归档当前运行日志，结束顺序不影响另一个工作区", async () => {
+    useNarrativeProject();
+    const scopeB = { tenantId: "tenant-logs-b", workspaceId: "ws-logs-b" };
+    const projectA = `VID-log-a-${++projectSequence}`;
+    const projectB = `VID-log-b-${++projectSequence}`;
+    function signal() {
+      let resolve!: () => void;
+      const promise = new Promise<void>((done) => { resolve = done; });
+      return { promise, resolve };
+    }
+    const a = signal();
+    const b = signal();
+    const aReady = signal();
+    const bReady = signal();
+    doubles.runPreproduction
+      .mockImplementationOnce(async () => {
+        console.log("run-a-private-before"); aReady.resolve();
+        await a.promise; console.warn("run-a-private-after"); return rejected();
+      })
+      .mockImplementationOnce(async () => {
+        console.log("run-b-private-before"); bReady.resolve();
+        await b.promise; console.error("run-b-private-after"); return rejected();
+      });
+    const originals = [console.log, console.warn, console.error];
+    const runA = worker.startRun(scope, { projectId: projectA, intent: "山间日出" });
+    let runB: string | undefined;
+    try {
+      await aReady.promise;
+      runB = worker.startRun(scopeB, { projectId: projectB, intent: "海边日落" });
+      await bReady.promise;
+      console.log("unscoped-server-log");
+      a.resolve();
+      await vi.waitFor(() => expect(worker.getRun(runA, scope.workspaceId)?.finishedAt).toBeTruthy());
+    } finally {
+      a.resolve();
+      b.resolve();
+      if (runB) await vi.waitFor(() => expect(worker.getRun(runB!, scopeB.workspaceId)?.finishedAt).toBeTruthy());
+    }
+    const [logA, logB] = await Promise.all([projectA, projectB].map((id) =>
+      readFile(path.join(doubles.workDir, "logs", `${id}.log`), "utf8")));
+    expect(logA).toContain("run-a-private-before");
+    expect(logA).toContain("run-a-private-after");
+    expect(logA).not.toMatch(/run-b-private|unscoped-server-log/);
+    expect(logB).toContain("run-b-private-before");
+    expect(logB).toContain("run-b-private-after");
+    expect(logB).not.toMatch(/run-a-private|unscoped-server-log/);
+    expect([console.log, console.warn, console.error]).toEqual(originals);
+  });
+
   it("执行前输入快照保留原始需求与metadata供恢复，不能只保存加工正文", async () => {
     useNarrativeProject(); doubles.runPreproduction.mockResolvedValue(success());
     const projectId = `VID-resume-source-${++projectSequence}`;

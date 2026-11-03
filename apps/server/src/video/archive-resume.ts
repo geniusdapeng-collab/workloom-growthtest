@@ -42,7 +42,7 @@ export interface ResumeOptions {
   projectId: string;
   /** 人工裁决：强制从指定环节重跑 */
   fromStage?: string;
-  /** 预生产续跑需要（缺省读 video_projects.title） */
+  /** 可选覆盖预生产需求；缺省使用归档原始需求 */
   intent?: string;
   /** 复用既有补跑入口（router 传 `startRun(scope, …)`） */
   startRun: (input: {

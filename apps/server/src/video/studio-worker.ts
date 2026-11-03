@@ -12,6 +12,7 @@
  *      本工作器以 run 注册表 aborted 位实现同等中止语义（轮询每拍检查）。
  */
 import path from "node:path";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { getAppPool, getGatewayPool } from "@workloom/db";
@@ -154,20 +155,11 @@ function dataMiningConfigFor(
 }
 
 /**
- * 运行日志 tee（2026-09-22 真机审计需求）：
- * 预生产的 vendor 环节日志此前只进服务端 stdout（TTY），run 结束即丢，事后无法逐环节审计。
- * 这里在 run 期间把 console 输出旁路落盘到 `.vm-work/logs/<projectId>.log`（原样透传，不改语义），
- * 供 `scripts/tools/pipeline-audit.mts` 逐环节核对"是否正常产出/是否流转".
+ * 审计日志继续写 logs/<projectId>.log。console 只包装一次，异步上下文决定哪条
+ * 运行接收副本；进程其他日志只发往原输出。独立订阅支持乱序退出。
  */
-/**
- * C-07 修复：全局 console 劫持改为"单一包装 + 订阅者引用计数"。
- * 此前每个 run 各自捕获"当前"console 为 originals——并发两个 run 时 B 捕获的是 A 的包装器，
- * A 先结束恢复后，B 结束会把 console 永久还原成 A 的包装器（日志继续写入已结束 run 的文件，
- * 且后续 run 的恢复链彻底错位）。
- * 现在：console 只被包装一次（真正 originals 只捕获一次），各 run 以订阅者身份注册自己的
- * 日志文件，取消订阅时引用计数归零才还原 console——先后结束顺序任意都不错位。
- */
-const teeSubscribers = new Map<string, (level: string, args: unknown[]) => void>();
+const runLogContext = new AsyncLocalStorage<symbol>();
+const teeSubscribers = new Map<symbol, (level: string, args: unknown[]) => void>();
 let teeInstalled: { originals: Array<(...args: unknown[]) => void> } | null = null;
 
 function formatTeeLine(args: unknown[]): string {
@@ -188,13 +180,8 @@ function installTee(): void {
   const originals = methods.map((m) => console[m] as (...args: unknown[]) => void);
   methods.forEach((m, i) => {
     (console as unknown as Record<string, unknown>)[m] = (...args: unknown[]) => {
-      for (const write of teeSubscribers.values()) {
-        try {
-          write(m.toUpperCase(), args);
-        } catch {
-          /* 单个订阅者失败不影响其他订阅者与原输出 */
-        }
-      }
+      const token = runLogContext.getStore();
+      if (token) teeSubscribers.get(token)?.(m.toUpperCase(), args);
       originals[i]!.apply(console, args);
     };
   });
@@ -210,12 +197,13 @@ function uninstallTeeIfIdle(): void {
   teeInstalled = null;
 }
 
-function teeRunLogs(projectId: string): () => void {
+function teeRunLogs(projectId: string, token: symbol): () => void {
   const logDir = path.join(WORK_DIR, "logs");
   const logFile = path.join(logDir, `${projectId}.log`);
   try {
     mkdirSync(logDir, { recursive: true });
-  } catch {
+  } catch (error) {
+    console.warn("[studio-worker] 无法创建运行日志目录", error);
     return () => undefined;
   }
   const write = (level: string, args: unknown[]) => {
@@ -225,13 +213,13 @@ function teeRunLogs(projectId: string): () => void {
       /* 日志落盘失败不影响运行 */
     }
   };
-  teeSubscribers.set(projectId, write);
+  teeSubscribers.set(token, write);
   installTee();
   let released = false;
   return () => {
     if (released) return; // 幂等：重复调用不破坏其他 run 的订阅
     released = true;
-    teeSubscribers.delete(projectId);
+    teeSubscribers.delete(token);
     uninstallTeeIfIdle();
   };
 }
@@ -637,10 +625,6 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
     maxCharactersPerShot: 1,
     log: (line) => console.log(line),
   });
-  /** run 期间的全部 console 输出落盘（逐环节审计证据；run 结束摘除） */
-  const restoreRunLogs = teeRunLogs(input.projectId);
-  console.log(`[studio-worker] run 日志开始落盘：${path.join(WORK_DIR, "logs", `${input.projectId}.log`)}`);
-
   const entry: RunEntry = {
     runId: input.allocatedRunId??newId("RUN"),
     projectId: input.projectId,
@@ -1102,13 +1086,15 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
   };
 
   // 异步执行：不阻塞 tRPC 响应；终态只写注册表投影（生命周期事件由 onEvent 落库）
-  void (async () => {
+  const runLogToken = Symbol(entry.runId);
+  void runLogContext.run(runLogToken, async () => {
     /**
      * 项目级执行者租约（规格书 §11：同一项目同一时刻只允许一个执行者，杜绝双写与重复烧额度）。
      * 会话级 advisory lock 持有到 run 结束；进程被 kill -9 → 连接断开 → 锁自动释放。
      */
     let activeLease: Awaited<ReturnType<typeof acquireProjectLease>> = null;
     let detachStructuredLog: (() => void) | null = null;
+    let restoreRunLogs: (() => void) | null = null;
     let projectMeta: Awaited<ReturnType<typeof readProjectMeta>> = null;
     try {
       activeLease = await acquireProjectLease(scope, input.projectId);
@@ -1119,6 +1105,8 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
       if (!projectMeta) throw new Error(`PROJECT_NOT_FOUND: 项目 ${input.projectId} 不存在或不属于当前工作区`);
       if (projectMeta.kind !== pipelineKind) throw new Error("PIPELINE_KIND_MISMATCH：预生产管线与服务项目类型不一致");
       if(directorMode) await verifyDirectorGrant({...scope,projectId:input.projectId,runId:entry.runId},input.creativeDelegation);
+      restoreRunLogs = teeRunLogs(input.projectId, runLogToken);
+      console.log(`[studio-worker] run 日志开始落盘：${path.join(WORK_DIR, "logs", `${input.projectId}.log`)}`);
       await archive.ensure({ kind: projectMeta.kind, title: projectMeta.title, createdAt: projectMeta.createdAt });
       studioShadow = await ignorePipelineShadow("studio-start", () => createShadowSession({
         scope,
@@ -1664,8 +1652,8 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
       for (const cleanup of [
         () => detachStructuredLog?.(),
         () => activeLease?.release(),
-        restoreRunLogs,
         uninstallPortraitBinding,
+        () => restoreRunLogs?.(),
       ]) {
         try {
           await cleanup();
@@ -1678,7 +1666,7 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
       }
       entry.finishedAt = new Date().toISOString();
     }
-  })();
+  });
 
   return entry.runId;
 }
