@@ -29,8 +29,8 @@ import {
   attachStructuredLog,
   classifyError,
   withVendorEngineBridge,
-  installVendorPortraitBindingBridge,
-  installVendorRenderCompatBridge,
+  withVendorPortraitBindingBridge,
+  type PortraitBindingBridgeOptions,
   pipelineSha256,
   resolveVideoModel,
   reviewStage,
@@ -598,8 +598,6 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
   };
   if(directorMode)llm.attachConfiguredRouter(studioRouter);else llm.attachRouter(studioRouter);
 
-  // 逐镜渲染的入参归一（空 portraits 数组会以 characterRef.split 崩溃，见 vendor-compat.ts）
-  installVendorRenderCompatBridge();
   /**
    * 定妆照绑定桥：把「定妆照集」回填成渲染认得 `characterRef`（真机 2026-09-21：
    * vendor 只写 portraitBindings，渲染侧读 characterRef，中间断线 → 出了图也报
@@ -607,7 +605,7 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
    */
   const runWorkDir = path.join(WORK_DIR, "workspaces", scope.workspaceId);
   const portraitIndexPath = path.join(runWorkDir, "characters", input.projectId, "portrait-index.json");
-  const uninstallPortraitBinding = installVendorPortraitBindingBridge({
+  const portraitBindingOptions: PortraitBindingBridgeOptions = {
     resolveIndex: () => {
       try {
         if (!existsSync(portraitIndexPath)) return null;
@@ -618,7 +616,7 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
     },
     maxCharactersPerShot: 1,
     log: (line) => console.log(line),
-  });
+  };
   const entry: RunEntry = {
     runId: input.allocatedRunId??newId("RUN"),
     projectId: input.projectId,
@@ -1232,7 +1230,7 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
              * vendor 的提示词/分镜必须按本次选中的知识条目生成；G1 营销事实仍取自原始 input。
              */
             const r: Awaited<ReturnType<VideoStudio["runPreproduction"]>> = g1Approved
-              ? await withVendorEngineBridge(llm, () => studio.runPreproduction(runInput))
+              ? await withVendorEngineBridge(llm, () => withVendorPortraitBindingBridge(portraitBindingOptions, () => studio.runPreproduction(runInput)))
               : {
               success: false, stages: {}, confirmations: { hostG1: { approved: false, reason: "producer-rejected(G1_DOSSIER)：本次来源与事实未通过真实监制" } },
             };
@@ -1648,7 +1646,6 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
       for (const cleanup of [
         () => detachStructuredLog?.(),
         () => activeLease?.release(),
-        uninstallPortraitBinding,
         () => restoreRunLogs?.(),
       ]) {
         try {

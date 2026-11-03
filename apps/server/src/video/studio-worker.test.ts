@@ -94,8 +94,9 @@ vi.mock("@hyperreality/video-studio", async (importOriginal) => ({
   reviewStage: doubles.review,
   WorkloomLLMEngine: { fromEnv: () => ({ attachRouter: vi.fn(), attachConfiguredRouter: vi.fn() }) },
   withVendorEngineBridge: (_engine: unknown, run: () => Promise<unknown>) => run(),
-  installVendorRenderCompatBridge: vi.fn(),
-  installVendorPortraitBindingBridge: () => doubles.uninstall,
+  withVendorPortraitBindingBridge: async (_options: unknown, run: () => Promise<unknown>) => {
+    try { return await run(); } finally { doubles.uninstall(); }
+  },
   attachStructuredLog: () => doubles.detach,
 }));
 
@@ -427,7 +428,7 @@ describe("预生产原始结果与诚实终态", () => {
     expect(doubles.project.mock.calls[0]?.[3].dossierRoot).toBe(path.join(projectRoot, "stages/preproduction/attempt-2.marketing-dossier"));
     expect(worker.getRun(runId, "another-workspace")).toBeNull();
     expect(doubles.release).toHaveBeenCalledTimes(1);
-    expect(doubles.uninstall).toHaveBeenCalledTimes(1);
+    expect(doubles.uninstall).toHaveBeenCalledTimes(2);
   });
 
   it("默认：监制打回即停，不自动重跑（不再把 AI 打回变成重复烧钱）", async () => {
@@ -479,7 +480,7 @@ describe("预生产原始结果与诚实终态", () => {
     expect(doubles.lease).not.toHaveBeenCalled();
   });
 
-  it.each(["busy", "error"])("租约 %s 不会无锁执行，并清理已安装的桥", async (failure) => {
+  it.each(["busy", "error"])("租约 %s 不会安装供应商绑定桥或无锁执行", async (failure) => {
     if (failure === "busy") doubles.lease.mockResolvedValue(null);
     else doubles.lease.mockRejectedValue(new Error("lease network failed"));
     const { entry } = await runToTerminal();
@@ -487,7 +488,7 @@ describe("预生产原始结果与诚实终态", () => {
     expect(doubles.runPreproduction).not.toHaveBeenCalled();
     expect(doubles.meta).not.toHaveBeenCalled();
     expect(doubles.finish).not.toHaveBeenCalled();
-    expect(doubles.uninstall).toHaveBeenCalledTimes(1);
+    expect(doubles.uninstall).not.toHaveBeenCalled();
     expect(doubles.release).not.toHaveBeenCalled();
   });
 
@@ -502,7 +503,7 @@ describe("预生产原始结果与诚实终态", () => {
     expect(entry.status).toBe("failed");
     expect(doubles.runPreproduction).not.toHaveBeenCalled();
     expect(doubles.release).toHaveBeenCalledTimes(1);
-    expect(doubles.uninstall).toHaveBeenCalledTimes(1);
+    expect(doubles.uninstall).not.toHaveBeenCalled();
     if (failure !== "archive") {
       await expect(readFile(path.join(doubles.workDir, "archive", scope.workspaceId, projectId, "context-bundle.json"))).rejects.toMatchObject({ code: "ENOENT" });
     }
@@ -518,7 +519,7 @@ describe("预生产原始结果与诚实终态", () => {
     expect(doubles.release).toHaveBeenCalledTimes(1);
   });
 
-  it("解锁和日志清理抛错仍清理绑定桥并写终态", async () => {
+  it("绑定桥先随 vendor 退出，后续日志和解锁失败仍记录终态", async () => {
     doubles.runPreproduction.mockResolvedValue(success());
     doubles.detach.mockImplementation(() => { throw new Error("detach failed"); });
     doubles.release.mockRejectedValue(new Error("unlock failed"));
