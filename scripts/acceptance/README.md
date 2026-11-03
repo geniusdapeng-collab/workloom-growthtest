@@ -11,7 +11,7 @@ pnpm preview:all                  # 起真机（可用 profile.startup.command �
 pnpm acceptance:matrix            # L0 契约层 + L1 运行层：员工/技能/围栏矩阵
 pnpm acceptance:ui                # L3 页面层：路由 + 岗位档案页 + 技能中心 + 控制台
 pnpm acceptance:experience        # L4/L5：角色 × 旅程走查 + 术语/对比度/打扰机检
-pnpm acceptance:live              # P 域入口：缺少可信总量预算契约的真实 LLM 路线在调用前 blocked
+pnpm acceptance:live              # P 域入口：官方文本网关按独立总量预算预占，其它路径各有前置门禁
 pnpm acceptance:live:selftest     # P 域自有替身回归；媒体需实际下载与解码，业务能力仍未验证
 node scripts/acceptance/outcome.mjs --validate-only  # 本仓岗位/任务契约，只读、零模型调用
 node scripts/acceptance/outcome.mjs --selftest       # 执行器自有 HTTP 夹具；忽略外部目标、零模型/数据库调用
@@ -37,7 +37,7 @@ outputs/acceptance/
 
 ## 生产环境实测（P 域 · v3.1）
 
-本仓真实 LLM/产品派单入口在预占、登录、派单、子进程或供应商 HTTP 前阻断：当前服务不能提供总输入、输出、重试、工具与上下文的可信硬上界，`expectedTokens`/`maxTokens`/provider 标签不构成证明。未知 usage 保留预占并冻结后续付费任务；报告为 `blocked/unverified`、退出 2。O 域真实运行同样在调用前阻断；`--selftest` 只连接由执行器创建和关闭的本地 HTTP 夹具，不连接外部服务、SQL 或审批。
+正式 `model-gateway` 支持官方 DeepSeek 单次纯文本请求，复用产品的模型窗口规划。验收的累计额度单独预占，供应商用量与回执核实后按实际 token 结算。DSH 和产品派单缺少覆盖上下文、工具和重试的可信逐请求上界，在外部调用前保持 `blocked`。`expectedTokens` 是估算，不能授权付费。用量或回执未知时保持预占并冻结后续付费任务。O 域真实运行同样在调用前阻断；`--selftest` 只连接执行器自身的本地 HTTP 夹具。
 
 本机预览（`preview:all` + `LLM_PROVIDER=mock`）只能证明代码与装配；**要证明「客户端内置模型走通生产链路」必须声明环境档位并跑 P 域**：
 
@@ -57,12 +57,11 @@ pnpm acceptance:live --env deployed --require-live
 | 链路 | 走什么 | 证据 |
 |---|---|---|
 | `dsh-harness` | 客户端内置 DeepSeek Harness headless：真实 provider → 工具调用过围栏瀑布 → session/event 落哈希链账本 | `transcripts/*.json`（`fenceHits` + `audit.chain` 验证） |
-| `model-gateway` | OpenAI 兼容网关直连（推理/多模态理解），不含围栏与账本 | `receipts/*.json`（endpoint/model/tokens） |
+| `model-gateway` | 官方 DeepSeek OpenAI 兼容端点的单次纯文本请求。多模态网关与工具链另行验证 | `receipts/*.json`（模型、窗口、请求与响应摘要、结束原因、用量） |
 | `gen-http` | 火山方舟 Ark 生成 API（Seedream 生图同步 / Seedance 生视频任务制） | 产物落盘 + `task_id`/`video_url`/时长 |
 | `product-dispatch` | 经产品自身入口（trpc `threads.dispatch`）派单 + 状态断言 | 环境状态断言 + 回执；假成功直接红线候选 |
 
-配额与成本：`live.budgets` 是**硬上限**（基座下限：图 ≤8 张、视频 ≤3 段且各 10–15s、总 ≤45s、LLM ≤40 次/30 万 token/¥120），
-超限即中止该任务并写 `budget-ledger.jsonl`；成本是**估算值**，账单需另行对账（P1-04）。
+整轮 `live.budgets` 独立于单次模型窗口。累计 token 缺省为 300,000，可在授权的运行 profile 中显式设置。真实官方单次文本任务需要为共享上下文预占足够余量；额度不足时阻断并记录差额。LLM 次数、媒体和总成本仍按本仓硬闸执行，成本估算与账单分开。配置示例和结算细节见 [P 域预算指引](lib/live/README.md#profile-与任务)。
 
 凭据：只从环境变量/秘密存储解析（`DEEPSEEK_API_KEY`、`VOLCENGINE_ARK_API_KEY` / `SEEDREAM_API_KEY` / `SEEDANCE_API_KEY`），
 **禁止写进 profile、报告或仓库**；缺凭据时任务状态为 `blocked`，报告只能写“未验证”。
