@@ -14,7 +14,7 @@ const expected = {
   origin: "http://127.0.0.1:9123", instance: "growthtest-isolated", tenantId: "tenant-a",
   workspaceId: "ws-a", memberNo: "MEM-G01", memberId: "member-a",
 };
-const token = randomUUID();
+const token = Array.from({ length: 3 }, () => randomUUID()).join(".");
 const exec = promisify(execFile);
 const environment = {
   WORKLOOM_BASE_URL: expected.origin, WORKLOOM_DESKTOP_INSTANCE_ID: expected.instance,
