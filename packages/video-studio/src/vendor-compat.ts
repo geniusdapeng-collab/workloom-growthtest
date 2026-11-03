@@ -111,6 +111,13 @@ export function installVendorConfigIsolatorBridge(): () => void {
   }
 }
 
+type VendorCharacterRefParser = (this: unknown, ref: unknown) => unknown;
+const renderCompatInstallations = new WeakMap<object, {
+  original: VendorCharacterRefParser;
+  patched: VendorCharacterRefParser;
+  users: number;
+}>();
+
 export function installVendorRenderCompatBridge(): () => void {
   try {
     const repoRoot = videoRuntimeRoot(import.meta.url);
@@ -120,14 +127,30 @@ export function installVendorRenderCompatBridge(): () => void {
     const mod = vendorRequire(enginePath) as { RenderingEngine?: { prototype: Record<string, unknown> } };
     const prototype = mod?.RenderingEngine?.prototype;
     if (!prototype || typeof prototype._parseCharacterRef !== "function") return () => undefined;
-    const original = prototype._parseCharacterRef as (ref: unknown) => unknown;
-    prototype._parseCharacterRef = function patched(ref: unknown) {
-      let normalized: unknown = ref;
-      if (Array.isArray(ref)) normalized = ref.length ? ref.join(", ") : "NONE";
-      else if (ref && typeof ref === "object") normalized = "NONE";
-      return original.call(this, normalized);
+    let installation = renderCompatInstallations.get(prototype);
+    if (!installation) {
+      const original = prototype._parseCharacterRef as VendorCharacterRefParser;
+      const patched: VendorCharacterRefParser = function (ref) {
+        let normalized: unknown = ref;
+        if (Array.isArray(ref)) normalized = ref.length ? ref.join(", ") : "NONE";
+        else if (ref && typeof ref === "object") normalized = "NONE";
+        return original.call(this, normalized);
+      };
+      installation = { original, patched, users: 0 };
+      prototype._parseCharacterRef = patched;
+      renderCompatInstallations.set(prototype, installation);
+    }
+    const retained = installation;
+    retained.users += 1;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      retained.users -= 1;
+      if (retained.users !== 0) return;
+      if (prototype._parseCharacterRef === retained.patched) prototype._parseCharacterRef = retained.original;
+      renderCompatInstallations.delete(prototype);
     };
-    return () => { prototype._parseCharacterRef = original; };
   } catch {
     // vendor 不在（单测环境）时静默：桥接是增强，不是启动前置
     return () => undefined;
@@ -178,12 +201,13 @@ interface RenderPromptLike {
   [key: string]: unknown;
 }
 
-export function installVendorPortraitBindingBridge(options: PortraitBindingBridgeOptions): () => void {
+type PortraitBindingEngine = { config?: { charactersDir?: string } };
+type PortraitBoundEntry = { id: string; name: string; requiredAngles: readonly string[]; portraits: Record<string, string>; evidence: Record<string, unknown> };
+
+function createPortraitBindingState(options: PortraitBindingBridgeOptions) {
   const log = options.log ?? (() => undefined);
   const maxPerShot = options.maxCharactersPerShot ?? 1;
   if (!Number.isInteger(maxPerShot) || maxPerShot < 1) throw new Error("PORTRAIT_BINDING_INVALID: 每镜角色上限无效");
-  type Engine = { config?: { charactersDir?: string } };
-  type BoundEntry = { id: string; name: string; requiredAngles: readonly string[]; portraits: Record<string, string>; evidence: Record<string, unknown> };
   const boundSnapshots = new WeakMap<RenderPromptLike, string>();
   const inside = (root: string, file: string): boolean => { const rel = relative(root, file); return rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel); };
   function currentIndex(): PortraitIndex | null {
@@ -192,7 +216,7 @@ export function installVendorPortraitBindingBridge(options: PortraitBindingBridg
     return value ? structuredClone(value) : null;
   }
   /** Read only the indexed files; directory order and historical filenames cannot select a version. */
-  function exactEntry(engine: Engine, key: string, entry: PortraitIndexEntry): BoundEntry {
+  function exactEntry(engine: PortraitBindingEngine, key: string, entry: PortraitIndexEntry): PortraitBoundEntry {
     const root = engine.config?.charactersDir;
     if (!root || entry.kind !== "character" || typeof entry.id !== "string") throw new Error("PORTRAIT_BINDING_INVALID: 角色类型或根目录无效");
     const lexicalRoot = resolvePath(root); const canonicalRoot = realpathSync(root);
@@ -244,7 +268,7 @@ export function installVendorPortraitBindingBridge(options: PortraitBindingBridg
     return chosen.map((item) => item.key);
   }
 
-  function bindPrompt(engine: Engine, prompt: RenderPromptLike): BoundEntry[] {
+  function bindPrompt(engine: PortraitBindingEngine, prompt: RenderPromptLike): PortraitBoundEntry[] {
     const index = currentIndex(); const keys = pickFor(prompt, index);
     if (keys.length === 0 || !index) return [];
     const entries = keys.map((key) => exactEntry(engine, key, index.characters[key]!));
@@ -260,6 +284,21 @@ export function installVendorPortraitBindingBridge(options: PortraitBindingBridg
     return entries;
   }
 
+  return { currentIndex, exactEntry, bindPrompt, log, maxPerShot, active: true };
+}
+
+type PortraitBindingState = ReturnType<typeof createPortraitBindingState>;
+const portraitBindingScope = new AsyncLocalStorage<PortraitBindingState>();
+let standalonePortraitBinding: PortraitBindingState | null = null;
+let portraitBindingUsers = 0;
+let restorePortraitBindingMethods: (() => void) | null = null;
+
+function activePortraitBinding(): PortraitBindingState | null {
+  const state = portraitBindingScope.getStore() ?? standalonePortraitBinding;
+  return state?.active ? state : null;
+}
+
+function installPortraitBindingMethods(log: PortraitBindingState["log"]): () => void {
   try {
     const repoRoot = videoRuntimeRoot(import.meta.url);
     const vendorRequire = createRequire(resolvePath(repoRoot, "package.json"));
@@ -285,26 +324,30 @@ export function installVendorPortraitBindingBridge(options: PortraitBindingBridg
       ? (prototype._convertToShotFormat as (prompt: RenderPromptLike) => Record<string, unknown>)
       : null;
 
-    prototype.render = function patchedRender(this: Engine, prompts: unknown, opts?: unknown) {
+    prototype.render = function patchedRender(this: PortraitBindingEngine, prompts: unknown, opts?: unknown) {
+      const binding = activePortraitBinding();
+      if (!binding) return originalRender.call(this, prompts, opts);
       const list = Array.isArray(prompts) ? (prompts as RenderPromptLike[]) : [];
       let bound = 0;
       for (const prompt of list) {
-        bindPrompt(this, prompt);
+        binding.bindPrompt(this, prompt);
         if (prompt._workloomBoundCharacters?.length) bound += 1;
       }
       if (bound > 0) {
-        log(`[vendor-compat] 定妆照绑定桥：${bound}/${list.length} 个镜头已绑定角色定妆照（每镜 ≤${maxPerShot} 角色）`);
+        binding.log(`[vendor-compat] 定妆照绑定桥：${bound}/${list.length} 个镜头已绑定角色定妆照（每镜 ≤${binding.maxPerShot} 角色）`);
       }
       return originalRender.call(this, prompts, opts);
     };
 
-    prototype._generateBindingManifest = async function patchedManifest(this: Engine, prompts: RenderPromptLike[]) {
-      const characters: Record<string, BoundEntry> = {}; const shots: Record<string, unknown>[] = [];
+    prototype._generateBindingManifest = async function patchedManifest(this: PortraitBindingEngine, prompts: RenderPromptLike[]) {
+      const binding = activePortraitBinding();
+      if (!binding) return originalManifest.call(this, prompts);
+      const characters: Record<string, PortraitBoundEntry> = {}; const shots: Record<string, unknown>[] = [];
       const shotIds = new Set<string>();
       for (const prompt of prompts) {
         if (!prompt.shotId || shotIds.has(prompt.shotId)) throw new Error("PORTRAIT_BINDING_INVALID: 镜头ID缺失或重复");
         shotIds.add(prompt.shotId);
-        const entries = bindPrompt(this, prompt);
+        const entries = binding.bindPrompt(this, prompt);
         for (const entry of entries) {
           const prior = characters[entry.id];
           if (prior && cinematicSkillHash(prior) !== cinematicSkillHash(entry)) throw new Error("PORTRAIT_BINDING_CHANGED: 同一清单混入多个角色版本");
@@ -316,14 +359,16 @@ export function installVendorPortraitBindingBridge(options: PortraitBindingBridg
     };
 
     corePrototype.buildPayload = function patchedPayload(this: { charactersDir: string; extractCharactersFromShot: (shot: Record<string, unknown>) => string[] }, shot: Record<string, unknown>, manifest: Record<string, unknown>) {
+      const binding = activePortraitBinding();
+      if (!binding) return originalPayload.call(this, shot, manifest);
       if (manifest.schemaVersion !== "workloom.portrait-binding/v2") throw new Error("PORTRAIT_BINDING_INVALID: 提交体必须使用本次精确文件清单");
       if (manifest.bindingHash !== cinematicSkillHash({ characters: manifest.characters, shots: manifest.shots })) throw new Error("PORTRAIT_BINDING_CHANGED: 清单内容被改写");
-      const characters = manifest.characters as Record<string, BoundEntry>;
-      const index = currentIndex(); const expected: Array<{ sha256: string; bytes: number }> = [];
+      const characters = manifest.characters as Record<string, PortraitBoundEntry>;
+      const index = binding.currentIndex(); const expected: Array<{ sha256: string; bytes: number }> = [];
       for (const key of this.extractCharactersFromShot(shot)) {
         const entry = index?.characters[key];
         if (!entry || !characters[key]) throw new Error("PORTRAIT_BINDING_INVALID: 提交角色缺少当前索引或清单");
-        const current = exactEntry({ config: { charactersDir: this.charactersDir } }, key, entry);
+        const current = binding.exactEntry({ config: { charactersDir: this.charactersDir } }, key, entry);
         if (cinematicSkillHash(current) !== cinematicSkillHash(characters[key])) throw new Error("PORTRAIT_BINDING_CHANGED: 提交前角色版本发生变化");
         for (const angle of REQUIRED_ANGLES) expected.push(current.evidence[angle] as { sha256: string; bytes: number });
       }
@@ -342,7 +387,7 @@ export function installVendorPortraitBindingBridge(options: PortraitBindingBridg
     if (originalConvert) {
       prototype._convertToShotFormat = function patchedConvert(this: unknown, prompt: RenderPromptLike) {
         const shot = originalConvert.call(this, prompt) as Record<string, unknown>;
-        const boundKeys = Array.isArray(prompt?._workloomBoundCharacters) ? prompt._workloomBoundCharacters : [];
+        const boundKeys = activePortraitBinding() && Array.isArray(prompt?._workloomBoundCharacters) ? prompt._workloomBoundCharacters : [];
         if (boundKeys.length > 0) shot.characters = [...boundKeys];
         return shot;
       };
@@ -357,6 +402,57 @@ export function installVendorPortraitBindingBridge(options: PortraitBindingBridg
   } catch (err) {
     log(`[vendor-compat] 定妆照绑定桥注入失败：${err instanceof Error ? err.message : String(err)}`);
     throw err;
+  }
+}
+
+function retainPortraitBinding(state: PortraitBindingState): () => void {
+  if (portraitBindingUsers === 0) {
+    const releaseParser = installVendorRenderCompatBridge();
+    try {
+      const releaseMethods = installPortraitBindingMethods(state.log);
+      restorePortraitBindingMethods = () => {
+        try { releaseMethods(); } finally { releaseParser(); }
+      };
+    } catch (error) {
+      releaseParser();
+      throw error;
+    }
+  }
+  portraitBindingUsers += 1;
+  return () => {
+    if (!state.active) return;
+    state.active = false;
+    portraitBindingUsers -= 1;
+    if (portraitBindingUsers === 0) {
+      restorePortraitBindingMethods?.();
+      restorePortraitBindingMethods = null;
+    }
+  };
+}
+
+/** 单次独立工具兼容入口。并发宿主必须使用 withVendorPortraitBindingBridge。 */
+export function installVendorPortraitBindingBridge(options: PortraitBindingBridgeOptions): () => void {
+  if (standalonePortraitBinding) throw new Error("PORTRAIT_BINDING_SCOPE_REQUIRED: 并发绑定必须使用运行作用域");
+  const state = createPortraitBindingState(options);
+  const release = retainPortraitBinding(state);
+  standalonePortraitBinding = state;
+  return () => {
+    if (standalonePortraitBinding === state) standalonePortraitBinding = null;
+    release();
+  };
+}
+
+/** 只在本次vendor运行中绑定该项目索引，其他运行和无作用域调用使用自己的行为。 */
+export async function withVendorPortraitBindingBridge<T>(
+  options: PortraitBindingBridgeOptions,
+  fn: () => T | Promise<T>,
+): Promise<T> {
+  const state = createPortraitBindingState(options);
+  const release = retainPortraitBinding(state);
+  try {
+    return await portraitBindingScope.run(state, fn);
+  } finally {
+    release();
   }
 }
 
