@@ -112,7 +112,7 @@ export function rebuildPipelineProjection(
     } else if (event.kind === "gate.requested") {
       stage.verificationStatus = "pending";
       stage.disposition = "wait_human";
-    } else if (event.kind === "gate.decided") {
+    } else if (event.kind === "gate.decided" || event.kind === "gate.auto_approved") {
       const id = String(payload.gateDecisionId ?? "");
       if (id && !stage.gateDecisionIds.includes(id)) stage.gateDecisionIds.push(id);
       const decision = payload.decision;
