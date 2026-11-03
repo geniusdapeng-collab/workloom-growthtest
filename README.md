@@ -13,7 +13,7 @@ WorkLoom Growthtest 是面向企业增长与内容运营团队的隔离实验副
 3. 准备交付时，以真实环境的输入、产物、费用、失败恢复和外部回执验收；本页不提供未经实测的容量、延迟或经营收益承诺。
 4. Codex、DeepSeek Harness 或其他 Agent 先按 [Agent 接入指引](docs/AGENT-CLIENTS.md) 配置本仓，再按 [视频工作台指南](docs/ai-video-workbench-guide.md) 提交制作、接续任务和验收成片。
 
-接入后可以直接说“用 Growthtest 制作 18 秒雨后山间民宿短片”。[原生 Studio 入口](docs/ai-video-workbench-guide.md#一句话启动标准制片)保留原话和目标秒数，并在同一作业目录记录启动回执。当前项目已有正式原稿、固定工位和授权时，沿同项目完成生成与[官方后期](docs/video-standard-post.md)。服务渲染摘要只用于读回原片状态，标准后期还须取得 Film 工位签发的原片清单。
+接入后可以直接说“用 Growthtest 制作 18 秒雨后山间民宿短片”。[原生 Studio 入口](docs/video-native-agent-entry.md#从用户原话取得正式前期)保留原话和目标秒数，并在同一作业目录记录启动回执。当前项目已有正式原稿、固定工位和授权时，沿同项目完成生成与[官方后期](docs/video-standard-post.md)。服务渲染摘要只用于读回原片状态，标准后期还须取得 Film 工位签发的原片清单。
 
 ## 使用场景与产品边界
 

@@ -6,7 +6,7 @@
 
 ## 〇、Codex 与其他 Agent 的视频接入
 
-收到“用 Growthtest 制作 X 秒某主题视频”等制作请求时，直接按 [一句话启动标准制片](docs/ai-video-workbench-guide.md#一句话启动标准制片) 使用当前隔离实例的原生 Studio 自动分流。保留用户原话，将明确的目标秒数传为 `durationSec`，从同一项目继续核对正式渲染资格、原片和官方后期回执。制作途中保留阻断与原任务，禁止手工补镜头卡、另开同内容项目或用临时媒体合成替代正式交付。
+收到“用 Growthtest 制作 X 秒某主题视频”等制作请求时，直接按 [正式前期入口](docs/video-native-agent-entry.md#从用户原话取得正式前期) 使用当前隔离实例的原生 Studio 自动分流。保留用户原话，将明确的目标秒数传为 `durationSec`，从同一项目继续核对正式渲染资格、原片和官方后期回执。制作途中保留阻断与原任务，禁止手工补镜头卡、另开同内容项目或用临时媒体合成替代正式交付。
 
 1. 从 [GitHub](https://github.com/geniusdapeng-collab/workloom-growthtest) 拉取默认分支并记录完整 SHA。在仓库根目录打开 Agent 工作区，按照 [Agent 接入指引](docs/AGENT-CLIENTS.md) 准备依赖、隔离数据库、运行环境和会话身份。
 2. 直接制作任务从 [正式视频入口](docs/video-native-agent-entry.md) 启动和续跑，再按 [视频工作台指南](docs/ai-video-workbench-guide.md) 固定人物、商品、平台、时长、声音、授权和预算。先运行 `growth.repo.readiness`、内置素材检查和 `video:doctor`，再用实际运行服务的 `/health` 和成员权限回读目标身份。MCP 可发现能力，制作的写操作走正式 CLI 或服务入口。
