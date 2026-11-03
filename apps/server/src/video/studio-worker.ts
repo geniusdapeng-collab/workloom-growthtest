@@ -60,6 +60,7 @@ import { ingestPortraitsFromIndex } from "./media/library.js";
 import { upsertProductProfileFromDossier } from "./media/products.js";
 import { appendScenePolicyGuidance, resolveScenePolicyForIntent } from "./scene-policy-routing.js";
 import { appendPlatformGuidance, resolvePlatformForIntent } from "./platform-routing.js";
+import { captureStudioResumeInput } from "./studio-resume-input.js";
 import { createDirectorGrantOnClient, verifyDirectorGrant, readExplicitDirectorPreferences } from "./director-store.js";
 import {
   AUTO_GATES,
@@ -1203,7 +1204,9 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
         let rawResult: Awaited<ReturnType<VideoStudio["runPreproduction"]>> | undefined;
         await runner.run(
           "preproduction",
-          { intent: runInput.intent, isMarketing: input.isMarketing ?? false, pipelineKind, scenePolicy: selectedScenePolicy.decision },
+          { intent: runInput.intent, isMarketing: input.isMarketing ?? false, pipelineKind, scenePolicy: selectedScenePolicy.decision,
+            resumeInput: captureStudioResumeInput(scope, input, { projectCreatedAt: projectMeta?.createdAt ?? null,
+              requiresDelegation: directorMode, scenePolicy: selectedScenePolicy, platformId: selectedPlatform.decision.id }) },
           async (ctx) => {
             gateProofs.clear();
             completedVendorResult = null;

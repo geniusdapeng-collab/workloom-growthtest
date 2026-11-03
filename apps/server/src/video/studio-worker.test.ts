@@ -230,6 +230,19 @@ async function archiveOutput(projectId: string, attempt: number) {
 }
 
 describe("预生产原始结果与诚实终态", () => {
+  it("执行前输入快照保留原始需求与metadata供恢复，不能只保存加工正文", async () => {
+    useNarrativeProject(); doubles.runPreproduction.mockResolvedValue(success());
+    const projectId = `VID-resume-source-${++projectSequence}`;
+    const intent = `山间风景。${"保留紫色花与自然光。".repeat(35)}`;
+    const metadata = { aspectRatio: "16:9", noMusic: true, brief: { audience: "游客" } };
+    const runId = worker.startRun(scope, { projectId, intent, rawIntent: "用户原话", metadata });
+    await vi.waitFor(() => expect(worker.getRun(runId, scope.workspaceId)?.finishedAt).not.toBeNull(), { timeout: 3_000, interval: 10 });
+    const file = path.join(doubles.workDir, "archive", scope.workspaceId, projectId, "stages/preproduction/attempt-1.input.json");
+    const saved = JSON.parse(await readFile(file, "utf8"));
+    expect(saved.input.resumeInput).toMatchObject({ schemaVersion: "workloom.studio-resume-input/v1", ...scope, projectId,
+      intent, rawIntent: "用户原话", metadata, isMarketing: false, requiresDelegation: false });
+  });
+
   it("建项目之前拦截显式未知片型，未触及数据库和供应商", async () => {
     await expect(worker.startVideoProjectRun(scope, {
       intent: "给陈卓拍一条正式商务短片",
