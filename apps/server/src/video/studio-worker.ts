@@ -63,6 +63,7 @@ import { appendScenePolicyGuidance, resolveScenePolicyForIntent } from "./scene-
 import { appendPlatformGuidance, resolvePlatformForIntent } from "./platform-routing.js";
 import { captureStudioResumeInput } from "./studio-resume-input.js";
 import { createDirectorGrantOnClient, verifyDirectorGrant, readExplicitDirectorPreferences } from "./director-store.js";
+import { inheritedDirectorLease } from "./director-jobs.js";
 import {
   AUTO_GATES,
   GATE_PRODUCER_STAGE,
@@ -539,6 +540,19 @@ type StudioRunInput = RunInput & {
 };
 
 export function startRun(scope: Scope, input: StudioRunInput): string {
+  return launchRun(scope, input).runId;
+}
+
+/** The Director waits for this run's cleanup while it retains the project lease. */
+export function startDelegatedRun(scope: Scope, input: StudioRunInput, signal: AbortSignal) {
+  const inherited = inheritedDirectorLease(scope, input.projectId);
+  if (!inherited || !input.creativeDelegation || !input.allocatedRunId) {
+    throw new StudioWorkerError("DELEGATION_REQUIRED", "委托预生产须绑定当前运行和导演项目租约");
+  }
+  return launchRun(scope, input, { assertActive: inherited.assertActive, signal });
+}
+
+function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActive: () => void; signal: AbortSignal }) {
   assertPublicStudioMetadata(input.metadata);
   const directorMode=Boolean(input.creativeDelegation);
   if (input.directorIdentityImages !== undefined && !directorMode) {
@@ -632,6 +646,12 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
     aborted: false,
   };
   runs.set(entry.runId, entry);
+  const abortDelegatedRun = () => { entry.aborted = true; };
+  const checkDelegatedRun = () => {
+    if (!delegated) return;
+    delegated.assertActive();
+    if (delegated.signal.aborted || entry.aborted) throw new Error("DIRECTOR_CANCELLED：导演已停止本次预生产");
+  };
 
   /**
    * ================= 制片档案（T-2026-0926-0001） =================
@@ -1024,7 +1044,9 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
    * 内容摘要和计划节点。旁路在后台执行，失败不得改变预生产结果。
    */
   const onApproval: ApprovalCallback = async (req) => {
+    checkDelegatedRun();
     const verdict = await decideApproval(req);
+    checkDelegatedRun();
     if (studioShadow) {
       const planGate = /^(G\d+)/u.exec(req.gate)?.[1] ?? req.gate;
       const decision = verdict.approved
@@ -1068,7 +1090,7 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
     onEvent,
     totalDeadlineMs: TOTAL_DEADLINE_MS,
     // 片型硬闸必须在 G8 之前审完整分镜，禁止 env 让 vendor 在审计前直接渲染。
-    deferRender: selectedScenePolicy.policy ? true : (process.env.HR_DEFER_RENDER ?? "1") !== "0",
+    deferRender: Boolean(delegated || selectedScenePolicy.policy) || (process.env.HR_DEFER_RENDER ?? "1") !== "0",
     portraits: portraitConfig(runInput.metadata, directorMode ? input.directorIdentityImages : undefined),
     /** 营销路由 → 情报五站真跑（叙事路由不装配，vendor 也不会进情报层） */
     dataMining: input.isMarketing ? undefined : dataMiningConfigFor(runInput.metadata, llm, scope.workspaceId),
@@ -1077,7 +1099,7 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
 
   // 异步执行：不阻塞 tRPC 响应；终态只写注册表投影（生命周期事件由 onEvent 落库）
   const runLogToken = Symbol(entry.runId);
-  void runLogContext.run(runLogToken, async () => {
+  const completion = runLogContext.run(runLogToken, async () => {
     /**
      * 项目级执行者租约（规格书 §11：同一项目同一时刻只允许一个执行者，杜绝双写与重复烧额度）。
      * 会话级 advisory lock 持有到 run 结束；进程被 kill -9 → 连接断开 → 锁自动释放。
@@ -1087,9 +1109,14 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
     let restoreRunLogs: (() => void) | null = null;
     let projectMeta: Awaited<ReturnType<typeof readProjectMeta>> = null;
     try {
-      activeLease = await acquireProjectLease(scope, input.projectId);
-      if (!activeLease) {
-        throw new Error(`项目 ${input.projectId} 已有执行者持有档案租约（不重复启动，避免双份烧额度）`);
+      if (delegated) {
+        delegated.signal.addEventListener("abort", abortDelegatedRun, { once: true });
+        checkDelegatedRun();
+      } else {
+        activeLease = await acquireProjectLease(scope, input.projectId);
+        if (!activeLease) {
+          throw new Error(`项目 ${input.projectId} 已有执行者持有档案租约（不重复启动，避免双份烧额度）`);
+        }
       }
       projectMeta = await readProjectMeta(scope, input.projectId);
       if (!projectMeta) throw new Error(`PROJECT_NOT_FOUND: 项目 ${input.projectId} 不存在或不属于当前工作区`);
@@ -1176,6 +1203,7 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
        */
       const maxAttempts = Math.max(1, Number(process.env.VM_PRODUCER_RETRY ?? 0) + 1);
       const runOnce = async (): Promise<Awaited<ReturnType<VideoStudio["runPreproduction"]>>> => {
+        checkDelegatedRun();
         const runnerStore = archive;
         // 档案 output 是给索引/交接包使用的摘要，不能取代 vendor 业务结果。
         // confirmations 决定打回重试，stages.dataMining 决定商品档案投影；两者必须完整保留。
@@ -1230,9 +1258,11 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
              * 传入 runInput（而不是 input）：它带上了本轮的片型选型结论与注入指引，
              * vendor 的提示词/分镜必须按本次选中的知识条目生成；G1 营销事实仍取自原始 input。
              */
+            checkDelegatedRun();
             const r: Awaited<ReturnType<VideoStudio["runPreproduction"]>> = g1Failure
               ? { success: false, stages: {}, confirmations: { hostG1: g1Failure } }
               : await withVendorEngineBridge(llm, () => withVendorPortraitBindingBridge(portraitBindingOptions, () => studio.runPreproduction(runInput)));
+            checkDelegatedRun();
             completedVendorResult = r;
             if (r.success) {
               // vendor 真出图批量模式跳过的是生成前询问；服务必须在实际图片存在后完成 G5。
@@ -1641,6 +1671,7 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
         }
       }
     } finally {
+      delegated?.signal.removeEventListener("abort", abortDelegatedRun);
       // 一个清理失败不能跳过其余清理；租约解锁异常由宿主销毁连接，终态仍诚实报告失败。
       for (const cleanup of [
         () => detachStructuredLog?.(),
@@ -1660,7 +1691,7 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
     }
   });
 
-  return entry.runId;
+  return { runId: entry.runId, completion };
 }
 
 /**

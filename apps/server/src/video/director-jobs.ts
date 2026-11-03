@@ -1,8 +1,10 @@
 /** Scoped durable director queue. A completed receipt is immutable; retries use a new job. */
+import { AsyncLocalStorage } from "node:async_hooks";
+import type { PoolClient } from "pg";
 import { getAppPool } from "@workloom/db";
 import { gatewayAppendOnClient, insertWithReadableId, VIDEO_PROJECT_ID_SOURCE } from "@workloom/base/workdata";
 import { newId } from "@workloom/shared";
-import { directorHash, projectExecutionLeaseKey, type DirectorFilmPlan } from "@hyperreality/video-studio";
+import { directorHash, projectExecutionLeaseKey, routeVideoPipeline, type DirectorFilmPlan } from "@hyperreality/video-studio";
 import { directorTx, type CreativeScope } from "./director-store.js";
 
 export type DirectorJobStatus="queued"|"running"|"complete"|"partial"|"failed"|"interrupted"|"requires-generation-plan";
@@ -11,6 +13,13 @@ export interface DirectorJob {id:string;tenant_id:string;workspace_id:string;pro
   receipt:Record<string,unknown>|null;error_code:string|null;created_by:string;created_at:Date;updated_at:Date}
 export class DirectorJobError extends Error {
   constructor(readonly code:string,message:string){super(`${code}: ${message}`);this.name="DirectorJobError";}
+}
+
+export async function assertDirectorProductionRoute(intent: string): Promise<void> {
+  const decision = await routeVideoPipeline({ text: intent });
+  if (decision.route === "marketing" || decision.route === "explainer" || decision.clarify?.missing.includes("product")) {
+    throw new DirectorJobError("DIRECTOR_ROUTE_UNAVAILABLE", "导演 V2 的新生成仅支持叙事片；请通过正式 Studio 入口提交营销或口播解说需求");
+  }
 }
 export async function directorEvent(client:import("pg").PoolClient,scope:CreativeScope,projectId:string,
   action:string,after:Record<string,unknown>,actor:{id:string;type:"human"|"system"}) {
@@ -100,17 +109,76 @@ export async function latestDirectorPlan(scope:CreativeScope,projectId:string) {
   return directorTx(scope,async client=>(await client.query<FrozenDirectorPlan>(`SELECT revision,plan_hash,target_plan,source_manifest,variant_plans,film_plan,source_refs FROM video_director_plans
     WHERE tenant_id=$1 AND workspace_id=$2 AND project_id=$3 ORDER BY revision DESC LIMIT 1`,[scope.tenantId,scope.workspaceId,projectId])).rows[0]??null);
 }
+type DirectorLeaseScope = {
+  key: string;
+  client: PoolClient;
+  assertActive: () => void;
+  poison: () => void;
+};
+const directorLeaseScope = new AsyncLocalStorage<DirectorLeaseScope>();
+
+/** Only awaited in-process stages of the registered Director can inherit its exclusive lease. */
+export function inheritedDirectorLease(scope: CreativeScope, projectId: string): DirectorLeaseScope | undefined {
+  const inherited = directorLeaseScope.getStore();
+  if (!inherited) return;
+  if (inherited.key !== projectExecutionLeaseKey(scope, projectId)) {
+    throw new DirectorJobError("DIRECTOR_LEASE_SCOPE_MISMATCH", "当前导演租约与制作项目不一致");
+  }
+  inherited.assertActive();
+  return inherited;
+}
+
 /** Session lease survives transaction commits and releases on a killed host. */
 export async function acquireDirectorLease(scope:CreativeScope,projectId:string,onLost:(error:Error)=>void=()=>{}) {
   const client=await getAppPool().connect();
   try {
     const key=projectExecutionLeaseKey(scope,projectId);
     const held=(await client.query<{held:boolean}>("SELECT pg_try_advisory_lock(hashtext($1)) AS held",[key])).rows[0]?.held;
-    if(!held){client.release();return null;}
-    let lost=false;
-    const listener=(error:Error)=>{lost=true;onLost(error);};client.on("error",listener);
-    return {release:async()=>{try{if(!lost) await client.query("SELECT pg_advisory_unlock(hashtext($1))",[key]);}
-      finally{client.removeListener("error",listener);client.release(lost);}}};
+    if (held === false) { client.release(); return null; }
+    if (held !== true) throw new DirectorJobError("DIRECTOR_LEASE_RECEIPT_INVALID", "无法核实项目租约");
+    let lost = false, released = false;
+    let activeBorrow: DirectorLeaseScope | undefined;
+    const listener = (error: Error) => {
+      if (lost) return;
+      lost = true;
+      onLost(error);
+    };
+    const assertHeld = () => {
+      if (lost || released) throw new DirectorJobError("DIRECTOR_LEASE_UNAVAILABLE", "项目执行租约已失效");
+    };
+    client.on("error", listener);
+    return {
+      async run<T>(work: () => Promise<T>): Promise<T> {
+        assertHeld();
+        if (activeBorrow) throw new DirectorJobError("DIRECTOR_LEASE_BUSY", "项目已有委托工位正在执行");
+        const borrowed: DirectorLeaseScope = {
+          key, client,
+          assertActive() {
+            assertHeld();
+            if (activeBorrow !== borrowed || directorLeaseScope.getStore() !== borrowed) {
+              throw new DirectorJobError("DIRECTOR_LEASE_UNAVAILABLE", "导演委托工位已经结束");
+            }
+          },
+          poison: () => listener(new Error("委托工位事务状态无法核实")),
+        };
+        activeBorrow = borrowed;
+        try { return await directorLeaseScope.run(borrowed, work); }
+        finally { activeBorrow = undefined; }
+      },
+      async release() {
+        if (released) return;
+        if (activeBorrow) throw new DirectorJobError("DIRECTOR_LEASE_BUSY", "需等待委托工位清理后再释放项目");
+        released = true;
+        let discard = lost;
+        try {
+          if (!lost) {
+            const result = await client.query<{ ok: boolean }>("SELECT pg_advisory_unlock(hashtext($1)) AS ok", [key]);
+            if (result.rows[0]?.ok !== true) throw new DirectorJobError("DIRECTOR_LEASE_RELEASE_INVALID", "无法核实项目租约释放");
+          }
+        } catch (error) { discard = true; throw error; }
+        finally { client.removeListener("error", listener); client.release(discard || lost); }
+      },
+    };
   } catch(error){client.release(true);throw error;}
 }
 /** A dead lease is evidence of interruption, never authorization to replay a paid submission. */

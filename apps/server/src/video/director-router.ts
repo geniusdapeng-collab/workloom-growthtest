@@ -5,7 +5,7 @@ import { newId } from "@workloom/shared";
 import { DIRECTOR_POLICY_VERSION, resolveDeliveryTargets, attributeCreativeFeedback } from "@hyperreality/video-studio";
 import { actionProcedure, navigationPermissionProcedure, navigationPermissionWriteProcedure, router, scopeOf } from "../trpc/context.js";
 import { directorTx, readExplicitDirectorPreferences, saveExplicitDirectorPreference } from "./director-store.js";
-import { directorEvent, latestDirectorPlan, queueDirectorJob, readDirectorJob, recoverInterruptedDirectorJob, DirectorJobError, type DirectorJob } from "./director-jobs.js";
+import { assertDirectorProductionRoute, directorEvent, latestDirectorPlan, queueDirectorJob, readDirectorJob, recoverInterruptedDirectorJob, DirectorJobError, type DirectorJob } from "./director-jobs.js";
 import { bindOwnDirectorIdentity, publicDirectorVariants, publicDirectorDifference } from "./director-sources.js";
 import { resolveAuthoritativeClientAccess } from "../service/access-authority.js";
 import { cancelDirectorJob, dispatchDirectorJob } from "./director-worker.js";
@@ -56,6 +56,7 @@ export const directorRouter=router({
     maxBudgetCny:z.number().nonnegative().max(100000).optional(),idempotencyKey:z.string().min(8).max(200)}).strict())
     .mutation(({ctx,input})=>api(async()=>{
       resolveDeliveryTargets(input.intent,input.deliveryOptions);
+      if (input.mode === "produce") await assertDirectorProductionRoute(input.intent);
       const scope=scopeOf(ctx.identity);
       const queued=await queueDirectorJob(scope,{intent:input.intent,by:by(ctx.identity),idempotencyKey:input.idempotencyKey,
         payload:{kind:"create",mode:input.mode,audioMode:input.audioMode,deliveryOptions:input.deliveryOptions??null,
@@ -117,11 +118,16 @@ export const directorRouter=router({
         || job.receipt.planHash!==input.expectedPlanHash) throw new DirectorJobError("BUDGET_BATCH_INVALID","预算请求不是当前冻结镜头批次");
       const refs=job.receipt.qualifiedShots;
       if(!Array.isArray(refs)||!refs.length) throw new DirectorJobError("BUDGET_BATCH_INVALID","没有完整已评审请求");
+      const budgetCny = job.receipt.budgetCny;
+      if (typeof budgetCny !== "number" || !Number.isFinite(budgetCny) || budgetCny <= 0) {
+        throw new DirectorJobError("BUDGET_BATCH_INVALID", "没有当前批次的制作预算");
+      }
       const qualified=await Promise.all(refs.map(ref=>loadQualifiedRenderInput(getAppPool(),scope,String(ref.qualificationToken))));
       const plan=await latestDirectorPlan(scope,job.project_id);
       if(!plan) throw new DirectorJobError("PLAN_NOT_FOUND","导演方案不存在");
       const queued=await queueDirectorJob(scope,{projectId:job.project_id,revision:plan.revision,expectedPlanHash:input.expectedPlanHash,
-        idempotencyKey:input.idempotencyKey,by:by(ctx.identity),payload:{...job.payload,kind:"render",expectedPlanHash:input.expectedPlanHash}},
+        idempotencyKey:input.idempotencyKey,by:by(ctx.identity),payload:{...job.payload,kind:"render",expectedPlanHash:input.expectedPlanHash,
+          maxBudgetCny:budgetCny,approvedQualifiedShots:refs}},
         {beforeInsert:async client=>{
         for(const item of qualified){
           if(item.script.project_id!==job.project_id) throw new DirectorJobError("BUDGET_BATCH_INVALID","脚本归属不一致");

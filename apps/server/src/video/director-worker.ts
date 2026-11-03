@@ -8,14 +8,15 @@ import type { TrpcContext } from "../trpc/context.js";
 import { modelPolicyFor } from "../service/llm.js";
 import { currentMemberAuthority, memberAccessGrants } from "../service/access-authority.js";
 import { createDirectorGrantOnClient, directorTx, readExplicitDirectorPreferences, saveExplicitDirectorPreference } from "./director-store.js";
-import { acquireDirectorLease, readDirectorJob, updateDirectorJob, freezeDirectorPlan, latestDirectorPlan,
+import { acquireDirectorLease, assertDirectorProductionRoute, readDirectorJob, updateDirectorJob, freezeDirectorPlan, latestDirectorPlan,
   type DirectorJob, type DirectorJobStatus, DirectorJobError } from "./director-jobs.js";
 import { directorWorkRoot, directorConnectors, resolveDirectorIdentities, resolveDirectorAsset, prepareDirectorAudio,
   registerDirectorVariants, preflightDirectorAudio, type SourceClip } from "./director-sources.js";
-import { startRun, getRun } from "./studio-worker.js";
+import { startDelegatedRun, getRun } from "./studio-worker.js";
 import { safeSegment } from "./media/paths.js";
 import { sha256File } from "./media/register-local.js";
 import { renderSubmitAutoAllowed } from "./gate-policy.js";
+import { loadQualifiedRenderInput } from "./production-authority.js";
 
 const queue:Array<{scope:{tenantId:string;workspaceId:string};job:DirectorJob;context:TrpcContext}>=[];
 const controllers=new Map<string,AbortController>();let workers=0;
@@ -100,6 +101,7 @@ async function runDirectorJob({scope,job,context}:typeof queue[number]) {
       if(payload.expectedPlanHash!==frozen.plan_hash) throw new DirectorJobError("REVISION_CONFLICT","作品版本变化，请刷新后操作");
       progress={...progress,filmPlan,planHash:frozen.plan_hash,planRevision:frozen.revision,targetPlan:filmPlan.deliveryTargetPlan};
     }
+    if (kind !== "revise" && !Array.isArray(payload.sourceRefs)) await assertDirectorProductionRoute(filmPlan.intent);
     const connectors=await directorConnectors({mediaRuntime:kind==="revise"||Array.isArray(payload.sourceRefs)||Number(payload.maxBudgetCny??process.env.WORKLOOM_DIRECTOR_BUDGET_CNY??0)>0});
     const {post,measure,env,bins}=connectors;
     const base=path.join(directorWorkRoot(),safeSegment(scope.workspaceId),safeSegment(job.project_id));await mkdir(base,{recursive:true});
@@ -153,20 +155,31 @@ async function runDirectorJob({scope,job,context}:typeof queue[number]) {
           const delegation=await directorTx(scope,client=>createDirectorGrantOnClient(client,{...scope,projectId:job.project_id,runId},
             {id:job.created_by,type:"human"},{identityAssetRefs:identities.map(a=>a.id),maxBudgetCny:budget}));
           progress={...progress,imageApiCalls:null,imageApiCallEvidence:"preproduction-ledger",preproductionRunId:runId};
-          startRun(scope,{projectId:job.project_id,allocatedRunId:runId,creativeDelegation:delegation,deliveryTargetPlan:filmPlan.deliveryTargetPlan,
-            directorIdentityImages:identities.map(a=>a.path),
-            rawIntent:filmPlan.intent,intent:filmPlan.intent+`\n本次共享镜头池固定 ${filmPlan.shots.length} 镜，镜号、完整台词和角色动作不得增删。`
-              +"\n冻结导演方案，按此制作："+JSON.stringify(filmPlan),
-            metadata:{creativeMode:"director_auto",directorFilmPlan:filmPlan,maxBudgetCny:budget}});
-          while(true) {
-            await checkpoint("制作共享镜头方案",{preproductionRunId:runId});
-            const run=getRun(runId,scope.workspaceId);
-            if(!run) throw new DirectorJobError("PREPRODUCTION_INTERRUPTED","预生产工人已停止，请根据档案恢复");
-            if(run.status==="failed") throw new DirectorJobError("PREPRODUCTION_FAILED",run.error??"预生产失败");
-            if(run.status==="finished") break;
-            if(run.status==="awaiting_approval") await checkpoint("等待必要审批",{approvalId:run.pendingApprovalId,gate:run.currentGate});
-            await delay(2500,abort.signal);
-          }
+          await lease.run(async () => {
+            const studio = startDelegatedRun(scope,{projectId:job.project_id,allocatedRunId:runId,creativeDelegation:delegation,deliveryTargetPlan:filmPlan.deliveryTargetPlan,
+              directorIdentityImages:identities.map(a=>a.path),
+              rawIntent:filmPlan.intent,intent:filmPlan.intent+`\n本次共享镜头池固定 ${filmPlan.shots.length} 镜，镜号、完整台词和角色动作不得增删。`
+                +"\n冻结导演方案，按此制作："+JSON.stringify(filmPlan),
+              metadata:{creativeMode:"director_auto",directorFilmPlan:filmPlan,maxBudgetCny:budget}},abort.signal);
+            try {
+              while(true) {
+                await checkpoint("制作共享镜头方案",{preproductionRunId:runId});
+                const run=getRun(studio.runId,scope.workspaceId);
+                if(!run) throw new DirectorJobError("PREPRODUCTION_INTERRUPTED","预生产工人已停止，请根据档案恢复");
+                if(run.finishedAt) {
+                  if(run.status!=="finished") throw new DirectorJobError("PREPRODUCTION_FAILED",run.error??"预生产失败");
+                  break;
+                }
+                if(run.status==="awaiting_approval") await checkpoint("等待必要审批",{approvalId:run.pendingApprovalId,gate:run.currentGate});
+                await delay(2500,abort.signal);
+              }
+            } catch (error) {
+              abort.abort();
+              throw error;
+            } finally {
+              await studio.completion;
+            }
+          });
           caller=videoRouter.createCaller(await authority());source=await caller.production.shots({projectId:job.project_id});
         }
         const canonical=(id:string)=>id.replace(/^SC-0*(\d+)$/u,(_all,n:string)=>`SC-${Number(n)}`);
@@ -176,11 +189,29 @@ async function runDirectorJob({scope,job,context}:typeof queue[number]) {
         if(actualQuotes.some(q=>q.estimate.cny===null||!q.allowed)||actualQuotes.reduce((sum,q)=>sum+(q.estimate.cny??0),0)+preproductionReserve>budget)
           throw new DirectorJobError("PROJECT_BUDGET_EXCEEDED","正式镜头计划超过已授权预算，没有提交视频");
         const qualifiedShots:Array<{shotId:string;qualificationToken:string;scriptId:string;scriptVersion:number}>=[];
-        for(const shot of source.shots) {
-          await checkpoint("复核共享镜头的正式请求");caller=videoRouter.createCaller(await authority());
-          const qualified=await caller.production.qualifyShot({projectId:job.project_id,shotId:shot.shotId,modelId:model.id,
-            mode:"auto",params:{durationSec:shot.durationSec,aspectRatio:"9:16",generateAudio:payload.audioMode!=="dubbing",...(providerRefs.length?{referenceImageUrls:providerRefs}:{})}});
-          qualifiedShots.push({shotId:shot.shotId,qualificationToken:qualified.qualificationToken,scriptId:qualified.scriptId,scriptVersion:qualified.scriptVersion});
+        if (Array.isArray(payload.approvedQualifiedShots)) {
+          // The approval transaction binds this continuation to the already reviewed G8 batch.
+          if (payload.approvedQualifiedShots.length !== source.shots.length) throw new DirectorJobError("BUDGET_BATCH_INVALID","已批准批次镜号不齐全");
+          for (const [index, shot] of source.shots.entries()) {
+            const approved = payload.approvedQualifiedShots[index];
+            if (approved?.shotId !== shot.shotId || typeof approved.qualificationToken !== "string") {
+              throw new DirectorJobError("BUDGET_BATCH_INVALID","已批准批次和当前镜头不一致");
+            }
+            const qualified = await loadQualifiedRenderInput(getAppPool(), scope, approved.qualificationToken);
+            if (qualified.script.id !== approved.scriptId || qualified.script.version !== approved.scriptVersion
+              || qualified.script.project_id !== job.project_id || qualified.script.shot_id !== shot.shotId || qualified.modelId !== model.id
+              || qualified.script.status !== "approved" && !qualified.reconciliationOnly) {
+              throw new DirectorJobError("BUDGET_BATCH_INVALID","已批准批次的当前脚本或模型不一致");
+            }
+            qualifiedShots.push({shotId:shot.shotId,qualificationToken:approved.qualificationToken,scriptId:qualified.script.id,scriptVersion:qualified.script.version});
+          }
+        } else {
+          for(const shot of source.shots) {
+            await checkpoint("复核共享镜头的正式请求");caller=videoRouter.createCaller(await authority());
+            const params = {durationSec:shot.durationSec,aspectRatio:"9:16",generateAudio:payload.audioMode!=="dubbing",...(providerRefs.length?{referenceImageUrls:providerRefs}:{})};
+            const qualified=await lease.run(() => caller.production.qualifyShot({projectId:job.project_id,shotId:shot.shotId,modelId:model.id,mode:"auto",params}));
+            qualifiedShots.push({shotId:shot.shotId,qualificationToken:qualified.qualificationToken,scriptId:qualified.scriptId,scriptVersion:qualified.scriptVersion});
+          }
         }
         const scripts=await caller.cms.listScripts({projectId:job.project_id});
         if(!renderSubmitAutoAllowed() && qualifiedShots.some(q=>scripts.find(s=>s.id===q.scriptId)?.status==="draft")) {
@@ -191,7 +222,7 @@ async function runDirectorJob({scope,job,context}:typeof queue[number]) {
         const generated:Array<{shotId:string;jobId:string}>=[];
         for(const qualified of qualifiedShots) {
           await checkpoint("生成共享镜头",{generated});caller=videoRouter.createCaller(await authority());
-          const submitted=await caller.render.submit({qualificationToken:qualified.qualificationToken});
+          const submitted=await lease.run(() => caller.render.submit({qualificationToken:qualified.qualificationToken}));
           generated.push({shotId:qualified.shotId,jobId:submitted.jobId});progress={...progress,renderApiCalls:Number(progress.renderApiCalls??0)+(submitted.deduped?0:1)};
         }
         const completed:Array<{shotId:string;assetId:string}>=[];
