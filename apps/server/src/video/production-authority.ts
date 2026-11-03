@@ -17,6 +17,7 @@ import type { RenderScriptLike } from "./gen/submit.js";
 import type { VideoGenParams } from "./gen/types.js";
 import { SubmissionError } from "./gen/submission-ledger.js";
 import { verifyDirectorGrant } from "./director-store.js";
+import { inheritedDirectorLease } from "./director-jobs.js";
 import { canonicalRenderJson, compileRenderRequest, renderSha256, supportsCompiledRequest, type CompiledProviderRequest } from "./gen/compiled-request.js";
 
 const ISSUER = "workloom.production-authority";
@@ -72,23 +73,35 @@ async function scopedTx<T>(app: AppPool, scope: Scope, run: (client: pg.PoolClie
 
 /** 与预生产使用同一项目锁。评审/网络期间只持 session lease，不保持数据库事务。 */
 async function lease(app: AppPool, scope: Scope, projectId: string, shared: boolean): Promise<{ app: AppPool; release: () => Promise<void> }> {
-  const client = await app.connect();
+  const inherited = inheritedDirectorLease(scope, projectId);
+  const client = inherited?.client ?? await app.connect();
   const key = projectRunLockKey(scope, projectId);
   const lockFn = shared ? "pg_try_advisory_lock_shared" : "pg_try_advisory_lock";
   const unlockFn = shared ? "pg_advisory_unlock_shared" : "pg_advisory_unlock";
-  try {
-    const result = await client.query<{ ok: boolean }>(`SELECT ${lockFn}(hashtext($1)) AS ok`, [key]);
-    if (result.rows[0]?.ok !== true) fail("QUALIFICATION_BUSY", "项目正在预生产、审核或提交，稍后重试同一请求");
-  } catch (error) { client.release(true); throw error; }
+  if (!inherited) {
+    try {
+      const result = await client.query<{ ok: boolean }>(`SELECT ${lockFn}(hashtext($1)) AS ok`, [key]);
+      if (result.rows[0]?.ok !== true) fail("QUALIFICATION_BUSY", "项目正在预生产、审核或提交，稍后重试同一请求");
+    } catch (error) { client.release(true); throw error; }
+  }
   let released = false, poisoned = false;
   // 租约和业务短事务复用同一会话，避免 N 个并发提交耗尽 N 个池连接后各自等待第二个连接。
   // 事务的 release 只归还给此租约；真正连接由外层 finally 一次性解锁并归还。
   const leasedApp = { connect: async () => {
+    inherited?.assertActive();
     if (released || poisoned) throw new Error("qualification lease connection unavailable");
     return { query: client.query.bind(client), release: (discard?: boolean) => { poisoned ||= discard === true; } };
   } } as unknown as AppPool;
   return { app: leasedApp, release: async () => {
-    if (released) return; released = true; let discard = poisoned;
+    if (released) return;
+    released = true;
+    // The Director keeps the exclusive lock through all delegated stages and records.
+    if (inherited) {
+      if (poisoned) inherited.poison();
+      inherited.assertActive();
+      return;
+    }
+    let discard = poisoned;
     try {
       if (poisoned) throw new Error("qualification lease transaction unverified");
       const result = await client.query<{ ok: boolean }>(`SELECT ${unlockFn}(hashtext($1)) AS ok`, [key]);
