@@ -494,6 +494,8 @@ export function createWebSearch(options: {
 export interface SearchCacheEntry {
   at: string;
   hits: SearchHit[];
+  /** 旧缓存把请求失败也存为空；只有成功标记的线上空结果可复用。 */
+  outcome?: "success";
 }
 export interface SearchCache {
   version: 1;
@@ -528,13 +530,14 @@ export function saveSearchCache(file: string | undefined, cache: SearchCache): v
 function readCachedHits(cache: SearchCache, provider: string, query: string, ttlMs: number): SearchHit[] | null {
   const entry = cache.entries[searchCacheKey(provider, query)];
   if (!entry || !Array.isArray(entry.hits)) return null;
+  if (provider !== FIXTURE_PROVIDER && entry.hits.length === 0 && entry.outcome !== "success") return null;
   const age = Date.now() - new Date(entry.at).getTime();
   if (!Number.isFinite(age) || age > ttlMs) return null;
   return entry.hits;
 }
 
 function writeCachedHits(cache: SearchCache, provider: string, query: string, hits: SearchHit[]): void {
-  cache.entries[searchCacheKey(provider, query)] = { at: new Date().toISOString(), hits };
+  cache.entries[searchCacheKey(provider, query)] = { at: new Date().toISOString(), hits, outcome: "success" };
 }
 
 /**

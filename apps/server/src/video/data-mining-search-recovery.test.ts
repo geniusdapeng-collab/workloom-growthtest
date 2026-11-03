@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -93,5 +93,20 @@ describe("营销检索短暂失败后的真实恢复", () => {
     expect(await search(query, 2)).toEqual([]);
     expect(blockedFetch).toHaveBeenCalledTimes(1);
     expect(loadSearchCache(blockedFile).entries[searchCacheKey("api", query)]).toBeUndefined();
+  });
+
+  it("升级后重取无法区分失败或正常的旧空缓存，同时复用旧非空命中", async () => {
+    const file = await cacheFile();
+    const oldPositive = `${query} 价格`;
+    await writeFile(file, JSON.stringify({ version: 1, entries: {
+      [searchCacheKey("api", query)]: { at: new Date().toISOString(), hits: [] },
+      [searchCacheKey("api", oldPositive)]: { at: new Date().toISOString(), hits: [expectedHit] },
+    } }));
+    const fetchImpl = vi.fn(async () => success("api"));
+    const search = createWebSearch({ providers: ["api"], cacheFile: file, paceMs: 0,
+      api: { provider: "generic", apiKey: "test-only", apiUrl: "https://search.example.com/search", fetchImpl: fetchImpl as typeof fetch } });
+    expect(await search(query, 2)).toEqual([expectedHit]);
+    expect(await search(oldPositive, 2)).toEqual([expectedHit]);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 });
