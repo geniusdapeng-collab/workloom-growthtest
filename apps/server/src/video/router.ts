@@ -489,6 +489,8 @@ const studioRouter = router({
     .input(z.object({
       projectId: z.string().min(1).optional(),
       intent: z.string().min(1).max(2000),
+      /** 原话中明确的全片创作目标；旧客户端未传时沿用 30 秒。 */
+      durationSec: z.number().int().min(1).max(300).default(30),
       metadata: z.record(z.string(), z.unknown()).refine(isPublicStudioMetadata, RESERVED_STUDIO_METADATA_ERROR).optional(),
       /** 兼容旧字段：显式指定营销/叙事；与 route 同时给出时以 route 为准 */
       isMarketing: z.boolean().optional(),
@@ -535,7 +537,7 @@ const studioRouter = router({
             projectId: input.projectId,
             rawIntent: input.intent,
             intent: buildPipelineIntent(input.intent, {
-              durationSec: 30,
+              durationSec: input.durationSec,
               aspectRatio: decision.route === "marketing" ? selectedPlatform.decision.aspectRatio : undefined,
               platform: selectedPlatform.decision.id,
             }),
@@ -598,7 +600,7 @@ const studioRouter = router({
           rawIntent: input.intent,
           customerMetadata: input.metadata ?? null,
           intent: buildPipelineIntent(input.intent, {
-            durationSec: 30,
+            durationSec: input.durationSec,
             aspectRatio: decision.route === "marketing" ? standardPlatform.decision.aspectRatio : undefined,
             platform: standardPlatform.decision.id,
           }),
