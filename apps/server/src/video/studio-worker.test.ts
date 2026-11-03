@@ -93,7 +93,7 @@ vi.mock("@hyperreality/video-studio", async (importOriginal) => ({
   },
   reviewStage: doubles.review,
   WorkloomLLMEngine: { fromEnv: () => ({ attachRouter: vi.fn(), attachConfiguredRouter: vi.fn() }) },
-  installVendorEngineBridge: vi.fn(),
+  withVendorEngineBridge: (_engine: unknown, run: () => Promise<unknown>) => run(),
   installVendorRenderCompatBridge: vi.fn(),
   installVendorPortraitBindingBridge: () => doubles.uninstall,
   attachStructuredLog: () => doubles.detach,

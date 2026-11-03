@@ -28,7 +28,7 @@ import {
   auditScenePolicy,
   attachStructuredLog,
   classifyError,
-  installVendorEngineBridge,
+  withVendorEngineBridge,
   installVendorPortraitBindingBridge,
   installVendorRenderCompatBridge,
   pipelineSha256,
@@ -598,12 +598,6 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
   };
   if(directorMode)llm.attachConfiguredRouter(studioRouter);else llm.attachRouter(studioRouter);
 
-  /**
-   * vendor 自建 LLMEngine 也要接到宿主模型路由（2026-09-21 真机修复）：
-   * 剧本引擎/需求洞察等子引擎会自己 new 一个引擎读 vendor 的环境变量与模型名，
-   * 不桥接就会出现「LLM引擎返回失败: API Key 未配置」→ 预生产在 Layer 1 直接失败。
-   */
-  installVendorEngineBridge(llm);
   // 逐镜渲染的入参归一（空 portraits 数组会以 characterRef.split 崩溃，见 vendor-compat.ts）
   installVendorRenderCompatBridge();
   /**
@@ -1237,7 +1231,9 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
              * 传入 runInput（而不是 input）：它带上了本轮的片型选型结论与注入指引，
              * vendor 的提示词/分镜必须按本次选中的知识条目生成；G1 营销事实仍取自原始 input。
              */
-            const r: Awaited<ReturnType<VideoStudio["runPreproduction"]>> = g1Approved ? await studio.runPreproduction(runInput) : {
+            const r: Awaited<ReturnType<VideoStudio["runPreproduction"]>> = g1Approved
+              ? await withVendorEngineBridge(llm, () => studio.runPreproduction(runInput))
+              : {
               success: false, stages: {}, confirmations: { hostG1: { approved: false, reason: "producer-rejected(G1_DOSSIER)：本次来源与事实未通过真实监制" } },
             };
             completedVendorResult = r;

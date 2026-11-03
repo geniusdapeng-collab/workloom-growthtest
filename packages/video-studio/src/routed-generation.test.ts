@@ -2,7 +2,7 @@ import { createServer, type Server } from "node:http";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { WorkloomLLMEngine, installVendorEngineBridge } from "./llm-adapter.js";
+import { WorkloomLLMEngine, installVendorEngineBridge, withVendorEngineBridge } from "./llm-adapter.js";
 
 const repoRoot = fileURLToPath(new URL("../../../", import.meta.url));
 let server: Server;
@@ -135,6 +135,47 @@ describe("video adapter canonical dispatch", () => {
     const result = await pending;
     expect(result.success).toBe(false);
     expect(result.error).toContain("取消");
+  });
+
+  it("attributes real concurrent vendor calls to each run after a later run starts and an earlier one exits", async () => {
+    const a = engine();
+    const b = engine();
+    const vendorRequire = createRequire(`${repoRoot}/package.json`);
+    const { LLMEngine } = vendorRequire(`${repoRoot}/vendor/supermickey/systems/llm-reasoning-engine.js`);
+    const native = new LLMEngine();
+    let startA!: () => void;
+    let startB!: () => void;
+    const aGate = new Promise<void>((resolve) => { startA = resolve; });
+    const bGate = new Promise<void>((resolve) => { startB = resolve; });
+    const runA = withVendorEngineBridge(a, async () => { await aGate; return native.reason("scope-a", { forceJson: true }); });
+    const runB = withVendorEngineBridge(b, async () => { await bGate; return native.reason("scope-b", { forceJson: true }); });
+    startA();
+    const resultA = await runA;
+    startB();
+    const resultB = await runB;
+    expect([a.stats.totalCalls, b.stats.totalCalls]).toEqual([1, 1]);
+    expect(resultA).toMatchObject({ success: true });
+    expect(resultB).toMatchObject({ success: true });
+    expect(bodies.map((body) => (body.messages as Array<{ content: string }>).at(-1)?.content)).toEqual(["scope-a", "scope-b"]);
+  });
+
+  it("prevents asynchronous work left behind by a finished run from using another run’s adapter", async () => {
+    const adapter = engine();
+    const vendorRequire = createRequire(`${repoRoot}/package.json`);
+    const { LLMEngine } = vendorRequire(`${repoRoot}/vendor/supermickey/systems/llm-reasoning-engine.js`);
+    const native = new LLMEngine();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    let late!: Promise<unknown>;
+    await withVendorEngineBridge(adapter, async () => {
+      late = gate.then(() => native.reason("expired scope"));
+    });
+    const observed = expect(late).rejects.toThrow(/VENDOR_ENGINE_SCOPE_CLOSED/);
+    await withVendorEngineBridge(engine(), async () => {
+      release();
+      await observed;
+    });
+    expect(bodies).toHaveLength(0);
   });
 
   it("vendor bridge delegates reason/chat/structured to the same adapter and model", async () => {
