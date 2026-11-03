@@ -13,6 +13,12 @@ import { submitGenJob } from "./gen/submit.js";
 import { pollRenderJobs } from "./render-poller.js";
 import { projectRunLockKey } from "./archive-host.js";
 import { projectComputeUsed } from "./project-compute-budget.js";
+import { closeAllPools } from "@workloom/db";
+import { buildDirectorDefaults, directorHash, resolveDeliveryTargets, type DirectorFilmPlan } from "@hyperreality/video-studio";
+import * as accessAuthority from "../service/access-authority.js";
+import { acquireDirectorLease, freezeDirectorPlan, queueDirectorJob, readDirectorJob, updateDirectorJob } from "./director-jobs.js";
+import { directorRouter } from "./director-router.js";
+import * as directorWorker from "./director-worker.js";
 
 const RUN_DB = process.env.RUN_DB_TESTS === "1" && Boolean(process.env.DATABASE_APP_URL);
 describe.runIf(RUN_DB)("正式生成资格活库契约", () => {
@@ -93,9 +99,9 @@ describe.runIf(RUN_DB)("正式生成资格活库契约", () => {
         reason: "原始需求未命中已安装片型", evidence: [] } }, rule_impact: [],
     });
   });
-  afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+  afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
   // 不删除 append-only 资格/五元事件；专属测试作用域留作真实回归证据。
-  afterAll(async () => { await Promise.all([owner.end(), app.end(), gateway.end()]); await rm(dir, { recursive: true, force: true }); });
+  afterAll(async () => { await Promise.all([owner.end(), app.end(), gateway.end(), closeAllPools()]); await rm(dir, { recursive: true, force: true }); });
 
   const issue = (pool = app) => qualifyProductionShot({ app: pool, scope, actor: "MEM-ORIGINAL", projectId, shotId: "S1",
     modelId: "doubao-seedance-2-5", params: { aspectRatio: "16:9" }, mode: "manual", env });
@@ -397,6 +403,58 @@ describe.runIf(RUN_DB)("正式生成资格活库契约", () => {
       const second = await authorizeRenderSubmission(request); await second.release();
     } finally { await held.release(); observer.release(); }
     const next = await issue(); expect(next.qualificationId).not.toBe(qualification.qualificationId);
+  });
+  it("导演的正式资格和派发沿用同一独占租约，外部仍受锁约束且重放不会重复提交", async () => {
+    const director = await acquireDirectorLease(scope, projectId);
+    expect(director).not.toBeNull();
+    try {
+      await expect(issue()).rejects.toThrow("QUALIFICATION_BUSY");
+      const qualification = await director!.run(() => issue());
+      const request = await input(qualification.qualificationToken);
+      await expect(submitGenJob(request)).rejects.toThrow("QUALIFICATION_BUSY");
+      const submitted = await director!.run(() => submitGenJob(request));
+      const replay = await director!.run(() => submitGenJob(request));
+      expect(replay).toMatchObject({ jobId: submitted.jobId, deduped: true });
+      expect(providerCalls).toBe(1);
+      expect((await owner.query("SELECT dispatch_count,state FROM generation_submissions WHERE script_id=$1", [qualification.scriptId])).rows)
+        .toEqual([{ dispatch_count: 1, state: "finalized" }]);
+    } finally { await director!.release(); }
+    expect((await issue()).qualificationId).toBeTruthy();
+  });
+  it("G8批准继续作业保存同一镜头、资格和预算，幂等重放不重复审批", async () => {
+    const qualification = await issue();
+    vi.stubEnv("WORKLOOM_RENDER_SIGNING_SECRET", env.WORKLOOM_RENDER_SIGNING_SECRET);
+    const identity = { kind: "member" as const, ...scope, memberId: "MEM-ORIGINAL", memberNo: "MEM-ORIGINAL",
+      name: "测试成员", role: "owner" as const, plan: "pro" as const };
+    vi.spyOn(accessAuthority, "currentMemberAuthority").mockResolvedValue({ identity, permissions: {} });
+    vi.spyOn(accessAuthority, "resolveAuthoritativeClientAccess").mockResolvedValue({
+      navigationPermissions: ["ai-video.assets.read"],
+    } as Awaited<ReturnType<typeof accessAuthority.resolveAuthoritativeClientAccess>>);
+    vi.spyOn(directorWorker, "dispatchDirectorJob").mockImplementation(() => undefined);
+    const intent = "拍一段窗边空镜";
+    const filmPlan = { schemaVersion: "workloom.director-film-plan/v2", intent, brief: { title: "窗边" }, shots: [], narrativePlans: [],
+      directorProfile: buildDirectorDefaults({ intent }), deliveryTargetPlan: resolveDeliveryTargets(intent),
+      planHash: directorHash("fixture-budget-plan") } as unknown as DirectorFilmPlan;
+    const plan = await freezeDirectorPlan(scope, projectId, { filmPlan, by: identity.memberId });
+    const initial = await queueDirectorJob(scope, { projectId, revision: plan.revision, idempotencyKey: `g8-initial-${seq}`,
+      by: identity.memberId, intent, payload: { kind: "create", maxBudgetCny: null } });
+    const refs = [{ shotId: "S1", qualificationToken: qualification.qualificationToken,
+      scriptId: qualification.scriptId, scriptVersion: qualification.scriptVersion }];
+    await updateDirectorJob(scope, initial.job.id, "running", { stage: "测试准备" });
+    await updateDirectorJob(scope, initial.job.id, "requires-generation-plan", {
+      requiredApproval: "G8", planHash: plan.planHash, qualifiedShots: refs, budgetCny: 37,
+    });
+    const caller = directorRouter.createCaller({ identity, session: identity, partnerIdentity: null, headers: new Headers() });
+    const approval = { jobId: initial.job.id, approve: true as const, expectedPlanHash: plan.planHash, idempotencyKey: `g8-approved-${seq}` };
+    const continued = await caller.approveBudget(approval);
+    expect((await caller.approveBudget(approval)).id).toBe(continued.id);
+    expect((await readDirectorJob(scope, continued.id))?.payload).toMatchObject({
+      kind: "render", approvedQualifiedShots: refs, maxBudgetCny: 37, expectedPlanHash: plan.planHash,
+    });
+    expect((await owner.query("SELECT status FROM render_scripts WHERE id=$1", [qualification.scriptId])).rows).toEqual([{ status: "approved" }]);
+    expect((await owner.query(`SELECT event_id FROM biz_events WHERE workspace_id=$1
+      AND payload->'object'->>'id'=$2 AND payload->'decision'->>'action'='video.director.budget.approved'`, [scope.workspaceId, projectId])).rowCount).toBe(1);
+    expect(providerCalls).toBe(0);
   });
   it("100个同key真实提交在2连接池内不死锁；只有一个供应商调用和一个job", async () => {
     const qualification = await issue(), request = await input(qualification.qualificationToken);

@@ -1,13 +1,15 @@
 /** Real PostgreSQL scope, append-only, CAS and queue transactions; no provider calls. */
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { randomBytes } from "node:crypto";
 import pg from "pg";
 import { closeAllPools, getAppPool } from "@workloom/db";
-import { buildDirectorDefaults, directorHash, resolveDeliveryTargets, type DirectorFilmPlan } from "@hyperreality/video-studio";
+import { buildDirectorDefaults, directorHash, resolveDeliveryTargets, VideoStudio, type DirectorFilmPlan } from "@hyperreality/video-studio";
 import { directorTx, createDirectorGrantOnClient, verifyDirectorGrant, saveExplicitDirectorPreference, readExplicitDirectorPreferences } from "./director-store.js";
-import { queueDirectorJob, readDirectorJob, updateDirectorJob, freezeDirectorPlan, latestDirectorPlan, acquireDirectorLease,
+import { queueDirectorJob, readDirectorJob, updateDirectorJob, freezeDirectorPlan, latestDirectorPlan, acquireDirectorLease, assertDirectorProductionRoute, inheritedDirectorLease,
   recoverInterruptedDirectorJob, directorEvent } from "./director-jobs.js";
 import { directorRouter, publicDirectorJob, directorBlindLabel } from "./director-router.js";
+import { acquireProjectLease } from "./archive-host.js";
+import { getRun, startDelegatedRun } from "./studio-worker.js";
 
 const enabled=(process.env.RUN_DIRECTOR_DB_TESTS==="1"||process.env.RUN_DB_TESTS==="1")&&Boolean(process.env.DATABASE_APP_URL);
 describe.runIf(enabled)("director real PostgreSQL contracts",()=>{
@@ -128,6 +130,67 @@ describe.runIf(enabled)("director real PostgreSQL contracts",()=>{
     const id=await project(),lease=await acquireDirectorLease(scope,id);expect(lease).not.toBeNull();
     expect(await acquireDirectorLease(scope,id)).toBeNull();await lease!.release();
     const second=await acquireDirectorLease(scope,id);expect(second).not.toBeNull();await second!.release();
+  });
+  it.each(["vendor rejection", "cancellation"])("delegated Studio retains the live Director lease through %s and commits its run receipt", async (outcome) => {
+    vi.stubEnv("LLM_PROVIDER", "deepseek");
+    vi.stubEnv("LLM_BASE_URL", "http://127.0.0.1:9");
+    vi.stubEnv("LLM_API_KEY", "fixture-no-provider");
+    vi.stubEnv("LLM_MODEL", "deepseek-flash");
+    let enterVendor!: () => void, completeVendor!: () => void;
+    const entered = new Promise<void>(resolve => { enterVendor = resolve; });
+    const vendorCompletion = new Promise<void>(resolve => { completeVendor = resolve; });
+    const run = vi.spyOn(VideoStudio.prototype, "runPreproduction").mockImplementation(async () => {
+      enterVendor();
+      if (outcome === "cancellation") await vendorCompletion;
+      return { success: false, stages: {}, confirmations: { fixture: { approved: false, reason: "fixture vendor rejected" } } };
+    });
+    const id = await project();
+    const runId = `delegated-${id}`;
+    const grant = await directorTx(scope, client => createDirectorGrantOnClient(client, {
+      ...scope, projectId: id, runId,
+    }, { id: "MEM-test", type: "human" }));
+    const lease = await acquireDirectorLease(scope, id);
+    expect(lease).not.toBeNull();
+    try {
+      const input = { projectId: id, intent: "拍一段窗边空镜", creativeDelegation: grant, allocatedRunId: runId };
+      const abort = new AbortController();
+      expect(() => startDelegatedRun(scope, input, abort.signal)).toThrow("导演项目租约");
+      await lease!.run(async () => {
+        expect(() => inheritedDirectorLease(other, id)).toThrow("DIRECTOR_LEASE_SCOPE_MISMATCH");
+        expect(await acquireProjectLease(scope, id)).toBeNull();
+        const launched = startDelegatedRun(scope, input, abort.signal);
+        try {
+          if (outcome === "cancellation") {
+            await Promise.race([entered, launched.completion.then(() => { throw new Error("Studio did not reach its fixture worker"); })]);
+            abort.abort();
+            await expect(lease!.release()).rejects.toMatchObject({ code: "DIRECTOR_LEASE_BUSY" });
+            expect(await acquireProjectLease(scope, id)).toBeNull();
+          }
+        } finally {
+          completeVendor();
+          await launched.completion;
+        }
+        expect(getRun(runId, scope.workspaceId)).toMatchObject({ status: "failed", error: outcome === "cancellation"
+          ? expect.stringContaining("DIRECTOR_CANCELLED") : "fixture vendor rejected" });
+        expect(await acquireProjectLease(scope, id)).toBeNull();
+      });
+      expect(run).toHaveBeenCalledTimes(1);
+      const receipt = await owner.query("SELECT run_id,status FROM production_stage_runs WHERE project_id=$1 AND stage_id='preproduction'", [id]);
+      expect(receipt.rows).toEqual([{ run_id: runId, status: "failed" }]);
+    } finally {
+      await lease!.release();
+      vi.unstubAllEnvs();
+      run.mockRestore();
+    }
+    const next = await acquireProjectLease(scope, id);
+    expect(next).not.toBeNull();
+    await next!.release();
+  });
+  it("returns a typed route boundary for marketing and explainers without changing the narrative defaults", async () => {
+    for (const intent of ["走营销片，商品名是摩托车。", "走营销片。", "制作口播解说片"]) {
+      await expect(assertDirectorProductionRoute(intent)).rejects.toMatchObject({ code: "DIRECTOR_ROUTE_UNAVAILABLE" });
+    }
+    await expect(assertDirectorProductionRoute("拍一段窗边空镜")).resolves.toBeUndefined();
   });
   it("a dead aged lease becomes interrupted without provider replay",async()=>{
     const {job}=await enqueue(await project());await updateDirectorJob(scope,job.id,"running",{stage:"before crash",renderApiCalls:0});
