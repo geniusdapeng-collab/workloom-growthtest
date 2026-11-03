@@ -1,8 +1,8 @@
 /** Actual CLI + loopback HTTP; all provider keys/data are synthetic and no external calls occur. */
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -174,6 +174,13 @@ test("live CLI official gateway: same-task replay never sends another POST or mu
   }));
   const { f, env } = officialGatewayFixture(t, s.url, [{ ...gatewayFixtureTask, expect: ["proof"] }],
     { maxLlmTokens: 1_048_576, maxCostCny: 9 });
+  const checklist = "docs/acceptance/checklist.v3.json";
+  mkdirSync(join(f.repo, dirname(checklist)), { recursive: true });
+  copyFileSync(new URL(`../../../../${checklist}`, import.meta.url), join(f.repo, checklist));
+  const git = (args) => spawnSync("git", args, { cwd: f.repo, encoding: "utf8" });
+  const add = git(["add", "--", checklist]); assert.equal(add.status, 0, add.stderr);
+  const commit = git(["-c", "user.name=Synthetic Test", "-c", "user.email=synthetic@example.invalid", "commit", "-qm", "Add canonical checklist fixture"]);
+  assert.equal(commit.status, 0, commit.stderr);
   const first = await child(f, [], env);
   assert.equal(first.status, 0, first.stderr);
   const original = report(f);
@@ -181,6 +188,15 @@ test("live CLI official gateway: same-task replay never sends another POST or mu
   assert.equal(original.tasks[0].receipt.inputTokens, 7);
   assert.equal(original.tasks[0].receipt.outputTokens, 3);
   assert.equal(original.budget.used.llmTokens, 10);
+  assert.equal(original.tasks[0].model, officialGateway.id);
+  assert.equal(original.tasks[0].modelResolved, officialGateway.model);
+  assert.notEqual(original.tasks[0].model, original.tasks[0].modelResolved);
+  const reportCli = fileURLToPath(new URL("../../report-v3.mjs", import.meta.url));
+  const reportRun = spawnSync(process.execPath, [reportCli, "--root", dirname(f.out)], { cwd: f.repo, encoding: "utf8" });
+  assert.equal(reportRun.status, 2, reportRun.stderr);
+  const summary = JSON.parse(readFileSync(join(dirname(f.out), "report-summary.json"), "utf8"));
+  assert.equal(summary.reportGenerated, true);
+  assert.equal(summary.validationErrors.some(error => error.includes("任务模型不属于已就绪模型清单")), false);
   const receiptPath = join(f.out, "receipts", `${gatewayFixtureTask.id}.json`);
   const originalBytes = readFileSync(receiptPath, "utf8");
 

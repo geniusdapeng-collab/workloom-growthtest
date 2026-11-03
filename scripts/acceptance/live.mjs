@@ -398,7 +398,7 @@ async function runTask(task) {
           out.receipt.synced = false;
         }
         const verification = await verifyExpectations({ ...task, expectedModel: resolved.model }, out);
-        return { ...base, ...out, chain, modelResolved: out.model ?? null, verification,
+        return { ...base, ...out, chain, model: resolved.id, modelResolved: out.model ?? null, verification,
           status: out.status === "ok" && !verification.ok ? "failed" : out.status,
           reason: failureReason(out, verification) };
       }
