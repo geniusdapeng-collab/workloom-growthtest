@@ -336,6 +336,34 @@ describe("actual parent compiled submission, provider download, and copied sourc
       { type: "image_url", image_url: { url: `data:image/png;base64,${plateBytes.toString("base64")}` }, role: "reference_image" },
     ]);
   });
+  it("labels the built-in local portrait by its JPEG bytes despite the historical PNG name", async () => {
+    const f = fixture();
+    const portrait = readFileSync(new URL(
+      "../../../../bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png",
+      import.meta.url,
+    ));
+    expect(portrait.subarray(0, 3).toString("hex")).toBe("ffd8ff");
+    const ref = "review/registered-portrait.png";
+    writeFileSync(join(f.ctx.workDir, ref), portrait);
+    const { result } = await generate(f, "P1", { refs: [ref] });
+    const body = f.calls.find(call => call.method === "POST")!.body!;
+    const reference = (body.content as Array<{ role?: string; image_url?: { url: string } }>)
+      .find(part => part.role === "reference_image");
+    const [header, encoded] = reference!.image_url!.url.split(",", 2);
+    expect(header).toBe("data:image/jpeg;base64");
+    expect(hash(Buffer.from(encoded!, "base64"))).toBe(hash(portrait));
+    expect(result.submissionReceipt.referenceInputs).toEqual([
+      { role: "reference-image", ref, sha256: hash(portrait), hashKind: "bytes" },
+    ]);
+  });
+  it("does not dispatch arbitrary bytes labeled as a local image by their filename", async () => {
+    const f = fixture();
+    const ref = "review/not-an-image.png";
+    writeFileSync(join(f.ctx.workDir, ref), "not an image");
+    await expect(generate(f, "P1", { refs: [ref] })).rejects.toThrow("REFERENCE_IMAGE_TYPE_UNSUPPORTED");
+    expect(f.ledger.recordDispatch).not.toHaveBeenCalled();
+    expect(f.net).not.toHaveBeenCalled();
+  });
   it("copies current provider media while retaining both the raw bytes and the current private receipt", async () => {
     const f = fixture(), { result } = await generate(f);
     const copied = await handle(f.ctx, frame("media.fetch", "S1", { ref: result.ref, targetRef: "clips/S1.mp4" })) as { sha256: string; bytes: number };

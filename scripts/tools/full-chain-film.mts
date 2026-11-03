@@ -69,6 +69,7 @@ import {
   applyMicromotion, assessVariantDistinctness, auditContinuity, buildDeliveryManifest, buildGateEvent,
   assessMotionRichness, motionPolicyForShot, buildCoverDesignPrompt, buildMaterialMotionPrompt, buildPlatePrompt, buildRevisionPlan, buildRevisionReport, buildVariantPlan,
   buildMaterialScenePrompt, assessReferenceIndependence, decidePlateCache, plateRequestSha256, MATERIAL_SCENE_POLICY_VERSION,
+  encodeLocalImageDataUrl,
   isDoubledNarration, speechAcceptance,
   termPronunciationCheck,
   REFERENCE_INDEPENDENCE_POLICY,
@@ -756,6 +757,7 @@ const lineageComponentHash = productionHash([
   "packages/video-studio/src/film-completion.mjs", "packages/video-studio/src/standard-post-contract.ts",
   "packages/video-studio/src/character-release-source.ts", "packages/video-studio/src/film-worker-runtime.ts",
   "packages/video-studio/src/film-worker-provenance.ts", "packages/video-studio/src/film-worker-channel.ts",
+  "packages/video-studio/src/image-data-url.ts",
 ].map((file) => ({ file, sha256: sha256FileSync(join(REPO_ROOT, file)) })));
 const SCENE_BIBLE_FILE = arg("--scene-bible");
 const sceneBible: SceneBible | null = SCENE_BIBLE_FILE
@@ -2351,8 +2353,9 @@ function dataUrl(file: string): string {
   /** 方舟授权真人素材（`asset://<asset ID>`）不是本地文件：**原样透传**给平台，不能 base64 编码 */
   if (isAssetRefLocal(file)) return file;
   if (WORKER_RUNTIME) return `film-ref:${WORKER_RUNTIME.reference(file)}`;
-  const ext = file.toLowerCase().endsWith(".png") ? "png" : file.toLowerCase().endsWith(".webp") ? "webp" : "jpeg";
-  return `data:image/${ext};base64,${readFileSync(file).toString("base64")}`;
+  const url = encodeLocalImageDataUrl(readFileSync(file));
+  if (url === null) throw new Error(`REFERENCE_IMAGE_TYPE_UNSUPPORTED: 本地参考图内容不是 PNG、JPEG 或 WebP：${file}`);
+  return url;
 }
 
 async function arkImage(prompt: string, anchors: string[], size: string, shotId: string, target: string): Promise<string> {
