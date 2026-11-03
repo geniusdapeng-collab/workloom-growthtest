@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { hashBytes, ITEM_SCHEMA, INDEX_SCHEMA, revisionOf, verifyAcceptanceItem, verifyArtifact, verifyRun } from "../../delivery/evidence.mjs";
-import { LIVE_BUDGET_CAPS } from "./live/budget.mjs";
+import { DEEPSEEK_GATEWAY_CNY_PER_1K, LIVE_BUDGET_CAPS } from "./live/budget.mjs";
 import { verifyRegressionSummary } from "./regression-evidence.mjs";
 
 const EXECUTOR_CHECKLIST = fileURLToPath(new URL("../../../docs/acceptance/checklist.v3.json", import.meta.url));
@@ -175,6 +175,7 @@ export function validateProductionFiles(context, live) {
         const value = budget.budgets?.[key];
         if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || (key.startsWith("min") ? value < cap : value > cap)) errors.push(`P 预算 ${key} 缺失/非法/放宽硬闸`);
       }
+      if (!Number.isSafeInteger(budget.budgets?.maxLlmTokens) || budget.budgets.maxLlmTokens < 0) errors.push("P 缺有效的作业总 token 额度");
       if (!["llmCnyPer1kTokens", "imageCny", "videoCnyPerSecond"].every((key) => Number.isFinite(budget.pricing?.[key]) && budget.pricing[key] >= 0)) errors.push("P 配额缺有限非负冻结单价");
       if (!Number.isFinite(budget.used?.wallClockMin) || budget.used.wallClockMin < 0 || budget.used.wallClockMin > budget.budgets?.maxWallClockMin) errors.push("P 实际墙钟缺失/非法/超限");
       const init = entries.filter((entry) => entry.event === "budget-init");
@@ -185,16 +186,35 @@ export function validateProductionFiles(context, live) {
       const frozen = [];
       let previousAt = runStart;
       const estimate = (kind, units, tokens) => kind === "llm" ? tokens / 1000 * budget.pricing?.llmCnyPer1kTokens : kind === "image" ? units * budget.pricing?.imageCny : units * budget.pricing?.videoCnyPerSecond;
+      const activeUsage = (reservation) => {
+        const settlement = reservation.settlement;
+        const settledBound = reservation.llmRequestHash && settlement?.measured === true;
+        const units = Math.max(reservation.units, settlement?.units ?? 0);
+        const tokens = settledBound ? settlement.tokens : Math.max(reservation.tokens, settlement?.tokens ?? 0);
+        const cost = Math.max(settledBound ? 0 : reservation.estimateCny, estimate(reservation.kind, units, tokens), settlement?.costCny ?? 0);
+        return { units, tokens, cost, calls: Math.max(1, settlement?.calls ?? 0) };
+      };
       for (const entry of entries) {
         const at = Date.parse(entry.at);
         if (entry.schema !== "workloom.live-budget/v2" || entry.environmentKind !== live.environment?.kind || !Number.isFinite(at) || at < previousAt || at > runEnd) throw new Error("budget event identity/time invalid");
         previousAt = at;
         if (entry.event === "reserve") {
           if (reservations.has(entry.reservationId) || typeof entry.reservationId !== "string" || !entry.reservationId.trim() || typeof entry.taskId !== "string" || !entry.taskId.trim() || !["llm", "image", "video"].includes(entry.kind) || ![entry.units, entry.tokens, entry.estimateCny].every((n) => Number.isFinite(n) && n >= 0) || !Number.isSafeInteger(entry.tokens) || (entry.kind === "llm" && entry.tokens === 0) || (entry.kind === "image" && (!Number.isSafeInteger(entry.units) || entry.units === 0)) || (entry.kind === "video" && (entry.units < budget.budgets.minVideoSeconds || entry.units > budget.budgets.maxVideoSeconds)) || Math.abs(entry.estimateCny - estimate(entry.kind, entry.units, entry.tokens)) > 0.00000001) throw new Error("budget reservation invalid");
+          if (entry.llmRequestHash !== undefined) {
+            if (entry.kind !== "llm" || entry.units !== 0 || typeof entry.llmRequestHash !== "string"
+              || !/^[a-f0-9]{64}$/u.test(entry.llmRequestHash) || budget.pricing.llmCnyPer1kTokens < DEEPSEEK_GATEWAY_CNY_PER_1K) throw new Error("bounded gateway reservation invalid");
+            const prior = [...reservations.values()];
+            const llm = prior.filter(row => row.kind === "llm").map(activeUsage);
+            if (frozen.length || prior.some(row => row.settlement?.measured === false)
+              || entry.tokens > budget.budgets.maxLlmTokens - llm.reduce((sum, row) => sum + row.tokens, 0)
+              || 1 + llm.reduce((sum, row) => sum + row.calls, 0) > budget.budgets.maxLlmCalls
+              || entry.estimateCny + prior.map(activeUsage).reduce((sum, row) => sum + row.cost, 0) > budget.budgets.maxCostCny) throw new Error("bounded gateway admission exceeded aggregate allowance");
+          }
           reservations.set(entry.reservationId, { ...entry, settlement: null });
         } else if (entry.event === "commit") {
           const reservation = reservations.get(entry.reservationId);
           if (!reservation || reservation.settlement || reservation.taskId !== entry.taskId || reservation.kind !== entry.kind || ![entry.units, entry.tokens].every((n) => Number.isFinite(n) && n >= 0) || !Number.isSafeInteger(entry.tokens) || !Number.isSafeInteger(entry.calls) || entry.calls < 0 || (entry.kind !== "llm" && entry.calls !== 0) || typeof entry.measured !== "boolean" || !["ok", "failed", "blocked"].includes(entry.status) || (entry.costCny !== null && (!Number.isFinite(entry.costCny) || entry.costCny < 0))) throw new Error("budget settlement invalid");
+          if (reservation.llmRequestHash && (entry.units !== 0 || entry.calls !== 1 || entry.tokens > reservation.tokens || entry.costCny > reservation.estimateCny)) throw new Error("bounded gateway settlement exceeded reservation");
           reservation.settlement = entry;
         } else if (entry.event === "usage-unverified") {
           if (typeof entry.taskId !== "string" || !entry.taskId.trim() || typeof entry.reason !== "string" || !entry.reason.trim()) throw new Error("budget freeze identity invalid");
@@ -213,20 +233,33 @@ export function validateProductionFiles(context, live) {
       for (const reservation of reservations.values()) {
         const settlement = reservation.settlement;
         if (!settlement) errors.push(`P 任务 ${reservation.taskId} 配额仍 pending`);
-        const units = Math.max(reservation.units, settlement?.units ?? 0); const tokens = Math.max(reservation.tokens, settlement?.tokens ?? 0);
-        const cost = Math.max(reservation.estimateCny, estimate(reservation.kind, units, tokens), settlement?.costCny ?? 0);
-        add(usage, reservation.kind, units, tokens, cost, Math.max(1, settlement?.calls ?? 0));
+        const { units, tokens, cost, calls } = activeUsage(reservation);
+        add(usage, reservation.kind, units, tokens, cost, calls);
         if (settlement?.measured === true) add(actual, reservation.kind, settlement.units, settlement.tokens, settlement.costCny ?? estimate(reservation.kind, settlement.units, settlement.tokens), settlement.calls);
         else if (settlement) { add(unmeasured, reservation.kind, units, tokens, cost); frozen.push({ taskId: reservation.taskId, reservationId: reservation.reservationId, reason: settlement.detail || "实际用量没有取得供应商计量，后续付费调用冻结" }); }
       }
       for (const key of Object.keys(usage)) if (![usage[key], actual[key], budget.used?.[key], budget.actual?.[key]].every(Number.isFinite) || Math.abs(budget.used[key] - usage[key]) > 0.0001 || Math.abs(budget.actual[key] - actual[key]) > 0.0001 || budget.pending?.[key] !== 0) errors.push(`P 配额 ${key} 摘要与真实账本不一致或仍 pending`);
       for (const key of Object.keys(unmeasured)) if (!Number.isFinite(budget.unmeasured?.[key]) || Math.abs(budget.unmeasured[key] - unmeasured[key]) > 0.0001 || unmeasured[key] !== 0) errors.push(`P 配额 ${key} 实际计量缺失，预占不能表述为实际零用量`);
       if (budget.measurementComplete !== true || !same(budget.frozenBy, frozen) || frozen.length) errors.push("P 预算实际计量未完成/被冻结或摘要与真实账本不同");
-      const declaredReservations = [...reservations.values()].map((r) => ({ reservationId: r.reservationId, taskId: r.taskId, kind: r.kind, units: r.units, tokens: r.tokens, status: r.settlement?.status ?? "pending", settlement: r.settlement }));
+      const declaredReservations = [...reservations.values()].map((r) => ({ reservationId: r.reservationId, taskId: r.taskId, kind: r.kind, units: r.units, tokens: r.tokens, ...(r.llmRequestHash ? { llmRequestHash: r.llmRequestHash } : {}), status: r.settlement?.status ?? "pending", settlement: r.settlement }));
       if (!same(declaredReservations, budget.reservations)) errors.push("P 配额 reservation 摘要与真实账本不同");
       for (const [key, limit] of [["llmCalls", "maxLlmCalls"], ["llmTokens", "maxLlmTokens"], ["images", "maxImages"], ["videoClips", "maxVideoClips"], ["videoSeconds", "maxVideoSecondsTotal"], ["costCny", "maxCostCny"]]) if (usage[key] > budget.budgets?.[limit]) errors.push(`P 实际用量 ${key} 超限`);
       if (!Array.isArray(budget.exceeded) || budget.exceeded.length) errors.push("P 配额没有明确的空 exceeded 清单");
       for (const task of array(live?.tasks).filter((task) => task && ["llm", "image", "video"].includes(task.kind))) if (![...reservations.values()].some((reservation) => reservation.taskId === task.id && reservation.kind === task.kind && reservation.settlement?.status === "ok" && reservation.settlement.measured === true && (task.kind !== "llm" || reservation.settlement.calls > 0))) errors.push(`${task.id} 没有真实 reserve→commit(ok/measured) 配额链`);
+      for (const reservation of reservations.values()) if (reservation.llmRequestHash) {
+        const task = array(live?.tasks).find(row => row?.id === reservation.taskId);
+        const receipt = task?.receipt;
+        if (task?.chain !== "model-gateway" || receipt?.kind !== "model-gateway" || receipt.requestHash !== reservation.llmRequestHash
+          || receipt.contextTokens !== reservation.tokens || receipt.tokens !== reservation.settlement?.tokens
+          || typeof receipt.id !== "string" || !receipt.id.trim() || !/^[a-f0-9]{64}$/u.test(receipt.responseHash ?? "")
+          || receipt.requestedModel !== receipt.model || receipt.finishReason !== "stop" || receipt.usageComplete !== true
+          || ![receipt.inputTokens, receipt.outputTokens, receipt.inputTokenEstimate, receipt.outputCeiling, receipt.maxOutputTokens].every(value => Number.isSafeInteger(value) && value >= 0)
+          || receipt.outputCeiling < 1 || receipt.outputCeiling !== Math.min(receipt.maxOutputTokens, receipt.contextTokens - receipt.inputTokenEstimate)
+          || receipt.outputTokens > receipt.outputCeiling || receipt.inputTokens + receipt.outputTokens !== receipt.tokens
+          || task.usage?.inputTokens !== receipt.inputTokens || task.usage?.outputTokens !== receipt.outputTokens) {
+          errors.push(`${reservation.taskId} 网关请求/供应商计量与预算账本不一致`);
+        }
+      }
     } catch { errors.push("P 预算摘要/账本不可解析或占额结算链断裂"); }
   }
   const seen = new Set();

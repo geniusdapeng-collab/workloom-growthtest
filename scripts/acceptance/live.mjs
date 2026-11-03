@@ -13,8 +13,8 @@
  *   - 图片/视频按张、按秒硬计量，超限即中止（budget.reserve 返回 denied）；
  *   - 每个任务必须落回执（receipt）与产物路径；无回执不算完成；
  *   - `--selftest` 只证明管道可用，报告写明「非生产实测证据」。
- *   - 正式非 selftest 外部 LLM 缺可信输入/输出/重试总 token 上界，全部调用前 blocked；
- *     expectedTokens 的预占估算不能授权付费 I/O。产品入口同样在可信服务端预算 seam 接通前 blocked。
+ *   - 正式官方文本单请求以供应商共享上下文做总量预占，按实际用量结算；不改变其合法输出窗口。
+ *   - DSH/产品派单未取得可信总量控制前继续 blocked，expectedTokens 不能授权付费 I/O。
  *
  * 用法：
  *   node scripts/acceptance/live.mjs --out outputs/acceptance/live           # 按 profile.live 跑
@@ -39,11 +39,11 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { cliArgs, findRepoRoot, loadProfile } from "./lib/profile.mjs";
 import { fingerprintEnvironment, fingerprintLines, loadEnvFile, resolveEnvironment, probeEnvironment } from "./lib/target.mjs";
-import { createBudget, normalizeBudgets } from "./lib/live/budget.mjs";
+import { createBudget, DEEPSEEK_GATEWAY_CNY_PER_1K, normalizeBudgets } from "./lib/live/budget.mjs";
 import { loadBudgetRunIdentity } from "./lib/live/live-budget-scope.mjs";
 import {
   createMultimodalFixture,
-  readImageFixture, resolveLiveModels, runChatTask, runDshTask, runImageTask,
+  isBoundedTextGateway, readImageFixture, resolveLiveModels, runBoundedGatewayTask, runChatTask, runDshTask, runImageTask,
   runVideoTask, loginAsMember, pickMultimodalFixture,
   LLM_TOTAL_BUDGET_BLOCK, PRODUCT_DISPATCH_BUDGET_BLOCK,
 } from "./lib/live/providers.mjs";
@@ -266,6 +266,7 @@ const builtinTasks = [
     id: "LLM-G1", kind: "llm", chain: "model-gateway", model: "deepseek-v4.1-flash", criticality: "P1",
     title: "模型网关 · 结构化输出",
     prompt: "只输出一行 JSON：{\"verdict\":\"ok\",\"risk\":\"low\",\"reason\":\"<20 字内>\"}。不要输出任何其他内容。",
+    responseFormat: "json_object",
     expect: ["verdict"],
   },
   {
@@ -313,6 +314,10 @@ if (SELFTEST) {
 /* ---------------------------- 预算闸 ---------------------------- */
 const { budgets, warnings: budgetWarnings } = normalizeBudgets(liveProfile.budgets ?? {});
 notes.push(...budgetWarnings);
+if (!SELFTEST && resolvedModels.some(isBoundedTextGateway) && (budgets.pricing?.llmCnyPer1kTokens ?? 0) < DEEPSEEK_GATEWAY_CNY_PER_1K) {
+  budgets.pricing = { ...budgets.pricing, llmCnyPer1kTokens: DEEPSEEK_GATEWAY_CNY_PER_1K };
+  notes.push("正式文本单次网关用官方峰值输出价为所有 tokens 保守估价，不使用较低的配置单价");
+}
 const budgetOptions = { budgets, outDir: OUT_DIR, environmentKind: environment.kind,
   runId: loadBudgetRunIdentity({ outDir: OUT_DIR, environmentKind: environment.kind }) };
 const budget = createBudget(budgetOptions);
@@ -331,17 +336,17 @@ const gitInfo = (() => {
 const fingerprint = fingerprintEnvironment({ repoRoot: REPO_ROOT, env: environment, profile, git: gitInfo });
 fingerprint.targetProbe = probeResult;
 
-// A production probe must admit paid media before reservation or provider I/O.
-let productionMediaBlock = null;
+// A production probe must admit bounded paid calls before reservation or provider I/O.
+let productionProviderBlock = null;
 if (!SELFTEST && environment.isProduction) {
   const health = probeResult.checks.find((check) => check.name === "server.health");
   if (!profile.environment?.target?.apiUrl) {
-    productionMediaBlock = "生产媒体任务需要显式声明目标 API 地址，尚未调用供应商";
+    productionProviderBlock = "生产付费任务需要显式声明目标 API 地址，尚未调用供应商";
   } else if (!probeResult.ok || health?.json?.ok !== true) {
-    productionMediaBlock = "生产目标健康探测未通过，尚未调用供应商";
+    productionProviderBlock = "生产目标健康探测未通过，尚未调用供应商";
   } else if (environment.kind === "client-runtime" &&
     (!fingerprint.clientRuntimeVersion || fingerprint.clientInstallState?.status !== "complete" || fingerprint.clientInstallState.phase !== "ready")) {
-    productionMediaBlock = "客户端运行时身份未验证：缺少 VERSION 或已完成的安装状态，尚未调用供应商";
+    productionProviderBlock = "客户端运行时身份未验证：缺少 VERSION 或已完成的安装状态，尚未调用供应商";
   }
 }
 
@@ -354,8 +359,8 @@ async function runTask(task) {
   const base = { id: task.id, title: task.title, kind: task.kind, chain: task.chain ?? null, criticality: task.criticality ?? "P1", model: task.model ?? null, selftest: SELFTEST };
   if (task._blocked) return { ...base, status: "blocked", reason: task._blocked, ms: 0 };
   if (task._skip) return { ...base, status: "skipped", reason: task._skip, ms: 0 };
-  if (productionMediaBlock && (task.kind === "image" || task.kind === "video")) {
-    return { ...base, status: "blocked", called: false, reason: productionMediaBlock, ms: 0 };
+  if (productionProviderBlock && (task.kind === "image" || task.kind === "video")) {
+    return { ...base, status: "blocked", called: false, reason: productionProviderBlock, ms: 0 };
   }
   const resolved = task.model ? modelById.get(task.model) : resolvedModels.find((m) => m.kind === (task.kind === "product" ? "llm" : task.kind));
   const chain = task.chain ?? resolved?.adapter ?? "model-gateway";
@@ -378,10 +383,25 @@ async function runTask(task) {
   try {
     if (task.kind === "llm") {
       if (!resolved?.ready) return { ...base, chain, status: "blocked", called: false, reason: resolved?.missing?.join("；") ?? "文本模型未配置", ms: 0 };
-      // expectedTokens 是调用方估算；它不能证明输入/context、输出及每次
-      // 重试的总量会落在剩余额度内。先验总量不可得时，不得先计费再冻结。
-      // 所有未知/fallback LLM chain 同受此闸；只有内部本地 stub 的 selftest 可继续。
-      if (!SELFTEST) return { ...base, chain, status: "blocked", called: false, reason: LLM_TOTAL_BUDGET_BLOCK, ms: 0 };
+      if (!SELFTEST) {
+        if (chain !== "model-gateway" || !isBoundedTextGateway(resolved)) {
+          return { ...base, chain, status: "blocked", called: false, reason: LLM_TOTAL_BUDGET_BLOCK, ms: 0 };
+        }
+        if (!environment.isProduction || productionProviderBlock) {
+          return { ...base, chain, status: "blocked", called: false, reason: productionProviderBlock ?? "正式文本验证需要声明已授权生产目标", ms: 0 };
+        }
+        const out = await runBoundedGatewayTask({ resolved, task, budget, timeoutMs: TASK_TIMEOUT_MS, env: runnerEnv });
+        if (out.answer && redactText(out.answer) !== out.answer) {
+          out.status = "failed";
+          out.reason = "网关响应包含需脱敏的内容，不能作为成功证据";
+          out.answer = undefined;
+          out.receipt.synced = false;
+        }
+        const verification = await verifyExpectations({ ...task, expectedModel: resolved.model }, out);
+        return { ...base, ...out, chain, modelResolved: out.model ?? null, verification,
+          status: out.status === "ok" && !verification.ok ? "failed" : out.status,
+          reason: failureReason(out, verification) };
+      }
       // fail-closed：链路需要真实凭据而凭据缺失时，任务状态必须是 blocked（未验证），不得跑成“模型调用失败”
       if (resolved && resolved.ready === false) {
         return { ...base, chain, status: "blocked", reason: resolved.missing.join("；"), ms: Date.now() - startedAt };

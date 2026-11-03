@@ -7,7 +7,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { DEFAULT_ENVIRONMENT, ENVIRONMENT_KINDS, resolveEnvironment } from "./target.mjs";
-import { LIVE_BUDGET_CAPS, normalizeBudgets } from "./live/budget.mjs";
+import { DEFAULT_LIVE_BUDGETS, LIVE_BUDGET_CAPS, normalizeBudgets } from "./live/budget.mjs";
 
 export const PROFILE_SCHEMA = "workloom.acceptance-profile/v2";
 export const LEGACY_PROFILE_SCHEMAS = ["workloom.acceptance-profile/v1"];
@@ -106,7 +106,7 @@ export const DEFAULT_LIVE = {
   enabled: false,
   requireRealModels: false,
   allowDb: false,
-  budgets: { ...LIVE_BUDGET_CAPS },
+  budgets: { ...DEFAULT_LIVE_BUDGETS },
   models: [],
   tasks: [],
   notes: "",

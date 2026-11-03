@@ -123,6 +123,9 @@ export function validateProfileContract(raw, { manifest, bundleExists = false, p
   fail(object(live) && typeof live.enabled === 'boolean', 'live.enabled 必须显式声明');
   if (live?.enabled) {
     fail(Array.isArray(live.models) && Array.isArray(live.tasks) && live.tasks.length > 0 && unique(live.tasks.map((task) => task?.id)), 'live.models/tasks 必须为明确模型清单与非空唯一任务');
+    if (live.budgets?.maxLlmTokens !== undefined) {
+      fail(Number.isSafeInteger(live.budgets.maxLlmTokens) && live.budgets.maxLlmTokens >= 0, 'live.budgets.maxLlmTokens 须为非负安全整数');
+    }
     for (const [key, value] of Object.entries(object(live.budgets) ? live.budgets : {})) if (Object.hasOwn(LIVE_BUDGET_FLOORS, key)) {
       const lower = key === 'minVideoSeconds';
       fail(Number.isFinite(value) && value > 0 && (lower ? value >= LIVE_BUDGET_FLOORS[key] : value <= LIVE_BUDGET_FLOORS[key]), `live.budgets.${key} 无效或放宽硬上限`);

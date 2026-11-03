@@ -49,8 +49,10 @@ export function buildLiveChecks(report, { reportPath, outputPaths = [], secretSc
   const usage = report.budget.used;
   const caps = report.budget.budgets;
   const limits = [["llmCalls", "maxLlmCalls"], ["llmTokens", "maxLlmTokens"], ["images", "maxImages"], ["videoClips", "maxVideoClips"], ["videoSeconds", "maxVideoSecondsTotal"], ["costCny", "maxCostCny"]];
-  observe("P3-01", limits.every(([quantity, cap]) => Number.isFinite(usage[quantity]) && usage[quantity] <= caps[cap] && caps[cap] <= LIVE_BUDGET_CAPS[cap]) && report.budget.exceeded.length === 0 && report.budget.measurementComplete === true,
-    "冻结上限不放宽；实际与未结算占额累计均在配额内且用量完整", { used: usage, caps, exceeded: report.budget.exceeded, denied: report.budget.blocked, measurementComplete: report.budget.measurementComplete, unmeasured: report.budget.unmeasured, frozenBy: report.budget.frozenBy }, { unverified: report.budget.measurementComplete !== true });
+  observe("P3-01", limits.every(([quantity, cap]) => Number.isFinite(usage[quantity]) && usage[quantity] <= caps[cap]
+    && (cap === "maxLlmTokens" ? Number.isSafeInteger(caps[cap]) && caps[cap] >= 0 : caps[cap] <= LIVE_BUDGET_CAPS[cap]))
+    && report.budget.exceeded.length === 0 && report.budget.measurementComplete === true,
+    "基座硬闸和已冻结的作业总 token 额度分别核对；实际与未结算占额累计在配额内且用量完整", { used: usage, caps, exceeded: report.budget.exceeded, denied: report.budget.blocked, measurementComplete: report.budget.measurementComplete, unmeasured: report.budget.unmeasured, frozenBy: report.budget.frozenBy }, { unverified: report.budget.measurementComplete !== true });
   observe("P3-02", tasks.length > 0 && tasks.every((task) => task.receiptPath && task.transcriptPath) && outputPaths.some((path) => path.endsWith("budget-ledger.jsonl")) && outputPaths.some((path) => path.endsWith("budget-summary.json")),
     "每项回执/transcript、媒体、预算账本绑定到同一次运行索引", { files: outputPaths, taskIds: tasks.map((task) => task.id) });
   observe("P3-03", report.verdict !== "pass" || (productionReady && tasks.length > 0 && tasks.every(completed)), "缺凭据/目标/真实回执不得写 pass", { verdict: report.verdict, selftest: report.selftest, productionReady, statuses: tasks.map((task) => [task.id, task.status]) });

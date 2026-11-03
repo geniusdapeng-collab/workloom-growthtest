@@ -7,7 +7,7 @@ import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, copyFileSy
 import { join, dirname, basename, relative } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { createBudget, normalizeBudgets } from "../acceptance/lib/live/budget.mjs";
+import { createBudget, DEEPSEEK_GATEWAY_CNY_PER_1K, normalizeBudgets } from "../acceptance/lib/live/budget.mjs";
 import { fixture as liveFixture, run as liveRun } from "../acceptance/lib/live/cli-fixtures.mjs";
 import { captureEvidenceRun, recordEvidenceRun, verifyRun } from "./evidence.mjs";
 import { COMMAND_OBSERVATION_SCHEMA } from "../acceptance/lib/regression-evidence.mjs";
@@ -306,7 +306,7 @@ for (const mode of ["rebound-fake-executable", "rebound-fake-requested-executabl
   assert.equal(observed.ok, false, JSON.stringify({ mode, errors: observed.errors }));
 });
 
-function fullAcceptance() {
+function fullAcceptance({ boundedGateway = false } = {}) {
   const f = fixture(); const run = runProof(f);
   const ref = run.artifacts[0];
   const items = checklist.items.map((i) => ({ schema: "workloom.acceptance-item/v1", ...i, status: "pass", note: "isolated synthetic observation", commit: f.commit, actor: run.actor, command: run.command, observed_at: run.finished_at, expected: "fixture observation", actual: "observed", evidence: [ref], run: run.runRef }));
@@ -314,8 +314,20 @@ function fullAcceptance() {
   json(join(f.root, "coverage.json"), { schemaVersion: "workloom.acceptance-coverage/v2", specVersion: checklist.specVersion, checklistSha256: sha(readFileSync(checklistPath)), commit: f.commit, items, totals: { items: items.length, byStatus: { pass: items.length }, byTier: {} }, notRunT1: [] });
   // These summary artifacts also contain actual sample counts; their bytes are captured by run outputs.
   const liveTask = { id: "fixture-task", kind: "llm", model: "fixture-model", status: "ok", selftest: false, answer: "Observed fixture answer", receipt: { kind: "model-gateway", id: "fixture-call", model: "fixture", endpoint: "https://fixture.invalid/v1/chat/completions", synced: true, verified_at: new Date().toISOString() } };
-  const budget = createBudget({ budgets: normalizeBudgets().budgets, outDir: join(f.root, "live"), environmentKind: "deployed", runId: "fixture-budget" });
-  assert.equal(budget.reserve({ taskId: liveTask.id, kind: "llm", tokens: 10 }).allowed, true);
+  const contextTokens = 1_048_576;
+  const requestHash = sha("synthetic gateway request");
+  const budgets = normalizeBudgets(boundedGateway ? { maxLlmTokens: contextTokens, pricing: { llmCnyPer1kTokens: DEEPSEEK_GATEWAY_CNY_PER_1K } } : {}).budgets;
+  if (boundedGateway) {
+    liveTask.chain = "model-gateway";
+    liveTask.usage = { inputTokens: 2, outputTokens: 3 };
+    Object.assign(liveTask.receipt, {
+      model: "deepseek-v4.1-flash", requestedModel: "deepseek-v4.1-flash", endpoint: "https://api.deepseek.com/chat/completions",
+      contextTokens, maxOutputTokens: 393_216, inputTokenEstimate: 16, outputCeiling: 393_216, requestHash,
+      responseHash: sha("synthetic gateway response"), tokens: 5, ...liveTask.usage, finishReason: "stop", usageComplete: true,
+    });
+  }
+  const budget = createBudget({ budgets, outDir: join(f.root, "live"), environmentKind: "deployed", runId: "fixture-budget" });
+  assert.equal(budget.reserve({ taskId: liveTask.id, kind: "llm", ...(boundedGateway ? { tokens: contextTokens, llmRequestHash: requestHash } : { tokens: 10 }) }).allowed, true);
   assert.equal(budget.commit({ taskId: liveTask.id, kind: "llm", tokens: 5, status: "ok", measured: true }).committed, true);
   const regressionStarted = new Date().toISOString();
   const regressionExec = { file: process.execPath, args: ["-e", "console.log(process.argv[1]);", "release:gate"] };
@@ -347,7 +359,7 @@ function fullAcceptance() {
     "live/receipts/fixture-task.json": { task: liveTask.id, status: liveTask.status, receipt: liveTask.receipt, artifacts: [] },
     "live/transcripts/fixture-task.json": liveTask,
     "live/budget-summary.json": budgetSummary,
-    "live/live-report.json": { selftest: false, environment: { kind: "deployed", isProduction: true, allowWrites: false }, fingerprint: { repo: { commit: f.commit }, environmentKind: "deployed", targetProbe: { ok: true, checks: [{ name: "server.health", ok: true }] } }, models: [{ id: "fixture-model", kind: "llm", adapter: "model-gateway", model: "fixture", ready: true }], tasks: [liveTask], summary: { total: 1, byStatus: { ok: 1 } }, verdict: "pass", budget: budgetSummary },
+    "live/live-report.json": { selftest: false, environment: { kind: "deployed", isProduction: true, allowWrites: false }, fingerprint: { repo: { commit: f.commit }, environmentKind: "deployed", targetProbe: { ok: true, checks: [{ name: "server.health", ok: true }] } }, models: [{ id: "fixture-model", kind: "llm", adapter: "model-gateway", model: liveTask.receipt.model, ready: true }], tasks: [liveTask], summary: { total: 1, byStatus: { ok: 1 } }, verdict: "pass", budget: budgetSummary },
   };
   const outputs = Object.entries(summaries).map(([path, value]) => artifact(f, path, path === "live/budget-summary.json" ? value : { ...value, commit: f.commit }));
   outputs.push({ path: "live/budget-ledger.jsonl", sha256: sha(readFileSync(join(f.root, "live/budget-ledger.jsonl"))), commit: f.commit });
@@ -472,12 +484,32 @@ for (const [name, mutate] of [
   ["budget supplier measurement incomplete", (f) => modifyBudget(f, (b, entries) => { entries[2].measured = false; b.reservations[0].settlement.measured = false; b.measurementComplete = false; })],
   ["budget measurement falsely claimed complete", (f) => modifyBudget(f, (b, entries) => { entries[2].measured = false; b.reservations[0].settlement.measured = false; b.measurementComplete = true; })],
   ["budget usage-unverified freeze hidden", (f) => modifyBudget(f, (b, entries) => { entries.push({ ...entries[2], event: "usage-unverified", reason: "actual supplier usage unavailable" }); b.frozenBy = []; b.measurementComplete = true; })],
-  ["budget hard cap relaxed", (f) => modifyBudget(f, (b, entries) => { b.budgets.maxLlmTokens = 999999; entries[0].budgets.maxLlmTokens = 999999; })],
+  ["budget hard call cap relaxed", (f) => modifyBudget(f, (b, entries) => { b.budgets.maxLlmCalls = 41; entries[0].budgets.maxLlmCalls = 41; })],
+  ["budget token allowance is not numeric", (f) => modifyBudget(f, (b, entries) => { b.budgets.maxLlmTokens = "1048576"; entries[0].budgets.maxLlmTokens = "1048576"; })],
   ["budget summary file missing", (f) => { rmSync(join(f.root, "live/budget-summary.json")); }],
 ]) test(`G05 rejects ${name} after rebinding all hashes`, () => {
   const f = fullAcceptance(); mutate(f); rebindAcceptance(f);
   const result = cli(report, f.dir, ["--root", f.root]); assert.notEqual(result.status, 0, name);
   assert.equal(JSON.parse(readFileSync(join(f.root, "report-summary.json"))).acceptancePassed, false);
+});
+
+test("G05 bounded gateway replays an explicit allowance above 300k and releases measured unused tokens", () => {
+  const f = fullAcceptance({ boundedGateway: true });
+  const result = cli(report, f.dir, ["--root", f.root]); assert.equal(result.status, 0, result.stderr);
+  const budget = JSON.parse(readFileSync(join(f.root, "live/budget-summary.json")));
+  assert.equal(budget.reservations[0].tokens, 1_048_576);
+  assert.equal(budget.used.llmTokens, 5);
+  assert.equal(budget.actual.llmTokens, 5);
+});
+
+test("G05 bounded gateway rejects an earlier over-admission even if actual usage is within allowance", () => {
+  const f = fullAcceptance({ boundedGateway: true });
+  modifyBudget(f, (budget, entries) => {
+    budget.budgets.maxLlmTokens = 1_048_575;
+    entries[0].budgets.maxLlmTokens = budget.budgets.maxLlmTokens;
+  });
+  rebindAcceptance(f);
+  assert.notEqual(cli(report, f.dir, ["--root", f.root]).status, 0);
 });
 
 test("G05 measured zero-output video reservation reconciles zero actual clips (synthetic arithmetic control)", () => {
