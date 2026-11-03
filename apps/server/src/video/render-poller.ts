@@ -164,12 +164,34 @@ export async function pollRenderJobs(
     if (!provider) {
       // C-04：供应商未配置也不能让作业永远悬停——超龄判 failed（有终态出口）
       if (renderJobTimedOut(job)) {
-        await app.query(
-          `UPDATE render_jobs SET status='failed', updated_at=now() WHERE id=$1 AND workspace_id=$2`,
-          [job.id, scope.workspaceId],
-        );
-        report.failed += 1;
-        report.details.push({ jobId: job.id, status: "failed", error: `供应商未配置且已超 ${RENDER_JOB_TIMEOUT_H}h（C-04 超时判死）` });
+        const error = `供应商未配置且已超 ${RENDER_JOB_TIMEOUT_H}h（C-04 超时判死）`;
+        try {
+          await gw.query("BEGIN");
+          await gw.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
+          await gw.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]);
+          const updated = await gw.query(
+            `UPDATE render_jobs SET status='failed', updated_at=now()
+              WHERE id=$1 AND workspace_id=$2 AND status IN ('submitted','rendering') RETURNING id`,
+            [job.id, scope.workspaceId],
+          );
+          if (updated.rowCount) {
+            await gatewayAppendOnClient(gw, { ...scope, actor: { id: "render-poller", type: "system" } }, {
+              who: { type: "system", id: "render-poller" },
+              context: { tenant_id: scope.tenantId, workspace_id: scope.workspaceId, time: new Date().toISOString() },
+              object: { type: "render_job", id: job.id },
+              decision: { action: "render.failed", after: { task_id: job.task_id, error }, basis: [error] },
+              rule_impact: [], receipt: { synced: false },
+            });
+          }
+          await gw.query("COMMIT");
+          if (updated.rowCount) {
+            report.failed += 1;
+            report.details.push({ jobId: job.id, status: "failed", error });
+          }
+        } catch (err) {
+          await gw.query("ROLLBACK").catch(() => undefined);
+          throw err;
+        }
       } else {
         report.details.push({
           jobId: job.id,
@@ -374,8 +396,8 @@ export async function pollRenderJobs(
       });
     } else {
       // 仍在生成：状态推进 rendering（幂等）
-      await app.query(
-        `UPDATE render_jobs SET status='rendering' WHERE id=$1 AND workspace_id=$2 AND status='submitted'`,
+      await scopedQuery(app, scope,
+        `UPDATE render_jobs SET status='rendering', updated_at=now() WHERE id=$1 AND workspace_id=$2 AND status='submitted' RETURNING id`,
         [job.id, scope.workspaceId],
       );
       /**
