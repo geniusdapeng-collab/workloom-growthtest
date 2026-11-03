@@ -60,7 +60,7 @@ import { resolveScenePolicyForIntent, ScenePolicyRouteError } from "./scene-poli
 import { resolvePlatformForIntent } from "./platform-routing.js";
 import { makeStageArchive } from "./archive-host.js";
 import { readArchiveSummary, resumeProject, scanStaleRunsOnStartup } from "./archive-resume.js";
-import { applyRouteToMetadata, buildPipelineIntent, routeVideoPipeline } from "@hyperreality/video-studio";
+import { applyRouteToMetadata, buildPipelineIntent, filmTargetSecondsFromIntent, platformIdOf, routeVideoPipeline } from "@hyperreality/video-studio";
 import { routedLlmCall } from "../service/llm.js";
 import { deliveryIngestHook, mediaRouter } from "./media/index.js";
 import { whiteboardRouter } from "./whiteboard/router.js";
@@ -486,7 +486,19 @@ const studioRouter = router({
    * `route="marketing"|"narrative"` 表示调用方已确认（例如用户在澄清后重提）。
    */
   start: writeProcedure
-    .input(z.object({
+    .input(z.union([z.object({
+      officialIntent: z.literal(true),
+      intent: z.string().min(1).max(2000).refine((value) => Boolean(value.trim())),
+      durationSec: z.number().int().min(1).max(300).optional(),
+      platform: z.string().trim().min(1).max(40).refine(value => Boolean(platformIdOf(value)), "未登记的目标平台").optional(),
+      product: z.object({
+        name: z.string().trim().min(1).max(160).refine((value) => !/[\u0000-\u001f<>\\/]|\.\./u.test(value)),
+        brand: z.string().trim().min(1).max(100).optional(),
+        model: z.string().trim().min(1).max(100).optional(),
+        category: z.string().trim().min(1).max(100).optional(),
+      }).strict().optional(),
+    }).strict(), z.object({
+      officialIntent: z.undefined().optional(),
       projectId: z.string().min(1).optional(),
       intent: z.string().min(1).max(2000),
       /** 原话中明确的全片创作目标；旧客户端未传时沿用 30 秒。 */
@@ -496,10 +508,22 @@ const studioRouter = router({
       isMarketing: z.boolean().optional(),
       /** 管线选择：auto=按意图自动分流（默认） */
       route: z.enum(["auto", "marketing", "narrative"]).default("auto"),
-    }))
+    })]))
     .mutation(async ({ ctx, input }) => {
       const scope = scopeOf(ctx.identity);
-      const explicitRoute = input.route !== "auto"
+      const official = input.officialIntent === true;
+      if (official && process.env.HR_DEFER_RENDER === "0") {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "OFFICIAL_RENDER_DEFER_REQUIRED: 正式工作单需要前期与付费渲染分离" });
+      }
+      const statedSeconds = official ? filmTargetSecondsFromIntent(input.intent) : null;
+      const durationSec = official
+        ? input.durationSec ?? (statedSeconds !== null && statedSeconds <= 300 && Number.isInteger(statedSeconds) ? statedSeconds : undefined)
+        : input.durationSec;
+      const metadata = official ? {
+        brief: { ...(durationSec === undefined ? {} : { duration: durationSec }), ...(input.platform ? { platform: input.platform } : {}) },
+        ...(input.product ? { products: [input.product] } : {}),
+      } : input.metadata;
+      const explicitRoute = official ? undefined : input.route !== "auto"
         ? input.route
         : input.isMarketing === undefined
           ? undefined
@@ -507,7 +531,7 @@ const studioRouter = router({
             ? "marketing"
             : "narrative";
 
-      if (input.projectId) {
+      if (!official && input.projectId) {
         // 指定 projectId 的补跑：项目行已存在，仅重启管线（kind 以项目行为准，避免改写立项语义）
         const rows = await scopedQuery<{ kind: string | null }>(
           getAppPool(), scope,
@@ -554,7 +578,7 @@ const studioRouter = router({
 
       const decision = await routeVideoPipeline({
         text: input.intent,
-        metadata: input.metadata,
+        metadata,
         explicit: explicitRoute,
       }, { llmCall: routeLlmCall(scope) });
       if (decision.route === "clarify") {
@@ -573,6 +597,8 @@ const studioRouter = router({
        * 把控制权交回调用方（后续走 video.explainer.shotbook → submit → finalize，每步都有门）。
        */
       if (decision.route === "explainer") {
+        if (official) return { kind: "unsupported" as const, pipeline: "explainer" as const,
+          reason: "此意图匹配专用口播解说管线，请使用该管线的正式入口。" };
         const draft = await createExplainerDraft(scope, {
           intent: input.intent,
           by: ctx.identity.memberNo,
@@ -595,18 +621,19 @@ const studioRouter = router({
       }
       try {
         // 与「右栏派活识别出视频目标」共用同一条标准管线入口（studio-worker#startVideoProjectRun）
-        const standardPlatform = resolvePlatformForIntent(input.intent, input.metadata);
+        const standardPlatform = resolvePlatformForIntent(input.intent, metadata);
         const started = await startVideoProjectRun(scope, {
           rawIntent: input.intent,
-          customerMetadata: input.metadata ?? null,
+          customerMetadata: metadata ?? null,
           intent: buildPipelineIntent(input.intent, {
-            durationSec: input.durationSec,
+            durationSec,
             aspectRatio: decision.route === "marketing" ? standardPlatform.decision.aspectRatio : undefined,
             platform: standardPlatform.decision.id,
           }),
-          metadata: applyRouteToMetadata(input.metadata, decision),
+          metadata: applyRouteToMetadata(metadata, decision),
           platform: standardPlatform.decision.id,
           isMarketing: decision.route === "marketing",
+          ...(official ? { creativeMode: "manual" as const } : {}),
           by: { id: ctx.identity.memberNo, type: "human" },
         });
         return {
@@ -615,6 +642,7 @@ const studioRouter = router({
           projectId: started.projectId,
           pipeline: decision.route,
           product: decision.product?.name ?? null,
+          ...(official ? { platform: standardPlatform.decision.id, ...(durationSec === undefined ? {} : { durationSec }) } : {}),
           via: decision.via,
         };
       } catch (err) {
@@ -1138,9 +1166,9 @@ const renderRouter = router({
 
   /** 渲染轮询回填（v3.0 异步任务制第二步）：submitted/rendering → done/failed + render.complete/failed 事件 */
   poll: writeProcedure
-    .input(z.object({ limit: z.number().int().min(1).max(100).default(20) }).optional())
+    .input(z.object({ limit: z.number().int().min(1).max(100).default(20), projectId: z.string().min(1).max(200).optional() }).optional())
     .mutation(async ({ ctx, input }) => {
-      return pollRenderJobs(getAppPool(), getGatewayPool(), scopeOf(ctx.identity), { limit: input?.limit });
+      return pollRenderJobs(getAppPool(), getGatewayPool(), scopeOf(ctx.identity), { limit: input?.limit, projectId: input?.projectId });
     }),
 });
 

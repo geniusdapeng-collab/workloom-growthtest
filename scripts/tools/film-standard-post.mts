@@ -20,7 +20,15 @@ export class StandardPostError extends Error {
 interface Stream { codec_type?: string; codec_name?: string; width?: number; height?: number; avg_frame_rate?: string;
   nb_read_frames?: string; duration?: string; sample_rate?: string; channels?: number; side_data_list?: Array<{ rotation?: number }> }
 interface Media { streams: Stream[]; format: { duration?: string } }
-export interface StandardPostOptions { repoRoot?: string; ffmpeg?: string; ffprobe?: string; timeoutMs?: number }
+export interface ServiceOriginalProof {
+  shotId: string; durationSec: number; promptSha256: string; qualificationId: string; requestHash: string;
+  payloadHash: string; jobId: string; taskId: string; assetId: string; sha256: string; bytes: number;
+}
+export interface StandardPostOptions {
+  repoRoot?: string; ffmpeg?: string; ffprobe?: string; timeoutMs?: number;
+  /** Service originals must be re-read from the authenticated archive before composition and publication. */
+  readServiceOriginals?: () => Promise<readonly ServiceOriginalProof[]>;
+}
 export interface StandardPostExportClockOptions extends StandardPostOptions { expectedVideoFrames?: number; expectedFps?: number }
 interface FileBinding { path: string; sha256: string; bytes: number }
 interface OriginalRecord extends FileBinding { shotId: string; receiptFile: string; receiptSha256: string }
@@ -29,7 +37,7 @@ interface OriginalManifest {
   submitted: { json: string; sha256: string; bytes: number }; originals: OriginalRecord[];
 }
 interface OriginalReceipt { schemaVersion: "workloom.original-render/v1"; projectId: string; shotId: string;
-  submittedSha256: string; artifact: FileBinding; taskId: string; kind: "current-runtime-receipt" | "current-local-render-receipt" | "legacy-user-adopted" | "provider-success-adopted";
+  submittedSha256: string; artifact: FileBinding; taskId: string; kind: "current-runtime-receipt" | "current-local-render-receipt" | "legacy-user-adopted" | "provider-success-adopted" | "current-service-render-receipt";
   evidence: Record<string, unknown> }
 export interface StandardPostSettings {
   schemaVersion: "workloom.standard-post-settings/v1";
@@ -175,6 +183,21 @@ export async function issueOriginalRenderReceipt(input: { productionRoot: string
   }
   await writeFrozen(receiptPath(input.productionRoot, input.projectId, input.shotId), serialized);
   await sealOriginal(input.productionRoot, value, serialized); return value;
+}
+
+/** The service adapter passes the scoped, verified ingest receipt and its original bytes. */
+export async function issueServiceOriginal(input: { productionRoot: string; projectId: string; artifactPath: string; proof: ServiceOriginalProof }) {
+  const { productionRoot, projectId, proof } = input;
+  ensure(localPath(productionRoot) && id(projectId) && id(proof.shotId), "invalid service original scope");
+  ensure(input.artifactPath === join(productionRoot, "clips", projectId, `${proof.shotId}.raw.mp4`), "service original must be in the canonical raw slot");
+  const source = await readJson(submittedPath(productionRoot, projectId));
+  const artifact = await pinned(input.artifactPath, { path: input.artifactPath, sha256: proof.sha256, bytes: proof.bytes });
+  const receipt: OriginalReceipt = { schemaVersion: "workloom.original-render/v1", projectId, shotId: proof.shotId,
+    submittedSha256: digest(source.bytes), artifact, taskId: proof.taskId, kind: "current-service-render-receipt",
+    evidence: { service: proof } };
+  const serialized = `${JSON.stringify(receipt, null, 2)}\n`;
+  await writeFrozen(receiptPath(productionRoot, projectId, proof.shotId), serialized);
+  await sealOriginal(productionRoot, receipt, serialized);
 }
 /** Historical quality votes are irrelevant; scope and input/output byte bindings remain required. */
 async function completedHistoryBinding(row: Record<string, any>, scope: { projectId: string; shotId: string; submittedSha256: string; taskId: string }, artifact: FileBinding) {
@@ -325,6 +348,7 @@ export async function loadOriginalRenderManifest(file: string, options: Standard
   ensure(manifest.submitted.json === source.toString("utf8") && manifest.submitted.sha256 === digest(source) && manifest.submitted.bytes === source.length, "frozen submission changed");
   const doc = JSON.parse(source.toString("utf8")) as Record<string, any>;
   ensure(Array.isArray(manifest.originals) && manifest.originals.length === doc.shots.length, "issued shot count changed");
+  let liveOriginals: readonly ServiceOriginalProof[] | undefined;
   const originals: StandardOriginalRender[] = [];
   for (const [index, row] of manifest.originals.entries()) {
     keys(object(row, "original"), ["shotId", "path", "sha256", "bytes", "receiptFile", "receiptSha256"], "original");
@@ -369,6 +393,14 @@ export async function loadOriginalRenderManifest(file: string, options: Standard
         && within(manifest.productionRoot, receipt.evidence.parentWorkDir)
         && resolve(receipt.evidence.parentWorkDir, parent.artifact.ref) === row.path
         && parent.artifact.sha256 === row.sha256 && parent.artifact.bytes === row.bytes, "issued parent download changed");
+    } else if (receipt.kind === "current-service-render-receipt") {
+      ensure(options.readServiceOriginals, "service original requires live authenticated archive readback");
+      liveOriginals ??= await options.readServiceOriginals();
+      const proof = liveOriginals[index], submitted = doc.shots[index];
+      ensure(liveOriginals.length === manifest.originals.length && proof?.shotId === row.shotId
+        && proof.taskId === receipt.taskId && proof.sha256 === row.sha256 && proof.bytes === row.bytes
+        && proof.durationSec === submitted.duration && proof.promptSha256 === submitted.promptSha256
+        && JSON.stringify(proof) === JSON.stringify(receipt.evidence.service), "service original receipt differs from the current archive");
     } else {
       ensure(receipt.kind === "current-local-render-receipt" && receipt.evidence.requestInputVerified === true && receipt.evidence.taskId === receipt.taskId,
         "original issuance missing");
@@ -386,7 +418,11 @@ export async function loadOriginalRenderManifest(file: string, options: Standard
   const contract = buildStandardPostContract({ projectId: manifest.projectId, submitted: manifest.submitted, originals }); assertStandardPostTimeline(contract, contract.timeline);
   return { ...contract, manifestSha256: digest(bytes), manifestFile: file, productionRoot: manifest.productionRoot, contract };
 }
-export function validateStandardPostSettings(input: unknown, contract: StandardPostContract): StandardPostSettings {
+export function validateStandardPostSettings(input: unknown, contract: {
+  durationSec: number;
+  originals: readonly Pick<StandardOriginalRender, "shotId" | "path" | "sha256">[];
+  timeline: readonly Pick<StandardPostContract["timeline"][number], "shotId" | "durationSec">[];
+}): StandardPostSettings {
   const p = object(input, "settings"); keys(p, ["schemaVersion", "music", "subtitles", "subtitleFontsRoot", "cover", "versions"], "settings");
   ensure(p.schemaVersion === "workloom.standard-post-settings/v1" && localPath(p.subtitleFontsRoot), "invalid post settings");
   ensure(Array.isArray(p.music) && p.music.length <= 10, "music must be existing local files"); const music = new Set<string>();
@@ -557,6 +593,25 @@ async function relocateGeneratedReceipts(directory: string, staging: string, out
       const value = JSON.parse(await readFile(path, "utf8"));
       await writeFile(path, `${JSON.stringify(relocate(value, staging, output), null, 2)}\n`);
     }
+  }
+}
+
+/** Verify local post inputs before purchasing any generation. Actual media is checked again at post. */
+export async function preflightStandardPostAssets(settings: StandardPostSettings, options: StandardPostOptions = {}) {
+  const repo = resolve(options.repoRoot ?? join(import.meta.dirname, "../.."));
+  const ffprobe = await resolveStandardPostBinary(options.ffprobe ?? process.env.WL_FFPROBE ?? "ffprobe");
+  await resolveStandardPostBinary(options.ffmpeg ?? process.env.WL_FFMPEG ?? "ffmpeg");
+  const font = await regular(settings.cover.fontFile);
+  ensure(await standardPostFileHash(font) === settings.cover.fontSha256, "cover font SHA mismatch");
+  const subtitle = await loadCore(repo, "subtitle-bridge");
+  const catalog = subtitle.loadFontCatalog!();
+  const fonts = subtitle.scanFonts!({ catalog, root: settings.subtitleFontsRoot, verifySha: true }) as { total: number; verified: number; missing: string[] };
+  ensure(fonts.verified === fonts.total && !fonts.missing.length, "subtitle font bundle is incomplete or changed");
+  for (const music of settings.music) {
+    await pinned(music.path, music);
+    const media = await probe(music.path, { ffprobe }, options.timeoutMs ?? 600_000);
+    ensure(media.streams.filter(stream => stream.codec_type === "audio").length === 1
+      && !media.streams.some(stream => stream.codec_type === "video"), "BGM must be a pinned audio-only file");
   }
 }
 

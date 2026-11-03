@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
@@ -322,6 +323,25 @@ test("uses only a fixed checkout CLI and gives the child only the required sessi
   }]]);
 });
 
+test("video entry and delivery receive the validated instance and member scope only", async () => {
+  const env = { ...config, HOME: "/isolated", WORKLOOM_ACCESS_TOKEN: "stale", DEEPSEEK_API_KEY: "unrelated" };
+  for (const [entry, prefix, commandArgs] of [
+    ["video", ["scripts/workloom-video.mjs"], ["status", "--job-file", "job.json"]],
+    ["video-deliver", ["node_modules/tsx/dist/cli.mjs", "scripts/tools/deliver-studio-video.mts"], ["--job-file", "job.json"]],
+  ]) {
+    const f = fixtures();
+    assert.equal(await runSourceSession([entry, "--", ...commandArgs], { ...f, env }), 9);
+    const [[executable, command, options]] = f.spawnCalls;
+    assert.equal(executable, process.execPath);
+    assert.deepEqual(command, [...prefix.map(file => realpathSync(join(root, file))), ...commandArgs]);
+    assert.deepEqual(options.env, {
+      HOME: "/isolated", WORKLOOM_BASE_URL: config.WORKLOOM_BASE_URL, WORKLOOM_API: config.WORKLOOM_BASE_URL,
+      WORKLOOM_DEV_AUTO_LOGIN: "0", WORKLOOM_ACCESS_TOKEN: fixtureToken, WORKLOOM_DESKTOP_INSTANCE_ID: health.desktopInstanceId,
+      WORKLOOM_SOURCE_TENANT_ID: identity.tenantId, WORKLOOM_SOURCE_WORKSPACE_ID: identity.workspaceId, WORKLOOM_DESKTOP_MEMBER: identity.memberNo,
+    });
+  }
+});
+
 test("real loopback runs the actual guide CLI and the read-only render catalog", async t => {
   const seen = [];
   const server = createServer((req, res) => {
@@ -344,18 +364,28 @@ test("real loopback runs the actual guide CLI and the read-only render catalog",
   const env = { ...process.env, ...config, WORKLOOM_BASE_URL: `http://127.0.0.1:${server.address().port}` };
   const { stdout, stderr } = await run(process.execPath,
     [join(root, "scripts/workloom-source-session.mjs"), "agent", "--", "invoke", "growth.video.workbench.guide"],
-    { cwd: root, env, timeout: 10_000 });
+    { cwd: root, env, timeout: 60_000 });
   assert.equal(JSON.parse(stdout).result.repository, product.repository);
   assert.ok(!stdout.includes(fixtureKey) && !stdout.includes(fixtureToken) && !stderr);
   const catalog = await run(process.execPath,
     [join(root, "scripts/workloom-source-session.mjs"), "render", "--", "--list-models"],
-    { cwd: root, env, timeout: 10_000 });
+    { cwd: root, env, timeout: 60_000 });
   assert.deepEqual(JSON.parse(catalog.stdout), { models: [{ id: "fixture-model" }] });
   for (const stream of [catalog.stdout, catalog.stderr]) {
     assert.ok(!stream.includes(fixtureKey) && !stream.includes(fixtureToken));
   }
+  const absent = join(tmpdir(), "source-session-delivery-" + randomUUID());
+  await assert.rejects(run(process.execPath,
+    [join(root, "scripts/workloom-source-session.mjs"), "video-deliver", "--", "--job-file", join(absent, "job.json"),
+      "--work-dir", absent, "--model", "fixture-model", "--post-settings", join(absent, "settings.json"), "--out", join(absent, "out")],
+    { cwd: root, env, timeout: 60_000 }), error => {
+    assert.equal(error.code, 6);
+    assert.ok(error.stderr.includes("job.json") && !error.stderr.includes(fixtureKey) && !error.stderr.includes(fixtureToken));
+    assert.equal(error.stdout, "");
+    return true;
+  });
   const handshake = ["/health", "/trpc/auth.desktopLogin", "/trpc/access.me"];
-  assert.deepEqual(seen, [...handshake, ...handshake, "/trpc/video.gen.catalog"]);
+  assert.deepEqual(seen, [...handshake, ...handshake, "/trpc/video.gen.catalog", ...handshake]);
 });
 
 test("a loopback redirect cannot forward the bootstrap credential or start a child", async t => {

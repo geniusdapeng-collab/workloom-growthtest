@@ -11,6 +11,7 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { cors } from "hono/cors";
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { once } from "node:events";
 import { createWriteStream, existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
 import { readFile } from "node:fs/promises";
@@ -53,10 +54,23 @@ app.use(
   }),
 );
 
+/** Capture the source runtime revision once, before serving any request. */
+function sourceRevision(): string | null {
+  const root = fileURLToPath(new URL("../../../", import.meta.url));
+  if (!existsSync(join(root, ".git"))) return null;
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^GIT_/u.test(key)));
+  const git = (args: string[]) => spawnSync("git", ["--no-optional-locks", "-C", root, ...args], { encoding: "utf8", env, timeout: 10_000 });
+  const head = git(["rev-parse", "--verify", "HEAD"]);
+  const status = git(["status", "--porcelain", "--untracked-files=no"]);
+  const commit = head.stdout?.trim();
+  return head.status === 0 && status.status === 0 && !status.stdout.trim() && /^[a-f0-9]{40}$/u.test(commit ?? "") ? commit! : null;
+}
+const sourceCommit = sourceRevision();
+
 /** 裸健康检查（不进 tRPC，供 start.sh/编排探活） */
 app.get("/health", (c) => c.json({ ok: true, service: "workloom-im-server",
   productId: process.env.WORKLOOM_PRODUCT_ID ?? null,
-  desktopInstanceId: process.env.WORKLOOM_DESKTOP_INSTANCE_ID ?? null }));
+  desktopInstanceId: process.env.WORKLOOM_DESKTOP_INSTANCE_ID ?? null, sourceCommit }));
 
 /**
  * 本机克隆音色（小织/织伴的默认音色）[VOICE-DEFAULT]

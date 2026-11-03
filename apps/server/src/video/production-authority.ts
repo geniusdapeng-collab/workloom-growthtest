@@ -12,6 +12,7 @@ import { verifyMarketingFacts } from "./marketing-authority.js";
 import { archiveWorkDir, projectRunLockKey } from "./archive-host.js";
 import { ScenePolicyRenderGateError, verifyScenePolicyProductionSource, type ScenePolicySourceDecision } from "./scene-policy-render-gate.js";
 import { getModel, providerConfigured } from "./gen/catalog.js";
+import { mediaUrl, workspaceIdFromMediaPath } from "./gen/ingest.js";
 import type { AppPool, Scope } from "./gen/db.js";
 import type { RenderScriptLike } from "./gen/submit.js";
 import type { VideoGenParams } from "./gen/types.js";
@@ -261,9 +262,13 @@ async function sourceForShot(app: AppPool, scope: Scope, projectId: string, shot
 /** 正常 UI / CLI 只读当前服务档案中的镜头；不需要手工 CMS 插行作为前置。 */
 export async function listProductionShots(input: {
   app: AppPool; scope: Scope; projectId: string; env?: NodeJS.ProcessEnv; workDir?: string;
-}): Promise<{ projectId: string; sourceStageRunId: string; sourceAttempt: number; promptsSha256: string;
+}): Promise<{ projectId: string; runId: string; pipeline: string; sourceStageRunId: string; sourceAttempt: number; promptsSha256: string; referenceMode: "text-only" | "binding-required";
   shots: Array<{ shotId: string; durationSec: number; prompt: string; fields: JsonRecord; promptSha256: string }> }> {
   const source = await sourceForShot(input.app, input.scope, input.projectId, null, input.workDir ?? archiveWorkDir(input.env));
+  return projectShots(input.projectId, source);
+}
+
+function projectShots(projectId: string, source: Source) {
   const seen = new Set<string>();
   const shots = (source.prompts.shots as JsonRecord[]).map(shot => {
     if (typeof shot.shotId !== "string" || !shot.shotId || seen.has(shot.shotId) || shot.degraded === true
@@ -273,7 +278,79 @@ export async function listProductionShots(input: {
     return { shotId: shot.shotId, durationSec: shot.durationSec, prompt: shot.prompt,
       fields: record(shot.fields, "镜头字段缺失"), promptSha256: renderSha256(shot.prompt) };
   });
-  return { projectId: input.projectId, sourceStageRunId: source.row.id, sourceAttempt: source.row.attempt, promptsSha256: source.promptsHash, shots };
+  const gates = (source.output.productionEvidence as { gates: JsonRecord[] }).gates;
+  const referenceMode: "text-only" | "binding-required" = source.row.kind === "narrative" && gates.some(gate => gate.gate === "G5_PORTRAIT"
+    && gate.status === "not_applicable" && gate.basis === "no-characters-or-products") ? "text-only" : "binding-required";
+  return { projectId, runId: source.row.run_id, pipeline: source.row.kind, referenceMode,
+    sourceStageRunId: source.row.id, sourceAttempt: source.row.attempt, promptsSha256: source.promptsHash, shots };
+}
+
+/** 只从当前服务账本签发下载链接。供应商接受、片段完成和媒体入库是三个独立条件。 */
+export async function listProductionOriginals(input: {
+  app: AppPool; scope: Scope; projectId: string; modelId: string; env?: NodeJS.ProcessEnv; workDir?: string;
+}) {
+  const { app, scope, projectId, modelId } = input;
+  const env = input.env ?? process.env;
+  const locked = await lease(app, scope, projectId, true);
+  try {
+    const source = await sourceForShot(locked.app, scope, projectId, null, input.workDir ?? archiveWorkDir(env));
+    const plan = projectShots(projectId, source);
+    const rows = await scopedTx(locked.app, scope, async client => (await client.query<QualificationRow & {
+      job_id: string; task_id: string; asset_id: string; sha256: string; local_path: string; bytes: number; md: string;
+    }>(`SELECT q.*, j.id AS job_id, j.task_id, a.id AS asset_id, a.sha256, a.meta->>'localPath' AS local_path,
+              e.after->'ingest'->'bytes' AS bytes, s.md
+         FROM production_qualifications q
+         JOIN generation_submissions g ON g.tenant_id=q.tenant_id AND g.workspace_id=q.workspace_id
+           AND g.project_id=q.project_id AND g.script_id=q.script_id AND g.script_version=q.script_version
+           AND g.request_hash=q.request_hash AND g.idempotency_key='render:' || q.request_hash
+           AND g.state='finalized' AND g.provider=q.provider AND g.provider_model=q.provider_model
+         JOIN render_jobs j ON j.workspace_id=g.workspace_id AND j.project_id=g.project_id AND j.id=g.job_id
+           AND j.script_id=g.script_id AND j.script_version=g.script_version AND j.task_id=g.task_id
+           AND j.provider=g.provider AND j.provider_model=g.provider_model AND j.idempotency_key=g.idempotency_key
+           AND j.status='done' AND j.mock=false AND j.est_seconds=(q.params->>'durationSec')::numeric
+         JOIN render_scripts s ON s.id=q.script_id AND s.workspace_id=q.workspace_id AND s.project_id=q.project_id
+           AND s.shot_id=q.shot_id AND s.version=q.script_version
+         JOIN video_assets a ON a.workspace_id=j.workspace_id AND a.id=j.asset_id AND a.kind='clip'
+           AND a.provenance->>'source'='generated'
+         JOIN LATERAL (
+           SELECT b.payload->'decision'->'after' AS after
+           FROM biz_events b
+           WHERE b.tenant_id=q.tenant_id AND b.workspace_id=q.workspace_id
+             AND b.payload->'object'->>'type'='render_job' AND b.payload->'object'->>'id'=j.id
+             AND b.payload->'who'->>'type'='system' AND b.payload->'who'->>'id'='render-poller'
+             AND b.payload->'decision'->>'action' IN ('render.complete','render.ingested')
+             AND b.payload->'decision'->'after'->'ingest'->'ok'='true'::jsonb
+           ORDER BY b.seq DESC LIMIT 1
+         ) e ON e.after->>'task_id'=j.task_id AND e.after->'mock'='false'::jsonb
+           AND e.after->>'asset_id'=a.id AND e.after->>'local_path'=a.meta->>'localPath'
+        WHERE q.tenant_id=$1 AND q.workspace_id=$2 AND q.project_id=$3 AND q.model_id=$4
+          AND q.source_stage_run_id=$5 AND q.source_attempt=$6 AND q.source_output_sha256=$7
+          AND q.prompts_sha256=$8 AND q.status='passed' AND q.mode='auto'`,
+      [scope.tenantId, scope.workspaceId, projectId, modelId, source.row.id, source.row.attempt, source.row.output_sha256, source.promptsHash])).rows);
+    let hasBoundVisualReference = false;
+    const originals = plan.shots.map(shot => {
+      const matches = rows.filter(row => row.shot_id === shot.shotId);
+      if (!matches.length) return null;
+      if (matches.length !== 1) fail("ORIGINAL_AMBIGUOUS", "当前镜头有多个完成的生成任务，不能自动选用");
+      const row = matches[0]!;
+      const actual = Buffer.from(row.signature ?? "", "base64url"), expected = Buffer.from(signature(payloadFor(row), env), "base64url");
+      if (actual.length !== expected.length || !timingSafeEqual(actual, expected)
+        || renderSha256(row.md) !== shot.promptSha256 || row.params.durationSec !== shot.durationSec
+        || !row.task_id || !Number.isSafeInteger(row.bytes) || row.bytes <= 0 || !/^[a-f0-9]{64}$/.test(row.sha256)
+        || workspaceIdFromMediaPath(row.local_path) !== scope.workspaceId
+        || ![`video/${scope.workspaceId}/${row.sha256}.mp4`, `video/${scope.workspaceId}/${row.sha256}.webm`].includes(row.local_path)) {
+        fail("ORIGINAL_UNVERIFIED", "生成签名、镜头原文或媒体入库证据与当前预生产不一致");
+      }
+      hasBoundVisualReference ||= Boolean(row.params.firstFrameUrl || row.params.referenceImageUrls?.length || row.params.referenceVideoUrls?.length);
+      return { shotId: shot.shotId, durationSec: shot.durationSec, promptSha256: shot.promptSha256,
+        qualificationId: row.id, requestHash: row.request_hash, payloadHash: row.payload_hash, jobId: row.job_id,
+        taskId: row.task_id, assetId: row.asset_id, sha256: row.sha256, bytes: row.bytes, url: mediaUrl(row.local_path) };
+    });
+    if (plan.referenceMode === "binding-required" && originals.every(Boolean) && !hasBoundVisualReference) {
+      fail("ORIGINAL_REFERENCE_UNVERIFIED", "本项目的供应商请求均无已绑定的视觉参考输入");
+    }
+    return { ...plan, modelId, originals };
+  } finally { await locked.release(); }
 }
 
 function signingKey(env: NodeJS.ProcessEnv): { key: Buffer; keyId: string } {

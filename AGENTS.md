@@ -3,6 +3,10 @@
 > 本文件包含 WorkLoom 各仓共享的受控规则；仓库专属规则位于 AGENTS.repo.md 或更近层级的 AGENTS.md / AGENTS.override.md。共享规则由 workloom-im 统一维护和分发。
 > 本仓为隔离副本，遵循 registry 的 `none-in-none-out`；本次 `T-2026-1002-9001` 仅按产品所有者会话授权修复本仓安全机制和过时指引，未更新冻结上游基线、未解除隔离，也不向其他仓分发。
 
+## GrowthTest 视频任务入口
+
+用户指名 GrowthTest 制作视频时，主动读取 [本仓规则](AGENTS.repo.md) 与 [正式视频入口](docs/video-native-agent-entry.md)。把用户原话传给系统分流和正式前期，使用同一作业的渲染与标准后期。仓库被检出到其他工作区的子目录时，仍须显式读取这些指引。
+
 <!-- WORKLOOM-CONTEXT:BEGIN -->
 ## 1. 强制上下文与指令边界
 

@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { test } from "vitest";
 import { inspectGenerationManifest } from "./generation-quality.mjs";
-import { adoptCompletedOriginalRenders, runStandardPost, adoptLegacyOriginalRenders, assertStandardPostAudioClock, assertStandardPostExportClock, assertStandardPostVariantAxes, captureOriginalRenderManifest, freezeOriginalSubmission, issueOriginalRenderReceipt,
+import { adoptCompletedOriginalRenders, runStandardPost, adoptLegacyOriginalRenders, assertStandardPostAudioClock, assertStandardPostExportClock, assertStandardPostVariantAxes, captureOriginalRenderManifest, freezeOriginalSubmission, issueOriginalRenderReceipt, issueServiceOriginal,
   loadOriginalRenderManifest, resolveStandardPostBinary, standardPostFileHash, StandardPostError, validateStandardPostSettings, type StandardPostSettings } from "./film-standard-post.mjs";
 const hash = (bytes: Buffer | string) => createHash("sha256").update(bytes).digest("hex");
 const repo = resolve(import.meta.dirname, "../.."), cli = join(repo, "scripts/tools/full-chain-film.mts");
@@ -53,6 +53,29 @@ test("issued original manifest rebuilds exact complete native timeline from real
   assert.equal(hash(readFileSync(join(f.clips, "S1.mp4"))), sourceBefore);
   assert.deepEqual(validateStandardPostSettings(settings(f.root), loaded.contract), settings(f.root));
  }), 60_000);
+test("service originals need the same authenticated archive receipt at post readback", async () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "standard-service-original-"))), projectId = "SERVICE-FIXTURE";
+  const shotId = "S1", promptSha256 = hash("完整正式提示词");
+  try {
+    const artifactPath = join(root, "clips", projectId, "S1.raw.mp4");
+    mkdirSync(join(root, "clips", projectId), { recursive: true });
+    media(artifactPath);
+    await freezeOriginalSubmission({ productionRoot: root, projectId,
+      bytes: Buffer.from(JSON.stringify({ projectId, durationSeconds: 1, shots: [{ shotId, duration: 1, promptSha256 }] })) });
+    const proof = { shotId, durationSec: 1, promptSha256, qualificationId: "QUAL-FIXTURE", jobId: "JOB-FIXTURE",
+      taskId: "TASK-FIXTURE", assetId: "ASSET-FIXTURE", requestHash: hash("request"), payloadHash: hash("payload"),
+      sha256: hash(readFileSync(artifactPath)), bytes: statSync(artifactPath).size };
+    await issueServiceOriginal({ productionRoot: root, projectId, artifactPath, proof });
+    const manifestFile = await captureOriginalRenderManifest({ productionRoot: root, projectId });
+    await assert.rejects(loadOriginalRenderManifest(manifestFile, options), /requires live authenticated archive readback/);
+    await assert.rejects(loadOriginalRenderManifest(manifestFile, { ...options,
+      readServiceOriginals: async () => [{ ...proof, taskId: "TASK-OTHER" }] }), /differs from the current archive/);
+    const current = await loadOriginalRenderManifest(manifestFile, { ...options, readServiceOriginals: async () => [proof] });
+    assert.equal(current.originals[0]?.authority.kind, "current-service-render-receipt");
+    assert.equal(current.durationSec, 1);
+    assert.equal(current.totalFrames, 24);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}, 120_000);
 test("temporary ancestor names containing S2 cannot turn two distinct original fixtures into duplicate media", async () => {
   const f = await fixture("standard-original-fixture-S2-");
   try {
