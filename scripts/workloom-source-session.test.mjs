@@ -81,7 +81,7 @@ test("refuses denied login, scope mismatch, invalid JWT and changed access witho
     [{ login: { error: { message: fixtureKey } }, status: 401 }, "SOURCE_HTTP_ERROR", 2],
     [{ login: trpc({ token: fixtureToken, identity: { ...identity, tenantId: "other" } }) }, "LOGIN_SCOPE_MISMATCH", 2],
     [{ login: trpc({ token: fixtureToken, identity: { ...identity, memberNo: "GUEST" } }) }, "LOGIN_SCOPE_MISMATCH", 2],
-    [{ login: trpc({ token: "malformed", identity }) }, "MEMBER_TOKEN_INVALID", 2],
+    [{ login: trpc({ token: fixtureToken.split(".")[0], identity }) }, "MEMBER_TOKEN_INVALID", 2],
     [{ accessBody: trpc({ ...access, scope: { ...access.scope, workspaceId: "other" } }) }, "ACCESS_SCOPE_MISMATCH", 3],
     [{ accessBody: trpc({ ...access, subject: { ...access.subject, id: "other" } }) }, "ACCESS_SCOPE_MISMATCH", 3],
   ]) {
