@@ -1,6 +1,6 @@
 # Growthtest 视频调用指南：AI 工作台先读，再制作
 
-> guideVersion: 2026-11-03.1
+> guideVersion: 2026-11-03.2
 > 适用仓库：`geniusdapeng-collab/workloom-growthtest`（隔离副本）。
 > 读者：Codex、DeepSeek Harness 桌面端及其它可调用本仓 CLI / stdio MCP 的 AI 工作台。
 
@@ -55,6 +55,35 @@ node tools/codex-gateway/bin/cli.mjs video guide --json
 
 ## 3. 选择正式入口，分清方案、前期和渲染
 
+### 一句话启动标准制片
+
+“用 Growthtest 制作 18 秒雨后山间民宿短片”是制作请求。工作台从原话读取主题和明确的目标时长，保留原话，将目标传给本仓原生 Studio。下例使用[已核对的独立本机源码会话](AGENT-CLIENTS.md#独立本机源码会话)。准备和授权沿用本节后面的检查，文字前期可能发生模型调用。
+
+```bash
+node scripts/workloom-source-session.mjs studio -- start --work-root work/jobs/rainy-homestay --input-file - <<'JSON'
+{"intent":"用 Growthtest 制作 18 秒雨后山间民宿短片，只拍空景。","durationSec":18}
+JSON
+```
+
+输入也可读取当前作业的 JSON 文件。总时长是创作目标，镜头数、单镜时长和节奏由本次正式管线决定；只有明确登记的硬上限才约束成片。已知商品和授权素材可通过现有 `metadata` 合同随请求传入。默认 `route=auto`，只有用户已明确片型时才传 `route=narrative` 或 `route=marketing`。确认收到待澄清回执后，可用新尝试子目录发送补齐后的请求。收到解说片回执则继续其专用入口。
+
+每次启动先在 `--work-root` 独占写入 `studio-start.request.json`，再发原生请求。核对通过后保存 `studio-start.receipt.json`。同目录、同请求重开只读回已有回执，显示 `reused=true`。已有预占但缺可验证回执时返回 `STUDIO_START_OUTCOME_UNKNOWN`，在同一实例核对项目与档案。保留两份记录，禁止删文件或更换目录来规避待核对状态。
+
+保留 `result.projectId` 和 `result.runId`。以下命令均为只读，使用回执的真实 ID：
+
+```bash
+node scripts/workloom-source-session.mjs studio -- status RUN-实际编号
+node scripts/workloom-source-session.mjs studio -- archive VID-实际编号
+node scripts/workloom-source-session.mjs studio -- shots VID-实际编号
+```
+
+- 原生前期达到 `finished` 后，须以同项目的 `shots`、档案和固定约束证明当前版本可继续。待审批时用原审批；收到 `STUDIO_START_OUTCOME_UNKNOWN` 时先查同一实例的项目和档案，禁止重复启动。以上回执均有 `deliveryComplete:false`。
+- 当当前 Studio 档案有同项目正式可执行原稿、可回读的来源摘要，且固定 Film 工位和 G8 预算授权齐备时，用 [`video.film.start`](../apps/server/src/video/film-router.ts) 和登记的 [`full-chain-film.mts`](../scripts/tools/full-chain-film.mts) 工位走生成与正式后期。使用归档原稿，以工位回读的冻结摘要、供应商任务、首次原片签发及后期回执为证。已有该工位签发的 `original-render-manifest.json` 并需完整原片标准后期时，接续下节的 `--standard-post`。
+- 使用服务渲染链时，同项目通过[服务项目 CLI](../scripts/tools/render-project.mts) 核对镜头资格、模型、素材授权和估算上限。源码会话示例为 `node scripts/workloom-source-session.mjs render -- --project VID-实际编号 --model 实际模型ID --max-estimated-cny 已授权上限`。以实际资格、受理任务号和成功原片为证。服务渲染摘要缺少 Film 原片签发凭据，无法直接交给 `--standard-post`。
+- 缺正式原稿、真实资格或后期来源凭据时停在实际阶段，保留原片与回执。成片须通过当前导出、摘要和播放核验。禁止手工生成资格、镜头卡或交付清单。
+
+下面的流程图区分每一步的实际完成证据。
+
 ```mermaid
 flowchart LR
   A[用户原话和素材] --> B[固定约束与能力预检]
@@ -67,7 +96,7 @@ flowchart LR
 
 1. **能力与环境。**读取 `growth.repo.readiness`，回读实际服务的 `/health` 和有权限的 `growth.video.gen.catalog`，再运行 `pnpm video:doctor`。本地只读、服务探活、运行时模型可用、账户权限/余额和本次付费资格分别记录。按本次需要核对可用的图生图、文生图或参考图/视频生成模式，以及实际后期二进制、字体和授权音乐。已有可用原片的标准后期不需要生成供应商。
 2. **分流。**视频工位的 `video.studio.start` 进入系统营销/叙事/解释片分流。专业 CLI 使用 `route-video.mts` 保存分流记录；营销片必须有商品锚点。`clarify` 或类型不符时停，解释片走其专用入口，不硬塞进逐镜片管线。
-3. **由系统生成前期。**默认一句话导演使用 `scripts/workloom-director.mjs plan`；它会调用真实文字模型，强制 `mode=plan`，不提交图像/视频。`growth.video.director.preview` 是免费的确定性预览，不能当作真实文字方案。`plan` 返回导演方案，不等于已具备正式完整渲染提示词或完成媒体。
+3. **由系统生成前期。**普通制作走上面的原生 Studio 自动分流。明确要求独立导演方案时用 `scripts/workloom-director.mjs plan`；它会调用真实文字模型，强制 `mode=plan`，不提交图像/视频。`growth.video.director.preview` 是免费的确定性预览，不能当作真实文字方案。`plan` 返回导演方案，不等于已具备正式完整渲染提示词或完成媒体。
 4. **正式提示词与资格。**专业 Studio 前期通过 `startVideoProjectRun`、`VideoStudio.runPreproduction` 和实际制作引擎生成并归档前期素材。读取 `growth.video.production.shots` 和项目实际前期记录，对照冻结约束逐镜核验。归档草案镜头卡、纯文字导演方案、`ready:true` 本地计划都不能冒充正式渲染放行包。缺正式前期或资格时停止，不写临时镜头卡绕过系统；用户明确提供的镜头稿仍须走正式规范检查。
 5. **计划后执行。**`growth.video.production.plan` 只读已有镜头卡、分流、fps、原声合同和本地配置，返回 `checklist` 与 `execution.command/args/cwd`。`readyScope=authored-input-and-local-configuration`。逐项核对后以实际参数数组启动官方 `full-chain-film.mts`，将用户文本作为数据传入。失败时 `argv=[]`、`execution=null`，回到出错工位。服务项目逐镜提交使用同一服务的 `video.production.qualifyShot` 与渲染 API；[服务项目 CLI](../scripts/tools/render-project.mts) 可按真实项目 ID、模型 ID、批准范围和估算上限调用。
 6. **付费渲染。**正常生成先冻结原稿，逐镜核对 ID、请求参数、原生音轨选择及授权，保留实际供应商任务、下载与签发事实。保持已有项目/输入/目录，优先接续已受理任务；不清缓存、不自动重发付费 POST。真人档案在提交前核对；成功后不再跑 canary 或身份比对。普通导演保留原片音轨，只有用户明确授权 `audioMode=dubbing` 才进入真实配音处理。

@@ -127,6 +127,8 @@ WorkLoom 仓库的当前事实源为 CNB `https://cnb.cool/workloom-ai/*`，成�
 
 Codex 或其他 Agent 受托制作视频时，先按 [AGENTS.repo.md 的视频接入入口](AGENTS.repo.md#〇codex-与其他-agent-的视频接入) 进入本仓工作流。本隔离仓的视频接入以 [GitHub 上的 workloom-growthtest](https://github.com/geniusdapeng-collab/workloom-growthtest) 实际默认分支为代码源。
 
+收到“用 Growthtest 制作 X 秒某主题视频”时，加载 [Growthtest 标准制片技能](.agents/skills/workloom-growthtest-standard-video/SKILL.md)，使用当前隔离实例的原生 Studio 入口。
+
 <!-- WORKLOOM-RD-DELIVERY:BEGIN -->
 ## 普通研发自动交付（产品所有者 2026-10-06 现行授权）
 

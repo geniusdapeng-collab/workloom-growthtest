@@ -72,7 +72,21 @@ test("standard native production has no local ASR or dubbing prerequisite", () =
   assert.ok(plan.audioContracts.every(contract => contract.sourcePolicy === "render-native"));
   assert.ok(!plan.checklist.some(entry => entry.id === "local-asr"));
   assert.ok(!plan.argv.includes("--narration-unified"));
+  assert.ok(!plan.argv.includes("--review-policy"));
   assert.ok(plan.beforeRun.every(text => !/配音工位/u.test(text)));
+}));
+test("a Studio draft with valid shape and a valid route never gets runnable argv", () => fixture(({ root }) => {
+  const input = savePlanInputs(root);
+  for (const draft of [true, "true"]) {
+    writeFileSync(join(root, "out", "shots.json"), JSON.stringify({
+      draft, fps: 24, products: ["商品"], shots: [{ shotId: "S1", duration: 5 }],
+    }));
+    const plan = productionPlan(input);
+    assert.equal(plan.ready, false);
+    assert.equal(plan.execution, null);
+    assert.deepEqual(plan.argv, []);
+    assert.match(plan.checklist.find(entry => entry.id === "shotlist").detail, /草稿/u);
+  }
 }));
 test("native plan rejects replacement narration, muted generation and unsupported exact shot clocks", () => fixture(({ root }) => {
   const input = savePlanInputs(root);

@@ -110,6 +110,8 @@ printf '%s' '{"kind":"video"}' | node scripts/workloom-source-session.mjs agent 
 
 后面的 `node scripts/workloom-agent.mjs …`（需认证时）和 `node scripts/workloom-director.mjs …`，在此独立源码会话中分别改为 `node scripts/workloom-source-session.mjs agent -- …` 和 `node scripts/workloom-source-session.mjs director -- …`。使用服务项目渲染 CLI 时，对应子命令为 `render`。结束时在原终端用 `jobs -l` 找到 `workloom_source_pid` 对应作业，将其调回前台并按 Ctrl-C，再退出该终端。续跑时保留作业目录、数据库与原受理回执，通过已授权身份重新连接。临时凭据留在该会话环境。
 
+标准制作的固定子命令为 `node scripts/workloom-source-session.mjs studio -- start --work-root <本次作业目录> --input-file -`。按[一句话启动标准制片](ai-video-workbench-guide.md#一句话启动标准制片)送入用户原话和明确的目标秒数。它通过同一实例自动分流，将启动回执保存在该作业目录。
+
 ### 核对已连接的实例
 
 ```bash
@@ -161,9 +163,7 @@ codex mcp add workloom_growthtest -- /abs/path/to/node /abs/path/to/workloom-gro
 codex mcp list
 ```
 
-可以在新会话把这段话直接交给工作台：
-
-> 在当前 GitHub 检出根目录读取 AGENTS.md 指向的规则与视频指南。先核对仓库、提交、能力、服务和素材。保留我的原话与固定要求，使用正式入口规划、制作和续跑。付费前核对授权、资格和额度。交付时列出实际可播放文件、封面、字幕、清单和核验结果。遇到阻断，说明具体阶段、已取得的回执、是否发出生成请求及恢复入口。
+接入后，在当前 Growthtest 仓库会话只需描述作业，例如“用 Growthtest 制作 18 秒雨后山间民宿短片，只拍空景”。根级指引会引导工作台检查实例、授权与素材，再使用[原生制作入口](ai-video-workbench-guide.md#一句话启动标准制片)。只要方案时明确说“先给方案”。
 
 ---
 

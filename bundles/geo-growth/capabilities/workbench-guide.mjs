@@ -4,7 +4,7 @@ import { lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 export const VIDEO_WORKBENCH_GUIDE_PATH = 'docs/ai-video-workbench-guide.md';
-export const VIDEO_WORKBENCH_GUIDE_VERSION = '2026-11-03.1';
+export const VIDEO_WORKBENCH_GUIDE_VERSION = '2026-11-03.2';
 const REPOSITORY = 'geniusdapeng-collab/workloom-growthtest';
 const MAX_BYTES = 256 * 1024;
 

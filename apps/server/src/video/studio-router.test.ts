@@ -59,6 +59,39 @@ describe("普通视频入口的内部素材字段边界", () => {
   });
 });
 
+describe("标准制片目标时长", () => {
+  const intent = "制作 18 秒的雨后山间民宿短片，保留开门后的完整动作。";
+
+  it.each([undefined, "VID-existing"])("原生入口 projectId=%s 使用指定目标秒数并保留原话", async projectId => {
+    await expect(caller().studio.start({ projectId, intent, durationSec: 18 }))
+      .resolves.toMatchObject({ kind: "routed", pipeline: "narrative" });
+    expect(projectId ? d.existing : d.start).toHaveBeenCalledWith(
+      { tenantId: identity.tenantId, workspaceId: identity.workspaceId },
+      expect.objectContaining({ rawIntent: intent, intent: expect.stringContaining("[需求口径] 时长：18秒") }),
+    );
+  });
+
+  it("不指定时长的现有调用继续使用 30 秒目标", async () => {
+    await caller().studio.start({ intent: "山间民宿短片" });
+    expect(d.start.mock.calls[0]?.[1].intent).toContain("[需求口径] 时长：30秒");
+  });
+
+  it("营销自动分流保留指定目标和可核实商品身份", async () => {
+    d.route.mockResolvedValueOnce({ route: "marketing", product: { name: "测试品牌咖啡" }, signals: [], via: "rules" });
+    const rawIntent = "制作 42 秒的测试品牌咖啡营销片。";
+    await expect(caller().studio.start({ intent: rawIntent, durationSec: 42 }))
+      .resolves.toMatchObject({ kind: "routed", pipeline: "marketing", product: "测试品牌咖啡" });
+    expect(d.start.mock.calls[0]?.[1]).toMatchObject({ rawIntent, isMarketing: true,
+      intent: expect.stringContaining("[需求口径] 时长：42秒") });
+  });
+
+  it.each([0, 12.5, 301])("无效时长 %s 在分流或立项前拒绝", async durationSec => {
+    await expect(caller().studio.start({ intent, durationSec })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(d.route).not.toHaveBeenCalled();
+    expect(d.start).not.toHaveBeenCalled();
+  });
+});
+
 
 describe("公共产品参考图路径边界", () => {
   const referenceShapes: Array<[string, unknown]> = [

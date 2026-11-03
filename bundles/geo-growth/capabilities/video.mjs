@@ -421,6 +421,7 @@ function declaredFps(shotlist) {
 
 function validShots(doc) {
   if (!plain(doc) || !Array.isArray(doc.shots) || doc.shots.length === 0) throw new VideoCapabilityError("镜头卡须是含非空 shots 数组的对象");
+  if (doc.draft !== undefined && doc.draft !== false) throw new VideoCapabilityError("镜头草稿不能生成执行命令；请用服务档案与正式渲染资格继续");
   const ids = new Set();
   for (const shot of doc.shots) {
     if (!plain(shot) || typeof shot.shotId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(shot.shotId) || shot.shotId.includes("..")) {
@@ -503,7 +504,7 @@ export function productionPlan(input) {
   const ready = checklist.every(entry => entry.ok);
   const argv = ready ? ["exec", "tsx", "scripts/tools/full-chain-film.mts", "--shots", shotlistFile, "--project", projectId,
     "--work-dir", stageWorkDir, "--out", outputFile, "--route", routeFile, "--keys-file", configuration.keysFile,
-    "--platform", platform, "--fps", String(fps), "--subtitle-mode", "both", "--review-policy", "off"] : [];
+    "--platform", platform, "--fps", String(fps), "--subtitle-mode", "both"] : [];
   const executable = "pnpm";
   const command = ready ? [executable, ...argv].map(quoteShell).join(" ") : null;
   return {
