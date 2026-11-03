@@ -40,7 +40,7 @@ try {
  const productQuery = { name: '已核实 F3', brand: '检索品牌', category: '检索服务', model: '检索型号' };
  const studio = new VideoStudio({ llm: { model: 'offline', fastModel: 'offline' }, workDir: ${JSON.stringify(directory)},
    portraits: { enabled: false }, deferRender: true, log: () => undefined, onApproval: async () => ({ approved: true }),
-   dataMining: { mode: 'api', storeRoot: ${JSON.stringify(path.join(directory, "dossiers"))}, verifiedRaw: { projectId: 'P1', rawJson, sha256: createHash('sha256').update(rawJson).digest('hex'), productQuery } } });
+   dataMining: { mode: 'api', storeRoot: ${JSON.stringify(path.join(directory, "dossiers"))}, verifiedRaw: { projectId: 'P1', rawJson, sha256: createHash('sha256').update(rawJson).digest('hex'), productQuery, specSourceUrls: { 风量: 'https://source.example.com/f3' } } } });
  const result = await studio.runPreproduction({ projectId: 'P1', intent: '做商品介绍', isMarketing: true, metadata: { pipelineRoute: { kind: 'marketing' } } });
  console.log('RESULT '+JSON.stringify(result.stages));
 } finally { entry.HyperrealitySystem = Original; }

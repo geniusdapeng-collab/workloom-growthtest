@@ -46,7 +46,7 @@ import {
 import { AUDIO_DISCIPLINE_CLAUSE, AUDIO_NEGATIVE_TERMS } from "./shot-spec.js";
 import { loadDurationRules } from "./duration-rules.js";
 import { installVendorMarketingPriceBridge } from "./marketing-price-contract.js";
-import { verifiedMarketingDossierInput } from "./marketing-dossier-input.js";
+import { sourceBoundMarketingAssemblyRaw, verifiedMarketingDossierInput } from "./marketing-dossier-input.js";
 
 /** 全局桥只安装一次；可变的日志和事件出口属于调用它的异步运行。 */
 interface StudioBridgeScope {
@@ -159,7 +159,7 @@ export interface StudioConfig {
     storeRoot?: string;
     staleAfterDays?: number;
     /** 仅服务宿主在完整来源/G1通过后装配；浏览器metadata中的同名字段没有权限。 */
-    verifiedRaw?: { projectId: string; rawJson: string; sha256: string; productQuery: Record<string, unknown> };
+    verifiedRaw?: { projectId: string; rawJson: string; sha256: string; productQuery: Record<string, unknown>; specSourceUrls?: Record<string, string> };
   };
 }
 
@@ -357,7 +357,7 @@ export class VideoStudio {
         throw new Error("MARKETING_G1_REQUIRED：商品查询必须来自本次已审事实包");
       }
       metadata.dataMining = verifiedMarketingDossierInput(parsed);
-      verifiedRaw = parsed;
+      verifiedRaw = sourceBoundMarketingAssemblyRaw(parsed, verified.specSourceUrls ?? {});
     }
     const log = cfg.log ?? ((line: string) => console.log(line));
     const require = createRequire(import.meta.url);

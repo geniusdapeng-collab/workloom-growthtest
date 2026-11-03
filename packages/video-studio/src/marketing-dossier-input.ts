@@ -29,3 +29,21 @@ export function verifiedMarketingDossierInput(rawByAgent: RecordValue): RecordVa
   }
   return input;
 }
+
+/** Vendor规格需对象形态才能登记来源；原始提取及其哈希保持不变，仅给装订器传副本。 */
+export function sourceBoundMarketingAssemblyRaw(rawByAgent: RecordValue, specSourceUrls: Record<string, string>): RecordValue {
+  const output = structuredClone(rawByAgent);
+  const identity = record(record(output.A1).identity);
+  if (identity.specs === undefined) return output;
+  if (!identity.specs || typeof identity.specs !== "object" || Array.isArray(identity.specs)) {
+    throw new Error("MARKETING_SPEC_SOURCE_REQUIRED：已审规格表形状无效");
+  }
+  identity.specs = Object.fromEntries(Object.entries(identity.specs).map(([key, value]) => {
+    const source = Object.hasOwn(specSourceUrls, key) ? specSourceUrls[key] : undefined;
+    if (typeof source !== "string" || !source.trim()) {
+      throw new Error(`MARKETING_SPEC_SOURCE_REQUIRED：已审规格${key}缺少对应正文来源`);
+    }
+    return [key, { value, source_url: source }];
+  }));
+  return output;
+}

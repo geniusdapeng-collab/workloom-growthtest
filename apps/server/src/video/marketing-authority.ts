@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { constants } from "node:fs";
 import { mkdir, open, realpath, writeFile } from "node:fs/promises";
-import { installVendorMarketingPriceBridge, verifiedMarketingDossierInput, reviewStage, type ProducerVerdict } from "@hyperreality/video-studio";
+import { installVendorMarketingPriceBridge, sourceBoundMarketingAssemblyRaw, verifiedMarketingDossierInput, reviewStage, type ProducerVerdict } from "@hyperreality/video-studio";
 import { createDataMiningExecutor, type DataMiningStagePlan, type ExecutorLlm, type IntelStage, type SearchFn, type SearchHit } from "./data-mining-executor.js";
 import { fetchMarketingSource, sourceUrl, type SourceSnapshot } from "./marketing-source-fetcher.js";
 import { assertMarketingFactsFresh, validateStageFacts, revalidateStageFacts, type ValidatedStageFacts } from "./marketing-facts.js";
@@ -29,7 +29,7 @@ export interface MarketingFactsBundle {
 }
 export interface PreparedMarketingFacts {
   bundle: MarketingFactsBundle; g1Content: string; raw: Record<IntelStage, RecordValue>; storeRoot: string;
-  root: string; prefix: string;
+  root: string; prefix: string; specSourceUrls: Record<string, string>;
 }
 interface DossierEngine {
   plan(input: RecordValue): { trace_id: string; plans: Record<IntelStage, DataMiningStagePlan> };
@@ -196,21 +196,21 @@ export async function prepareMarketingFacts(input: {
    * claims 已经绑定到原文；装订时把这些来源附着到临时副本，避免档案把
    * 已审规格误报成“无来源”。rawByAgent 仍保留原始提取形状，审计哈希不漂移。
    */
-  const assemblyRaw = structuredClone(raw);
+  const specSourceUrls: Record<string, string> = Object.create(null);
   const a1Facts = reports.find((report) => report.stage === "A1")?.facts;
-  if (a1Facts && assemblyRaw.A1?.identity && typeof assemblyRaw.A1.identity === "object") {
-    const identity = assemblyRaw.A1.identity as RecordValue;
+  if (a1Facts && raw.A1?.identity && typeof raw.A1.identity === "object") {
+    const identity = raw.A1.identity as RecordValue;
     const specs = identity.specs && typeof identity.specs === "object" && !Array.isArray(identity.specs)
       ? identity.specs as RecordValue
       : {};
-    for (const [key, value] of Object.entries(specs)) {
+    for (const key of Object.keys(specs)) {
       const pointer = `/identity/specs/${key.replace(/~/g, "~0").replace(/\//g, "~1")}`;
       const claim = a1Facts.claims.find((item) => item.pointer === pointer);
       const source = claim ? sources.find((item) => item.sourceId === claim.sourceId) : undefined;
-      if (source) specs[key] = { value, source_url: source.requestedUrl };
+      if (source) specSourceUrls[key] = source.requestedUrl;
     }
-    identity.specs = specs;
   }
+  const assemblyRaw = sourceBoundMarketingAssemblyRaw(raw, specSourceUrls) as Record<IntelStage, RecordValue>;
   const restorePriceBridge = installVendorMarketingPriceBridge();
   let assembled: ReturnType<DossierEngine["assemble"]>;
   try { assembled = collector.assemble(plan.trace_id, verifiedMarketingDossierInput(raw), assemblyRaw); }
@@ -226,7 +226,7 @@ export async function prepareMarketingFacts(input: {
     instruction: "用户意图与Brief仅是需求，事实只能来自已核实claims；下游创意必须遵守restrictions" });
   if (g1Content.length > 100_000) fail("MARKETING_REVIEW_TOO_LARGE", "完整事实档案超过G1评审容量，不能只审摘要");
   bundle.g1ContentSha256 = renderSha256(g1Content);
-  return { bundle, g1Content, raw: structuredClone(raw), storeRoot, root, prefix };
+  return { bundle, g1Content, raw: structuredClone(raw), storeRoot, root, prefix, specSourceUrls };
 }
 
 export async function finalizeMarketingFacts(prepared: PreparedMarketingFacts, shots: Array<{ shotId: string; prompt: string; fields: unknown }>, env: NodeJS.ProcessEnv = process.env): Promise<{ ref: string; sha256: string }> {
