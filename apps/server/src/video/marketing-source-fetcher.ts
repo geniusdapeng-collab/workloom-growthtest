@@ -8,6 +8,7 @@ import { createHash } from "node:crypto";
 
 export const SOURCE_MAX_BYTES = 2 * 1024 * 1024;
 export const SOURCE_MAX_TEXT_CHARS = 24_000;
+export const PUBLIC_RESOURCE_MAX_BYTES = 15 * 1024 * 1024;
 export interface SourceSnapshot {
   sourceId: string; requestedUrl: string; finalUrl: string; redirectChain: string[];
   fetchedAt: string; contentType: string; rawSha256: string; textSha256: string;
@@ -48,36 +49,40 @@ export function sourceUrl(raw: string): URL {
   return url;
 }
 
-/** 低层传输独立导出供真实本地HTTP回归；生产只能由fetchMarketingSource在校验后调用。 */
-export const requestSource: SourceTransport = (url, address, signal) => new Promise((resolve, reject) => {
-  const options: RequestOptions = {
-    method: "GET", agent: false, signal, family: address.family,
-    headers: {
-      "user-agent": "WorkLoom-FactSource/1.0",
-      accept: "text/html,text/plain,application/json",
-      "accept-encoding": "identity",
-      // 部分官方只读 API 会拒绝空来源。固定为当前 URL 的同源根，不携带搜索页或其它站点信息。
-      referer: `${url.protocol}//${url.host}/`,
-    },
-    lookup: ((_hostname: string, options: { all?: boolean }, done: (...args: unknown[]) => void) => {
-      if (options.all) done(null, [address]); else done(null, address.address, address.family);
-    }) as RequestOptions["lookup"],
-  };
-  const request = (url.protocol === "https:" ? httpsRequest : httpRequest)(url, options, response => {
-    response.once("error", reject);
-    if (Number(response.headers["content-length"] ?? 0) > SOURCE_MAX_BYTES) { response.destroy(new Error("SOURCE_TOO_LARGE：来源响应超过读取上限")); return; }
-    const chunks: Buffer[] = []; let bytes = 0;
-    response.on("data", (chunk: Buffer) => {
-      bytes += chunk.length;
-      if (bytes > SOURCE_MAX_BYTES) { response.destroy(new Error("SOURCE_TOO_LARGE：来源响应超过读取上限")); return; }
-      chunks.push(Buffer.from(chunk));
+/** 低层传输供来源/图片共用；生产必须在逐跳公网校验后调用。 */
+export function createSourceTransport(maxBytes = SOURCE_MAX_BYTES, accept = "text/html,text/plain,application/json"): SourceTransport {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0 || maxBytes > PUBLIC_RESOURCE_MAX_BYTES) throw new Error("SOURCE_LIMIT_INVALID：来源读取上限非法");
+  return (url, address, signal) => new Promise((resolve, reject) => {
+    const options: RequestOptions = {
+      method: "GET", agent: false, signal, family: address.family,
+      headers: {
+        "user-agent": "WorkLoom-FactSource/1.0",
+        accept,
+        "accept-encoding": "identity",
+        // 部分官方只读 API 会拒绝空来源。固定为当前 URL 的同源根，不携带搜索页或其它站点信息。
+        referer: `${url.protocol}//${url.host}/`,
+      },
+      lookup: ((_hostname: string, options: { all?: boolean }, done: (...args: unknown[]) => void) => {
+        if (options.all) done(null, [address]); else done(null, address.address, address.family);
+      }) as RequestOptions["lookup"],
+    };
+    const request = (url.protocol === "https:" ? httpsRequest : httpRequest)(url, options, response => {
+      response.once("error", reject);
+      if (Number(response.headers["content-length"] ?? 0) > maxBytes) { response.destroy(new Error("SOURCE_TOO_LARGE：来源响应超过读取上限")); return; }
+      const chunks: Buffer[] = []; let bytes = 0;
+      response.on("data", (chunk: Buffer) => {
+        bytes += chunk.length;
+        if (bytes > maxBytes) { response.destroy(new Error("SOURCE_TOO_LARGE：来源响应超过读取上限")); return; }
+        chunks.push(Buffer.from(chunk));
+      });
+      response.once("aborted", () => reject(new Error("SOURCE_ABORTED：来源响应中途断开")));
+      response.once("end", () => resolve({ status: response.statusCode ?? 0, headers: response.headers, body: Buffer.concat(chunks) }));
     });
-    response.once("aborted", () => reject(new Error("SOURCE_ABORTED：来源响应中途断开")));
-    response.once("end", () => resolve({ status: response.statusCode ?? 0, headers: response.headers, body: Buffer.concat(chunks) }));
+    request.once("error", reject);
+    request.end();
   });
-  request.once("error", reject);
-  request.end();
-});
+}
+export const requestSource: SourceTransport = createSourceTransport();
 
 function decodeEntities(text: string): string {
   const named: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
@@ -132,6 +137,60 @@ async function abortable<T>(operation: Promise<T>, signal: AbortSignal): Promise
   });
 }
 
+async function checkedSourceResponse(current: URL, options: {
+  resolver: SourceResolver; transport: SourceTransport; signal: AbortSignal; maxBytes: number;
+}): Promise<SourceResponse> {
+  const { resolver, transport, signal, maxBytes } = options;
+  signal.throwIfAborted();
+  const hostname = current.hostname.replace(/^\[|\]$/g, "");
+  const addresses = isIP(hostname) ? [{ address: hostname, family: isIP(hostname) }] : await abortable(resolver(hostname), signal);
+  signal.throwIfAborted();
+  if (addresses.length === 0 || addresses.some(address => !publicSourceAddress(address.address))) throw new Error("SOURCE_URL_PRIVATE：来源解析到非公网地址");
+  const result = await abortable(transport(current, addresses[0]!, signal), signal);
+  if (result.body.length > maxBytes) throw new Error("SOURCE_TOO_LARGE：来源响应超过读取上限");
+  return result;
+}
+
+function decodedSourceBytes(result: SourceResponse, maxBytes: number): Buffer {
+  let decoded = result.body;
+  const encoding = result.headers["content-encoding"];
+  if (encoding && encoding !== "identity") {
+    const decode = encoding === "gzip" ? gunzipSync : encoding === "deflate" ? inflateSync : encoding === "br" ? brotliDecompressSync : null;
+    if (!decode) throw new Error("SOURCE_ENCODING_UNSUPPORTED：来源压缩格式不支持");
+    decoded = decode(decoded, { maxOutputLength: maxBytes });
+  }
+  if (!decoded.length || decoded.length > maxBytes) throw new Error("SOURCE_TOO_LARGE：来源字节为空或超过上限");
+  return decoded;
+}
+
+export interface PublicResourceOptions {
+  resolver?: SourceResolver; transport?: SourceTransport; timeoutMs?: number; maxBytes?: number;
+}
+
+/** 非文本公开资源使用与事实正文相同的逐跳DNS固定/超时/字节围栏，不执行页面脚本。 */
+export async function fetchPublicResource(rawUrl: string, options: PublicResourceOptions = {}): Promise<{
+  body: Buffer; requestedUrl: string; finalUrl: string; redirectChain: string[]; contentType: string;
+}> {
+  const maxBytes = options.maxBytes ?? SOURCE_MAX_BYTES;
+  if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0 || maxBytes > PUBLIC_RESOURCE_MAX_BYTES) throw new Error("SOURCE_LIMIT_INVALID：来源读取上限非法");
+  const signal = AbortSignal.timeout(options.timeoutMs ?? 15_000);
+  const resolver = options.resolver ?? (async hostname => lookup(hostname, { all: true, verbatim: true }));
+  const transport = options.transport ?? createSourceTransport(maxBytes, "image/*,application/octet-stream;q=0.9,*/*;q=0.1");
+  const requested = sourceUrl(rawUrl); let current = requested;
+  const chain: string[] = [];
+  for (let hop = 0; hop <= 4; hop++) {
+    const result = await checkedSourceResponse(current, { resolver, transport, signal, maxBytes });
+    if ([301, 302, 303, 307, 308].includes(result.status)) {
+      if (hop === 4 || !result.headers.location) throw new Error("SOURCE_REDIRECT_INVALID：来源重定向过多或缺目标");
+      chain.push(current.href); current = sourceUrl(new URL(result.headers.location, current).href); continue;
+    }
+    if (result.status !== 200) throw new Error(`SOURCE_HTTP_FAILED：来源HTTP ${result.status}`);
+    return { body: decodedSourceBytes(result, maxBytes), requestedUrl: requested.href, finalUrl: current.href,
+      redirectChain: chain, contentType: String(result.headers["content-type"] ?? "") };
+  }
+  throw new Error("SOURCE_REDIRECT_INVALID：来源重定向未完成");
+}
+
 export async function fetchMarketingSource(rawUrl: string, options: {
   resolver?: SourceResolver; transport?: SourceTransport; timeoutMs?: number;
 } = {}): Promise<{ snapshot: SourceSnapshot; rawBytes: Buffer }> {
@@ -141,13 +200,7 @@ export async function fetchMarketingSource(rawUrl: string, options: {
   const requested = sourceUrl(rawUrl); let current = requested;
   const chain: string[] = [];
   for (let hop = 0; hop <= 4; hop++) {
-    signal.throwIfAborted();
-    const hostname = current.hostname.replace(/^\[|\]$/g, "");
-    const addresses = isIP(hostname) ? [{ address: hostname, family: isIP(hostname) }] : await abortable(resolve(hostname), signal);
-    signal.throwIfAborted();
-    if (addresses.length === 0 || addresses.some(address => !publicSourceAddress(address.address))) throw new Error("SOURCE_URL_PRIVATE：来源解析到非公网地址");
-    const result = await abortable(transport(current, addresses[0]!, signal), signal);
-    if (result.body.length > SOURCE_MAX_BYTES) throw new Error("SOURCE_TOO_LARGE：来源响应超过读取上限");
+    const result = await checkedSourceResponse(current, { resolver: resolve, transport, signal, maxBytes: SOURCE_MAX_BYTES });
     if ([301, 302, 303, 307, 308].includes(result.status)) {
       if (hop === 4 || !result.headers.location) throw new Error("SOURCE_REDIRECT_INVALID：来源重定向过多或缺目标");
       chain.push(current.href); current = sourceUrl(new URL(result.headers.location, current).href); continue;
@@ -155,14 +208,7 @@ export async function fetchMarketingSource(rawUrl: string, options: {
     if (result.status !== 200) throw new Error(`SOURCE_HTTP_FAILED：来源HTTP ${result.status}`);
     const contentType = String(result.headers["content-type"] ?? "");
     if (!/^(text\/(?:html|plain)|application\/(?:json|xhtml\+xml))(?:;|$)/i.test(contentType)) throw new Error("SOURCE_TYPE_UNSUPPORTED：来源不是可读取的HTML、文本或JSON正文");
-    let decoded = result.body;
-    const encoding = result.headers["content-encoding"];
-    if (encoding && encoding !== "identity") {
-      const decode = encoding === "gzip" ? gunzipSync : encoding === "deflate" ? inflateSync : encoding === "br" ? brotliDecompressSync : null;
-      if (!decode) throw new Error("SOURCE_ENCODING_UNSUPPORTED：来源压缩格式不支持");
-      decoded = decode(decoded, { maxOutputLength: SOURCE_MAX_BYTES });
-    }
-    if (!decoded.length || decoded.length > SOURCE_MAX_BYTES) throw new Error("SOURCE_TOO_LARGE：来源字节为空或超过上限");
+    const decoded = decodedSourceBytes(result, SOURCE_MAX_BYTES);
     const charset = /charset\s*=\s*["']?([^;\s"']+)/i.exec(contentType)?.[1] ?? "utf-8";
     const raw = new TextDecoder(charset, { fatal: true }).decode(decoded);
     const metaTarget = /(?:html|xhtml)/i.test(contentType) ? metaRefreshTarget(raw) : null;

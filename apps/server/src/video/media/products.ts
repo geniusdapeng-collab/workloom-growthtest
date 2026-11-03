@@ -18,6 +18,7 @@ import { scopedQuery, type AppPool, type Scope } from "../gen/db.js";
 import { mediaRelPathFor, registerLocalAsset, registerStoredMedia, sha256File } from "./register-local.js";
 import { mediaRoot } from "../gen/ingest.js";
 import { assertInside, safeSegment } from "./paths.js";
+import { fetchPublicResource, type PublicResourceOptions } from "../marketing-source-fetcher.js";
 
 export type ProductProfileRow = {
   id: string;
@@ -165,14 +166,11 @@ export function summarizeDossier(dossier: DossierLike): Record<string, unknown> 
   };
 }
 
-/** 下载商品主图（有上限/超时；失败返回 null，不编造 hero） */
-async function fetchHeroImage(url: string, targetAbs: string, maxBytes = 15 * 1024 * 1024): Promise<boolean> {
-  if (!/^https?:\/\//i.test(url)) return false;
+/** 下载商品主图（逐跳公网校验、字节上限和超时；失败返回false） */
+export async function fetchDossierHeroImage(url: string, targetAbs: string, maxBytes = 15 * 1024 * 1024,
+  sourceOptions: Omit<PublicResourceOptions, "maxBytes"> = {}): Promise<boolean> {
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(20_000) });
-    if (!res.ok) return false;
-    const buf = Buffer.from(await res.arrayBuffer());
-    if (buf.byteLength === 0 || buf.byteLength > maxBytes) return false;
+    const { body: buf } = await fetchPublicResource(url, { ...sourceOptions, timeoutMs: sourceOptions.timeoutMs ?? 20_000, maxBytes });
     mkdirSync(dirname(targetAbs), { recursive: true });
     await writeFile(targetAbs, buf);   // 异步落盘：主图最大 15MB，不该阻塞事件循环
     return true;
@@ -276,7 +274,7 @@ export async function upsertProductProfileFromDossier(
         } else if (heroEntry.url && (input.fetchHero ?? true)) {
           const sha = createHash("sha256").update(heroEntry.url, "utf8").digest("hex");
           const tmp = join(mediaRoot(), "upload", scope.workspaceId, `.staging-${randomUUID()}`);
-          const ok = await fetchHeroImage(heroEntry.url, tmp, input.heroMaxBytes);
+          const ok = await fetchDossierHeroImage(heroEntry.url, tmp, input.heroMaxBytes);
           if (ok) {
             const bytes = statSync(tmp).size;
             const sha256 = await sha256File(tmp);
