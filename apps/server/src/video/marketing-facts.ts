@@ -104,6 +104,33 @@ export function stagePayloadShape(stage: IntelStage, raw: unknown): Record<strin
   catch (error) { throw new Error(`MARKETING_PAYLOAD_INVALID：${stage} ${error instanceof Error ? error.message : String(error)}`); }
 }
 
+/** URL可有多个真实抓取快照；归属由该主张的引证选择，不能用Map最后项替代。 */
+function sourceHasUrl(source: SourceSnapshot, value: unknown): boolean {
+  return typeof value === "string" && (source.requestedUrl === value || source.finalUrl === value);
+}
+
+/** 只有schema明确定义的来源字段参与归属；specs里名为url/source的商品事实不是元数据。 */
+function citationMatchesSource(payload: Record<string, unknown>, pointer: string, source: SourceSnapshot): boolean {
+  const parts = pointer.split("/").slice(1);
+  let parent: unknown = payload;
+  for (const part of parts.slice(0, -1)) {
+    if (!parent || typeof parent !== "object") return false;
+    parent = (parent as Record<string, unknown>)[part.replace(/~1/g, "/").replace(/~0/g, "~")];
+  }
+  if (!parent || typeof parent !== "object") return false;
+  const record = parent as Record<string, unknown>;
+  if (/^\/identity\/(?:prices|official_selling_points)\/\d+\//u.test(pointer)
+    || /^\/competitors\/\d+\/(?:selling_points|viral_patterns)\/\d+\//u.test(pointer)) return sourceHasUrl(source, record.source_url);
+  if (/^\/reviews\/\d+\//u.test(pointer)) return sourceHasUrl(source, record.url);
+  if (/^\/images\/\d+\/angle$/u.test(pointer)) {
+    // 同一终点URL可能对应两次不同快照。角度引文必须属于确实含这张图的那一次。
+    return sourceHasUrl(source, record.page_url) && typeof record.url === "string" && source.assetUrls.includes(record.url);
+  }
+  if (/^\/competitors\/\d+\/price_band$/u.test(pointer)) return sourceHasUrl(source, record.price_source_url);
+  if (/^\/competitors\/\d+\/visual_style$/u.test(pointer)) return sourceHasUrl(source, record.visual_source_url);
+  return true;
+}
+
 export function validateStageFacts(stage: IntelStage, raw: unknown, sources: SourceSnapshot[]): ValidatedStageFacts {
   const extraction = extractionSchema.parse(raw);
   const payload = stagePayloadShape(stage, extraction.payload);
@@ -111,17 +138,17 @@ export function validateStageFacts(stage: IntelStage, raw: unknown, sources: Sou
   if (sourceMap.size !== sources.length) throw new Error("MARKETING_SOURCE_INVALID：来源ID重复");
   if (stage === "A1") {
     const identity = payload.identity as { prices?: Array<Record<string, unknown>> };
-    const actualUrls = new Map(sources.flatMap(source => [[source.requestedUrl, source], [source.finalUrl, source]] as const));
     const citations = new Map(extraction.citations.map(citation => [citation.pointer, citation]));
     for (const [index, price] of (identity.prices ?? []).entries()) {
-      const source = typeof price.source_url === "string" ? actualUrls.get(price.source_url) : undefined;
-      if (source) price.observedAt = source.fetchedAt;
       const amountCitation = citations.get(`/identity/prices/${index}/amount`);
       const currencyCitation = citations.get(`/identity/prices/${index}/currency`);
       if (amountCitation && currencyCitation && amountCitation.sourceId !== currencyCitation.sourceId) {
         throw new Error("MARKETING_PRICE_SOURCE_MISMATCH：同一价格的金额与币种必须引用同一来源");
       }
+      const source = sourceMap.get(amountCitation?.sourceId ?? currencyCitation?.sourceId ?? "");
       if (source) {
+        if (!sourceHasUrl(source, price.source_url)) throw new Error("MARKETING_PRICE_SOURCE_MISMATCH：价格引证与source_url不是同一来源");
+        price.observedAt = source.fetchedAt;
         for (const field of ["amount", "currency", "note"]) {
           const citation = citations.get(`/identity/prices/${index}/${field}`);
           if (citation && citation.sourceId !== source.sourceId) {
@@ -136,6 +163,9 @@ export function validateStageFacts(stage: IntelStage, raw: unknown, sources: Sou
     if (!leaves.has(citation.pointer) || covered.has(citation.pointer)) throw new Error(`MARKETING_CITATION_INVALID：主张路径不存在或重复 ${citation.pointer}`);
     const source = sourceMap.get(citation.sourceId);
     if (!source) throw new Error("MARKETING_CITATION_INVALID：主张引用了未知来源");
+    if (!citationMatchesSource(payload, citation.pointer, source)) {
+      throw new Error(`MARKETING_CITATION_SOURCE_MISMATCH：${citation.pointer}引证与条目来源不是同一次抓取来源`);
+    }
     if (renderSha256(source.text) !== source.textSha256) throw new Error("MARKETING_FACTS_CHANGED：主张引用的正文摘要已变化");
     let quote = citation.quote;
     let quoteStart = source.text.indexOf(quote);
@@ -181,22 +211,24 @@ export function validateStageFacts(stage: IntelStage, raw: unknown, sources: Sou
   }
   const missing = [...leaves.keys()].filter(pointer => !covered.has(pointer));
   if (missing.length) throw new Error(`MARKETING_CLAIM_UNSOURCED：${stage} 缺少逐项原文引用 ${missing.join(",")}`);
-  const actualUrls = new Map(sources.flatMap(source => [[source.requestedUrl, source], [source.finalUrl, source]] as const));
-  const walk = (node: unknown): void => {
-    if (Array.isArray(node)) { node.forEach(walk); return; }
+  const walk = (node: unknown, pointer = ""): void => {
+    if (Array.isArray(node)) { node.forEach((entry, index) => walk(entry, `${pointer}/${index}`)); return; }
     if (!node || typeof node !== "object") return;
+    if (pointer === "/identity/specs") return; // 规格键由用户品类决定，不是来源字段。
     const object = node as Record<string, unknown>;
     for (const [key, value] of Object.entries(object)) {
       if ((key === "url" || key.endsWith("_url")) && typeof value === "string") {
         const image = key === "url" && typeof object.page_url === "string";
-        const source = image ? actualUrls.get(object.page_url as string) : actualUrls.get(value);
-        if (!source || image && !source.assetUrls.includes(value)) throw new Error(`MARKETING_URL_UNVERIFIED：${key} 不属于实际抓取正文或页面图片`);
+        const matches = sources.filter(source => sourceHasUrl(source, image ? object.page_url : value));
+        if (!matches.length || image && !matches.some(source => source.assetUrls.includes(value))) {
+          throw new Error(`MARKETING_URL_UNVERIFIED：${key} 不属于实际抓取正文或页面图片`);
+        }
       }
-      walk(value);
+      walk(value, `${pointer}/${escapePointer(key)}`);
     }
     // 渠道标签从实际URL产生，不能由模型自称“官方/用户授权”。
     const recordUrl = object.page_url ?? object.source_url ?? object.url;
-    if (typeof recordUrl === "string" && actualUrls.has(recordUrl)) {
+    if (typeof recordUrl === "string" && sources.some(source => sourceHasUrl(source, recordUrl))) {
       if ("source" in object) object.source = new URL(recordUrl).hostname;
       if ("channel" in object) object.channel = new URL(recordUrl).hostname;
     }

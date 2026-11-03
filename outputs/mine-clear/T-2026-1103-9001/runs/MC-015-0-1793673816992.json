@@ -1,0 +1,40 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-015-0-1793673816992",
+  "command": "RUN_DB_TESTS=1 node node_modules/vitest/vitest.mjs run apps/server/src/video/archive-resume-input.test.ts apps/server/src/video/studio-worker.test.ts apps/server/src/video/archive.pg.test.ts --maxWorkers=2",
+  "exec": {
+    "file": "node",
+    "args": [
+      "node_modules/vitest/vitest.mjs",
+      "run",
+      "apps/server/src/video/archive-resume-input.test.ts",
+      "apps/server/src/video/studio-worker.test.ts",
+      "apps/server/src/video/archive.pg.test.ts",
+      "--maxWorkers=2"
+    ]
+  },
+  "actor": "/root/marketing_audit",
+  "role": "acceptance",
+  "subject": {
+    "card_id": "MC-015",
+    "assertion_index": 0
+  },
+  "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-03T02:43:36.992Z",
+  "finished_at": "2026-11-03T02:43:38.552Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-015-0-1793673816992.txt",
+      "sha256": "1abcc5e5ebd1248144fe3288e54e907a33e02e4769ba06c3d8e31e8ce3e78af7",
+      "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+    }
+  ]
+}

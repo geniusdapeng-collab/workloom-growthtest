@@ -1,0 +1,39 @@
+{
+  "outcome": "passed",
+  "loopbackRequests": [
+    {
+      "endpoint": "alpha",
+      "prompts": [
+        "alpha-generate",
+        "alpha-raw"
+      ],
+      "traceIds": [
+        "alpha:alpha-generate",
+        "alpha:alpha-raw"
+      ]
+    },
+    {
+      "endpoint": "beta",
+      "prompts": [
+        "beta-chat",
+        "beta-structured"
+      ],
+      "traceIds": [
+        "beta:beta-chat",
+        "beta:beta-structured"
+      ]
+    },
+    {
+      "endpoint": "cli",
+      "prompts": [
+        "cli-reason"
+      ],
+      "traceIds": [
+        "cli:cli-reason"
+      ]
+    }
+  ],
+  "rejectedLateRequest": true,
+  "failedScopeClosed": true,
+  "cliFallbackOutsideScopes": true
+}

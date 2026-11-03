@@ -1,0 +1,5823 @@
+{
+  "scope": "上一轮交付清单仍在树中的路径、本轮从实际调用链展开的相关文件及所有源码改动的并集；排除工作流以外的仓库子产品、历史产物和完整传递依赖闭包。",
+  "baseline": "c028118de87f80b4ff0726c758b1ca0d964b9a63",
+  "source": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+  "total": 348,
+  "counts": {
+    "A": 178,
+    "B": 165,
+    "C": 5,
+    "D": 0
+  },
+  "absent_paths": [],
+  "files": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "level": "A",
+      "lines": 115,
+      "sha256": "8b98dd8c502dfa0a7bd2ecac7c5297bc9f2c9cee179f011c49b970957c5fe23c",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "notes": "本轮完整读或编写并审查最终差异。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": ".github/workflows/workloom-ui-contract.yml",
+      "level": "A",
+      "lines": 93,
+      "sha256": "70dc4ca3a3dcd1a0e4c6cbae030be1e33ed466be4306f9e5f094b9456fb3a153",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "notes": "本轮完整读或编写并审查最终差异。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "AGENTS.md",
+      "level": "A",
+      "lines": 136,
+      "sha256": "a35fa19fba96d1fdcbfbfa15f505215cc6ad77bbff18182562dff888938c1e15",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "a35fa19fba96d1fdcbfbfa15f505215cc6ad77bbff18182562dff888938c1e15",
+          "notes": "repo-instructions"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "a35fa19fba96d1fdcbfbfa15f505215cc6ad77bbff18182562dff888938c1e15",
+          "notes": "context"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "AGENTS.repo.md",
+      "level": "A",
+      "lines": 58,
+      "sha256": "753f2a318589a76a880b467ae80f28c2e41b4826805e8fe82076f7c0278b78a4",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "753f2a318589a76a880b467ae80f28c2e41b4826805e8fe82076f7c0278b78a4",
+          "notes": "repo-instructions"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "753f2a318589a76a880b467ae80f28c2e41b4826805e8fe82076f7c0278b78a4",
+          "notes": "context"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "WORKLOOM_PRODUCT_CONTEXT.md",
+      "level": "A",
+      "lines": 596,
+      "sha256": "59667533f52d296468d152eb7bc05908fef64decc8e6a5415b48938c79410e51",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "59667533f52d296468d152eb7bc05908fef64decc8e6a5415b48938c79410e51",
+          "notes": "repo-instructions"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "59667533f52d296468d152eb7bc05908fef64decc8e6a5415b48938c79410e51",
+          "notes": "context"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/package.json",
+      "level": "A",
+      "lines": 37,
+      "sha256": "e394b4853e18c6b52f3f54090d291b64bc4ea94067915aeab2ca65bcca51750b",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "e394b4853e18c6b52f3f54090d291b64bc4ea94067915aeab2ca65bcca51750b",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/service/access-authority.ts",
+      "level": "B",
+      "lines": 457,
+      "sha256": "e3b4d8b16e3c937fd7101386fb7498f73994cf21adb6bbb550d875e4d4c17148",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./active-bundle.js",
+        "@workloom/base/tenancy",
+        "@workloom/db",
+        "@workloom/shared",
+        "pg"
+      ]
+    },
+    {
+      "path": "apps/server/src/service/llm.ts",
+      "level": "B",
+      "lines": 125,
+      "sha256": "86e2ce3dc4c7923a45396f2c6039cbe4122d53ce367fd47cc96b9eb8e6eb567c",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "@workloom/base/bundles",
+        "@workloom/base/model-router",
+        "node:path",
+        "pg"
+      ]
+    },
+    {
+      "path": "apps/server/src/trpc/context.ts",
+      "level": "B",
+      "lines": 197,
+      "sha256": "60c5f70cae897c34c789a8c8aa0479552cc110b9ae04dff639f02c0d1e244c89",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "../service/access-authority.js",
+        "@trpc/server",
+        "@workloom/base/tenancy"
+      ]
+    },
+    {
+      "path": "apps/server/src/video/accounting.ts",
+      "level": "B",
+      "lines": 29,
+      "sha256": "b2c52a95d67c854adddf94007743ba2c09637429b7e87fb64d111f6894b61b39",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "../trpc/context.js",
+        "@workloom/base/social-listening",
+        "@workloom/db",
+        "zod"
+      ]
+    },
+    {
+      "path": "apps/server/src/video/archive-access.pg.test.ts",
+      "level": "A",
+      "lines": 60,
+      "sha256": "b6febddb753dade1ea86ed9a4a2b6f674fba8010783b7c116f4b685698dbaf35",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/archive-access.test.ts",
+      "level": "A",
+      "lines": 56,
+      "sha256": "0257162885fecee9dde9d758c869791e06103a154498746ec21002ad993d2715",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/archive-host.test.ts",
+      "level": "B",
+      "lines": 111,
+      "sha256": "7386003b7112f77d7ae562fe138ce76327080b538ef78cbf4018e37bab7a215c",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./archive-host.js",
+        "vitest"
+      ]
+    },
+    {
+      "path": "apps/server/src/video/archive-host.ts",
+      "level": "A",
+      "lines": 314,
+      "sha256": "6e13130845e2b3af66033e29a4155ba18ccd145c9ba99a005d753b0b69c56664",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/archive-resume-input.test.ts",
+      "level": "A",
+      "lines": 83,
+      "sha256": "2f4b3aff044dc315de186e56b3514190112e8935fca8c6554692adea20393e02",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/archive-resume.test.ts",
+      "level": "A",
+      "lines": 153,
+      "sha256": "b8fd05c91570c5ac3aaf7b60ba08f3110c7373cd85ac701b65ff8fae92702a48",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/archive-resume.ts",
+      "level": "A",
+      "lines": 465,
+      "sha256": "fcaaba4f09affad8b05d3bda4188281a16cc41a2a2a670bc5799fc4201a72cde",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        },
+        {
+          "role": "root",
+          "level": "A",
+          "notes": "本轮完整读或编写并审查最终差异。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/archive.pg.test.ts",
+      "level": "A",
+      "lines": 352,
+      "sha256": "fad60cd7d77779ff6323ed314a38cf04f520f6493f52c8c144a7edc3af30939a",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/auto-approval.ts",
+      "level": "B",
+      "lines": 141,
+      "sha256": "a6a673d783999603af4956811910eea2c343e70e0f885bfaf240bd60238192f1",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "@workloom/base/fence-engine",
+        "node:fs",
+        "node:path",
+        "node:url"
+      ]
+    },
+    {
+      "path": "apps/server/src/video/data-mining-executor.test.ts",
+      "level": "A",
+      "lines": 252,
+      "sha256": "59442bc3b9c0d7017e3c9e2ee13f9927cc13556e75f5d3bfa683afdb00487428",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "59442bc3b9c0d7017e3c9e2ee13f9927cc13556e75f5d3bfa683afdb00487428",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/data-mining-executor.ts",
+      "level": "A",
+      "lines": 879,
+      "sha256": "162a607ff4f677ccf0755f7a53956af9c5e074b51eba20d4569e3d5ba7562d3a",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "162a607ff4f677ccf0755f7a53956af9c5e074b51eba20d4569e3d5ba7562d3a",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/data-mining-pacing.test.ts",
+      "level": "A",
+      "lines": 78,
+      "sha256": "67f9267f616220e55f1cebb804f8ed9d631c9b17b6f6543d78b51a739dc6613d",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "67f9267f616220e55f1cebb804f8ed9d631c9b17b6f6543d78b51a739dc6613d",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/data-mining-search-recovery-independent.test.ts",
+      "level": "A",
+      "lines": 28,
+      "sha256": "4108d1dc85de80a86936bdb604c8c3729573a5e92170bd145081f2c3d2dc7863",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "4108d1dc85de80a86936bdb604c8c3729573a5e92170bd145081f2c3d2dc7863",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/data-mining-search-recovery.test.ts",
+      "level": "A",
+      "lines": 135,
+      "sha256": "1cabca1802e7a4b7d89ce50a4da3f83a2f531d7c0f62ccb00dd8a371351d3eca",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "1cabca1802e7a4b7d89ce50a4da3f83a2f531d7c0f62ccb00dd8a371351d3eca",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/deal.ts",
+      "level": "B",
+      "lines": 167,
+      "sha256": "b26b103cf41514a1081aa3d7720c33482cc1dd6052b853bb2b3e556cf0a376a1",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "../trpc/context.js",
+        "./router.js",
+        "@trpc/server",
+        "@workloom/base/deal-flow",
+        "@workloom/base/fence-engine",
+        "@workloom/db",
+        "@workloom/shared",
+        "zod"
+      ]
+    },
+    {
+      "path": "apps/server/src/video/delivery.ts",
+      "level": "B",
+      "lines": 1097,
+      "sha256": "8292a794388a011b91bcc57467ea98107b1135252ee6e2183aed54d74f85a399",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./delivery-trust.js",
+        "./pipeline-control-plane.js",
+        "@hyperreality/video-studio",
+        "node:child_process",
+        "node:fs",
+        "node:path",
+        "node:url"
+      ]
+    },
+    {
+      "path": "apps/server/src/video/director-jobs.ts",
+      "level": "A",
+      "lines": 128,
+      "sha256": "39c5b9fbc1ff3e6408fffea3d65ec69726780d59d2de2e0338868709cd273471",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "39c5b9fbc1ff3e6408fffea3d65ec69726780d59d2de2e0338868709cd273471",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/director-router.ts",
+      "level": "A",
+      "lines": 173,
+      "sha256": "2fcc0be29b39b2a6163ee40b4869b80ac418fe0d8c8a13180be854e9e250d2ef",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "2fcc0be29b39b2a6163ee40b4869b80ac418fe0d8c8a13180be854e9e250d2ef",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/director-sources.ts",
+      "level": "B",
+      "lines": 191,
+      "sha256": "4b9da53771439e2abeb2c36312f73457c618626c19b0d64dfca1f1ece0a3e701",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./director-jobs.js",
+        "./director-store.js",
+        "./gen/ingest.js",
+        "./media/paths.js",
+        "./media/register-local.js",
+        "@hyperreality/video-studio",
+        "@workloom/base/workdata",
+        "@workloom/db",
+        "@workloom/shared",
+        "node:fs/promises",
+        "node:path",
+        "node:url"
+      ]
+    },
+    {
+      "path": "apps/server/src/video/director-store.ts",
+      "level": "B",
+      "lines": 58,
+      "sha256": "438b28e9e4af00ba113a24390417da92e4ed27fb76e102e7d75fa126c7e452c3",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "@hyperreality/video-studio",
+        "@workloom/base/workdata",
+        "@workloom/db",
+        "@workloom/shared",
+        "pg"
+      ]
+    },
+    {
+      "path": "apps/server/src/video/director-worker.ts",
+      "level": "A",
+      "lines": 267,
+      "sha256": "76724e3337c0bd8e5950c9e3789f3d795c962bbbb2604b56ea0d4b43c7dbb6b8",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "76724e3337c0bd8e5950c9e3789f3d795c962bbbb2604b56ea0d4b43c7dbb6b8",
+          "notes": "core"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/explainer/db.ts",
+      "level": "B",
+      "lines": 260,
+      "sha256": "3e80d727e157a696b3938d2bd89249c7a370746c499d733be43edd8b7b668c5d",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./script.js",
+        "./types.js",
+        "@workloom/base/workdata",
+        "@workloom/db",
+        "@workloom/shared",
+        "node:crypto",
+        "pg"
+      ]
+    },
+    {
+      "path": "apps/server/src/video/explainer/remotion-provider.ts",
+      "level": "A",
+      "lines": 261,
+      "sha256": "faf1b61bbf9f478230e9d88f520be8dfdbb6d5280461f0782d5e4f1aa2e2da50",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "faf1b61bbf9f478230e9d88f520be8dfdbb6d5280461f0782d5e4f1aa2e2da50",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/explainer/router.ts",
+      "level": "B",
+      "lines": 727,
+      "sha256": "7d886ce3b7d39eff93aa140558833489c04bb5ac2fdc2239c754f94ba5b167f5",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "../../trpc/context.js",
+        "../auto-approval.js",
+        "../gen/submission-ledger.js",
+        "../gen/submit.js",
+        "../media/register-local.js",
+        "../pipeline-control-plane.js",
+        "../project-compute-budget.js",
+        "../router.js",
+        "./card-registry.js",
+        "./db.js",
+        "./deliver.js",
+        "./engine.js",
+        "./pipeline.js",
+        "./project-builder.js",
+        "./qa-gates.js",
+        "./semantics.js",
+        "./shotbook.js",
+        "./types.js",
+        "./voice-prep.js",
+        "@trpc/server",
+        "@workloom/base/asset-cms",
+        "@workloom/base/fence-engine",
+        "@workloom/base/model-router",
+        "@workloom/db",
+        "node:crypto",
+        "node:fs",
+        "node:path",
+        "zod"
+      ]
+    },
+    {
+      "path": "apps/server/src/video/explainer/runs.ts",
+      "level": "B",
+      "lines": 50,
+      "sha256": "be2f55e583098958f242e073ed89c4df23365e54e83422b945622eaf45c489ee",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./pipeline.js",
+        "@workloom/shared"
+      ]
+    },
+    {
+      "path": "apps/server/src/video/film-ledger.pg.test.ts",
+      "level": "A",
+      "lines": 138,
+      "sha256": "ddb3b57473b6779b4bad4ec81af73aad6db806fb790caf5dcbfb176955284d09",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "ddb3b57473b6779b4bad4ec81af73aad6db806fb790caf5dcbfb176955284d09",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/film-ledger.ts",
+      "level": "A",
+      "lines": 596,
+      "sha256": "a2a7cb3dec8b2614acc77c0b6da9c7c94975b4cfa5206c1714f47778102ae916",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "a2a7cb3dec8b2614acc77c0b6da9c7c94975b4cfa5206c1714f47778102ae916",
+          "notes": "independent-film-ledger"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "a2a7cb3dec8b2614acc77c0b6da9c7c94975b4cfa5206c1714f47778102ae916",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/film-provider-receipt.pg.test.ts",
+      "level": "A",
+      "lines": 185,
+      "sha256": "b8f740f6cf12b0043b1a90a8018892f161a897459880143c564eea08833fc80c",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "b8f740f6cf12b0043b1a90a8018892f161a897459880143c564eea08833fc80c",
+          "notes": "independent-film-ledger"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "b8f740f6cf12b0043b1a90a8018892f161a897459880143c564eea08833fc80c",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/film-router.ts",
+      "level": "B",
+      "lines": 87,
+      "sha256": "be176e9c058e987ae7285335362cc80ad80aec89c1d25c851476b23b94e8fb89",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "../trpc/context.js",
+        "./film-ledger.js",
+        "./film-worker.js",
+        "./gen/submission-ledger.js",
+        "@trpc/server",
+        "@workloom/db",
+        "zod"
+      ]
+    },
+    {
+      "path": "apps/server/src/video/film-worker-identity.test.ts",
+      "level": "A",
+      "lines": 604,
+      "sha256": "976eb43a2b58419c2434b91f8354bce6c6bc7ef8dadc8798f257b9d36358a2fa",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "976eb43a2b58419c2434b91f8354bce6c6bc7ef8dadc8798f257b9d36358a2fa",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/film-worker.test.ts",
+      "level": "A",
+      "lines": 221,
+      "sha256": "1680833e5435b932de3eabef32264e9f72bad42a88d63f9e20dc9e34d16647d2",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "1680833e5435b932de3eabef32264e9f72bad42a88d63f9e20dc9e34d16647d2",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/film-worker.ts",
+      "level": "A",
+      "lines": 1438,
+      "sha256": "2dc111c29796808f0b42bf1071130de8c79784193f706a4f180bc3db26e2beda",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "2dc111c29796808f0b42bf1071130de8c79784193f706a4f180bc3db26e2beda",
+          "notes": "independent-film-ledger"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "2dc111c29796808f0b42bf1071130de8c79784193f706a4f180bc3db26e2beda",
+          "notes": "core"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/gate-ledger-bridge.ts",
+      "level": "B",
+      "lines": 116,
+      "sha256": "87d7233a5e900149cb4aab3becd345ff98053a3bd27de3acdd0a4641457ecf17",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "@hyperreality/video-studio"
+      ]
+    },
+    {
+      "path": "apps/server/src/video/gate-policy.ts",
+      "level": "B",
+      "lines": 255,
+      "sha256": "636902008f2e10a2373c7c7ee9bb56cc2c663e4a49a10bf5683634be55175691",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./auto-approval.js",
+        "@hyperreality/video-studio",
+        "node:crypto",
+        "node:fs",
+        "node:path"
+      ]
+    },
+    {
+      "path": "apps/server/src/video/gen/catalog.ts",
+      "level": "A",
+      "lines": 193,
+      "sha256": "08cb1723c15d58eaad81bb594936f604c043a58dcbfc1a00ae9056eefa47368d",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "08cb1723c15d58eaad81bb594936f604c043a58dcbfc1a00ae9056eefa47368d",
+          "notes": "independent-implementation"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "08cb1723c15d58eaad81bb594936f604c043a58dcbfc1a00ae9056eefa47368d",
+          "notes": "core"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/gen/compiled-request.test.ts",
+      "level": "A",
+      "lines": 63,
+      "sha256": "1eaa4d456329f593bb9c95bdb475a33e67ea7c1910d6f94a7835d1e5ad1f4ca0",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "1eaa4d456329f593bb9c95bdb475a33e67ea7c1910d6f94a7835d1e5ad1f4ca0",
+          "notes": "core"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/gen/compiled-request.ts",
+      "level": "A",
+      "lines": 154,
+      "sha256": "8eef97897d6da113c56f2543098c0f27f0fbda171443869db29095ff965f181a",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "8eef97897d6da113c56f2543098c0f27f0fbda171443869db29095ff965f181a",
+          "notes": "independent-implementation"
+        },
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "8eef97897d6da113c56f2543098c0f27f0fbda171443869db29095ff965f181a",
+          "notes": "Full source read or authored and reviewed in this round"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "8eef97897d6da113c56f2543098c0f27f0fbda171443869db29095ff965f181a",
+          "notes": "core"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/gen/cost.ts",
+      "level": "A",
+      "lines": 149,
+      "sha256": "917f72908053925e579d939f34b51d693ab24d6c3280fe98083ef97846f5f930",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "917f72908053925e579d939f34b51d693ab24d6c3280fe98083ef97846f5f930",
+          "notes": "independent-implementation"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "917f72908053925e579d939f34b51d693ab24d6c3280fe98083ef97846f5f930",
+          "notes": "core"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/gen/db.ts",
+      "level": "A",
+      "lines": 33,
+      "sha256": "44ff4a9c803a4899e8f9239cc9ffc0c345e17811e91cbbe6a9ec1e61e7243e9c",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "44ff4a9c803a4899e8f9239cc9ffc0c345e17811e91cbbe6a9ec1e61e7243e9c",
+          "notes": "independent-implementation"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "44ff4a9c803a4899e8f9239cc9ffc0c345e17811e91cbbe6a9ec1e61e7243e9c",
+          "notes": "core"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/gen/domestic-provider-polling.test.ts",
+      "level": "A",
+      "lines": 89,
+      "sha256": "ccc081f88174574fc04f6bd8bdea56b7525efef3910c9ea2f125995bd1625a3c",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "ccc081f88174574fc04f6bd8bdea56b7525efef3910c9ea2f125995bd1625a3c",
+          "notes": "independent-implementation"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "ccc081f88174574fc04f6bd8bdea56b7525efef3910c9ea2f125995bd1625a3c",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/gen/gen.test.ts",
+      "level": "A",
+      "lines": 465,
+      "sha256": "93ee7b8d2d526fb75b5a69e4dbb54b5da396d9c018e7d7ba291bd605e54ac7bb",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "93ee7b8d2d526fb75b5a69e4dbb54b5da396d9c018e7d7ba291bd605e54ac7bb",
+          "notes": "independent-implementation"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "93ee7b8d2d526fb75b5a69e4dbb54b5da396d9c018e7d7ba291bd605e54ac7bb",
+          "notes": "core"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/gen/ingest.ts",
+      "level": "A",
+      "lines": 274,
+      "sha256": "1e6445bae0eee9bef061ba64007ef41ed60511c50bd09685ab226c70c7cadf91",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "1e6445bae0eee9bef061ba64007ef41ed60511c50bd09685ab226c70c7cadf91",
+          "notes": "independent-implementation"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "1e6445bae0eee9bef061ba64007ef41ed60511c50bd09685ab226c70c7cadf91",
+          "notes": "core"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/gen/params.ts",
+      "level": "A",
+      "lines": 27,
+      "sha256": "1750ff6c40d90a40e130dfd05109524259043044e5397312462366156915edbf",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "1750ff6c40d90a40e130dfd05109524259043044e5397312462366156915edbf",
+          "notes": "core"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/gen/provider-polling.test.ts",
+      "level": "A",
+      "lines": 92,
+      "sha256": "e84a6acb0988896ee98ecd1f0ceb8e4dcf316b00adcec6092e708dd5d2b57d04",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "e84a6acb0988896ee98ecd1f0ceb8e4dcf316b00adcec6092e708dd5d2b57d04",
+          "notes": "independent-implementation"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "e84a6acb0988896ee98ecd1f0ceb8e4dcf316b00adcec6092e708dd5d2b57d04",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/gen/providers.ts",
+      "level": "A",
+      "lines": 337,
+      "sha256": "1910893a24a52e9071c172225a602edad1106179160fdaee82dbdaa29b41e590",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "1910893a24a52e9071c172225a602edad1106179160fdaee82dbdaa29b41e590",
+          "notes": "independent-implementation"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "1910893a24a52e9071c172225a602edad1106179160fdaee82dbdaa29b41e590",
+          "notes": "core"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/gen/publish.ts",
+      "level": "A",
+      "lines": 210,
+      "sha256": "6099efd4a3024afba80c46ffef93bcc2585745a979522b050216608ad156c5ff",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "6099efd4a3024afba80c46ffef93bcc2585745a979522b050216608ad156c5ff",
+          "notes": "core"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/gen/submission-ledger.pg.test.ts",
+      "level": "A",
+      "lines": 214,
+      "sha256": "965fc9e996e9e96fa69931d0250920cafdb7669a83ad8cd2b8f663da9edb84a0",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "965fc9e996e9e96fa69931d0250920cafdb7669a83ad8cd2b8f663da9edb84a0",
+          "notes": "core"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/gen/submission-ledger.ts",
+      "level": "A",
+      "lines": 231,
+      "sha256": "c4ec9d7df53b103e3e1eb4d5684726fbd26db472e307ae844d908d96e7b14738",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "c4ec9d7df53b103e3e1eb4d5684726fbd26db472e307ae844d908d96e7b14738",
+          "notes": "core"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/gen/submit.test.ts",
+      "level": "A",
+      "lines": 261,
+      "sha256": "fcc8eab976c86c8cb0e53be2bdb0cb36096ece9dcac342b994fe75aba10badea",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "fcc8eab976c86c8cb0e53be2bdb0cb36096ece9dcac342b994fe75aba10badea",
+          "notes": "core"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/gen/submit.ts",
+      "level": "A",
+      "lines": 295,
+      "sha256": "389778d71d66154b026faa5a5bd516c9c6130103029eb4881351f8313fb15b3a",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "389778d71d66154b026faa5a5bd516c9c6130103029eb4881351f8313fb15b3a",
+          "notes": "core"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/gen/types.ts",
+      "level": "A",
+      "lines": 158,
+      "sha256": "f4fa56ca52b82217698ee3cf05facb0b693144a6b59ae4ab081c06d6d0520b95",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "f4fa56ca52b82217698ee3cf05facb0b693144a6b59ae4ab081c06d6d0520b95",
+          "notes": "independent-implementation"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "f4fa56ca52b82217698ee3cf05facb0b693144a6b59ae4ab081c06d6d0520b95",
+          "notes": "core"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/marketing-authority.test.ts",
+      "level": "A",
+      "lines": 231,
+      "sha256": "66e1574d02d90ab490407ab94eecac9b0bf4b5c86f1e77cb53d468ffabdc3df8",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "66e1574d02d90ab490407ab94eecac9b0bf4b5c86f1e77cb53d468ffabdc3df8",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/marketing-authority.ts",
+      "level": "A",
+      "lines": 306,
+      "sha256": "60313d303539a4f11307d34266bbe3edc07ae69ce920ae2110a76f5b44e34868",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "60313d303539a4f11307d34266bbe3edc07ae69ce920ae2110a76f5b44e34868",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/marketing-dossier-consumption.test.ts",
+      "level": "A",
+      "lines": 70,
+      "sha256": "db84e40350e4bb267552d9728cdaa5d648ad5507d91a34b1dfad621744174f29",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "db84e40350e4bb267552d9728cdaa5d648ad5507d91a34b1dfad621744174f29",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/marketing-facts.test.ts",
+      "level": "A",
+      "lines": 157,
+      "sha256": "abe2c155a2be36bdb31898e5b4a8100821591d7ee9e1c66cdba769fb78131005",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "abe2c155a2be36bdb31898e5b4a8100821591d7ee9e1c66cdba769fb78131005",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/marketing-facts.ts",
+      "level": "A",
+      "lines": 252,
+      "sha256": "682d50ef9fc1ff7c6a5e092dffa05877067977d2355fa9d1962eecc152020fe8",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "682d50ef9fc1ff7c6a5e092dffa05877067977d2355fa9d1962eecc152020fe8",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/marketing-source-attribution-independent.test.ts",
+      "level": "A",
+      "lines": 27,
+      "sha256": "2b1d432e7b00f8fd107f6e5bde1d791cfa1ca4b7cb9c3aad6c0cebd28c555854",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "2b1d432e7b00f8fd107f6e5bde1d791cfa1ca4b7cb9c3aad6c0cebd28c555854",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/marketing-source-attribution.test.ts",
+      "level": "A",
+      "lines": 108,
+      "sha256": "1c2ff74505831dd4dc97c51bd17fa5763479d3152a13142c5616a5c0dd42e06b",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "1c2ff74505831dd4dc97c51bd17fa5763479d3152a13142c5616a5c0dd42e06b",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/marketing-source-fetcher.test.ts",
+      "level": "A",
+      "lines": 85,
+      "sha256": "cd6023fef9af24c5d0688a285d865b09af26508b47517c5917b8fab03db913fd",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "cd6023fef9af24c5d0688a285d865b09af26508b47517c5917b8fab03db913fd",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/marketing-source-fetcher.ts",
+      "level": "A",
+      "lines": 231,
+      "sha256": "9ecd1578afaa7d7b372ac9b0f02a8fba4a19d185a369b6adcf092860baee9a1f",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "9ecd1578afaa7d7b372ac9b0f02a8fba4a19d185a369b6adcf092860baee9a1f",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/media/columns.ts",
+      "level": "A",
+      "lines": 99,
+      "sha256": "4b9286fbc1d862224fe56d039c673064cd120d9811ea8c25afff6fbe787427f3",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "4b9286fbc1d862224fe56d039c673064cd120d9811ea8c25afff6fbe787427f3",
+          "notes": "independent-implementation"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "4b9286fbc1d862224fe56d039c673064cd120d9811ea8c25afff6fbe787427f3",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/media/ffmpeg.ts",
+      "level": "A",
+      "lines": 176,
+      "sha256": "88b30a14b5ee7208299f6f4c01cc5669352b3a68a523a60afd3022fd9bd4c191",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "88b30a14b5ee7208299f6f4c01cc5669352b3a68a523a60afd3022fd9bd4c191",
+          "notes": "independent-implementation"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "88b30a14b5ee7208299f6f4c01cc5669352b3a68a523a60afd3022fd9bd4c191",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/media/index.ts",
+      "level": "B",
+      "lines": 480,
+      "sha256": "0cf9701900cc9c45d6dcbbc62df3935bd7e154abd309f14459d4a4f68b74da2c",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "../../trpc/context.js",
+        "../archive-host.js",
+        "../delivery-trust.js",
+        "../gen/db.js",
+        "./collections.js",
+        "./ingest-delivery.js",
+        "./library.js",
+        "./products.js",
+        "./recut.js",
+        "./reuse.js",
+        "./sync.js",
+        "./upload.js",
+        "@trpc/server",
+        "@workloom/base/tenancy",
+        "@workloom/db",
+        "node:path",
+        "zod"
+      ]
+    },
+    {
+      "path": "apps/server/src/video/media/library.ts",
+      "level": "B",
+      "lines": 718,
+      "sha256": "e8d91dde909d94b6b8ecb20e62c96492ff7a2a504e101ac2937651c26e92a1c8",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "../archive-host.js",
+        "../gen/db.js",
+        "../gen/ingest.js",
+        "./embed.js",
+        "./paths.js",
+        "./register-local.js",
+        "@workloom/base/workdata",
+        "@workloom/shared",
+        "node:fs",
+        "node:path",
+        "pg"
+      ]
+    },
+    {
+      "path": "apps/server/src/video/media/media.pg.test.ts",
+      "level": "C",
+      "lines": 816,
+      "sha256": "862d597104767e22ec7a4a9c70aaa27e5c57307503730c04769e30c1f2497819",
+      "changed": false,
+      "reason": "仅所列边界或相关区段；其余代码未作逐行审计。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "C",
+          "reviewed_sha256": "862d597104767e22ec7a4a9c70aaa27e5c57307503730c04769e30c1f2497819",
+          "notes": "Product projection setup and source/rename regression sections read; complete suite executed as B evidence"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/media/paths.ts",
+      "level": "A",
+      "lines": 45,
+      "sha256": "492dd3777fc3a27b4f377c9755c5820bddd2cdd10b599435ad19ae499dc196e1",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "492dd3777fc3a27b4f377c9755c5820bddd2cdd10b599435ad19ae499dc196e1",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/media/products-source-safety.test.ts",
+      "level": "A",
+      "lines": 153,
+      "sha256": "ddb62aebcf08123d15a5b7adb6b4173740958fb4e0536083158870b725726a92",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "ddb62aebcf08123d15a5b7adb6b4173740958fb4e0536083158870b725726a92",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/media/products.ts",
+      "level": "A",
+      "lines": 345,
+      "sha256": "fccc9f7aa84acc5225c3f48e89cc0d77ae23c5a2115bff5026415345f8513509",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "fccc9f7aa84acc5225c3f48e89cc0d77ae23c5a2115bff5026415345f8513509",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/media/register-local.ts",
+      "level": "A",
+      "lines": 264,
+      "sha256": "7aa54392058e9b7756fc755ebffdd38871bd2e78c9ad79edfbb431fd8001d10f",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "7aa54392058e9b7756fc755ebffdd38871bd2e78c9ad79edfbb431fd8001d10f",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/pipeline-control-concurrency.pg.test.ts",
+      "level": "A",
+      "lines": 79,
+      "sha256": "d2d7ffc2064aebee69acb1d6efc86a392dd63b418cf1ff4a1ae17fbd61190ec2",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/pipeline-control-plane.pg.test.ts",
+      "level": "B",
+      "lines": 334,
+      "sha256": "aa942f58a623c43551e1874ba00d71cff2771a61070d18fd78b66ded192b555e",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "B",
+          "reviewed_sha256": null,
+          "notes": "全套回归实际运行，未逐行语义阅读全文件。"
+        }
+      ],
+      "import_reference_scan": [
+        "./archive-host.js",
+        "./director-jobs.js",
+        "./pipeline-control-plane.js",
+        "@hyperreality/video-studio",
+        "node:crypto",
+        "pg",
+        "vitest"
+      ]
+    },
+    {
+      "path": "apps/server/src/video/pipeline-control-plane.ts",
+      "level": "A",
+      "lines": 832,
+      "sha256": "21052ce554cdd3bdd0adef6b40b672ab5a93426017bf8511f18bc5b68ca6d124",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/platform-routing.ts",
+      "level": "A",
+      "lines": 62,
+      "sha256": "9f727f8bf94d102a80f25166200313ecc5c766062a7ccea351fc2a5394defc80",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/production-authority.pg.test.ts",
+      "level": "B",
+      "lines": 393,
+      "sha256": "b5296858ec59e064d7ad100649532715d23802cde7834d08173aefea2104d13d",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./archive-host.js",
+        "./gen/compiled-request.js",
+        "./gen/submit.js",
+        "./marketing-authority.js",
+        "./production-authority.js",
+        "./project-compute-budget.js",
+        "@workloom/base/workdata",
+        "node:crypto",
+        "node:fs/promises",
+        "node:os",
+        "node:path",
+        "pg",
+        "vitest"
+      ]
+    },
+    {
+      "path": "apps/server/src/video/production-authority.test.ts",
+      "level": "B",
+      "lines": 364,
+      "sha256": "df5d51dd7262c707a572efd9547eeaa8a16b8418e2415d77d4e45ff91e012a16",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./gen/compiled-request.js",
+        "./gen/submit.js",
+        "./production-authority.js",
+        "@hyperreality/video-studio",
+        "node:fs/promises",
+        "node:os",
+        "node:path",
+        "pg",
+        "vitest"
+      ]
+    },
+    {
+      "path": "apps/server/src/video/production-authority.ts",
+      "level": "B",
+      "lines": 469,
+      "sha256": "d2a7680fe2c7b20f67a599ebbfe50eb66377edd59d4d2db2f417380c26940dce",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./archive-host.js",
+        "./director-store.js",
+        "./gen/catalog.js",
+        "./gen/compiled-request.js",
+        "./gen/db.js",
+        "./gen/submission-ledger.js",
+        "./gen/submit.js",
+        "./gen/types.js",
+        "./marketing-authority.js",
+        "./scene-policy-render-gate.js",
+        "@hyperreality/video-studio",
+        "@workloom/base/workdata",
+        "@workloom/shared",
+        "node:crypto",
+        "node:fs",
+        "node:fs/promises",
+        "node:path",
+        "node:url",
+        "pg"
+      ]
+    },
+    {
+      "path": "apps/server/src/video/production-router.test.ts",
+      "level": "B",
+      "lines": 152,
+      "sha256": "c14227916ce2a6d1f4502fae0cb1cac4ff1807c3c9baf88d9770c31a2a9659c1",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "../trpc/context.js",
+        "./gen/submission-ledger.js",
+        "./router.js",
+        "vitest"
+      ]
+    },
+    {
+      "path": "apps/server/src/video/production-router.ts",
+      "level": "B",
+      "lines": 42,
+      "sha256": "4c6dd2ee654dc8e629efaf6bc23d3734927a6a1f6d56ab94a52a7167395b58cf",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "../trpc/context.js",
+        "./gen/submission-ledger.js",
+        "./production-authority.js",
+        "@trpc/server",
+        "@workloom/db",
+        "zod"
+      ]
+    },
+    {
+      "path": "apps/server/src/video/project-compute-budget.ts",
+      "level": "B",
+      "lines": 100,
+      "sha256": "569baf94b4f3f05a3097a6ab4229b677403cb739c9b98ab3f0ee41c46f7fc932",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./gen/db.js",
+        "./gen/submission-ledger.js",
+        "@workloom/db"
+      ]
+    },
+    {
+      "path": "apps/server/src/video/render-poller.pg.test.ts",
+      "level": "A",
+      "lines": 232,
+      "sha256": "c806619e89dfa17859563dfd8cd2e849e2a6ae7e72e558f462cf94cc7facd060",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "c806619e89dfa17859563dfd8cd2e849e2a6ae7e72e558f462cf94cc7facd060",
+          "notes": "independent-implementation"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "c806619e89dfa17859563dfd8cd2e849e2a6ae7e72e558f462cf94cc7facd060",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/render-poller.ts",
+      "level": "A",
+      "lines": 489,
+      "sha256": "09495ef3535113f270c592bd3c1e25afad2908e80077f5198d5ca16a3a0e6bce",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "09495ef3535113f270c592bd3c1e25afad2908e80077f5198d5ca16a3a0e6bce",
+          "notes": "independent-implementation"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "09495ef3535113f270c592bd3c1e25afad2908e80077f5198d5ca16a3a0e6bce",
+          "notes": "core"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/router.ts",
+      "level": "B",
+      "lines": 1583,
+      "sha256": "0c15336d7cf8dc9793f08c4e54b8650f79097441d1ea83c04320cf991ffa1e93",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "../service/llm.js",
+        "../trpc/context.js",
+        "./accounting.js",
+        "./archive-host.js",
+        "./archive-resume.js",
+        "./auto-approval.js",
+        "./deal.js",
+        "./delivery.js",
+        "./director-router.js",
+        "./explainer/db.js",
+        "./explainer/router.js",
+        "./explainer/runs.js",
+        "./film-router.js",
+        "./gate-policy.js",
+        "./gen/catalog.js",
+        "./gen/compiled-request.js",
+        "./gen/cost.js",
+        "./gen/ingest.js",
+        "./gen/params.js",
+        "./gen/publish.js",
+        "./gen/submission-ledger.js",
+        "./gen/submit.js",
+        "./media/index.js",
+        "./pipeline-control-plane.js",
+        "./platform-routing.js",
+        "./production-authority.js",
+        "./production-router.js",
+        "./project-compute-budget.js",
+        "./render-poller.js",
+        "./scene-policy-routing.js",
+        "./studio-worker.js",
+        "./whiteboard/router.js",
+        "@hyperreality/video-studio",
+        "@trpc/server",
+        "@workloom/base/asset-cms",
+        "@workloom/base/fence-engine",
+        "@workloom/base/model-router",
+        "@workloom/base/publish-rpa",
+        "@workloom/base/social-listening",
+        "@workloom/base/workdata",
+        "@workloom/db",
+        "zod"
+      ]
+    },
+    {
+      "path": "apps/server/src/video/scene-policy-render-gate.ts",
+      "level": "B",
+      "lines": 179,
+      "sha256": "864ffaa4726e667b2f93d2bc1271e2ed8c48ff72d005ff437bf096749021068c",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "@hyperreality/video-studio"
+      ]
+    },
+    {
+      "path": "apps/server/src/video/scene-policy-routing.ts",
+      "level": "A",
+      "lines": 105,
+      "sha256": "7c32ee723debaadd912f1ebda3046b3664120431ea17a366bc1c8869c612a9ae",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/studio-resume-input.ts",
+      "level": "A",
+      "lines": 98,
+      "sha256": "3251cda8ae28260796133bfed38f8b5927bad476907a04b9e67ed55c9143c9aa",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/studio-worker.test.ts",
+      "level": "A",
+      "lines": 842,
+      "sha256": "075a63665c55192232b89703ce4fedbcb01602288e8ef0b486a7004902b31cc3",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        },
+        {
+          "role": "root",
+          "level": "A",
+          "notes": "本轮完整读或编写并审查最终差异。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/studio-worker.ts",
+      "level": "A",
+      "lines": 1780,
+      "sha256": "4a321bccdca32f10430d577a6e7b3da26093a9757529cacb6f09cc889e524ecb",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        },
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "4a321bccdca32f10430d577a6e7b3da26093a9757529cacb6f09cc889e524ecb",
+          "notes": "全文精读并复读冻结源码前的所有后续差异"
+        },
+        {
+          "role": "root",
+          "level": "A",
+          "notes": "本轮完整读或编写并审查最终差异。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/whiteboard/engine.ts",
+      "level": "A",
+      "lines": 407,
+      "sha256": "a5bd9f0c6e74fb94f970c14d6b27fe60f78ca53dd268bd9fbfa5f00763db87e6",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "a5bd9f0c6e74fb94f970c14d6b27fe60f78ca53dd268bd9fbfa5f00763db87e6",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/whiteboard/provider.ts",
+      "level": "A",
+      "lines": 279,
+      "sha256": "70bfa536c0b30ec0a90ce8ee81b61e604b32b16272b4f78e51b2f638c6acb192",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "70bfa536c0b30ec0a90ce8ee81b61e604b32b16272b4f78e51b2f638c6acb192",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/whiteboard/router.ts",
+      "level": "B",
+      "lines": 1095,
+      "sha256": "81563c2e8809c729647e3f37bbf1c8bea926ee1d9203ba8e5b0fe5941453658f",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "../../trpc/context.js",
+        "../auto-approval.js",
+        "../gate-policy.js",
+        "../gen/db.js",
+        "../gen/ingest.js",
+        "../gen/submit.js",
+        "../project-compute-budget.js",
+        "../render-poller.js",
+        "./annotate.js",
+        "./engine.js",
+        "./lineart.js",
+        "./mux.js",
+        "./narration.js",
+        "./srt.js",
+        "./store.js",
+        "@trpc/server",
+        "@workloom/base/asset-cms",
+        "@workloom/base/fence-engine",
+        "@workloom/base/workdata",
+        "@workloom/db",
+        "@workloom/shared",
+        "node:crypto",
+        "node:fs",
+        "zod"
+      ]
+    },
+    {
+      "path": "apps/server/tsconfig.json",
+      "level": "A",
+      "lines": 8,
+      "sha256": "9222ec437c1c4b8378784ebceca444214102b64598ff2d611cb4f362d576990d",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "9222ec437c1c4b8378784ebceca444214102b64598ff2d611cb4f362d576990d",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/web/src/extensions/ai-video/pages/Assets.tsx",
+      "level": "B",
+      "lines": 356,
+      "sha256": "f9bbfeb5a7c4599e2cefe1b46f902fad7a9d3cd800ac2199bfc3c0cc44bec967",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "../../../components/hud",
+        "../../../lib/trpc",
+        "../../../shell/Bridge",
+        "react",
+        "react-router"
+      ]
+    },
+    {
+      "path": "apps/web/src/extensions/ai-video/pages/Studio.tsx",
+      "level": "B",
+      "lines": 533,
+      "sha256": "2f959322c9f4cd003f8e02b09a97aa88e81188f611fe12a4bac1ec28f6b93176",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "../../../components/hud",
+        "../../../lib/trpc",
+        "../../../shell/Bridge",
+        "react",
+        "react-router"
+      ]
+    },
+    {
+      "path": "bundles/ai-video/library/director-system/core.mjs",
+      "level": "B",
+      "lines": 425,
+      "sha256": "d104b2ce6ca68907c502279abaa4ab19ef87bc10fc850d84fb44522d838fd3a7",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "node:crypto",
+        "node:fs"
+      ]
+    },
+    {
+      "path": "bundles/ai-video/library/media-catalog/media-catalog.json",
+      "level": "B",
+      "lines": 738,
+      "sha256": "569f9a0f05a8bb66eb48d67b742bd53a3bd64ea213a79cb0f4925c7ecf627d27",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "B",
+          "reviewed_sha256": "569f9a0f05a8bb66eb48d67b742bd53a3bd64ea213a79cb0f4925c7ecf627d27",
+          "notes": "Parsed the complete JSON metadata and provider/pricing records; did not prose-read every catalog entry."
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "bundles/ai-video/pipelines/marketing-film.yml",
+      "level": "B",
+      "lines": 90,
+      "sha256": "4ba95c0e83538de605126072ce26a462211e4cea3a82c5fcaee8227a71b485b1",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "bundles/ai-video/skills/marketing-brief-parser/SKILL.md",
+      "level": "B",
+      "lines": 66,
+      "sha256": "dc302932fb2a3133eca12ac375443f27e6f14e8d019aa9600f0767844fad5dac",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "bundles/ai-video/skills/render-ops/SKILL.md",
+      "level": "B",
+      "lines": 45,
+      "sha256": "b34a8a089bcddec4176237bfbd105acc04279f140a39a82556ff5c958a0a0be1",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "bundles/geo-growth/capabilities/video.mjs",
+      "level": "B",
+      "lines": 539,
+      "sha256": "edaedf217d771c86290aceb1c50d36b53cabcc4d869af9ef2805aba80ff8b8e7",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "../../../packages/video-studio/src/film-completion.mjs",
+        "../../../scripts/tools/film-audio-policy.mjs",
+        "../../../scripts/tools/film-render-ledger.mjs",
+        "./post-quality.mjs",
+        "./workbench-guide.mjs",
+        "node:crypto",
+        "node:fs",
+        "node:path"
+      ]
+    },
+    {
+      "path": "docs/AUTOMATIC-RD-DELIVERY.md",
+      "level": "A",
+      "lines": 19,
+      "sha256": "4ea3988f8320e1acf401bd7f005326416600fcc5fcbe2f04055b100902db566a",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "4ea3988f8320e1acf401bd7f005326416600fcc5fcbe2f04055b100902db566a",
+          "notes": "context"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "docs/DEVELOPMENT-PROTOCOL.md",
+      "level": "A",
+      "lines": 307,
+      "sha256": "9864be671721bd8531146f311709a978c88805e309b8755e41a5da6ba6fca39b",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "9864be671721bd8531146f311709a978c88805e309b8755e41a5da6ba6fca39b",
+          "notes": "context"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "docs/MINE-CLEAR-DELIVERY-SPEC.md",
+      "level": "B",
+      "lines": 327,
+      "sha256": "3059504359d336b0e48075265d95ef906262e9daf2a2a7904c1125886632b912",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "docs/PIPELINE-CONTROL-PLANE.md",
+      "level": "B",
+      "lines": 131,
+      "sha256": "8f95a17ea612a0bc1603c2c929ded759d9df378bafd38f5cea5490d45411c620",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "docs/ai-video-workbench-guide.md",
+      "level": "A",
+      "lines": 267,
+      "sha256": "5ef5424a538adbe39ddbb90afac900d9b3995a8e0dd4b2493686b495659cbcd3",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "5ef5424a538adbe39ddbb90afac900d9b3995a8e0dd4b2493686b495659cbcd3",
+          "notes": "repo-instructions"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "5ef5424a538adbe39ddbb90afac900d9b3995a8e0dd4b2493686b495659cbcd3",
+          "notes": "context"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "docs/character-archive-design.md",
+      "level": "B",
+      "lines": 293,
+      "sha256": "b515be5ee30605a58a8fd27f34225a83788f9437b9d70c8aa1682995a32e8535",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "docs/character-registry.md",
+      "level": "B",
+      "lines": 106,
+      "sha256": "8e78c682a2a710dbf2366724a28e12df01fda272f152d3a4e76c5355a3bbc003",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "docs/desktop-product-rendering-contract.md",
+      "level": "B",
+      "lines": 64,
+      "sha256": "f27a6038764668239cd63e2b62489431d2e0612595564d3791ec74cc1094e4d5",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "docs/director-studio-v2.md",
+      "level": "B",
+      "lines": 195,
+      "sha256": "af8e0cebbcd0420d13c68969b103eff8ac150dba2dccbb19c77adf079594ae8e",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "docs/native-render-verification.md",
+      "level": "B",
+      "lines": 44,
+      "sha256": "546dd196f0e2b5c6887562f6f10cdab77f707203f7cd4edb1ebabb67ccd09a83",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "docs/repairs/T-2026-0927-0029.md",
+      "level": "B",
+      "lines": 113,
+      "sha256": "d07052fcc8ca01640ce3669b8bf4d97c13810dcc86179cd211d11f06c5883cad",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "docs/repairs/T-2026-0927-0032.md",
+      "level": "B",
+      "lines": 81,
+      "sha256": "583ab649b75fa3a00adbb30db3be87565b32912f9e8f477a2bac4ee0ed769596",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "docs/repairs/T-2026-0927-0034.md",
+      "level": "B",
+      "lines": 51,
+      "sha256": "72902c4c06abe45213ac847e95f3c09e903f8e02a1b87d446683e8d12428d5a8",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "package.json",
+      "level": "A",
+      "lines": 119,
+      "sha256": "4a66bbd746410b86c8c398f6e01779a755ff2090ca3acbb49152fdd36c537773",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "4a66bbd746410b86c8c398f6e01779a755ff2090ca3acbb49152fdd36c537773",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/base/asset-cms/assets.ts",
+      "level": "A",
+      "lines": 297,
+      "sha256": "57b1d4cfe71a1237a7b65f91dc9a7554665421376256047a47d4b787efe2f18f",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "57b1d4cfe71a1237a7b65f91dc9a7554665421376256047a47d4b787efe2f18f",
+          "notes": "independent-implementation"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "57b1d4cfe71a1237a7b65f91dc9a7554665421376256047a47d4b787efe2f18f",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/base/asset-cms/index.ts",
+      "level": "A",
+      "lines": 9,
+      "sha256": "8ba0819eec40e8eba6d5e5e043f6bacf3458ae2d7e82b644f17ca7fdfad5bd3a",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "8ba0819eec40e8eba6d5e5e043f6bacf3458ae2d7e82b644f17ca7fdfad5bd3a",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/base/cost-ledger/index.ts",
+      "level": "A",
+      "lines": 307,
+      "sha256": "a701fba68ec8e25e6f43c095cd4424d9c6f476555fefab7d3e5b58a5922aee5c",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "a701fba68ec8e25e6f43c095cd4424d9c6f476555fefab7d3e5b58a5922aee5c",
+          "notes": "independent-implementation"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "a701fba68ec8e25e6f43c095cd4424d9c6f476555fefab7d3e5b58a5922aee5c",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/base/model-router/gen-pool.test.ts",
+      "level": "A",
+      "lines": 201,
+      "sha256": "0c565a6558f49b5fe1627b35387c090db0a03d0070c7bddcf5a71fc50a9a16e9",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "0c565a6558f49b5fe1627b35387c090db0a03d0070c7bddcf5a71fc50a9a16e9",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/base/model-router/gen-pool.ts",
+      "level": "A",
+      "lines": 438,
+      "sha256": "e5c3979f9ad9d27a9741ee16a3e9e042f256f6f1ff43b3d7e0d8b2cc40465ce5",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "e5c3979f9ad9d27a9741ee16a3e9e042f256f6f1ff43b3d7e0d8b2cc40465ce5",
+          "notes": "independent-implementation"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "e5c3979f9ad9d27a9741ee16a3e9e042f256f6f1ff43b3d7e0d8b2cc40465ce5",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/base/model-router/providers.ts",
+      "level": "B",
+      "lines": 547,
+      "sha256": "e576c3355d9615194812e0ccd041e938bdcf8df733d7b79e735bb84dd6819e73",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "../workdata/pii.js",
+        "./deepseek-policy.js",
+        "./token-budget.js",
+        "node:crypto"
+      ]
+    },
+    {
+      "path": "packages/base/model-router/router.ts",
+      "level": "A",
+      "lines": 630,
+      "sha256": "7611f442fa6e78e61692d91e442cad18f7a3dfeebe3a91d6c1142edc6917adac",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "7611f442fa6e78e61692d91e442cad18f7a3dfeebe3a91d6c1142edc6917adac",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/base/workdata/events.ts",
+      "level": "A",
+      "lines": 262,
+      "sha256": "c2cea423e934037fa4e2802a83ebe69daca1facb1e6876434783d2b13a530ed5",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "c2cea423e934037fa4e2802a83ebe69daca1facb1e6876434783d2b13a530ed5",
+          "notes": "independent-implementation"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/base/workdata/gateway.ts",
+      "level": "A",
+      "lines": 456,
+      "sha256": "ec58a342eaade4fdc42a5a60ee53f9cc7481c433d26df5cf2e576b1e1822530a",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "ec58a342eaade4fdc42a5a60ee53f9cc7481c433d26df5cf2e576b1e1822530a",
+          "notes": "independent-implementation"
+        },
+        {
+          "role": "submission",
+          "level": "C",
+          "reviewed_sha256": "ec58a342eaade4fdc42a5a60ee53f9cc7481c433d26df5cf2e576b1e1822530a",
+          "notes": "Only the called in-transaction event append implementation was read; unrelated public auth/replay paths were not re-audited in this agent scope."
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/db/migrations/0009_video_studio.sql",
+      "level": "A",
+      "lines": 207,
+      "sha256": "c60a4a7eed08dd0013314afc21713e4ded8c5f3d829f4a57057b986d423ff679",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "c60a4a7eed08dd0013314afc21713e4ded8c5f3d829f4a57057b986d423ff679",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/db/migrations/0037_video_gen_full.sql",
+      "level": "A",
+      "lines": 30,
+      "sha256": "8041aab3c8c12e63c6c39913e2931465cc0128b8320e8017c3d5544606e32a0a",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "8041aab3c8c12e63c6c39913e2931465cc0128b8320e8017c3d5544606e32a0a",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/db/migrations/0044_generation_submissions.sql",
+      "level": "B",
+      "lines": 84,
+      "sha256": "82dc12eb30c16e4389089181123365843b3195ec5ba91e11202d4c8ec40ccc73",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/db/migrations/0045_production_qualifications.sql",
+      "level": "B",
+      "lines": 82,
+      "sha256": "a0cb09addd61ab7f1cb381c58c84d1ac5d8f52ca9492b4fd2787f7447fb4c2a8",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/db/migrations/0046_registered_film_workers.sql",
+      "level": "A",
+      "lines": 264,
+      "sha256": "ba9d4fbcec17d033f60eafce92b847dc7154a4fd14a159ad64b50bb32024e065",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "ba9d4fbcec17d033f60eafce92b847dc7154a4fd14a159ad64b50bb32024e065",
+          "notes": "independent-film-ledger"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "ba9d4fbcec17d033f60eafce92b847dc7154a4fd14a159ad64b50bb32024e065",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/db/migrations/0060_film_provider_receipts.sql",
+      "level": "A",
+      "lines": 20,
+      "sha256": "a3cf98f7a537176a76553fe00d04b130b54f33409efc6ea25590fd90c2e320cc",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "a3cf98f7a537176a76553fe00d04b130b54f33409efc6ea25590fd90c2e320cc",
+          "notes": "independent-film-ledger"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "a3cf98f7a537176a76553fe00d04b130b54f33409efc6ea25590fd90c2e320cc",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/db/src/client.ts",
+      "level": "A",
+      "lines": 96,
+      "sha256": "67b8b3b34049046cb4449e9e05975cb8549f81acbb856b6e91b425ef20798e7d",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/db/src/index.ts",
+      "level": "A",
+      "lines": 6,
+      "sha256": "6161108ee4997a4202d8ee2612b89f931fc910376cb8185a6fb7444318ad9782",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/db/src/schema.ts",
+      "level": "B",
+      "lines": 368,
+      "sha256": "7d27b195d4f383f80e98c3029859802dcea89525cdb01a8d31df1e8ddaeafda5",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "drizzle-orm/pg-core"
+      ]
+    },
+    {
+      "path": "packages/shared/src/index.ts",
+      "level": "B",
+      "lines": 9,
+      "sha256": "eee90f31785aa9fd46d1c6c4873eb28df8d0e344735eda5bf43dafac9216c48f",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./client-access.js",
+        "./constants.js",
+        "./enums.js",
+        "./event-schema.js",
+        "./ids.js"
+      ]
+    },
+    {
+      "path": "packages/video-studio/package.json",
+      "level": "B",
+      "lines": 22,
+      "sha256": "085e3c497081cf3dc868dca6774e46a2ec3bb0ff63c279adf4aab7916ee84d10",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/ai-color-policy.ts",
+      "level": "B",
+      "lines": 83,
+      "sha256": "9d6b8835404d08b6a554a0e3d0dda482ac787e1b1658e5db308b547de2e43bed",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./deliver.js"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/archive/context-bundle.test.ts",
+      "level": "B",
+      "lines": 56,
+      "sha256": "977263064145eb986a5a42c766d543b4a9d416d47152de3573c3224be2dabeed",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./context-bundle.js",
+        "./store.js",
+        "node:fs/promises",
+        "node:os",
+        "node:path",
+        "vitest"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/archive/context-bundle.ts",
+      "level": "A",
+      "lines": 153,
+      "sha256": "1c707522e41703128bb89d5a9f131571034bdd9adea1917b9477dca0f1490a45",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/archive/index.ts",
+      "level": "B",
+      "lines": 14,
+      "sha256": "62738cfa907b81f8cbf9f906f9c76fd2d5433087c80c88aea9d6a4fe3634ad45",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./context-bundle.js",
+        "./logger.js",
+        "./stage-log.js",
+        "./stage-runner.js",
+        "./store.js"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/archive/logger.ts",
+      "level": "B",
+      "lines": 135,
+      "sha256": "124c49385888f24e86858048908ba82b58db017f6f0b95869487be207a7e86cb",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./store.js"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/archive/stage-log.test.ts",
+      "level": "B",
+      "lines": 121,
+      "sha256": "901be9a1c59371bd0c6a31801ffbfb84188faa8043a5e8228b75a8b1768fd9fb",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./stage-log.js",
+        "./stage-runner.js",
+        "./store.js",
+        "node:fs/promises",
+        "node:os",
+        "node:path",
+        "vitest"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/archive/stage-log.ts",
+      "level": "B",
+      "lines": 153,
+      "sha256": "ef51247c4dcdc2ba143e6648472fc6480804c73b5fa3f2b63b827c3a8d9dc8d4",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./stage-runner.js",
+        "./store.js"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/archive/stage-runner.test.ts",
+      "level": "B",
+      "lines": 319,
+      "sha256": "b8ddc615cbb6d80161d8fb805b15c76de4dbf47830ab599875238c2702760697",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./stage-runner.js",
+        "./store.js",
+        "node:fs/promises",
+        "node:os",
+        "node:path",
+        "vitest"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/archive/stage-runner.ts",
+      "level": "A",
+      "lines": 337,
+      "sha256": "42fc6a965e5889667b5c84316c20c97b067a4cee059047e16a862ba5f37cbb43",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/archive/store.test.ts",
+      "level": "A",
+      "lines": 160,
+      "sha256": "00230f47a184bbf6c3a11186ad59beb000549606ac33656620a4547c2cba7160",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/archive/store.ts",
+      "level": "A",
+      "lines": 307,
+      "sha256": "6bdf671ce7c7427e978f64bdf44861e5a7e752c04fb8fbcd375d7f2fbb8e6aea",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/av-sync.ts",
+      "level": "B",
+      "lines": 306,
+      "sha256": "ec9c8dc2ec75a4295cc5fad8e3d3be265b9307d668087a14cf09722144bf8f1a",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/beat-verify.ts",
+      "level": "B",
+      "lines": 146,
+      "sha256": "5f57f4964ede0df5baaf5f7f0393ad6be45f7308e9fe7acefe07660759995e4b",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/character-archive.test.ts",
+      "level": "B",
+      "lines": 288,
+      "sha256": "60d26c5f3c9f0e671df43b09a85ab1cc0aabbe54479cc66ffb7b13d2df64b8e4",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./character-archive.js",
+        "node:child_process",
+        "node:fs",
+        "node:os",
+        "node:path",
+        "node:url",
+        "vitest"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/character-archive.ts",
+      "level": "B",
+      "lines": 544,
+      "sha256": "5e0c4275c74ab982263df47105885947d800ea9182811b78e560fe9fbcb5d8d0",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./shot-intent.js",
+        "node:crypto",
+        "node:fs",
+        "node:path"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/character-consistency.ts",
+      "level": "B",
+      "lines": 198,
+      "sha256": "96da491b29e27562d75b129566d50c21755c87baeadb9e56163df8a2f78fe7ca",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/character-release-contract.integration.test.ts",
+      "level": "B",
+      "lines": 91,
+      "sha256": "2a66b7a96585ee00abd0ade05b79b24f753547b08b8ec5bb4dceb14541f7aa1b",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./character-release-contract.js",
+        "./producer-gate.js",
+        "./real-person-asset.js",
+        "node:child_process",
+        "node:crypto",
+        "node:fs",
+        "node:os",
+        "node:path",
+        "vitest"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/character-release-contract.test.ts",
+      "level": "B",
+      "lines": 309,
+      "sha256": "3048c16346f2956c9793e6f059805dea7165413ca7005830fc5cc150f8f6478a",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./character-release-contract.js",
+        "./real-person-asset.js",
+        "vitest"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/character-release-contract.ts",
+      "level": "B",
+      "lines": 382,
+      "sha256": "f44746fa05ebb6886d6fe6381f4d721c96b9480eb7861b9857edd8beab12110a",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./real-person-asset.js",
+        "node:crypto"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/character-release-source.test.ts",
+      "level": "B",
+      "lines": 559,
+      "sha256": "0d70f5f2d43f3b55238ada646a19f51eab096e4f5a8a19f1a4515dcb5e986be5",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./character-release-contract.js",
+        "./character-release-source.js",
+        "./real-person-asset.js",
+        "node:crypto",
+        "node:fs",
+        "node:os",
+        "node:path",
+        "vitest"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/character-release-source.ts",
+      "level": "B",
+      "lines": 321,
+      "sha256": "55c0ea7274c819c773134503704bf25d4eaba6ea6b506db175020ec7725d056c",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./character-release-contract.js",
+        "./real-person-asset.js",
+        "node:crypto",
+        "node:fs",
+        "node:path"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/cinematic-contract.ts",
+      "level": "B",
+      "lines": 94,
+      "sha256": "e8df6cecb4883d99498ffea2ffdc1df51f4353c50c12d60632e1013372dfdaa1",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./shot-spec.js",
+        "node:crypto"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/cinematic-skill-policy.ts",
+      "level": "B",
+      "lines": 281,
+      "sha256": "c3cdebaa21e0f2a4af10eaba5fd9299fc9157f1df19b49836757a05605ec464c",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "node:crypto"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/confirmation.ts",
+      "level": "A",
+      "lines": 74,
+      "sha256": "12b4537481efa5bd0927cb43fca3f5c7813fc267bf2b7142ad3352c2a1202a18",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "12b4537481efa5bd0927cb43fca3f5c7813fc267bf2b7142ad3352c2a1202a18",
+          "notes": "host-runtime-and-independent-proofs"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/continuity.ts",
+      "level": "B",
+      "lines": 352,
+      "sha256": "cbc71ea8126255b37c50fe67ab23c24a485301bae8ad43e3d225ebb577a590f2",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/cover-assembly.ts",
+      "level": "B",
+      "lines": 281,
+      "sha256": "317faf324aa0bfc872b5a78aa4b53ff639d787bd4fee8e7198f25347d76de3f0",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./cover-platforms.js",
+        "node:child_process",
+        "node:crypto",
+        "node:fs",
+        "node:fs/promises",
+        "node:path"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/cover-design.ts",
+      "level": "B",
+      "lines": 859,
+      "sha256": "9f6913abbc5047d1c46b7d279bc627b51094d46fffd17a1d970b8ce78e5a7b0b",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./cover-platforms.js"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/cover-platforms.ts",
+      "level": "B",
+      "lines": 281,
+      "sha256": "8bc06295e352018b6a477cc6879aa7189ab1e7150e5bfdaae41573a3d30d538e",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/data-mining-engine.test.ts",
+      "level": "A",
+      "lines": 206,
+      "sha256": "4e36ae85e7a2d6518f8418e705b8a6cca1838b53420279c94e13ce7255c9f12f",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "4e36ae85e7a2d6518f8418e705b8a6cca1838b53420279c94e13ce7255c9f12f",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/deliver.ts",
+      "level": "B",
+      "lines": 373,
+      "sha256": "f8345fd01c937a05bf5a7a660e2d3a8b0c76f8659ee36e82aa3acc3505fb3cd4",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./ai-color-policy.js",
+        "node:path",
+        "node:url"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/device-policy.ts",
+      "level": "B",
+      "lines": 217,
+      "sha256": "301e77574bca1438c166cba18f01b38c24c41351b5fb9ec36d5a182e72215a6d",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./era-profile.js",
+        "./shot-intent.js"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/dialogue-contract.ts",
+      "level": "B",
+      "lines": 236,
+      "sha256": "39cbf934d02ca530582d613714a0c167e49de23820a38e56bead7a6ac824d1d3",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/director-planner.ts",
+      "level": "B",
+      "lines": 195,
+      "sha256": "b5c772b1105b5e00e729b39c62d2d524c8c96da59e4a2df0a70236646db6c149",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./director-v2.js",
+        "./film-completion.mjs",
+        "./llm-adapter.js"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/director-v2.ts",
+      "level": "B",
+      "lines": 24,
+      "sha256": "d6c57dc79a0845b4bc7dd71ba2b11090c8ff2d23591f188b08ede79cad1c9578",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "../../../bundles/ai-video/library/director-system/core.mjs",
+        "node:fs",
+        "node:path",
+        "node:url"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/duration-projection-bridge.test.ts",
+      "level": "B",
+      "lines": 236,
+      "sha256": "cf03e46e167c46c7761442749653a5b132fcff1c41b8da24f514e313486e2743",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./vendor-compat.js",
+        "node:module",
+        "node:path",
+        "node:url",
+        "vitest"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/duration-projection.test.ts",
+      "level": "B",
+      "lines": 181,
+      "sha256": "9ac59718b500b1b6cbeb93799d0241254c9bb074131eddc0615e78c9c69b0fcc",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./duration-projection.js",
+        "vitest"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/duration-projection.ts",
+      "level": "B",
+      "lines": 431,
+      "sha256": "4f1ae7ff8ed5102a0a4ef7e205181c3de6bd8c0fbffa3a23ec93aed896b70421",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./runtime-root.js",
+        "node:module",
+        "node:path",
+        "node:url"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/duration-rules.ts",
+      "level": "B",
+      "lines": 683,
+      "sha256": "6da9816265e704d05214b8872304c78288da51422d3d07917347fc5e73a4edfa",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./runtime-root.js",
+        "node:fs",
+        "node:module",
+        "node:path",
+        "node:url"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/duration-voice-ceiling.test.ts",
+      "level": "B",
+      "lines": 44,
+      "sha256": "ad29de60a8196ed786b802df1de7691539beb4a8c20cc523ba29a6010162e9a4",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./duration-projection.js",
+        "vitest"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/era-profile.ts",
+      "level": "B",
+      "lines": 69,
+      "sha256": "93354bfab063c1cc513cf4a869ed603b778123e265a54825f4088786aa3d6802",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/film-completion.mjs",
+      "level": "B",
+      "lines": 49,
+      "sha256": "5e45a371b524ceb727f43fbf821009b69c54be938b389e390953df0192bce3f2",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/film-contracts.ts",
+      "level": "B",
+      "lines": 89,
+      "sha256": "b43ae278f10a26f8f5ab11926559fff83c4c40cb42d0197cce827e4730e7a75c",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./era-profile.js",
+        "./post-render-acceptance.js",
+        "./producer-gate.js",
+        "./scene-bible.js",
+        "node:crypto",
+        "node:fs",
+        "node:path"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/film-service-client.ts",
+      "level": "B",
+      "lines": 205,
+      "sha256": "ef716aac6905588d0dd31c92322a532789288b0c9addaa7c979e7e23f4a05005",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/film-worker-channel.ts",
+      "level": "B",
+      "lines": 387,
+      "sha256": "923ef7197c5e4580dfb2712d8b79005f54cd835b8620b2a2a0dcc32de182fa41",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "node:crypto"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/film-worker-provenance.ts",
+      "level": "B",
+      "lines": 213,
+      "sha256": "aab2e57cd04a35f8c4fee3732be85172349b4e4c2e125952c739b8c3f245352d",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./film-worker-channel.js",
+        "node:crypto"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/film-worker-runtime.test.ts",
+      "level": "B",
+      "lines": 612,
+      "sha256": "7ff32d95da2299c224bc32e691e8d3fb1d5e8b3fe25051eaa0d11c7644a11948",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./character-release-contract.js",
+        "./film-worker-channel.js",
+        "./film-worker-provenance.js",
+        "./film-worker-runtime.js",
+        "./post-render-acceptance.js",
+        "./producer-gate.js",
+        "node:child_process",
+        "node:crypto",
+        "node:fs",
+        "node:os",
+        "node:path",
+        "vitest"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/film-worker-runtime.ts",
+      "level": "A",
+      "lines": 425,
+      "sha256": "5a684a1bc35426259aafab8c885c178d7595f46ca5f9074df25aa19161faed02",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "5a684a1bc35426259aafab8c885c178d7595f46ca5f9074df25aa19161faed02",
+          "notes": "core"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/final-shot-character-qualification.ts",
+      "level": "B",
+      "lines": 504,
+      "sha256": "4b022562deb130c1e39ad0b004ef22887d21c0e2c8f1cbd93d00c85b2adf8b2f",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./character-archive.js",
+        "node:fs",
+        "node:path"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/final-shot-contract.ts",
+      "level": "B",
+      "lines": 116,
+      "sha256": "8f74654da0a300405f2d99b25cee974cacf47cbc57e267a37c7e75041b8b4994",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/first-pass.ts",
+      "level": "B",
+      "lines": 172,
+      "sha256": "4f948195e2817dc2a54b41c379613c693f105c77684e94c2b9775ab6298b4a1d",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./dialogue-contract.js"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/gate-ledger.ts",
+      "level": "B",
+      "lines": 286,
+      "sha256": "637e061307bf1712ba531b7ffcf6c0bc160841b2ba1aa5d41f644db5933de208",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "node:fs",
+        "node:path"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/gates.ts",
+      "level": "A",
+      "lines": 83,
+      "sha256": "5c60cc86122dabc625d7ba523fcb2552d134a154bdb3345a7af021be496ea9ca",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "5c60cc86122dabc625d7ba523fcb2552d134a154bdb3345a7af021be496ea9ca",
+          "notes": "host-runtime-and-independent-proofs"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/generation-submission.d.mts",
+      "level": "B",
+      "lines": 17,
+      "sha256": "cb9ac44905869f820aea537586863758342e960e6a1c955255100041e2045bb3",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/generation-submission.mjs",
+      "level": "B",
+      "lines": 115,
+      "sha256": "37a00d7beb795c208b5855436ac9f3c6fc51fa76eba555edfb7e53ccd0985409",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "node:crypto",
+        "node:fs",
+        "node:path"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/generation-submission.test.ts",
+      "level": "B",
+      "lines": 102,
+      "sha256": "beba2dd8921f3eb667bc16e314377b3a988e952b215c82344dbe2dcb75085266",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./generation-submission.mjs",
+        "node:child_process",
+        "node:fs",
+        "node:http",
+        "node:os",
+        "node:path",
+        "vitest"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/index.ts",
+      "level": "A",
+      "lines": 78,
+      "sha256": "7fe7b6d7d2f8995034c6a8a843b9e0318885feb146aad7ae1ba868594bd010a6",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "7fe7b6d7d2f8995034c6a8a843b9e0318885feb146aad7ae1ba868594bd010a6",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/library-bpm.ts",
+      "level": "B",
+      "lines": 205,
+      "sha256": "8226bf20083c056299990ff321f18ec8208b1928e561bacad170603a1138400a",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/likeness-policy.ts",
+      "level": "B",
+      "lines": 40,
+      "sha256": "9a5fc9c76ad23697d989c8bc666a036b3e7a622755599c65b22868bb313f9932",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/llm-adapter.ts",
+      "level": "A",
+      "lines": 505,
+      "sha256": "235a42381a78e61b3f5cc4d4999713e9fa86bff77471162475268ac75e0a2663",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "235a42381a78e61b3f5cc4d4999713e9fa86bff77471162475268ac75e0a2663",
+          "notes": "independent-vendor-model-routing"
+        },
+        {
+          "role": "root",
+          "level": "A",
+          "notes": "本轮完整读或编写并审查最终差异。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/llm-config.ts",
+      "level": "B",
+      "lines": 64,
+      "sha256": "ce01d0e5fd3ddbb4ae497a03049fab5624020df048207f1c59ab3c56d6236d58",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "@workloom/base/model-router"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/local-cover-render.ts",
+      "level": "B",
+      "lines": 480,
+      "sha256": "de3655a1d9d582845594ab9b536b2fa0c1f1b9266970f19671beda485489300f",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./cover-assembly.js",
+        "./cover-design.js",
+        "./cover-platforms.js",
+        "node:child_process",
+        "node:crypto",
+        "node:fs/promises",
+        "node:path"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/marketing-dossier-input.test.ts",
+      "level": "A",
+      "lines": 27,
+      "sha256": "22ccd1702beef213ed41b3ffc2823f8337683aad74a6d54a9ef75c22371a055c",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "22ccd1702beef213ed41b3ffc2823f8337683aad74a6d54a9ef75c22371a055c",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/marketing-dossier-input.ts",
+      "level": "A",
+      "lines": 49,
+      "sha256": "e73c175506fbf92351210066c7e706c6aeeda37ddd3993c4a0a78a697f6ab2a4",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "e73c175506fbf92351210066c7e706c6aeeda37ddd3993c4a0a78a697f6ab2a4",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/marketing-price-contract.test.ts",
+      "level": "A",
+      "lines": 38,
+      "sha256": "eb3110c167845e475f171ad01a34ef86994fecb1e2b8d5a81a52a01a66141ba2",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "eb3110c167845e475f171ad01a34ef86994fecb1e2b8d5a81a52a01a66141ba2",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/marketing-price-contract.ts",
+      "level": "A",
+      "lines": 85,
+      "sha256": "b3e2eab4daa8bff5a3c0b000db0f372aa292d559da1854c201e959f34c4ccaab",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "b3e2eab4daa8bff5a3c0b000db0f372aa292d559da1854c201e959f34c4ccaab",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/material-policy.ts",
+      "level": "B",
+      "lines": 679,
+      "sha256": "2d5da7d008773cb4042380c6955aeefb82aa92bf59f9904901e8382b691624cb",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./quality-evidence.js",
+        "./shot-spec.js"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/micromotion.ts",
+      "level": "B",
+      "lines": 121,
+      "sha256": "8857543fd41f5956223bc7cf014b26d146b868143924207138eb590fcbcd1863",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./shot-intent.js"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/narration.ts",
+      "level": "B",
+      "lines": 86,
+      "sha256": "f858c6541090404fd7e49ad254539ffcc6659ab4efd8fb012ad5cf1a9037893c",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/narrative-aspect-contract.test.ts",
+      "level": "B",
+      "lines": 17,
+      "sha256": "bf40b0b039b1a2ad7155053b018304695896ebb906363f0b173c62b229eba2b1",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./vendor-compat.js",
+        "vitest"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/narrative-no-person-source.test.ts",
+      "level": "B",
+      "lines": 50,
+      "sha256": "5a1a75d20144eaf4864cec855d98bbbfdf4ac78cb348a4ccd7e6f30c6c1d54b5",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./vendor-compat.js",
+        "vitest"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/narrative-source-action.test.ts",
+      "level": "B",
+      "lines": 140,
+      "sha256": "af69ca3888bb653193bad19bf6356e297a671b642f0d3d57eb67ad37b13bbd1a",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./vendor-compat.js",
+        "./vendor/supermickey/hyperreality-system/index.js",
+        "node:child_process",
+        "node:fs",
+        "node:module",
+        "node:os",
+        "node:path",
+        "node:url",
+        "vitest"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/narrative-speech-contract.test.ts",
+      "level": "B",
+      "lines": 32,
+      "sha256": "dd34d45c83d703bdc71b7c93608d1a6dd246f8e846aec7d8be09993697aa6bae",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./vendor-compat.js",
+        "vitest"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/opening-hook.ts",
+      "level": "B",
+      "lines": 272,
+      "sha256": "3811e845fadb7eb19bedc4aa6d034a7fb3b8d8a85d1c7e64471c931c96804cdb",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./platform-intent.js"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/auto-approval-projection.test.ts",
+      "level": "A",
+      "lines": 36,
+      "sha256": "736e833a3ab1fdb3ac81f212492926af3b1cca4ae4ef8a7d654e9c49ba32db9c",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/compiler.ts",
+      "level": "A",
+      "lines": 460,
+      "sha256": "8bb82d455baca3641b09d428fcd0866ce8c159e91170b3c74f59f87bdb2518b1",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/contracts.ts",
+      "level": "A",
+      "lines": 265,
+      "sha256": "756b7e1cd82af30c7ee17c8fc0bebf8f05e2611ce54b4e82556cdb50bf7fcd28",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/coordinator.ts",
+      "level": "A",
+      "lines": 994,
+      "sha256": "f71ffca36161324a9acd3ba7f34d7585dde29a43959c614a56315913475eb041",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/in-memory-repository.ts",
+      "level": "A",
+      "lines": 275,
+      "sha256": "0d9939edcd1420940097cb9ecacb7e3ac3b7b8bc257830abc45ac3548fc8974e",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/index.ts",
+      "level": "A",
+      "lines": 9,
+      "sha256": "9717a013359d110620428a4345f88c6c49d4e48b2d330b86408fd763ce4e92c3",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/lease.ts",
+      "level": "A",
+      "lines": 44,
+      "sha256": "f04836af890dd9055b64ba24d4ca711372dd7e9de762b1c44ff41bce4336f1df",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/pipeline-control-plane.test.ts",
+      "level": "B",
+      "lines": 576,
+      "sha256": "86e2de28f07c3bd5629ad753930df7920a377907c8d4e6235edd60c8a76124c8",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "B",
+          "reviewed_sha256": null,
+          "notes": "全套回归实际运行，未逐行语义阅读全文件。"
+        }
+      ],
+      "import_reference_scan": [
+        "./compiler.js",
+        "./contracts.js",
+        "./coordinator.js",
+        "./in-memory-repository.js",
+        "./lease.js",
+        "./shadow.js",
+        "./state.js",
+        "node:fs/promises",
+        "node:path",
+        "node:url",
+        "vitest",
+        "yaml"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/projection.ts",
+      "level": "A",
+      "lines": 185,
+      "sha256": "0830dd3ad9ecf3cef738a707e7a20c4e896c16c89233608530e4be9623ae16e1",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/repository.ts",
+      "level": "A",
+      "lines": 64,
+      "sha256": "8f8725c72b0ed1308eefb1c3d531b065cc005941db483cd2bcf8ede12ac9c4e1",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/shadow.ts",
+      "level": "A",
+      "lines": 328,
+      "sha256": "f8e81195589b32fa9856ef391e943003be6ee4b7fae74392b364d4923e8fa4bd",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/state.ts",
+      "level": "A",
+      "lines": 109,
+      "sha256": "97125ce8ceafb6d50adae2b7eed34a01aae6b87b7c90635f1a9557d0ac0b9540",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-route-negation.test.ts",
+      "level": "B",
+      "lines": 47,
+      "sha256": "061234b046025031d4e1bec55fe4d8d65fdf8317623213c135ff845550c1f7df",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./pipeline-router.js",
+        "vitest"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-router.test.ts",
+      "level": "B",
+      "lines": 278,
+      "sha256": "2eabb757a354360dc8feb8dd67979cc4a5849da6d7dc4b55e3aec09fdfa0779a",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./pipeline-router.js",
+        "vitest"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-router.ts",
+      "level": "B",
+      "lines": 696,
+      "sha256": "844f643175296c82a969b606b5f566d07236aad797e13898fc72b8c99737a4a2",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/plate-cache.ts",
+      "level": "B",
+      "lines": 98,
+      "sha256": "770ff7429729391693e248cdebed3fb5183e2c7278d17111528949d619778fb2",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "node:crypto"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/plate-prompt.ts",
+      "level": "B",
+      "lines": 87,
+      "sha256": "37947af7696e8169faac9a3def7aab88d12661d86c5cbc887c256d2e4a362032",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./device-policy.js",
+        "./era-profile.js",
+        "./scene-bible.js",
+        "./shot-intent.js",
+        "./shot-spec.js"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/platform-intent.ts",
+      "level": "B",
+      "lines": 307,
+      "sha256": "d94ab38ca1b81d46f901ee9703fe932e0ee42835b55a83f25042d957db6c0305",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./cover-platforms.js"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/plausibility-review.ts",
+      "level": "B",
+      "lines": 342,
+      "sha256": "d837584a553ac908d555a5e36af6b10ef1a5363751e390e1766d70ff6ac8b358",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./producer-gate.js",
+        "@workloom/base/model-router",
+        "node:fs"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/portrait-agent.ts",
+      "level": "B",
+      "lines": 525,
+      "sha256": "b0450c450e0b7d092a12a656cb9d065004242685bba5e709cfe5241382a96adb",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./character-archive.js",
+        "./generation-submission.mjs",
+        "./shot-intent.js",
+        "./shot-spec.js",
+        "node:child_process",
+        "node:crypto",
+        "node:fs",
+        "node:path"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/portrait-binding.ts",
+      "level": "B",
+      "lines": 172,
+      "sha256": "6cae7a7e4e720f58b010224f42d9826042663f9189ee46ffc929c9d1195b73f2",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./character-archive.js",
+        "./shot-intent.js"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/portrait-decision.ts",
+      "level": "B",
+      "lines": 91,
+      "sha256": "6846ad0975cafc89d5efc890e4e842b67c63050a815ea5e99c5cad7160436607",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/portrait-runtime.ts",
+      "level": "C",
+      "lines": 562,
+      "sha256": "9f104e885899c9bdadbdee0ec27c276db8c7c572a668d049b8d43e03f47082fb",
+      "changed": false,
+      "reason": "仅所列边界或相关区段；其余代码未作逐行审计。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "C",
+          "reviewed_sha256": "9f104e885899c9bdadbdee0ec27c276db8c7c572a668d049b8d43e03f47082fb",
+          "notes": "读取1–95行定妆索引、角度与收据类型；不据此宣称出图实现全读"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/post-render-acceptance.ts",
+      "level": "B",
+      "lines": 63,
+      "sha256": "c6da3647377d526fb1226eb131727b48fd57e8890d8ff56740eb57b4eeebb575",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./producer-gate.js",
+        "node:child_process",
+        "node:fs"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/producer-gate.ts",
+      "level": "B",
+      "lines": 627,
+      "sha256": "0a4b51adb59fa1e7e178c0ac556873f04fec82b8441bf726e061825ef91544f9",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./device-policy.js",
+        "./era-profile.js",
+        "./llm-config.js",
+        "./post-render-acceptance.js",
+        "./quality-evidence.js",
+        "./scene-bible.js",
+        "./shot-intent.js",
+        "@workloom/base/model-router",
+        "node:child_process",
+        "node:crypto",
+        "node:fs",
+        "node:os",
+        "node:path"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/product-archive.multitype.test.ts",
+      "level": "B",
+      "lines": 110,
+      "sha256": "bfdff9d2403a57ab46618e6b29eddfb37b95b31a8b218a5dd4ac7d42ace827b1",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./product-archive.js",
+        "node:crypto",
+        "node:fs",
+        "node:os",
+        "node:path",
+        "vitest"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/product-archive.test.ts",
+      "level": "B",
+      "lines": 213,
+      "sha256": "722c5507f847dd8a7a8b6ac144eb26159ec24bcb7087ead9989bd6d66666ea96",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./product-archive.js",
+        "node:crypto",
+        "node:fs",
+        "node:os",
+        "node:path",
+        "vitest"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/product-archive.ts",
+      "level": "A",
+      "lines": 423,
+      "sha256": "48b278c7cca3aeb117fd327010ff484d7315dde3c43b2265f35a63c00442acdc",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "48b278c7cca3aeb117fd327010ff484d7315dde3c43b2265f35a63c00442acdc",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/production-client.test.ts",
+      "level": "A",
+      "lines": 186,
+      "sha256": "310b4e5f21db8d4cb22a49945c6931da86e46a91400e8c31e28cd92c86d42d4a",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "310b4e5f21db8d4cb22a49945c6931da86e46a91400e8c31e28cd92c86d42d4a",
+          "notes": "independent-implementation"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "310b4e5f21db8d4cb22a49945c6931da86e46a91400e8c31e28cd92c86d42d4a",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/production-client.ts",
+      "level": "A",
+      "lines": 180,
+      "sha256": "396ee4835feb0687afb7fa6be77da71f5ba003c5e2eb93ba4fcd3e68bf72e19c",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "396ee4835feb0687afb7fa6be77da71f5ba003c5e2eb93ba4fcd3e68bf72e19c",
+          "notes": "independent-implementation"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "396ee4835feb0687afb7fa6be77da71f5ba003c5e2eb93ba4fcd3e68bf72e19c",
+          "notes": "core"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/production-lineage.ts",
+      "level": "B",
+      "lines": 183,
+      "sha256": "fbe3e78efdacdde15be2ed2d1bdf961a33bd0cb3d40be633f90c845d9c37185c",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "node:crypto",
+        "node:fs",
+        "node:path"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/prompt-language.ts",
+      "level": "B",
+      "lines": 302,
+      "sha256": "bfe27b2ed42eff09e866561a82a3da4d869711203c5a156d115a2d6fdcc70236",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/prompt-redlines.ts",
+      "level": "B",
+      "lines": 101,
+      "sha256": "cb3de2950f27619462911d78614605b0f2fdd54fc067d3ef35363e4fdd8fe04a",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/pronunciation.ts",
+      "level": "B",
+      "lines": 138,
+      "sha256": "371fb05ecb46ffdb12b6260fe6d101c763f0b7aee5d8a8036b6134d97ce7ecd2",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/quality-evidence.ts",
+      "level": "B",
+      "lines": 17,
+      "sha256": "906d709d72691b07d005f675975eed18d60693a80ed7838b15e8d0a51eefef0c",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/real-person-asset-sync.ts",
+      "level": "B",
+      "lines": 237,
+      "sha256": "10e5826cacce9c1da454e6373f8679b0b2791fabc1a6246b2485c58d6029690d",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./real-person-asset.js"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/real-person-asset.ts",
+      "level": "B",
+      "lines": 235,
+      "sha256": "3631c4060895c19365b0bb7b4bc305ebdbb201df61652f7fd3f5707524a4172c",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "node:fs",
+        "node:path"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/render-scripts.ts",
+      "level": "B",
+      "lines": 107,
+      "sha256": "9dbe99d17e171d4566fdcabe28edf58423b5a6cfe835f1b7d4bb3b3c01fadd54",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "node:module",
+        "node:path",
+        "node:url"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/revise.ts",
+      "level": "B",
+      "lines": 227,
+      "sha256": "dd22f865438b8de48fa97ac368eb16d215297f48af41bd8588b2905ca704a3bb",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./gate-ledger.js"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/revision-executor.ts",
+      "level": "B",
+      "lines": 75,
+      "sha256": "e24a44fe3999eb34c315b68bb15b9b9e906046c017b9ccd3a3efc69c4d4a560b",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./production-lineage.js",
+        "./revise.js"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/rhythm-plan.ts",
+      "level": "B",
+      "lines": 150,
+      "sha256": "21ee0c2b6dcff49115a184552842de53dbda1457c3099156466859a28acbfb5f",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "node:crypto"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/route-preflight.ts",
+      "level": "B",
+      "lines": 191,
+      "sha256": "dd73e7513efd282268c5e7a08f12bd6dafcd11837a9f773490c43122cd0987c8",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/routed-adapter.test.ts",
+      "level": "B",
+      "lines": 314,
+      "sha256": "006562eb27e157e8c7161934eeb06549335f53dd9d742c8cbaa5339180305ad2",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./llm-adapter.js",
+        "@workloom/base/model-router",
+        "node:module",
+        "vitest"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/routed-generation.test.ts",
+      "level": "A",
+      "lines": 197,
+      "sha256": "cfd9331153ba1801d108b91f2394dfa6d85cb811929ae2a0cf7fa0a4ecd61fc0",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "cfd9331153ba1801d108b91f2394dfa6d85cb811929ae2a0cf7fa0a4ecd61fc0",
+          "notes": "independent-vendor-model-routing"
+        },
+        {
+          "role": "root",
+          "level": "A",
+          "notes": "本轮完整读或编写并审查最终差异。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/runtime-root.ts",
+      "level": "A",
+      "lines": 16,
+      "sha256": "dfdafa3f2d2f7805c967900e8e7bb0ce36c12202b38849056565c4f45c94488b",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "dfdafa3f2d2f7805c967900e8e7bb0ce36c12202b38849056565c4f45c94488b",
+          "notes": "全文读取，vendor真实运行根解析"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/scene-bible.ts",
+      "level": "B",
+      "lines": 361,
+      "sha256": "46d77d82ff8f198ddebee7db8335523dbf44f472b4fef9cee48a9a31c1bf9c0c",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./era-profile.js",
+        "./shot-intent.js"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/scene-policy.ts",
+      "level": "B",
+      "lines": 338,
+      "sha256": "52774e6c4639b24689c02a54188e79d89d0c3b83a780254b58f35012fd2a58cc",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./cinematic-skill-policy.js",
+        "node:crypto",
+        "node:fs",
+        "node:path"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/sfx-synth.ts",
+      "level": "B",
+      "lines": 271,
+      "sha256": "ce1e278ae2a041a322d01be24472e92d1d12004e6427b3af88d7a7dccc563ba1",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/shot-intent.ts",
+      "level": "B",
+      "lines": 17,
+      "sha256": "685fb47fa53b0f2f271b4a57810ad70379c0c971af3b771d7c0008b8260f4dd5",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "../../../bundles/ai-video/connectors/cine-kb-bridge/shot-intent.mjs",
+        "./runtime-root.js",
+        "node:path",
+        "node:url"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/shot-order.ts",
+      "level": "B",
+      "lines": 83,
+      "sha256": "f9d99967edba92cf11c1965d8f6d8790605e6218b95cbff77791a4f7953b069c",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/shot-spec.ts",
+      "level": "B",
+      "lines": 973,
+      "sha256": "13211f885c496a55d4ceaf2cb95d607f351ea69486da2a717a0a8a05af8ff031",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./dialogue-contract.js",
+        "./prompt-language.js",
+        "./runtime-root.js",
+        "node:fs",
+        "node:module",
+        "node:path",
+        "node:url"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/stage-registry.ts",
+      "level": "B",
+      "lines": 373,
+      "sha256": "4c7b2a1e01d8d2b38713665e58c21c5abd8f76c0895f257b58b620b1668be80a",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/standard-post-contract.ts",
+      "level": "B",
+      "lines": 251,
+      "sha256": "352d414d4abd50546de9c4d18d329121f216a2065f1926ab976c43d293f9d3dd",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./film-completion.mjs",
+        "./production-lineage.js",
+        "node:crypto",
+        "node:path"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/studio-bridge-concurrency.test.ts",
+      "level": "B",
+      "lines": 95,
+      "sha256": "6b20b756fce496d7135fae0f7340d60d8f9611a99d28b36fe39118ef520aad4a",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./vendor/supermickey/hyperreality-system/engines/field-quality/field-check-agent.js",
+        "./vendor/supermickey/hyperreality-system/engines/script-engine/core/script-generator.js",
+        "./vendor/supermickey/hyperreality-system/index.js",
+        "./vendor/supermickey/hyperreality-system/utils/config-isolator.js",
+        "node:child_process",
+        "node:fs",
+        "node:module",
+        "node:os",
+        "node:path",
+        "node:url",
+        "vitest"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/studio-marketing-input.test.ts",
+      "level": "A",
+      "lines": 67,
+      "sha256": "9490f244bbf2838ac026bcf8f1e0c8c9fa98d006a39406ca22f71c6c94d6a638",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "9490f244bbf2838ac026bcf8f1e0c8c9fa98d006a39406ca22f71c6c94d6a638",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/studio.test.ts",
+      "level": "B",
+      "lines": 393,
+      "sha256": "fcd07e13ea89ccaff0d34f342f2f7e234cb49bbdcd6964e940bfdbc65105992b",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./confirmation.js",
+        "./gates.js",
+        "./llm-adapter.js",
+        "./render-scripts.js",
+        "./studio.js",
+        "node:child_process",
+        "node:crypto",
+        "node:fs",
+        "node:module",
+        "node:path",
+        "node:url",
+        "vitest"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/studio.ts",
+      "level": "A",
+      "lines": 729,
+      "sha256": "44d72847197f9a9bd0b36b5860dfabb6808babb7ad481313f62f9f1738ade4c5",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "44d72847197f9a9bd0b36b5860dfabb6808babb7ad481313f62f9f1738ade4c5",
+          "notes": "host-runtime-and-independent-proofs"
+        },
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "44d72847197f9a9bd0b36b5860dfabb6808babb7ad481313f62f9f1738ade4c5",
+          "notes": "全文精读并复读冻结源码前的所有后续差异"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/uhd-delivery.ts",
+      "level": "B",
+      "lines": 155,
+      "sha256": "27879578a7a3f35474b7d872afb2244da3d0be4af26b3a176e53aa3e34226597",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "node:crypto",
+        "node:fs",
+        "node:path"
+      ]
+    },
+    {
+      "path": "packages/video-studio/src/vendor-compat.test.ts",
+      "level": "C",
+      "lines": 4180,
+      "sha256": "58b2622e2febc050818bf6321ac46d90dc418b4820536a85c644c2364389159f",
+      "changed": false,
+      "reason": "仅所列边界或相关区段；其余代码未作逐行审计。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "C",
+          "reviewed_sha256": "58b2622e2febc050818bf6321ac46d90dc418b4820536a85c644c2364389159f",
+          "notes": "聚焦既有1–290行定妆照CJS消费/失败测试，整套107例实际执行B"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/vendor-compat.ts",
+      "level": "A",
+      "lines": 8006,
+      "sha256": "8bf749e807700b409c1540644b45e8e446362977e03b5a33cae475ccf85a0cbe",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "8bf749e807700b409c1540644b45e8e446362977e03b5a33cae475ccf85a0cbe",
+          "notes": "host-runtime-and-independent-proofs"
+        },
+        {
+          "role": "marketing",
+          "level": "C",
+          "reviewed_sha256": "8bf749e807700b409c1540644b45e8e446362977e03b5a33cae475ccf85a0cbe",
+          "notes": "完整精读定妆绑定/Parser桥约111–460行及营销桥区域；超大文件其余由通用审计范围处理。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/vendor-discovery-await.test.ts",
+      "level": "A",
+      "lines": 109,
+      "sha256": "175458a19dac47d3566c0d3405cda626ad2050c69c08781c9655652e7927808c",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "175458a19dac47d3566c0d3405cda626ad2050c69c08781c9655652e7927808c",
+          "notes": "formal-regression"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/vendor-portrait-binding-concurrency.test.ts",
+      "level": "A",
+      "lines": 133,
+      "sha256": "89b8f95c41d28069f4ed88fd6b92eca5eb6d0bc24b67d7def3fc32dcfecaf1cd",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "89b8f95c41d28069f4ed88fd6b92eca5eb6d0bc24b67d7def3fc32dcfecaf1cd",
+          "notes": "全文编写与实际Node/CJS验证"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/vendor-prd-approval-failure.test.ts",
+      "level": "A",
+      "lines": 151,
+      "sha256": "462665023bc0530724d84198396352af01c204ae628d939a39fb74b00ce3985d",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "462665023bc0530724d84198396352af01c204ae628d939a39fb74b00ce3985d",
+          "notes": "host-runtime-and-independent-proofs"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/vendor-runtime-agent-config-independent.test.ts",
+      "level": "A",
+      "lines": 53,
+      "sha256": "fbd6a8a9ee492f8bcd2e33e3fae655381f665e00b8fd7a788f417427ca2352aa",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "fbd6a8a9ee492f8bcd2e33e3fae655381f665e00b8fd7a788f417427ca2352aa",
+          "notes": "host-runtime-and-independent-proofs"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/vendor-runtime-agent-config.test.ts",
+      "level": "A",
+      "lines": 79,
+      "sha256": "ec8e8b435df216b662d705c312804af253c8bc64ed7532215e02d2b52ae35d0e",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "ec8e8b435df216b662d705c312804af253c8bc64ed7532215e02d2b52ae35d0e",
+          "notes": "formal-regression"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/tsconfig.json",
+      "level": "A",
+      "lines": 8,
+      "sha256": "9222ec437c1c4b8378784ebceca444214102b64598ff2d611cb4f362d576990d",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "9222ec437c1c4b8378784ebceca444214102b64598ff2d611cb4f362d576990d",
+          "notes": "check-configuration"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "scripts/migrate.ts",
+      "level": "A",
+      "lines": 134,
+      "sha256": "3776b4efc5f2622bd0c55353652780290f3267dbd1d4d35b7f919328a473dacc",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "3776b4efc5f2622bd0c55353652780290f3267dbd1d4d35b7f919328a473dacc",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "scripts/product-runtime-assets.mjs",
+      "level": "A",
+      "lines": 197,
+      "sha256": "6f0e855135569d35da20848ece9141823b14480f2b68b3a422ea066d93303066",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "6f0e855135569d35da20848ece9141823b14480f2b68b3a422ea066d93303066",
+          "notes": "runtime-hash-reference"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "scripts/runtime-payload-probe.mts",
+      "level": "A",
+      "lines": 24,
+      "sha256": "f89d86437ba7e07a6923f87eb635f3426ecddf6848968f2dbe9b98ea2062b880",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "f89d86437ba7e07a6923f87eb635f3426ecddf6848968f2dbe9b98ea2062b880",
+          "notes": "runtime-hash-reference"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "scripts/tools/film-audio-policy.mjs",
+      "level": "B",
+      "lines": 144,
+      "sha256": "7e02392e33231304d1b441da681db6afcbebba3eb71b1a38a05ed5b54f3dc32e",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "node:crypto"
+      ]
+    },
+    {
+      "path": "scripts/tools/film-publication-policy.mjs",
+      "level": "B",
+      "lines": 29,
+      "sha256": "ff802559101629169a6ac2f39da71feff66449d53144a6b3c5f09af999c2e92d",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "scripts/tools/film-render-ledger.mjs",
+      "level": "B",
+      "lines": 99,
+      "sha256": "ee472ff2f68ae58dd436509815a6368727cb773a073c6052d19e6120713772ef",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "scripts/tools/film-render-ledger.test.mjs",
+      "level": "B",
+      "lines": 56,
+      "sha256": "75fd09fd6cc9d17802857d19151549d053c5cde674d9b3211d5ec373f552db11",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "./film-render-ledger.mjs",
+        "node:assert/strict",
+        "node:test"
+      ]
+    },
+    {
+      "path": "scripts/tools/film-render-task.mjs",
+      "level": "B",
+      "lines": 121,
+      "sha256": "cf3748d69e9ff374b75f539375f431ff61aa9004c7157d288d27db0cc2a30ce3",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "node:crypto",
+        "node:fs",
+        "node:path"
+      ]
+    },
+    {
+      "path": "scripts/tools/film-render-task.test.mjs",
+      "level": "B",
+      "lines": 198,
+      "sha256": "7f0eb71ab5aec4ded33eb058f9070c3727dcf91bc0816b000d6695bcb3ac8e25",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "../../bundles/geo-growth/capabilities/video.mjs",
+        "./film-render-task.mjs",
+        "node:assert/strict",
+        "node:fs",
+        "node:os",
+        "node:path",
+        "node:test"
+      ]
+    },
+    {
+      "path": "scripts/tools/film-standard-post.mts",
+      "level": "B",
+      "lines": 835,
+      "sha256": "b5fc7c91fffc8fed21489ec12b0e29c62f0210347d286210a9589f60c91f782e",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "../../packages/video-studio/src/cover-assembly.js",
+        "../../packages/video-studio/src/cover-design.js",
+        "../../packages/video-studio/src/cover-platforms.js",
+        "../../packages/video-studio/src/deliver.js",
+        "../../packages/video-studio/src/film-completion.mjs",
+        "../../packages/video-studio/src/film-worker-provenance.js",
+        "../../packages/video-studio/src/standard-post-contract.js",
+        "./generation-quality.mjs",
+        "node:child_process",
+        "node:crypto",
+        "node:fs",
+        "node:fs/promises",
+        "node:path",
+        "node:url"
+      ]
+    },
+    {
+      "path": "scripts/tools/film-voice-artifact.ts",
+      "level": "B",
+      "lines": 115,
+      "sha256": "4b5f4e95de1ba2d1f34bfc0dbaeb6ed1040a552c80fb83c32071b1cc57cbe1f5",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "node:crypto",
+        "node:fs"
+      ]
+    },
+    {
+      "path": "scripts/tools/full-chain-film.mts",
+      "level": "B",
+      "lines": 6846,
+      "sha256": "7ddb0cc5413107880ffaf8b72e9dfc02ed1c994b9afc7e973bac89248b0f7e8b",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "../../packages/base/model-router/providers.js",
+        "../../packages/video-studio/src/ai-color-policy.js",
+        "../../packages/video-studio/src/av-sync.js",
+        "../../packages/video-studio/src/character-release-contract.js",
+        "../../packages/video-studio/src/character-release-source.js",
+        "../../packages/video-studio/src/cinematic-contract.js",
+        "../../packages/video-studio/src/cover-assembly.js",
+        "../../packages/video-studio/src/cover-design.js",
+        "../../packages/video-studio/src/deliver.js",
+        "../../packages/video-studio/src/dialogue-contract.js",
+        "../../packages/video-studio/src/film-completion.mjs",
+        "../../packages/video-studio/src/film-contracts.js",
+        "../../packages/video-studio/src/film-worker-provenance.js",
+        "../../packages/video-studio/src/film-worker-runtime.js",
+        "../../packages/video-studio/src/first-pass.js",
+        "../../packages/video-studio/src/index.js",
+        "../../packages/video-studio/src/plate-cache.js",
+        "../../packages/video-studio/src/plausibility-review.js",
+        "../../packages/video-studio/src/portrait-decision.js",
+        "../../packages/video-studio/src/producer-gate.js",
+        "../../packages/video-studio/src/product-archive.js",
+        "../../packages/video-studio/src/production-lineage.js",
+        "../../packages/video-studio/src/prompt-redlines.js",
+        "../../packages/video-studio/src/real-person-asset.js",
+        "../../packages/video-studio/src/revision-executor.js",
+        "../../packages/video-studio/src/rhythm-plan.js",
+        "../../packages/video-studio/src/shot-intent.js",
+        "../../packages/video-studio/src/shot-spec.js",
+        "../../packages/video-studio/src/standard-post-contract.js",
+        "../../packages/video-studio/src/uhd-delivery.js",
+        "./film-audio-policy.mjs",
+        "./film-publication-policy.mjs",
+        "./film-render-ledger.mjs",
+        "./film-render-task.mjs",
+        "./film-standard-post.mjs",
+        "./film-voice-artifact.js",
+        "./generation-quality.mjs",
+        "./lib/ai-production-defaults.js",
+        "./rhythm-edit.mjs",
+        "node:child_process",
+        "node:crypto",
+        "node:fs",
+        "node:os",
+        "node:path",
+        "yaml"
+      ]
+    },
+    {
+      "path": "scripts/tools/generation-quality.mjs",
+      "level": "B",
+      "lines": 365,
+      "sha256": "1484cfb8f2fae9f2506300133cdabf614f832f81f7d50357f08c941d84d3b4cf",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "../../bundles/ai-video/connectors/post-bridge/quality-gate.mjs",
+        "../../bundles/ai-video/connectors/subtitle-bridge/measure.mjs",
+        "node:crypto",
+        "node:fs",
+        "node:path"
+      ]
+    },
+    {
+      "path": "scripts/tools/lib/ai-production-defaults.ts",
+      "level": "B",
+      "lines": 35,
+      "sha256": "e3f5e23443364e3de14ac8d4cf5390a0f25d7fab55eb9a6236ffc466a81ddd48",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "scripts/tools/render-project.mts",
+      "level": "B",
+      "lines": 594,
+      "sha256": "d0fcbf0bfcf42739b013517904293a1ae95b014cc415be0bf645467ec049a7e0",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "../../packages/video-studio/src/index.js",
+        "../../packages/video-studio/src/production-client.js",
+        "node:crypto",
+        "node:fs",
+        "node:path"
+      ]
+    },
+    {
+      "path": "scripts/tools/rhythm-edit.mts",
+      "level": "B",
+      "lines": 152,
+      "sha256": "340b73f857832907b67e40eb31a2af7ff779ee02db8c92ffe1fc3b67173ebdca",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": [
+        "../../packages/video-studio/src/rhythm-plan.js",
+        "../../packages/video-studio/src/sfx-synth.js",
+        "node:child_process",
+        "node:crypto",
+        "node:fs",
+        "node:path"
+      ]
+    },
+    {
+      "path": "tsconfig.base.json",
+      "level": "A",
+      "lines": 19,
+      "sha256": "8ed090d95c0a7767fe10b5d9d511dc84cb2356e1d82f787149d1c003d82abb6a",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "8ed090d95c0a7767fe10b5d9d511dc84cb2356e1d82f787149d1c003d82abb6a",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/LICENSE",
+      "level": "A",
+      "lines": 190,
+      "sha256": "8ec97162de009d12715c71977efe0bcd7aa91b3e577b12ce70c0491052104f95",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "8ec97162de009d12715c71977efe0bcd7aa91b3e577b12ce70c0491052104f95",
+          "notes": "vendor-license"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/config/production-profile.js",
+      "level": "A",
+      "lines": 146,
+      "sha256": "a3061fd9d8b21e236c092d49315c24f2c0d4cda15873e81dac05e1491999b9bc",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "a3061fd9d8b21e236c092d49315c24f2c0d4cda15873e81dac05e1491999b9bc",
+          "notes": "direct-dependency"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/competitor-scout.js",
+      "level": "A",
+      "lines": 200,
+      "sha256": "a4e8c92172890c1076bf4fba6626cc6709f7191c5b8d82e7586e6d2ce584978e",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "a4e8c92172890c1076bf4fba6626cc6709f7191c5b8d82e7586e6d2ce584978e",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/cross-verifier.js",
+      "level": "A",
+      "lines": 184,
+      "sha256": "083116bb4b9113d3fd0f76bc4d0215ddf74756c81b93b8fbace3555635d3d055",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "083116bb4b9113d3fd0f76bc4d0215ddf74756c81b93b8fbace3555635d3d055",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/dossier-binder.js",
+      "level": "A",
+      "lines": 149,
+      "sha256": "c8d3ea0e94ec2742f83d4f7fa940fa54aef2b905d3506e911c9badf866d496d9",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "c8d3ea0e94ec2742f83d4f7fa940fa54aef2b905d3506e911c9badf866d496d9",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/product-info-collector.js",
+      "level": "A",
+      "lines": 285,
+      "sha256": "de479bd1f9e702968791faabe6938baca138ed991734ca96c2fb92df026bafb3",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "de479bd1f9e702968791faabe6938baca138ed991734ca96c2fb92df026bafb3",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/review-miner.js",
+      "level": "A",
+      "lines": 283,
+      "sha256": "19880ec8c72be34ad11aa5cfc800af198b365821601f37e2e62bbf9ab5ea003b",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "19880ec8c72be34ad11aa5cfc800af198b365821601f37e2e62bbf9ab5ea003b",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/card-consumers.js",
+      "level": "A",
+      "lines": 133,
+      "sha256": "fd02bd7d971e8d5dcaec2498fd3cf47a96a994f17a337fee346e801410741a9f",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "fd02bd7d971e8d5dcaec2498fd3cf47a96a994f17a337fee346e801410741a9f",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/contracts/confirmation-sheet.js",
+      "level": "A",
+      "lines": 81,
+      "sha256": "c23fe0dfe12feb2f5782512ca8e292cdac40bcd4692fb8d7384478dc9f61c414",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "c23fe0dfe12feb2f5782512ca8e292cdac40bcd4692fb8d7384478dc9f61c414",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/contracts/dossier-schema.js",
+      "level": "A",
+      "lines": 184,
+      "sha256": "76f967520bbd6640ea93678c38a97c6f24463167a1f482571b9ce5e76e7a61fe",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "76f967520bbd6640ea93678c38a97c6f24463167a1f482571b9ce5e76e7a61fe",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/contracts/summary-cards.js",
+      "level": "A",
+      "lines": 185,
+      "sha256": "5fd20d336d229477dd0660b6de776556f3c0875c29497bba402eeb7df4b1ed7b",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "5fd20d336d229477dd0660b6de776556f3c0875c29497bba402eeb7df4b1ed7b",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/index.js",
+      "level": "A",
+      "lines": 280,
+      "sha256": "fdfb26ca8a788478ca03a502777208b0e43f0f3f86a00c46ebc2db04a231e172",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "fdfb26ca8a788478ca03a502777208b0e43f0f3f86a00c46ebc2db04a231e172",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/pipeline/dossier-store.js",
+      "level": "A",
+      "lines": 137,
+      "sha256": "cbec8551f5bd01f035f6bfd463565c17ff702831cb9a2742249ad12b06ec37f2",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "cbec8551f5bd01f035f6bfd463565c17ff702831cb9a2742249ad12b06ec37f2",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/pipeline/evidence-ledger.js",
+      "level": "A",
+      "lines": 152,
+      "sha256": "b04b1da20c705024c55169b754de2478c07efb222a6f120f9dabe0154bdd9064",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "b04b1da20c705024c55169b754de2478c07efb222a6f120f9dabe0154bdd9064",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/pipeline/handoff-validator.js",
+      "level": "A",
+      "lines": 136,
+      "sha256": "3f6d8aed6e43f3d8ae3d89c359f20076580a9f29aa3482d8cf03845fb3eadbb1",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "3f6d8aed6e43f3d8ae3d89c359f20076580a9f29aa3482d8cf03845fb3eadbb1",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/pipeline/message-envelope.js",
+      "level": "A",
+      "lines": 122,
+      "sha256": "e51f52a9a48660b0665f4488ee8c3de98bca27f6b0668d8c5c9c66028a0375e7",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "e51f52a9a48660b0665f4488ee8c3de98bca27f6b0668d8c5c9c66028a0375e7",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/duration-constraint/duration-constraint-manager.js",
+      "level": "A",
+      "lines": 177,
+      "sha256": "f69c1a427812fbe1b12fc027a3bef316c635ebf9da3c57fe4898f12107a2275f",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "f69c1a427812fbe1b12fc027a3bef316c635ebf9da3c57fe4898f12107a2275f",
+          "notes": "primary-vendor-source"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/field-quality/field-check-agent.js",
+      "level": "A",
+      "lines": 784,
+      "sha256": "e5ba6cc6252fb478c90b20eba771eb1e4f8efe200f2e7cc30db601747d737105",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "e5ba6cc6252fb478c90b20eba771eb1e4f8efe200f2e7cc30db601747d737105",
+          "notes": "primary-vendor-source"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/field-quality/field-quality-pipeline.js",
+      "level": "A",
+      "lines": 309,
+      "sha256": "46b81198f761f14a93b8dd1367be0ff644e176097ae8c58b54f014c979807ca0",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "46b81198f761f14a93b8dd1367be0ff644e176097ae8c58b54f014c979807ca0",
+          "notes": "primary-vendor-source"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/field-quality/field-repair-agent.js",
+      "level": "A",
+      "lines": 977,
+      "sha256": "eecf64c3294efcd714de6f76d0a4658b134c04ed38f7a6ce2a3b665ba4646177",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "eecf64c3294efcd714de6f76d0a4658b134c04ed38f7a6ce2a3b665ba4646177",
+          "notes": "primary-vendor-source"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/field-quality/index.js",
+      "level": "A",
+      "lines": 31,
+      "sha256": "2f0949b92933b836f40631e465bd329f551e5ccd5fb1f34328ab5927213f17ad",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "2f0949b92933b836f40631e465bd329f551e5ccd5fb1f34328ab5927213f17ad",
+          "notes": "primary-vendor-source"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/field-quality/json-salvage.js",
+      "level": "A",
+      "lines": 110,
+      "sha256": "2f35e1c01b5d59426aa7ee8d9ccf201026489c04f48e950d27c26bad96245ad1",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "2f35e1c01b5d59426aa7ee8d9ccf201026489c04f48e950d27c26bad96245ad1",
+          "notes": "primary-vendor-source"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/production-engine/agents/base-agent.js",
+      "level": "A",
+      "lines": 439,
+      "sha256": "150d39846cb20be3b8d79701a16e5f9ade6edffce08746c76dacd44a11cf8f09",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "150d39846cb20be3b8d79701a16e5f9ade6edffce08746c76dacd44a11cf8f09",
+          "notes": "direct-dependency"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/production-engine/phases/phase-1-scene-design.js",
+      "level": "A",
+      "lines": 212,
+      "sha256": "a2484d2914b2db1c2d154f69b83521d7d668d6e3e47c3d70f6dce39ec164c48b",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "a2484d2914b2db1c2d154f69b83521d7d668d6e3e47c3d70f6dce39ec164c48b",
+          "notes": "primary-vendor-source"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/production-engine/phases/phase-2-visual-audio.js",
+      "level": "A",
+      "lines": 154,
+      "sha256": "5cc80e7c18e191b1d551912dda6bef2a2b1f0975749990ab3b42b17b862d14c2",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "5cc80e7c18e191b1d551912dda6bef2a2b1f0975749990ab3b42b17b862d14c2",
+          "notes": "primary-vendor-source"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/production-engine/phases/phase-3-5-field-quality.js",
+      "level": "A",
+      "lines": 86,
+      "sha256": "52a608ee1172a0d6778d499e3890ff10f0b2df8533f9e43327b189f0e8c0ceb7",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "52a608ee1172a0d6778d499e3890ff10f0b2df8533f9e43327b189f0e8c0ceb7",
+          "notes": "primary-vendor-source"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/production-engine/phases/phase-3-prompt-fusion.js",
+      "level": "A",
+      "lines": 316,
+      "sha256": "0dac2c1372ac8c4c58d319c14fbc1e6df610ed38954d1f417dded59e9f4399b7",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "0dac2c1372ac8c4c58d319c14fbc1e6df610ed38954d1f417dded59e9f4399b7",
+          "notes": "primary-vendor-source"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/production-engine/phases/phase-executor.js",
+      "level": "A",
+      "lines": 62,
+      "sha256": "04f4dbc3947ab1ceea8829d2b286222a42586a96beda700fccd0c4c1ea3480d6",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "04f4dbc3947ab1ceea8829d2b286222a42586a96beda700fccd0c4c1ea3480d6",
+          "notes": "primary-vendor-source"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/production-engine/production-engine.js",
+      "level": "A",
+      "lines": 1825,
+      "sha256": "6c5feb471b10eede541d637cfc3b75cd7e46f71c3a367a9c22eba01bdcc01e37",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "6c5feb471b10eede541d637cfc3b75cd7e46f71c3a367a9c22eba01bdcc01e37",
+          "notes": "primary-vendor-source"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/production-engine/utils/rule-fallback.js",
+      "level": "A",
+      "lines": 116,
+      "sha256": "0ef82303384b09471ba32f9173af0cf599402fedafd72825f7ae11e4e91d47c6",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "0ef82303384b09471ba32f9173af0cf599402fedafd72825f7ae11e4e91d47c6",
+          "notes": "host-runtime-and-independent-proofs"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/rendering-engine/rendering-engine.js",
+      "level": "C",
+      "lines": 529,
+      "sha256": "c91e4b867fc59a512e5a7a64d696afaed03e12851ddfeab29591e3781d7b1ce7",
+      "changed": false,
+      "reason": "仅所列边界或相关区段；其余代码未作逐行审计。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "C",
+          "reviewed_sha256": "c91e4b867fc59a512e5a7a64d696afaed03e12851ddfeab29591e3781d7b1ce7",
+          "notes": "读1–217及343–420行构造/渲染和真实manifest实现，执行实际引擎"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/requirement-discovery-engine.js",
+      "level": "A",
+      "lines": 1009,
+      "sha256": "9732b1debc526cc2dce0ab2cf1c7e8044bf0a780cff1c6bb9b66aac6978e1fad",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "9732b1debc526cc2dce0ab2cf1c7e8044bf0a780cff1c6bb9b66aac6978e1fad",
+          "notes": "direct-dependency"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/script-engine/core/adapter.js",
+      "level": "A",
+      "lines": 572,
+      "sha256": "5bd3b1d873de29fc724b4eb3ffcae14b432cc043defbd30859d5c4a6171c227c",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "5bd3b1d873de29fc724b4eb3ffcae14b432cc043defbd30859d5c4a6171c227c",
+          "notes": "primary-vendor-source"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/script-engine/core/boundary-prompt-templates.js",
+      "level": "A",
+      "lines": 240,
+      "sha256": "7c472fe4a7be6a200338eefaf0fc12c781f4f3895e32f998ce67f2010aa7c1db",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "7c472fe4a7be6a200338eefaf0fc12c781f4f3895e32f998ce67f2010aa7c1db",
+          "notes": "primary-vendor-source"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/script-engine/core/creative-intensity-engine.js",
+      "level": "A",
+      "lines": 836,
+      "sha256": "88a892f83abe6264698b9e17c9925edc47901f9fa6973006e57259360dcfe0ef",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "88a892f83abe6264698b9e17c9925edc47901f9fa6973006e57259360dcfe0ef",
+          "notes": "primary-vendor-source"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/script-engine/core/intent-parser.js",
+      "level": "A",
+      "lines": 399,
+      "sha256": "74d8cad8eb44ae514ef5578a947ae81b97d54eb92e3a3c08669f20d79c02125b",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "74d8cad8eb44ae514ef5578a947ae81b97d54eb92e3a3c08669f20d79c02125b",
+          "notes": "primary-vendor-source"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/script-engine/core/profile-resolver.js",
+      "level": "A",
+      "lines": 165,
+      "sha256": "a7bfbe10b219e5fa0bba71ae0203ac4188787a6eebb7b4d9176d68e768314f33",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "a7bfbe10b219e5fa0bba71ae0203ac4188787a6eebb7b4d9176d68e768314f33",
+          "notes": "primary-vendor-source"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/script-engine/core/requirement-list-builder.js",
+      "level": "A",
+      "lines": 1113,
+      "sha256": "e965e7223ee11e8dbcc96a9fcc71296414bf9dedfaad4e5797298cd8c981350d",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "e965e7223ee11e8dbcc96a9fcc71296414bf9dedfaad4e5797298cd8c981350d",
+          "notes": "primary-vendor-source"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/script-engine/core/scene-type-normalizer.js",
+      "level": "A",
+      "lines": 185,
+      "sha256": "8dd9416aaa8cd29d6e6606b2881c16a9721241e9ed5a8bded8f4752db5ed18a3",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "8dd9416aaa8cd29d6e6606b2881c16a9721241e9ed5a8bded8f4752db5ed18a3",
+          "notes": "primary-vendor-source"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/script-engine/core/script-blueprint.js",
+      "level": "A",
+      "lines": 152,
+      "sha256": "d8aea579823f5dc3203ab8e0a7b08fae188892edb05cb119a576cb76bf6672e1",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "d8aea579823f5dc3203ab8e0a7b08fae188892edb05cb119a576cb76bf6672e1",
+          "notes": "primary-vendor-source"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/script-engine/core/script-generator.js",
+      "level": "A",
+      "lines": 1378,
+      "sha256": "289d926c8220b97cd0eb3d762684325eb00732789053dee11e993ef447d8726e",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "289d926c8220b97cd0eb3d762684325eb00732789053dee11e993ef447d8726e",
+          "notes": "primary-vendor-source"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/script-engine/core/script-validator.js",
+      "level": "A",
+      "lines": 751,
+      "sha256": "79a5587409f7ba3b8c01ef75e1a983fb49ba34b7a93c6e11959ecccc5a752388",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "79a5587409f7ba3b8c01ef75e1a983fb49ba34b7a93c6e11959ecccc5a752388",
+          "notes": "primary-vendor-source"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/script-engine/index.js",
+      "level": "A",
+      "lines": 301,
+      "sha256": "40b7cc50549f5da253d56757c7b549b7b79de04a456e592d8c2b7e118d3c89c2",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "40b7cc50549f5da253d56757c7b549b7b79de04a456e592d8c2b7e118d3c89c2",
+          "notes": "primary-vendor-source"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/truth-check-bridge.js",
+      "level": "B",
+      "lines": 202,
+      "sha256": "bbbb0f7e509c86c7c3a98d7781eee7665f819ba3e7c036284a373789bb40cb7d",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/index.js",
+      "level": "A",
+      "lines": 4126,
+      "sha256": "c8719217200cca1c36dc4743455323d9290198950c929620cf698a055a121109",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "c8719217200cca1c36dc4743455323d9290198950c929620cf698a055a121109",
+          "notes": "direct-dependency"
+        },
+        {
+          "role": "marketing",
+          "level": "C",
+          "reviewed_sha256": "c8719217200cca1c36dc4743455323d9290198950c929620cf698a055a121109",
+          "notes": "读2282–2327行Layer3渲染分支，供宿主可达性核对"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/package.json",
+      "level": "A",
+      "lines": 31,
+      "sha256": "e4f7e60c3c0e30215c4937504cc9d4500a73c5ddb94fd32f8bf731f1ae1c8e6c",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "e4f7e60c3c0e30215c4937504cc9d4500a73c5ddb94fd32f8bf731f1ae1c8e6c",
+          "notes": "vendor-package"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/skills/marketing-brief/index.js",
+      "level": "B",
+      "lines": 132,
+      "sha256": "30b5d185dce1baf8601087036bbc4ae3b894039ab901299d1e2f2dbdaf4f1dca",
+      "changed": false,
+      "reason": "Git 树、字节散列、导入/引用机检；没有全文精读结论。",
+      "read_receipts": [],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/scripts/render-submitter-core.js",
+      "level": "C",
+      "lines": 477,
+      "sha256": "07dba0fadb4a8ad0a60026d50b1d0cd18f11934b2ca0f68162428f290b0b7cd0",
+      "changed": false,
+      "reason": "仅所列边界或相关区段；其余代码未作逐行审计。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "C",
+          "reviewed_sha256": "07dba0fadb4a8ad0a60026d50b1d0cd18f11934b2ca0f68162428f290b0b7cd0",
+          "notes": "读1–125及284–384行真实submit和payload，执行实际验证与本地构建"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/systems/llm-reasoning-engine.js",
+      "level": "A",
+      "lines": 529,
+      "sha256": "a1fd1cb59c8991dfdaee406113f51859c145f6689be1a13499ac4be97c0231e0",
+      "changed": false,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "a1fd1cb59c8991dfdaee406113f51859c145f6689be1a13499ac4be97c0231e0",
+          "notes": "independent-vendor-model-routing"
+        }
+      ],
+      "import_reference_scan": []
+    }
+  ]
+}

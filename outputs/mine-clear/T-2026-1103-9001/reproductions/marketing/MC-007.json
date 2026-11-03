@@ -1,0 +1,90 @@
+{
+  "id": "MC-007",
+  "title": "逐主张引用与下游来源归属未绑定，及URL别名被最后快照覆盖",
+  "severity": "P1",
+  "evidence_level": "A+B",
+  "baseline": "c028118de87f80b4ff0726c758b1ca0d964b9a63",
+  "fixed_by": "/root/marketing_audit",
+  "fix_commit": "a982f8ff50f5199da6f26be03a167b1daef7b65c",
+  "root_causes": [
+    {
+      "file": "apps/server/src/video/marketing-facts.ts",
+      "lines": "114-128",
+      "detail": "实际URL到单快照Map被共享最终URL覆盖；有效价格被错判，observedAt取错误快照"
+    },
+    {
+      "file": "apps/server/src/video/marketing-facts.ts",
+      "lines": "135-139,184-201",
+      "detail": "引文和来源URL分别校验，未要求同一来源；商品specs被按元数据键名遍历改写或误拒"
+    }
+  ],
+  "assertion": "apps/server/src/video/marketing-source-attribution.test.ts",
+  "runs": [
+    {
+      "log": "source-attribution-red.log",
+      "exit_code": 1,
+      "passed": 1,
+      "failed": 9,
+      "phase": "red-before-fix",
+      "sha256": "4e4c4d18d416c63289b5894979e6377976b34f755e1fa9936de434b1e3381c29"
+    },
+    {
+      "log": "source-attribution-followup-red.log",
+      "exit_code": 1,
+      "passed": 10,
+      "failed": 3,
+      "phase": "followup-red-before-fix",
+      "sha256": "bcdfd8f19e6f2b4ad4725b1a11154fc2fac211b39f3de1cf55b6ea5758c41084"
+    },
+    {
+      "log": "source-metadata-scope-red.log",
+      "exit_code": 1,
+      "passed": 13,
+      "failed": 1,
+      "phase": "metadata-scope-red-before-fix",
+      "sha256": "665fb62f6bcb373712820ccbd16c0c011e23796ab7315b697fa67e3209021ad9"
+    },
+    {
+      "log": "source-attribution-final-green.log",
+      "exit_code": 0,
+      "files": 3,
+      "passed": 57,
+      "failed": 0,
+      "phase": "regression-green",
+      "sha256": "5970e2578f9ff6adf2e1d6b38d0ba79b99f383639bdba2da84666cc5b8a0007d"
+    },
+    {
+      "log": "image-attribution-independent-confirm-red.log",
+      "exit_code": 1,
+      "passed": 1,
+      "failed": 1,
+      "files": 1,
+      "sha256": "4b0e3489ac2fed4f821127df7480e61fc7c6108f026efa83b4cf1e85d173224d"
+    },
+    {
+      "log": "independent-corrections-full-green.log",
+      "exit_code": 0,
+      "passed": 150,
+      "files": 10,
+      "sha256": "8e3fe342d99c51243ddc16867b1b5bc02c4568aaa8634d8b60a1d0561d422867"
+    },
+    {
+      "log": "independent-corrections-server-typecheck.log",
+      "exit_code": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "typecheck": {
+    "log": "source-attribution-typecheck.log",
+    "exit_code": 1,
+    "reason": "并行开发中的archive-access.pg.test.ts:31 string|undefined；非本簇文件，已告知root"
+  },
+  "limitations": "真实函数、CJS引擎与本地HTTP；来源模型审核使用协议替身，无真实付费。独立验收由root/其他角色执行。",
+  "followup_commits": [
+    "3447bd2e9735c49891bd5510f8b7e9ddfb4d9504"
+  ],
+  "additional_assertions": [
+    "apps/server/src/video/marketing-source-attribution-independent.test.ts"
+  ],
+  "image_source_followup": "独验复现共享finalUrl的两次快照各含不同图片；角度引证必须绑定到同一次真实抓取的page_url与assetUrls，禁止借其他快照图像及原文。合法同源图与角度仍能归档复读。"
+}

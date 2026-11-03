@@ -1,0 +1,82 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2
+
+ ❯ apps/server/src/video/film-provider-receipt.pg.test.ts (3 tests | 3 failed) 1104ms
+     × persists the accepted video task before cancellation, leaving the receipt available for reconciliation 28ms
+     × retains the known synchronous image task when its media download fails, and refuses replay 15ms
+     × records a provider acknowledgement that arrives after the abort already marked the component unknown 1060ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/server/src/video/film-provider-receipt.pg.test.ts > film provider acceptance survives local failure > persists the accepted video task before cancellation, leaving the receipt available for reconciliation
+AssertionError: expected { …(2) } to match object { …(2) }
+(2 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "providerRequestHash": StringMatching /^[a-f0-9]{64}$/,
+-   "providerTaskId": "already-paid-video-task",
++   "failureClass": "JOB_DEADLINE_EXCEEDED",
++   "message": "JOB_DEADLINE_EXCEEDED: 作业已关闭；在途调用按未核实处理",
+  }
+
+ ❯ apps/server/src/video/film-provider-receipt.pg.test.ts:66:26
+     64|     const row = await component();
+     65|     expect(row.state).toBe("unknown");
+     66|     expect(row.evidence).toMatchObject({ providerTaskId: "already-paid…
+       |                          ^
+     67|     expect(submit).toHaveBeenCalledTimes(1); expect(poll).not.toHaveBe…
+     68|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  apps/server/src/video/film-provider-receipt.pg.test.ts > film provider acceptance survives local failure > retains the known synchronous image task when its media download fails, and refuses replay
+AssertionError: expected { …(2) } to match object { …(3) }
+(1 matching property omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "failureClass": "MEDIA_FETCH_FAILED",
+-   "providerRequestHash": StringMatching /^[a-f0-9]{64}$/,
+-   "providerTaskId": "sync-url-aHR0cHM6Ly9jZG4uZXhhbXBsZS50ZXN0L2FjY2VwdGVkLnBuZw",
+  }
+
+ ❯ apps/server/src/video/film-provider-receipt.pg.test.ts:76:26
+     74|     await expect(handleChannelRequest(ctx, frame("image"))).rejects.to…
+     75|     const row = await component();
+     76|     expect(row.evidence).toMatchObject({ providerTaskId: taskId, provi…
+       |                          ^
+     77|     await expect(handleChannelRequest(ctx, frame("image"))).rejects.to…
+     78|     expect(submit).toHaveBeenCalledTimes(1);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  apps/server/src/video/film-provider-receipt.pg.test.ts > film provider acceptance survives local failure > records a provider acknowledgement that arrives after the abort already marked the component unknown
+AssertionError: expected undefined to be 'late-paid-video-task' // Object.is equality
+
+- Expected:
+"late-paid-video-task"
+
++ Received:
+undefined
+
+ ❯ apps/server/src/video/film-provider-receipt.pg.test.ts:90:86
+     88|     expect((await component()).state).toBe("unknown");
+     89|     acknowledge({ taskId: "late-paid-video-task" });
+     90|     await vi.waitFor(async () => expect((await component()).evidence.p…
+       |                                                                                      ^
+     91|     expect((await component()).state).toBe("unknown"); expect(submit).…
+     92|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed (3)
+   Start at  09:43:01
+   Duration  2.10s (transform 550ms, setup 0ms, import 914ms, tests 1.10s, environment 0ms)
+

@@ -1,0 +1,135 @@
+import { createServer } from "node:http";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createWebSearch, loadSearchCache, searchCacheKey, type SearchProvider } from "./data-mining-executor.js";
+
+const nativeFetch = globalThis.fetch;
+const directories: string[] = [];
+const query = "星野 F3 参数";
+const expectedHit = { title: "星野 F3 公开规格", url: "https://source.example.com/f3", snippet: "星野 F3 风量 9 档" };
+async function cacheFile() {
+  const directory = await mkdtemp(path.join(tmpdir(), "wl-search-recovery-")); directories.push(directory);
+  return path.join(directory, "search.json");
+}
+afterEach(async () => {
+  vi.unstubAllGlobals();
+  for (const directory of directories.splice(0)) await rm(directory, { recursive: true, force: true });
+});
+function success(provider: SearchProvider): Response {
+  if (provider === "api") return new Response(JSON.stringify({ results: [expectedHit] }));
+  if (provider === "bing") return new Response(`<rss><item><title>${expectedHit.title}</title><link>${expectedHit.url}</link><description>${expectedHit.snippet}</description></item></rss>`);
+  return new Response(`<h3><a href="${expectedHit.url}">${expectedHit.title}</a></h3>${expectedHit.snippet}`);
+}
+
+describe("营销检索短暂失败后的真实恢复", () => {
+  it.each([
+    { provider: "api" as const, failure: "500", restart: false },
+    { provider: "api" as const, failure: "network", restart: false },
+    { provider: "api" as const, failure: "bad-json", restart: true },
+    { provider: "api" as const, failure: "error-envelope", restart: true },
+    { provider: "api" as const, failure: "error-with-empty-results", restart: true },
+    { provider: "bing" as const, failure: "500", restart: false },
+    { provider: "bing" as const, failure: "500", restart: true },
+    { provider: "bing" as const, failure: "broken-item", restart: true },
+    { provider: "so360" as const, failure: "500", restart: true },
+  ])("$provider $failure重试不复用失败空缓存，重建实例=$restart", async ({ provider, failure, restart }) => {
+    const file = await cacheFile();
+    let calls = 0;
+    const fetchImpl = vi.fn(async () => {
+      calls++;
+      if (calls > 1) return success(provider);
+      if (failure === "network") throw new TypeError("controlled network failure");
+      if (failure === "bad-json") return new Response("{broken-json");
+      if (failure === "error-envelope") return new Response(JSON.stringify({ error: "temporary upstream failure" }));
+      if (failure === "error-with-empty-results") return Response.json({ error: "temporary upstream failure", results: [] });
+      if (failure === "broken-item") return new Response("<rss><channel><item><title>unclosed</title></channel></rss>");
+      return new Response("temporary failure", { status: 500 });
+    });
+    vi.stubGlobal("fetch", fetchImpl);
+    const options = { providers: [provider], cacheFile: file, paceMs: 0,
+      api: { provider: "generic" as const, apiKey: "test-only", apiUrl: "https://search.example.com/search", fetchImpl: fetchImpl as typeof fetch } };
+    const search = createWebSearch(options);
+    expect(await search(query, 2)).toEqual([]);
+    expect(loadSearchCache(file).entries[searchCacheKey(provider, query)]).toBeUndefined();
+    expect(await (restart ? createWebSearch(options) : search)(query, 2)).toEqual([expectedHit]);
+    expect(calls).toBe(2);
+  });
+
+  it("真实HTTP超时不会写入12小时空缓存，服务恢复后同查询确实再次出站", async () => {
+    const file = await cacheFile();
+    let calls = 0;
+    const server = createServer((_request, response) => {
+      calls++;
+      if (calls === 1) return; // 原生fetch必须通过AbortSignal实际中断。
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ results: [expectedHit] }));
+    });
+    await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+    try {
+      const address = server.address() as { port: number };
+      const search = createWebSearch({ providers: ["api"], cacheFile: file, paceMs: 0,
+        api: { provider: "generic", apiKey: "test-only", apiUrl: `http://127.0.0.1:${address.port}/search`, timeoutMs: 100, fetchImpl: nativeFetch } });
+      expect(await search(query, 2)).toEqual([]);
+      expect(calls).toBe(1);
+      expect(await search(query, 2)).toEqual([expectedHit]);
+      expect(calls).toBe(2);
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>(resolve => server.close(() => resolve()));
+    }
+  });
+
+  it("正常零结果仍缓存；429仍在同实例冷却且不持久化成零结果", async () => {
+    const file = await cacheFile();
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ results: [] })));
+    const options = { providers: ["api" as const], cacheFile: file, paceMs: 0,
+      api: { provider: "generic" as const, apiKey: "test-only", apiUrl: "https://search.example.com/search", fetchImpl: fetchImpl as typeof fetch } };
+    expect(await createWebSearch(options)(query, 2)).toEqual([]);
+    expect(await createWebSearch(options)(query, 2)).toEqual([]);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(loadSearchCache(file).entries[searchCacheKey("api", query)]?.hits).toEqual([]);
+    const blockedFile = await cacheFile();
+    const blockedFetch = vi.fn(async () => new Response("limited", { status: 429 }));
+    const search = createWebSearch({ ...options, cacheFile: blockedFile, api: { ...options.api, fetchImpl: blockedFetch as typeof fetch } });
+    expect(await search(query, 2)).toEqual([]);
+    expect(await search(query, 2)).toEqual([]);
+    expect(blockedFetch).toHaveBeenCalledTimes(1);
+    expect(loadSearchCache(blockedFile).entries[searchCacheKey("api", query)]).toBeUndefined();
+  });
+
+  it("升级后重取无法区分失败或正常的旧空缓存，同时复用旧非空命中", async () => {
+    const file = await cacheFile();
+    const oldPositive = `${query} 价格`;
+    const oldClaimedSuccess = `${query} 配置`;
+    await writeFile(file, JSON.stringify({ version: 1, entries: {
+      [searchCacheKey("api", query)]: { at: new Date().toISOString(), hits: [] },
+      [searchCacheKey("api", oldClaimedSuccess)]: { at: new Date().toISOString(), hits: [], outcome: "success" },
+      [searchCacheKey("api", oldPositive)]: { at: new Date().toISOString(), hits: [expectedHit] },
+    } }));
+    const fetchImpl = vi.fn(async () => success("api"));
+    const search = createWebSearch({ providers: ["api"], cacheFile: file, paceMs: 0,
+      api: { provider: "generic", apiKey: "test-only", apiUrl: "https://search.example.com/search", fetchImpl: fetchImpl as typeof fetch } });
+    expect(await search(query, 2)).toEqual([expectedHit]);
+    expect(await search(oldClaimedSuccess, 2)).toEqual([expectedHit]);
+    expect(await search(oldPositive, 2)).toEqual([expectedHit]);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("可识别的空RSS和含合法条目的部分API结果保持缓存", async () => {
+    const file = await cacheFile();
+    const fetchImpl = vi.fn(async (input: string | URL | Request) => String(input).includes("bing.com")
+      ? new Response('<?xml version="1.0"?><rss version="2.0"><channel><title>Search</title><link>https://www.bing.com/</link><description>Search</description></channel></rss>')
+      : Response.json({ results: [{ title: {}, url: "https://invalid.example.com" }, { title: "星野 F3 invalid", url: "javascript:alert(1)" }, expectedHit] }));
+    vi.stubGlobal("fetch", fetchImpl);
+    const common = { cacheFile: file, paceMs: 0 };
+    const api = { ...common, providers: ["api" as const], api: { provider: "generic" as const, apiKey: "test-only", apiUrl: "https://search.example.com/search" } };
+    const rss = { ...common, providers: ["bing" as const] };
+    expect(await createWebSearch(rss)(query, 2)).toEqual([]);
+    expect(await createWebSearch(rss)(query, 2)).toEqual([]);
+    expect(await createWebSearch(api)(query, 2)).toEqual([expectedHit]);
+    expect(await createWebSearch(api)(query, 2)).toEqual([expectedHit]);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+});

@@ -17,7 +17,10 @@ import path from "node:path";
 import { newId } from "@workloom/shared";
 import { getAppPool, getOwnerPool } from "@workloom/db";
 import { ArchiveStore, readContextBundle, type ContextBundle } from "@hyperreality/video-studio";
-import { scopedRows, archiveWorkDir, projectRunLockKey } from "./archive-host.js";
+import { scopedRows, archiveWorkDir, projectRunLockKey, readProjectMeta } from "./archive-host.js";
+import { restoreStudioResumeInput } from "./studio-resume-input.js";
+import type { resolveScenePolicyForIntent } from "./scene-policy-routing.js";
+import type { resolvePlatformForIntent } from "./platform-routing.js";
 
 interface Scope {
   tenantId: string;
@@ -39,7 +42,7 @@ export interface ResumeOptions {
   projectId: string;
   /** 人工裁决：强制从指定环节重跑 */
   fromStage?: string;
-  /** 预生产续跑需要（缺省读 video_projects.title） */
+  /** 可选覆盖预生产需求；缺省使用归档原始需求 */
   intent?: string;
   /** 复用既有补跑入口（router 传 `startRun(scope, …)`） */
   startRun: (input: {
@@ -47,6 +50,9 @@ export interface ResumeOptions {
     intent: string;
     isMarketing: boolean;
     metadata?: Record<string, unknown>;
+    rawIntent?: string;
+    selectedScenePolicy?: ReturnType<typeof resolveScenePolicyForIntent>;
+    selectedPlatform?: ReturnType<typeof resolvePlatformForIntent>;
   }) => string | Promise<string>;
   actor: { id: string; type: "human" | "system" };
 }
@@ -208,29 +214,31 @@ export async function resumeProject(
   }
 
   if (stuckStage === "preproduction") {
-    const project = (
-      await scopedRows<{ title: string | null; kind: string | null }>(
-        scope,
-        `SELECT title, kind FROM video_projects WHERE id=$1 AND workspace_id=$2`,
-        [opts.projectId, scope.workspaceId],
-      )
-    )[0];
+    const project = await readProjectMeta(scope, opts.projectId);
     if (!project) {
       return { kind: "noaction", stage: stuckStage, message: `项目 ${opts.projectId} 不存在或不属于当前工作区` };
     }
-    const runId = await opts.startRun({
-      projectId: opts.projectId,
-      intent: opts.intent ?? project.title ?? "",
-      isMarketing: project.kind === "marketing",
-    });
-    const attempt = breakpoints[0]?.attempt ?? null;
+    const latest = (await scopedRows<{ attempt: number; input_ref: string | null; status: string }>(
+      scope,
+      `SELECT attempt, input_ref, status FROM production_stage_runs
+        WHERE workspace_id=$1 AND project_id=$2 AND stage_id='preproduction' AND pipeline_run_id IS NULL
+        ORDER BY attempt DESC LIMIT 1`,
+      [scope.workspaceId, opts.projectId],
+    ))[0];
+    const attempt = latest && Number.isSafeInteger(latest.attempt) && latest.attempt > 0 ? latest.attempt : null;
+    const inputRef = attempt === null ? null : `stages/preproduction/attempt-${attempt}.input.json`;
+    const saved = inputRef !== null && latest?.input_ref === inputRef
+      ? await archive.readJson<{ input?: { resumeInput?: unknown } }>(inputRef) : null;
+    const restored = restoreStudioResumeInput(saved?.input?.resumeInput, scope, project, opts.intent);
+    if (!restored.ok) return { kind: "noaction", stage: stuckStage, message: restored.reason };
+    const runId = await opts.startRun(restored.input);
     return {
       kind: "resumed",
       stage: "preproduction",
       runId,
       attempt,
       message:
-        `预生产断点（attempt=${attempt ?? "-"}，状态=${breakpoints[0]?.status ?? "无记录"}）→ 走既有补跑入口续跑。`
+        `预生产断点（attempt=${attempt ?? "-"}，状态=${latest?.status ?? "无记录"}）→ 走既有补跑入口续跑。`
         + `注意：vendor Phase checkpoint 仅在 blueprint 指纹一致时命中（真实模型下常不一致 → 全量重跑，重复计费风险）；`
         + `本轮开跑前已把 checkpoint 快照进档案（checkpoints/attempt-<n>-before/），跑完看输出里的 resumed 标记。`
         + (interruptedRows > 0 ? `已把 ${interruptedRows} 条 running 台账归位为 interrupted。` : ""),
@@ -274,6 +282,8 @@ export interface ArchiveSummary {
 
 /** 档案只读视图（任务详情页「制片档案」标签数据源）：文件本体 + PG 索引合并返回 */
 export async function readArchiveSummary(scope: Scope, projectId: string): Promise<ArchiveSummary> {
+  // 文件档案不受数据库RLS保护；必须先用当前租户/工作区核验项目归属。
+  if (!await readProjectMeta(scope, projectId)) throw new Error("ARCHIVE_PROJECT_NOT_FOUND");
   const store = new ArchiveStore(archiveWorkDir(), scope.workspaceId, projectId);
   const manifest = await store.readManifest();
   const contextBundle = await readContextBundle(store);

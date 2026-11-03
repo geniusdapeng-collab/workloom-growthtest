@@ -1,0 +1,37 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2
+
+ ❯ apps/server/src/video/archive-resume-input.test.ts (7 tests | 1 failed) 27ms
+     × 显式重跑已完成的前期阶段，仍采用最新合法输入快照 6ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/server/src/video/archive-resume-input.test.ts > 档案恢复使用原始完整输入而非项目标题 > 显式重跑已完成的前期阶段，仍采用最新合法输入快照
+AssertionError: expected { kind: 'noaction', …(2) } to match object { kind: 'resumed', attempt: 3 }
+(2 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "attempt": 3,
+-   "kind": "resumed",
++   "kind": "noaction",
+  }
+
+ ❯ apps/server/src/video/archive-resume-input.test.ts:68:20
+     66|     const startRun = vi.fn().mockReturnValue("RUN-forced");
+     67|     const result = await resumeProject(scope, { projectId, fromStage: …
+     68|     expect(result).toMatchObject({ kind: "resumed", attempt: 3 });
+       |                    ^
+     69|     expect(startRun).toHaveBeenCalledWith(expect.objectContaining({ in…
+     70|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 passed (7)
+   Start at  10:11:09
+   Duration  847ms (transform 576ms, setup 0ms, import 755ms, tests 27ms, environment 0ms)
+

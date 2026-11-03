@@ -1,0 +1,116 @@
+TAP version 13
+# Subtest: explicit resume uses GET only and validates provider metadata
+ok 1 - explicit resume uses GET only and validates provider metadata
+  ---
+  duration_ms: 10.672208
+  type: 'test'
+  ...
+# Subtest: acceptance is persisted before first poll and automatic continuation sends no POST
+ok 2 - acceptance is persisted before first poll and automatic continuation sends no POST
+  ---
+  duration_ms: 1.254542
+  type: 'test'
+  ...
+# Subtest: read-only continuation preserves the first accepted journal bytes and timestamp
+ok 3 - read-only continuation preserves the first accepted journal bytes and timestamp
+  ---
+  duration_ms: 1.127
+  type: 'test'
+  ...
+# Subtest: a denied beforeSubmit gate causes zero I/O and creates no unknown-outcome journal
+ok 4 - a denied beforeSubmit gate causes zero I/O and creates no unknown-outcome journal
+  ---
+  duration_ms: 0.586
+  type: 'test'
+  ...
+# Subtest: an accepted task resumes without a new-submit gate; its local input binding remains verifiable
+ok 5 - an accepted task resumes without a new-submit gate; its local input binding remains verifiable
+  ---
+  duration_ms: 0.9825
+  type: 'test'
+  ...
+# Subtest: explicit provider recovery retrieves bytes without claiming that its new prompt was submitted
+ok 6 - explicit provider recovery retrieves bytes without claiming that its new prompt was submitted
+  ---
+  duration_ms: 0.768125
+  type: 'test'
+  ...
+# Subtest: four failed GETs preserve the task and recovery cannot pay twice
+ok 7 - four failed GETs preserve the task and recovery cannot pay twice
+  ---
+  duration_ms: 0.815625
+  type: 'test'
+  ...
+# Subtest: unknown POST outcome blocks subsequent submissions until provider ID is supplied
+ok 8 - unknown POST outcome blocks subsequent submissions until provider ID is supplied
+  ---
+  duration_ms: 0.729708
+  type: 'test'
+  ...
+# Subtest: two concurrent processes cannot submit the same shot twice
+ok 9 - two concurrent processes cannot submit the same shot twice
+  ---
+  duration_ms: 0.607166
+  type: 'test'
+  ...
+# Subtest: resume rejects each mismatched or missing provider specification without POST
+ok 10 - resume rejects each mismatched or missing provider specification without POST
+  ---
+  duration_ms: 2.5315
+  type: 'test'
+  ...
+# Subtest: failed, cancelled, expired and malformed success cannot be approved
+ok 11 - failed, cancelled, expired and malformed success cannot be approved
+  ---
+  duration_ms: 3.036541
+  type: 'test'
+  ...
+# Subtest: poll HTTP permissions fail closed while transient HTTP can recover
+ok 12 - poll HTTP permissions fail closed while transient HTTP can recover
+  ---
+  duration_ms: 0.713542
+  type: 'test'
+  ...
+# Subtest: pending timeout keeps accepted task for later recovery
+ok 13 - pending timeout keeps accepted task for later recovery
+  ---
+  duration_ms: 0.477042
+  type: 'test'
+  ...
+# Subtest: changed request and conflicting task map cannot reuse or create a task
+ok 14 - changed request and conflicting task map cannot reuse or create a task
+  ---
+  duration_ms: 0.696708
+  type: 'test'
+  ...
+# Subtest: unwritable journal fails before paid POST
+ok 15 - unwritable journal fails before paid POST
+  ---
+  duration_ms: 0.4365
+  type: 'test'
+  ...
+# Subtest: mapping validates empty, duplicate, unknown, traversal and malformed input
+ok 16 - mapping validates empty, duplicate, unknown, traversal and malformed input
+  ---
+  duration_ms: 0.937459
+  type: 'test'
+  ...
+# Subtest: Codex production status does not count cached or resumed verification as paid submission
+ok 17 - Codex production status does not count cached or resumed verification as paid submission
+  ---
+  duration_ms: 6.9585
+  type: 'test'
+  ...
+1..17
+# tests 17
+# suites 0
+# pass 17
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 76.979916
+
+
+exit_code=0 signal=none error=none
+assertion_validation={"ok":true,"errors":[],"testSummary":{"total":17,"passed":17,"failed":0,"cancelled":0,"skipped":0,"todo":0}}

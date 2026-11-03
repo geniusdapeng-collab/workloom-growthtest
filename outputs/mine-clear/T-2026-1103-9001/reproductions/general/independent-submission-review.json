@@ -1,0 +1,259 @@
+{
+  "task": "T-2026-1103-9001",
+  "actor": "general-audit",
+  "role": "independent-review",
+  "cards": [
+    "MC-003",
+    "MC-004",
+    "MC-005",
+    "MC-006"
+  ],
+  "repairCommits": [
+    "4b6de3d39ba74000e095825b85a30dde244d72a9",
+    "9b058d8043a873e0c19712b51293167c3f5b859c",
+    "6783459238bf91731c5ff82b1a38d2325af8871e",
+    "1d9ed551b44c4ec8cccf47de00a31c37867e1cc2",
+    "06fabc6ea2657be3d49fb53840c9af53b6054f33",
+    "802584c67ded9d27054e7a7f0e3384d952d2ce92"
+  ],
+  "readScope": [
+    {
+      "path": "apps/server/src/video/gen/providers.ts",
+      "lines": 337,
+      "sha256": "1910893a24a52e9071c172225a602edad1106179160fdaee82dbdaa29b41e590",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "apps/server/src/video/gen/types.ts",
+      "lines": 158,
+      "sha256": "f4fa56ca52b82217698ee3cf05facb0b693144a6b59ae4ab081c06d6d0520b95",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "apps/server/src/video/gen/compiled-request.ts",
+      "lines": 154,
+      "sha256": "8eef97897d6da113c56f2543098c0f27f0fbda171443869db29095ff965f181a",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "apps/server/src/video/gen/cost.ts",
+      "lines": 149,
+      "sha256": "917f72908053925e579d939f34b51d693ab24d6c3280fe98083ef97846f5f930",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "apps/server/src/video/gen/db.ts",
+      "lines": 33,
+      "sha256": "44ff4a9c803a4899e8f9239cc9ffc0c345e17811e91cbbe6a9ec1e61e7243e9c",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "apps/server/src/video/gen/ingest.ts",
+      "lines": 274,
+      "sha256": "1e6445bae0eee9bef061ba64007ef41ed60511c50bd09685ab226c70c7cadf91",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "apps/server/src/video/gen/catalog.ts",
+      "lines": 193,
+      "sha256": "08cb1723c15d58eaad81bb594936f604c043a58dcbfc1a00ae9056eefa47368d",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "apps/server/src/video/render-poller.ts",
+      "lines": 489,
+      "sha256": "09495ef3535113f270c592bd3c1e25afad2908e80077f5198d5ca16a3a0e6bce",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "apps/server/src/video/gen/provider-polling.test.ts",
+      "lines": 92,
+      "sha256": "e84a6acb0988896ee98ecd1f0ceb8e4dcf316b00adcec6092e708dd5d2b57d04",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "apps/server/src/video/gen/domestic-provider-polling.test.ts",
+      "lines": 89,
+      "sha256": "ccc081f88174574fc04f6bd8bdea56b7525efef3910c9ea2f125995bd1625a3c",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "apps/server/src/video/render-poller.pg.test.ts",
+      "lines": 232,
+      "sha256": "c806619e89dfa17859563dfd8cd2e849e2a6ae7e72e558f462cf94cc7facd060",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "packages/video-studio/src/production-client.ts",
+      "lines": 180,
+      "sha256": "396ee4835feb0687afb7fa6be77da71f5ba003c5e2eb93ba4fcd3e68bf72e19c",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "packages/video-studio/src/production-client.test.ts",
+      "lines": 186,
+      "sha256": "310b4e5f21db8d4cb22a49945c6931da86e46a91400e8c31e28cd92c86d42d4a",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "apps/server/src/video/gen/gen.test.ts",
+      "lines": 465,
+      "sha256": "93ee7b8d2d526fb75b5a69e4dbb54b5da396d9c018e7d7ba291bd605e54ac7bb",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "packages/base/model-router/gen-pool.ts",
+      "lines": 438,
+      "sha256": "e5c3979f9ad9d27a9741ee16a3e9e042f256f6f1ff43b3d7e0d8b2cc40465ce5",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "packages/base/cost-ledger/index.ts",
+      "lines": 307,
+      "sha256": "a701fba68ec8e25e6f43c095cd4424d9c6f476555fefab7d3e5b58a5922aee5c",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "packages/base/asset-cms/assets.ts",
+      "lines": 297,
+      "sha256": "57b1d4cfe71a1237a7b65f91dc9a7554665421376256047a47d4b787efe2f18f",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "apps/server/src/video/media/columns.ts",
+      "lines": 99,
+      "sha256": "4b9286fbc1d862224fe56d039c673064cd120d9811ea8c25afff6fbe787427f3",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "apps/server/src/video/media/ffmpeg.ts",
+      "lines": 176,
+      "sha256": "88b30a14b5ee7208299f6f4c01cc5669352b3a68a523a60afd3022fd9bd4c191",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "packages/base/workdata/gateway.ts",
+      "lines": 456,
+      "sha256": "ec58a342eaade4fdc42a5a60ee53f9cc7481c433d26df5cf2e576b1e1822530a",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "packages/base/workdata/events.ts",
+      "lines": 262,
+      "sha256": "c2cea423e934037fa4e2802a83ebe69daca1facb1e6876434783d2b13a530ed5",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    }
+  ],
+  "localRuns": [
+    {
+      "env": "local-preview; RUN_DB_TESTS=1; dedicated PostgreSQL; provider network boundary fixtures",
+      "tests": {
+        "apps/server/src/video/gen/provider-polling.test.ts": 61,
+        "apps/server/src/video/gen/domestic-provider-polling.test.ts": 54,
+        "apps/server/src/video/render-poller.pg.test.ts": 16,
+        "apps/server/src/video/gen/gen.test.ts": 50,
+        "packages/video-studio/src/production-client.test.ts": 32
+      },
+      "passed": 213,
+      "failed": 0,
+      "skipped": 0,
+      "suites": 5,
+      "log": "independent-submission-final.log",
+      "logSha256": "c24e3c3a2fd120fe07be1ca43af8804c58698fcde30ebbe0fff5af0a7d6fce51"
+    }
+  ],
+  "independentCounterexample": {
+    "card": "MC-003",
+    "description": "Legacy Seedance, Kling and Jimeng have reachable historical-provider lookups in base gen-pool; original adapters conflated failed lookups with terminal status. Reported to repair author, who expanded coverage to 54 cases.",
+    "failed": 15,
+    "log": "MC-003-independent-domestic-red.log",
+    "logSha256": "009d12670139886a60ae21f772e50c15de45d1322033a82537a57c8c103e414b"
+  },
+  "reviewedContracts": [
+    {
+      "card": "MC-003",
+      "level": "A",
+      "result": "Recognized business terminal states can close the task. Lookup transport, auth, rate-limit, missing or unrecognized responses preserve accepted tasks. Confirmed through server and legacy provider adapters."
+    },
+    {
+      "card": "MC-004",
+      "level": "A",
+      "result": "Provider done with local media or cost pending is retried; SQL job lock and CAS prevent concurrent duplication; CLI waits for actual local asset registration."
+    },
+    {
+      "card": "MC-005",
+      "level": "A",
+      "result": "Poll progress and expiry paths use tenant and workspace scoped transactions; independent tests use app-role PostgreSQL and verify cross-tenant isolation."
+    },
+    {
+      "card": "MC-006",
+      "level": "A",
+      "result": "Mock path chosen only from the persisted job mock flag and mock lookup never services accepted real tasks even with missing credentials."
+    }
+  ],
+  "documentation": [
+    {
+      "provider": "Ark",
+      "url": "https://docs.volcengine.com/docs/ark/list-video-generation-tasks-api?lang=zh"
+    },
+    {
+      "provider": "Higgsfield",
+      "url": "https://docs.higgsfield.ai/docs/api-reference/requests/get-request-status.md"
+    },
+    {
+      "provider": "MuAPI",
+      "url": "https://api.muapi.ai/openapi.json"
+    },
+    {
+      "provider": "Kling",
+      "url": "https://kling.ai/document-api/api/video/3-0-omni/text-to-video/legacy"
+    },
+    {
+      "provider": "Jimeng",
+      "url": "https://docs.volcengine.com/docs/jimeng-ai/jimeng-ai-video-generation-30720-p-text-to-video-interface-documentation?lang=zh"
+    }
+  ],
+  "limitations": "No paid requests, live provider jobs, production database, or vendor media quality. MCD runner acceptance is separate and will be executed after root freezes a clean source commit."
+}

@@ -1,0 +1,693 @@
+{
+  "task": "T-2026-1103-9001",
+  "baseline": "c028118de87f80b4ff0726c758b1ca0d964b9a63",
+  "scope": "Bounded primary vendor/host runtime paths and independent submission, polling, and film receipt dependencies. Full code reading for A; no claim of full repository or transitive vendor coverage.",
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "lines": 136,
+      "sha256": "a35fa19fba96d1fdcbfbfa15f505215cc6ad77bbff18182562dff888938c1e15",
+      "level": "A",
+      "read": "full",
+      "scope": "repo-instructions"
+    },
+    {
+      "path": "AGENTS.repo.md",
+      "lines": 58,
+      "sha256": "753f2a318589a76a880b467ae80f28c2e41b4826805e8fe82076f7c0278b78a4",
+      "level": "A",
+      "read": "full",
+      "scope": "repo-instructions"
+    },
+    {
+      "path": "WORKLOOM_PRODUCT_CONTEXT.md",
+      "lines": 596,
+      "sha256": "59667533f52d296468d152eb7bc05908fef64decc8e6a5415b48938c79410e51",
+      "level": "A",
+      "read": "full",
+      "scope": "repo-instructions"
+    },
+    {
+      "path": "apps/server/src/video/film-ledger.ts",
+      "lines": 596,
+      "sha256": "a2a7cb3dec8b2614acc77c0b6da9c7c94975b4cfa5206c1714f47778102ae916",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-film-ledger"
+    },
+    {
+      "path": "apps/server/src/video/film-provider-receipt.pg.test.ts",
+      "lines": 185,
+      "sha256": "b8f740f6cf12b0043b1a90a8018892f161a897459880143c564eea08833fc80c",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-film-ledger"
+    },
+    {
+      "path": "apps/server/src/video/film-worker.ts",
+      "lines": 1438,
+      "sha256": "2dc111c29796808f0b42bf1071130de8c79784193f706a4f180bc3db26e2beda",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-film-ledger"
+    },
+    {
+      "path": "apps/server/src/video/gen/catalog.ts",
+      "lines": 193,
+      "sha256": "08cb1723c15d58eaad81bb594936f604c043a58dcbfc1a00ae9056eefa47368d",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "apps/server/src/video/gen/compiled-request.ts",
+      "lines": 154,
+      "sha256": "8eef97897d6da113c56f2543098c0f27f0fbda171443869db29095ff965f181a",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "apps/server/src/video/gen/cost.ts",
+      "lines": 149,
+      "sha256": "917f72908053925e579d939f34b51d693ab24d6c3280fe98083ef97846f5f930",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "apps/server/src/video/gen/db.ts",
+      "lines": 33,
+      "sha256": "44ff4a9c803a4899e8f9239cc9ffc0c345e17811e91cbbe6a9ec1e61e7243e9c",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "apps/server/src/video/gen/domestic-provider-polling.test.ts",
+      "lines": 89,
+      "sha256": "ccc081f88174574fc04f6bd8bdea56b7525efef3910c9ea2f125995bd1625a3c",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "apps/server/src/video/gen/gen.test.ts",
+      "lines": 465,
+      "sha256": "93ee7b8d2d526fb75b5a69e4dbb54b5da396d9c018e7d7ba291bd605e54ac7bb",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "apps/server/src/video/gen/ingest.ts",
+      "lines": 274,
+      "sha256": "1e6445bae0eee9bef061ba64007ef41ed60511c50bd09685ab226c70c7cadf91",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "apps/server/src/video/gen/provider-polling.test.ts",
+      "lines": 92,
+      "sha256": "e84a6acb0988896ee98ecd1f0ceb8e4dcf316b00adcec6092e708dd5d2b57d04",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "apps/server/src/video/gen/providers.ts",
+      "lines": 337,
+      "sha256": "1910893a24a52e9071c172225a602edad1106179160fdaee82dbdaa29b41e590",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "apps/server/src/video/gen/types.ts",
+      "lines": 158,
+      "sha256": "f4fa56ca52b82217698ee3cf05facb0b693144a6b59ae4ab081c06d6d0520b95",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "apps/server/src/video/media/columns.ts",
+      "lines": 99,
+      "sha256": "4b9286fbc1d862224fe56d039c673064cd120d9811ea8c25afff6fbe787427f3",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "apps/server/src/video/media/ffmpeg.ts",
+      "lines": 176,
+      "sha256": "88b30a14b5ee7208299f6f4c01cc5669352b3a68a523a60afd3022fd9bd4c191",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "apps/server/src/video/render-poller.pg.test.ts",
+      "lines": 232,
+      "sha256": "c806619e89dfa17859563dfd8cd2e849e2a6ae7e72e558f462cf94cc7facd060",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "apps/server/src/video/render-poller.ts",
+      "lines": 489,
+      "sha256": "09495ef3535113f270c592bd3c1e25afad2908e80077f5198d5ca16a3a0e6bce",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "docs/ai-video-workbench-guide.md",
+      "lines": 267,
+      "sha256": "5ef5424a538adbe39ddbb90afac900d9b3995a8e0dd4b2493686b495659cbcd3",
+      "level": "A",
+      "read": "full",
+      "scope": "repo-instructions"
+    },
+    {
+      "path": "packages/base/asset-cms/assets.ts",
+      "lines": 297,
+      "sha256": "57b1d4cfe71a1237a7b65f91dc9a7554665421376256047a47d4b787efe2f18f",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "packages/base/cost-ledger/index.ts",
+      "lines": 307,
+      "sha256": "a701fba68ec8e25e6f43c095cd4424d9c6f476555fefab7d3e5b58a5922aee5c",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "packages/base/model-router/gen-pool.ts",
+      "lines": 438,
+      "sha256": "e5c3979f9ad9d27a9741ee16a3e9e042f256f6f1ff43b3d7e0d8b2cc40465ce5",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "packages/base/workdata/events.ts",
+      "lines": 262,
+      "sha256": "c2cea423e934037fa4e2802a83ebe69daca1facb1e6876434783d2b13a530ed5",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "packages/base/workdata/gateway.ts",
+      "lines": 456,
+      "sha256": "ec58a342eaade4fdc42a5a60ee53f9cc7481c433d26df5cf2e576b1e1822530a",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "packages/db/migrations/0046_registered_film_workers.sql",
+      "lines": 264,
+      "sha256": "ba9d4fbcec17d033f60eafce92b847dc7154a4fd14a159ad64b50bb32024e065",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-film-ledger"
+    },
+    {
+      "path": "packages/db/migrations/0060_film_provider_receipts.sql",
+      "lines": 20,
+      "sha256": "a3cf98f7a537176a76553fe00d04b130b54f33409efc6ea25590fd90c2e320cc",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-film-ledger"
+    },
+    {
+      "path": "packages/video-studio/src/confirmation.ts",
+      "lines": 74,
+      "sha256": "12b4537481efa5bd0927cb43fca3f5c7813fc267bf2b7142ad3352c2a1202a18",
+      "level": "A",
+      "read": "full",
+      "scope": "host-runtime-and-independent-proofs"
+    },
+    {
+      "path": "packages/video-studio/src/gates.ts",
+      "lines": 83,
+      "sha256": "5c60cc86122dabc625d7ba523fcb2552d134a154bdb3345a7af021be496ea9ca",
+      "level": "A",
+      "read": "full",
+      "scope": "host-runtime-and-independent-proofs"
+    },
+    {
+      "path": "packages/video-studio/src/llm-adapter.ts",
+      "lines": 505,
+      "sha256": "235a42381a78e61b3f5cc4d4999713e9fa86bff77471162475268ac75e0a2663",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-vendor-model-routing"
+    },
+    {
+      "path": "packages/video-studio/src/production-client.test.ts",
+      "lines": 186,
+      "sha256": "310b4e5f21db8d4cb22a49945c6931da86e46a91400e8c31e28cd92c86d42d4a",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "packages/video-studio/src/production-client.ts",
+      "lines": 180,
+      "sha256": "396ee4835feb0687afb7fa6be77da71f5ba003c5e2eb93ba4fcd3e68bf72e19c",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-implementation"
+    },
+    {
+      "path": "packages/video-studio/src/routed-generation.test.ts",
+      "lines": 197,
+      "sha256": "cfd9331153ba1801d108b91f2394dfa6d85cb811929ae2a0cf7fa0a4ecd61fc0",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-vendor-model-routing"
+    },
+    {
+      "path": "packages/video-studio/src/studio.ts",
+      "lines": 729,
+      "sha256": "44d72847197f9a9bd0b36b5860dfabb6808babb7ad481313f62f9f1738ade4c5",
+      "level": "A",
+      "read": "full",
+      "scope": "host-runtime-and-independent-proofs"
+    },
+    {
+      "path": "packages/video-studio/src/vendor-compat.ts",
+      "lines": 8006,
+      "sha256": "8bf749e807700b409c1540644b45e8e446362977e03b5a33cae475ccf85a0cbe",
+      "level": "A",
+      "read": "full baseline plus all task changes",
+      "scope": "host-runtime-and-independent-proofs"
+    },
+    {
+      "path": "packages/video-studio/src/vendor-discovery-await.test.ts",
+      "lines": 109,
+      "sha256": "175458a19dac47d3566c0d3405cda626ad2050c69c08781c9655652e7927808c",
+      "level": "A",
+      "read": "full",
+      "scope": "formal-regression"
+    },
+    {
+      "path": "packages/video-studio/src/vendor-prd-approval-failure.test.ts",
+      "lines": 151,
+      "sha256": "462665023bc0530724d84198396352af01c204ae628d939a39fb74b00ce3985d",
+      "level": "A",
+      "read": "full",
+      "scope": "host-runtime-and-independent-proofs"
+    },
+    {
+      "path": "packages/video-studio/src/vendor-runtime-agent-config-independent.test.ts",
+      "lines": 53,
+      "sha256": "fbd6a8a9ee492f8bcd2e33e3fae655381f665e00b8fd7a788f417427ca2352aa",
+      "level": "A",
+      "read": "full",
+      "scope": "host-runtime-and-independent-proofs"
+    },
+    {
+      "path": "packages/video-studio/src/vendor-runtime-agent-config.test.ts",
+      "lines": 79,
+      "sha256": "ec8e8b435df216b662d705c312804af253c8bc64ed7532215e02d2b52ae35d0e",
+      "level": "A",
+      "read": "full",
+      "scope": "formal-regression"
+    },
+    {
+      "path": "packages/video-studio/tsconfig.json",
+      "lines": 8,
+      "sha256": "9222ec437c1c4b8378784ebceca444214102b64598ff2d611cb4f362d576990d",
+      "level": "A",
+      "read": "full",
+      "scope": "check-configuration"
+    },
+    {
+      "path": "scripts/product-runtime-assets.mjs",
+      "lines": 197,
+      "sha256": "6f0e855135569d35da20848ece9141823b14480f2b68b3a422ea066d93303066",
+      "level": "A",
+      "read": "full",
+      "scope": "runtime-hash-reference"
+    },
+    {
+      "path": "scripts/runtime-payload-probe.mts",
+      "lines": 24,
+      "sha256": "f89d86437ba7e07a6923f87eb635f3426ecddf6848968f2dbe9b98ea2062b880",
+      "level": "A",
+      "read": "full",
+      "scope": "runtime-hash-reference"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/LICENSE",
+      "lines": 190,
+      "sha256": "8ec97162de009d12715c71977efe0bcd7aa91b3e577b12ce70c0491052104f95",
+      "level": "A",
+      "read": "full",
+      "scope": "vendor-license"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/config/production-profile.js",
+      "lines": 146,
+      "sha256": "a3061fd9d8b21e236c092d49315c24f2c0d4cda15873e81dac05e1491999b9bc",
+      "level": "A",
+      "read": "full",
+      "scope": "direct-dependency"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/duration-constraint/duration-constraint-manager.js",
+      "lines": 177,
+      "sha256": "f69c1a427812fbe1b12fc027a3bef316c635ebf9da3c57fe4898f12107a2275f",
+      "level": "A",
+      "read": "full",
+      "scope": "primary-vendor-source"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/field-quality/field-check-agent.js",
+      "lines": 784,
+      "sha256": "e5ba6cc6252fb478c90b20eba771eb1e4f8efe200f2e7cc30db601747d737105",
+      "level": "A",
+      "read": "full",
+      "scope": "primary-vendor-source"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/field-quality/field-quality-pipeline.js",
+      "lines": 309,
+      "sha256": "46b81198f761f14a93b8dd1367be0ff644e176097ae8c58b54f014c979807ca0",
+      "level": "A",
+      "read": "full",
+      "scope": "primary-vendor-source"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/field-quality/field-repair-agent.js",
+      "lines": 977,
+      "sha256": "eecf64c3294efcd714de6f76d0a4658b134c04ed38f7a6ce2a3b665ba4646177",
+      "level": "A",
+      "read": "full",
+      "scope": "primary-vendor-source"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/field-quality/index.js",
+      "lines": 31,
+      "sha256": "2f0949b92933b836f40631e465bd329f551e5ccd5fb1f34328ab5927213f17ad",
+      "level": "A",
+      "read": "full",
+      "scope": "primary-vendor-source"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/field-quality/json-salvage.js",
+      "lines": 110,
+      "sha256": "2f35e1c01b5d59426aa7ee8d9ccf201026489c04f48e950d27c26bad96245ad1",
+      "level": "A",
+      "read": "full",
+      "scope": "primary-vendor-source"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/production-engine/agents/base-agent.js",
+      "lines": 439,
+      "sha256": "150d39846cb20be3b8d79701a16e5f9ade6edffce08746c76dacd44a11cf8f09",
+      "level": "A",
+      "read": "full",
+      "scope": "direct-dependency"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/production-engine/phases/phase-1-scene-design.js",
+      "lines": 212,
+      "sha256": "a2484d2914b2db1c2d154f69b83521d7d668d6e3e47c3d70f6dce39ec164c48b",
+      "level": "A",
+      "read": "full",
+      "scope": "primary-vendor-source"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/production-engine/phases/phase-2-visual-audio.js",
+      "lines": 154,
+      "sha256": "5cc80e7c18e191b1d551912dda6bef2a2b1f0975749990ab3b42b17b862d14c2",
+      "level": "A",
+      "read": "full",
+      "scope": "primary-vendor-source"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/production-engine/phases/phase-3-5-field-quality.js",
+      "lines": 86,
+      "sha256": "52a608ee1172a0d6778d499e3890ff10f0b2df8533f9e43327b189f0e8c0ceb7",
+      "level": "A",
+      "read": "full",
+      "scope": "primary-vendor-source"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/production-engine/phases/phase-3-prompt-fusion.js",
+      "lines": 316,
+      "sha256": "0dac2c1372ac8c4c58d319c14fbc1e6df610ed38954d1f417dded59e9f4399b7",
+      "level": "A",
+      "read": "full",
+      "scope": "primary-vendor-source"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/production-engine/phases/phase-executor.js",
+      "lines": 62,
+      "sha256": "04f4dbc3947ab1ceea8829d2b286222a42586a96beda700fccd0c4c1ea3480d6",
+      "level": "A",
+      "read": "full",
+      "scope": "primary-vendor-source"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/production-engine/production-engine.js",
+      "lines": 1825,
+      "sha256": "6c5feb471b10eede541d637cfc3b75cd7e46f71c3a367a9c22eba01bdcc01e37",
+      "level": "A",
+      "read": "full",
+      "scope": "primary-vendor-source"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/production-engine/utils/rule-fallback.js",
+      "lines": 116,
+      "sha256": "0ef82303384b09471ba32f9173af0cf599402fedafd72825f7ae11e4e91d47c6",
+      "level": "A",
+      "read": "full",
+      "scope": "host-runtime-and-independent-proofs"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/requirement-discovery-engine.js",
+      "lines": 1009,
+      "sha256": "9732b1debc526cc2dce0ab2cf1c7e8044bf0a780cff1c6bb9b66aac6978e1fad",
+      "level": "A",
+      "read": "full",
+      "scope": "direct-dependency"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/script-engine/core/adapter.js",
+      "lines": 572,
+      "sha256": "5bd3b1d873de29fc724b4eb3ffcae14b432cc043defbd30859d5c4a6171c227c",
+      "level": "A",
+      "read": "full",
+      "scope": "primary-vendor-source"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/script-engine/core/boundary-prompt-templates.js",
+      "lines": 240,
+      "sha256": "7c472fe4a7be6a200338eefaf0fc12c781f4f3895e32f998ce67f2010aa7c1db",
+      "level": "A",
+      "read": "full",
+      "scope": "primary-vendor-source"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/script-engine/core/creative-intensity-engine.js",
+      "lines": 836,
+      "sha256": "88a892f83abe6264698b9e17c9925edc47901f9fa6973006e57259360dcfe0ef",
+      "level": "A",
+      "read": "full",
+      "scope": "primary-vendor-source"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/script-engine/core/intent-parser.js",
+      "lines": 399,
+      "sha256": "74d8cad8eb44ae514ef5578a947ae81b97d54eb92e3a3c08669f20d79c02125b",
+      "level": "A",
+      "read": "full",
+      "scope": "primary-vendor-source"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/script-engine/core/profile-resolver.js",
+      "lines": 165,
+      "sha256": "a7bfbe10b219e5fa0bba71ae0203ac4188787a6eebb7b4d9176d68e768314f33",
+      "level": "A",
+      "read": "full",
+      "scope": "primary-vendor-source"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/script-engine/core/requirement-list-builder.js",
+      "lines": 1113,
+      "sha256": "e965e7223ee11e8dbcc96a9fcc71296414bf9dedfaad4e5797298cd8c981350d",
+      "level": "A",
+      "read": "full",
+      "scope": "primary-vendor-source"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/script-engine/core/scene-type-normalizer.js",
+      "lines": 185,
+      "sha256": "8dd9416aaa8cd29d6e6606b2881c16a9721241e9ed5a8bded8f4752db5ed18a3",
+      "level": "A",
+      "read": "full",
+      "scope": "primary-vendor-source"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/script-engine/core/script-blueprint.js",
+      "lines": 152,
+      "sha256": "d8aea579823f5dc3203ab8e0a7b08fae188892edb05cb119a576cb76bf6672e1",
+      "level": "A",
+      "read": "full",
+      "scope": "primary-vendor-source"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/script-engine/core/script-generator.js",
+      "lines": 1378,
+      "sha256": "289d926c8220b97cd0eb3d762684325eb00732789053dee11e993ef447d8726e",
+      "level": "A",
+      "read": "full",
+      "scope": "primary-vendor-source"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/script-engine/core/script-validator.js",
+      "lines": 751,
+      "sha256": "79a5587409f7ba3b8c01ef75e1a983fb49ba34b7a93c6e11959ecccc5a752388",
+      "level": "A",
+      "read": "full",
+      "scope": "primary-vendor-source"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/script-engine/index.js",
+      "lines": 301,
+      "sha256": "40b7cc50549f5da253d56757c7b549b7b79de04a456e592d8c2b7e118d3c89c2",
+      "level": "A",
+      "read": "full",
+      "scope": "primary-vendor-source"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/index.js",
+      "lines": 4126,
+      "sha256": "c8719217200cca1c36dc4743455323d9290198950c929620cf698a055a121109",
+      "level": "A",
+      "read": "full",
+      "scope": "direct-dependency"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/package.json",
+      "lines": 31,
+      "sha256": "e4f7e60c3c0e30215c4937504cc9d4500a73c5ddb94fd32f8bf731f1ae1c8e6c",
+      "level": "A",
+      "read": "full",
+      "scope": "vendor-package"
+    },
+    {
+      "path": "vendor/supermickey/systems/llm-reasoning-engine.js",
+      "lines": 529,
+      "sha256": "a1fd1cb59c8991dfdaee406113f51859c145f6689be1a13499ac4be97c0231e0",
+      "level": "A",
+      "read": "full",
+      "scope": "independent-vendor-model-routing"
+    }
+  ],
+  "findings": [
+    {
+      "card": "MC-002",
+      "title": "Production phase agents retain old runtime configuration and do not receive updated deadline",
+      "status": "fixed-await-independent",
+      "evidence": "A",
+      "baseline": "c028118de87f80b4ff0726c758b1ca0d964b9a63",
+      "rootCause": "vendor/supermickey/hyperreality-system/engines/production-engine/production-engine.js:228 _initAgents replaces this.agents without rebinding existing phaseN.agents",
+      "realTrigger": "vendor/supermickey/hyperreality-system/index.js:1301 and :1313 -> ProductionEngine.produce:470",
+      "formalTest": "packages/video-studio/src/vendor-runtime-agent-config.test.ts",
+      "observed": {
+        "sameAgents": false,
+        "phaseModel": "before",
+        "currentModel": "after",
+        "phaseDeadline": null,
+        "currentDeadline": 123456
+      },
+      "commit": "63272856",
+      "red": "MC-002-red.log",
+      "green": "MC-002-green.log",
+      "typecheck": "MC-002-typecheck.log",
+      "validation": {
+        "files": 3,
+        "passed": 113,
+        "failed": 0,
+        "skip": 0
+      },
+      "followupCommit": "2a0e6e2161fbf0f8696bd0fe0a0b0613464ef7e2",
+      "followupRootCause": "Phase 3.5 creates its own checker from an engine-level model cache that was initialized only in the constructor; health monitor may rebuild Phase 3.5 from that stale engine cache.",
+      "independentRed": "../submission/MC-002-phase35-independent-red.log",
+      "followupGreen": "MC-002-phase35-final-green.log",
+      "followupValidation": {
+        "files": 4,
+        "passed": 116,
+        "typescriptExit": 0
+      }
+    },
+    {
+      "card": "MC-012",
+      "title": "Async discovery conversion was consumed as a Promise by live create before G3",
+      "status": "fixed-await-independent",
+      "evidence": "A",
+      "baseline": "c028118de87f80b4ff0726c758b1ca0d964b9a63",
+      "rootCause": "vendor/supermickey/hyperreality-system/index.js:743 did not await async _convertDiscoveryToRequirementList (:2776); both original and host bridge conversion are async",
+      "formalTest": "packages/video-studio/src/vendor-discovery-await.test.ts",
+      "red": "MC-012-red.log",
+      "green": "MC-012-green.log",
+      "typecheck": "MC-012-typecheck.log",
+      "durationRegression": "MC-012-duration-regression.log",
+      "commit": "d5f97f5a",
+      "validation": {
+        "formalCases": 4,
+        "combinedFiles": 3,
+        "combinedPassed": 113,
+        "durationFiles": 3,
+        "durationPassed": 30,
+        "failed": 0,
+        "typescriptExit": 0,
+        "nodeSyntaxExit": 0
+      },
+      "license": "Apache-2.0 retained, modified-file notice added; no upstream version claim changed",
+      "hashReferences": "No static source hash registry located in queried paths. scripts/product-runtime-assets.mjs computes actual copied file hashes at packaging time."
+    },
+    {
+      "card": "MC-019",
+      "title": "PRD fallback could enter script before current G4 approval",
+      "status": "fixed-await-independent",
+      "evidence": "A",
+      "baseline": "c028118de87f80b4ff0726c758b1ca0d964b9a63",
+      "rootCause": "vendor/supermickey/hyperreality-system/index.js:1068 catches PRD generation/approval failures and reaches minimal PRD fallback, bypassing a current verified G4 for the host run.",
+      "formalTest": "packages/video-studio/src/vendor-prd-approval-failure.test.ts",
+      "commit": "cde51696e54df8ec2ba821c33f232e00d782bdf2",
+      "red": "MC-019-red.log",
+      "green": "MC-019-regression-final.log",
+      "typecheck": "MC-019-typecheck-final.log",
+      "validation": {
+        "formalCases": 5,
+        "initialFailed": 3,
+        "initialPassed": 2,
+        "adjacentFiles": 5,
+        "adjacentPassed": 155,
+        "typescriptExit": 0
+      },
+      "limitation": "Actual host/vendor control flow with no external paid models. Unscoped vendor preview can still degrade; host stops before script model boundary without a current approval."
+    }
+  ],
+  "counts": {
+    "A": 74,
+    "B": 0,
+    "C": 0,
+    "D": 0
+  },
+  "sourceScopeNote": "All 23 originally inventoried primary vendor implementation files were fully read; index.js and direct profile/discovery dependencies also read in full. This remains a bounded audit and does not cover every transitively imported vendor module.",
+  "reviewedSourceCommit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+}

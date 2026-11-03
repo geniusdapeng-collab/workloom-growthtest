@@ -1,0 +1,87 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2
+
+ ❯ packages/video-studio/src/pipeline-control-plane/auto-approval-projection.test.ts (3 tests | 3 failed) 20ms
+     × passed 不能在投影中退回not_run 17ms
+     × rejected 不能在投影中退回not_run 1ms
+     × unverified 不能在投影中退回not_run 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/video-studio/src/pipeline-control-plane/auto-approval-projection.test.ts > 自动门裁决在控制面投影中保持相同语义 > passed 不能在投影中退回not_run
+AssertionError: expected { nodeKey: 'prompt', …(11) } to match object { verificationStatus: 'passed', …(1) }
+(10 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "disposition": "continue",
+-   "verificationStatus": "passed",
++   "verificationStatus": "not_run",
+  }
+
+ ❯ packages/video-studio/src/pipeline-control-plane/auto-approval-projection.test.ts:32:35
+     30|     expect(saved.verificationStatus).toBe(decision);
+     31|     const projection = await coordinator.readProjection(scope, pipelin…
+     32|     expect(projection?.stages[0]).toMatchObject({ verificationStatus: …
+       |                                   ^
+     33|     expect(projection?.stages[0]?.gateDecisionIds).toHaveLength(1);
+     34|     expect(projection?.nextAction).toBe(nextAction);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  packages/video-studio/src/pipeline-control-plane/auto-approval-projection.test.ts > 自动门裁决在控制面投影中保持相同语义 > rejected 不能在投影中退回not_run
+AssertionError: expected { nodeKey: 'prompt', …(11) } to match object { Object (verificationStatus, disposition) }
+(10 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "disposition": "repair",
+-   "verificationStatus": "rejected",
++   "disposition": "continue",
++   "verificationStatus": "not_run",
+  }
+
+ ❯ packages/video-studio/src/pipeline-control-plane/auto-approval-projection.test.ts:32:35
+     30|     expect(saved.verificationStatus).toBe(decision);
+     31|     const projection = await coordinator.readProjection(scope, pipelin…
+     32|     expect(projection?.stages[0]).toMatchObject({ verificationStatus: …
+       |                                   ^
+     33|     expect(projection?.stages[0]?.gateDecisionIds).toHaveLength(1);
+     34|     expect(projection?.nextAction).toBe(nextAction);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  packages/video-studio/src/pipeline-control-plane/auto-approval-projection.test.ts > 自动门裁决在控制面投影中保持相同语义 > unverified 不能在投影中退回not_run
+AssertionError: expected { nodeKey: 'prompt', …(11) } to match object { …(2) }
+(10 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "disposition": "reconcile",
+-   "verificationStatus": "unverified",
++   "disposition": "continue",
++   "verificationStatus": "not_run",
+  }
+
+ ❯ packages/video-studio/src/pipeline-control-plane/auto-approval-projection.test.ts:32:35
+     30|     expect(saved.verificationStatus).toBe(decision);
+     31|     const projection = await coordinator.readProjection(scope, pipelin…
+     32|     expect(projection?.stages[0]).toMatchObject({ verificationStatus: …
+       |                                   ^
+     33|     expect(projection?.stages[0]?.gateDecisionIds).toHaveLength(1);
+     34|     expect(projection?.nextAction).toBe(nextAction);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed (3)
+   Start at  09:36:10
+   Duration  199ms (transform 46ms, setup 0ms, import 108ms, tests 20ms, environment 0ms)
+

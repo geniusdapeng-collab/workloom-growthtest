@@ -64,9 +64,10 @@ async function prepare(options: {
   mixedCurrencies?: boolean;
   zeroPrice?: boolean;
   fragmentAliases?: boolean;
+  queryHints?: { brand?: string; category?: string; model?: string };
 } = {}): Promise<PreparedMarketingFacts> {
   let searches = 0;
-  return prepareMarketingFacts({ scope: { ...scope, attempt: options.attempt ?? 1 }, root, intent: "做一条风扇介绍", metadata: { brief: { product: "星野 F3", brand: "星野" } }, env: { ...env, ...(options.mode ? { VM_DATA_MINING_MODE: options.mode } : {}) },
+  return prepareMarketingFacts({ scope: { ...scope, attempt: options.attempt ?? 1 }, root, intent: "做一条风扇介绍", metadata: { brief: { product: "星野 F3", brand: "星野" }, ...(options.queryHints ? { dataMining: { name: "星野 F3", ...options.queryHints } } : {}) }, env: { ...env, ...(options.mode ? { VM_DATA_MINING_MODE: options.mode } : {}) },
     llm: { reason: async prompt => {
       extractionCalls.push(prompt); if (options.modelFailure) return { success: false, error: "LLM unavailable" };
       const match = /当前阶段：(A[123])\n(.*)$/s.exec(prompt)!; const source = JSON.parse(match[2]!).sources[0];
@@ -101,6 +102,27 @@ async function prepare(options: {
 }
 const shots = [{ shotId: "S1", prompt: "窗边展示星野 F3 风扇，字幕说明风量 9 档。", fields: { 场景: "窗边", 产品: "星野 F3", 规格: "9 档" } }];
 describe("营销事实宿主完整执行", () => {
+  it("未进入已审A1主张的品牌、类别、型号仍只是检索线索，不能兜底成档案身份", async () => {
+    const hints = { brand: "仅供检索品牌", category: "仅供检索服务", model: "仅供检索型号" };
+    const prepared = await prepare({ queryHints: hints });
+    expect(prepared.bundle.productQuery).toMatchObject(hints);
+    expect(prepared.raw.A1.identity).not.toHaveProperty("brand");
+    expect(prepared.raw.A1.identity).not.toHaveProperty("category");
+    expect(prepared.raw.A1.identity).not.toHaveProperty("model");
+    expect(prepared.bundle.dossier.identity).toMatchObject({ name: "星野 F3", brand: "", category: "", model: "" });
+    expect(prepared.bundle.cards.brief_card).toMatchObject({ product: "星野 F3", category: "" });
+    const persisted = JSON.parse(await readFile(path.join(prepared.storeRoot, String(prepared.bundle.dossier.product_id), "dossier.json"), "utf8"));
+    expect(persisted.identity).toMatchObject({ name: "星野 F3", brand: "", category: "", model: "" });
+  });
+  it("没有竞品证据时不把己方卖点补集当成竞争差异事实交给创作", async () => {
+    const prepared = await prepare();
+    expect(prepared.raw.A3.competitors).toEqual([]);
+    expect(prepared.bundle.restrictions).toContain("没有可核实竞品证据：禁止对比、竞品弱点或市场领先主张");
+    expect(prepared.bundle.dossier.differentiation).toEqual({ our_opening: [], crowded_points: [], weakness_openings: [] });
+    expect((prepared.bundle.cards.theme_card as { differentiation_space: string[] }).differentiation_space).toEqual([]);
+    expect((prepared.bundle.cards.insight_card as { market_position: { our_opening: string[] } }).market_position.our_opening).toEqual([]);
+    expect((prepared.bundle.dossier.identity as { official_selling_points: unknown[] }).official_selling_points).toHaveLength(1);
+  });
   it("跨站不同fragment指向同一规范来源时复用同次抓取快照，不因抓取时间不同破坏审核绑定", async () => {
     const prepared = await prepare({ fragmentAliases: true });
     const saved = await finalizeMarketingFacts(prepared, shots, env);

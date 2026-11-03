@@ -1,0 +1,91 @@
+
+ RUN  v3.2.7 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2
+
+ ❯ packages/video-studio/src/vendor-portrait-binding-concurrency.test.ts (2 tests | 2 failed) 295ms
+   × vendor渲染的并发定妆照绑定 > 两项目重叠并从a先结束，精确消费各自的四张图 148ms
+     → {"a":{"success":true,"bytes":[16,17,18,19],"schemaVersion":"workloom.portrait-binding/v2","errors":[]},"b":{"success":true,"bytes":[32,33,34,35],"schemaVersion":"workloom.portrait-binding/v2","errors":[]},"retainedWhileActive":true,"restored":true,"scopedParserPatched":false,"scopedParserRetained":false,"scopedParserRestored":true,"parserSingleWrapper":false,"parserRetained":false,"parserRestored":false}: expected { a: { success: true, …(3) }, …(9) } to match object { a: { success: true, …(2) }, …(9) }
+   × vendor渲染的并发定妆照绑定 > 两项目重叠并从b先结束，精确消费各自的四张图 147ms
+     → {"b":{"success":true,"bytes":[32,33,34,35],"schemaVersion":"workloom.portrait-binding/v2","errors":[]},"a":{"success":true,"bytes":[16,17,18,19],"schemaVersion":"workloom.portrait-binding/v2","errors":[]},"retainedWhileActive":true,"restored":true,"scopedParserPatched":false,"scopedParserRetained":false,"scopedParserRestored":true,"parserSingleWrapper":false,"parserRetained":false,"parserRestored":false}: expected { b: { success: true, …(3) }, …(9) } to match object { a: { success: true, …(2) }, …(9) }
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/video-studio/src/vendor-portrait-binding-concurrency.test.ts > vendor渲染的并发定妆照绑定 > 两项目重叠并从a先结束，精确消费各自的四张图
+AssertionError: {"a":{"success":true,"bytes":[16,17,18,19],"schemaVersion":"workloom.portrait-binding/v2","errors":[]},"b":{"success":true,"bytes":[32,33,34,35],"schemaVersion":"workloom.portrait-binding/v2","errors":[]},"retainedWhileActive":true,"restored":true,"scopedParserPatched":false,"scopedParserRetained":false,"scopedParserRestored":true,"parserSingleWrapper":false,"parserRetained":false,"parserRestored":false}: expected { a: { success: true, …(3) }, …(9) } to match object { a: { success: true, …(2) }, …(9) }
+
+- Expected
++ Received
+
+@@ -17,14 +17,14 @@
+        35,
+      ],
+      "schemaVersion": "workloom.portrait-binding/v2",
+      "success": true,
+    },
+-   "parserRestored": true,
+-   "parserRetained": true,
+-   "parserSingleWrapper": true,
++   "parserRestored": false,
++   "parserRetained": false,
++   "parserSingleWrapper": false,
+    "restored": true,
+    "retainedWhileActive": true,
+-   "scopedParserPatched": true,
++   "scopedParserPatched": false,
+    "scopedParserRestored": true,
+-   "scopedParserRetained": true,
++   "scopedParserRetained": false,
+  }
+
+ ❯ packages/video-studio/src/vendor-portrait-binding-concurrency.test.ts:106:50
+    104|       if (!line) throw new Error(`子进程未输出回执：${stdout.slice(-600)}`);
+    105|       const observed = JSON.parse(line.slice(7));
+    106|       expect(observed, JSON.stringify(observed)).toMatchObject({
+       |                                                  ^
+    107|         a: { success: true, bytes: [16, 17, 18, 19], schemaVersion: "w…
+    108|         b: { success: true, bytes: [32, 33, 34, 35], schemaVersion: "w…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  packages/video-studio/src/vendor-portrait-binding-concurrency.test.ts > vendor渲染的并发定妆照绑定 > 两项目重叠并从b先结束，精确消费各自的四张图
+AssertionError: {"b":{"success":true,"bytes":[32,33,34,35],"schemaVersion":"workloom.portrait-binding/v2","errors":[]},"a":{"success":true,"bytes":[16,17,18,19],"schemaVersion":"workloom.portrait-binding/v2","errors":[]},"retainedWhileActive":true,"restored":true,"scopedParserPatched":false,"scopedParserRetained":false,"scopedParserRestored":true,"parserSingleWrapper":false,"parserRetained":false,"parserRestored":false}: expected { b: { success: true, …(3) }, …(9) } to match object { a: { success: true, …(2) }, …(9) }
+
+- Expected
++ Received
+
+@@ -17,14 +17,14 @@
+        35,
+      ],
+      "schemaVersion": "workloom.portrait-binding/v2",
+      "success": true,
+    },
+-   "parserRestored": true,
+-   "parserRetained": true,
+-   "parserSingleWrapper": true,
++   "parserRestored": false,
++   "parserRetained": false,
++   "parserSingleWrapper": false,
+    "restored": true,
+    "retainedWhileActive": true,
+-   "scopedParserPatched": true,
++   "scopedParserPatched": false,
+    "scopedParserRestored": true,
+-   "scopedParserRetained": true,
++   "scopedParserRetained": false,
+  }
+
+ ❯ packages/video-studio/src/vendor-portrait-binding-concurrency.test.ts:106:50
+    104|       if (!line) throw new Error(`子进程未输出回执：${stdout.slice(-600)}`);
+    105|       const observed = JSON.parse(line.slice(7));
+    106|       expect(observed, JSON.stringify(observed)).toMatchObject({
+       |                                                  ^
+    107|         a: { success: true, bytes: [16, 17, 18, 19], schemaVersion: "w…
+    108|         b: { success: true, bytes: [32, 33, 34, 35], schemaVersion: "w…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+   Start at  10:30:43
+   Duration  429ms (transform 18ms, setup 0ms, collect 20ms, tests 295ms, environment 0ms, prepare 28ms)
+

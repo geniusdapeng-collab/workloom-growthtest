@@ -1,0 +1,61 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2
+
+ ❯ packages/video-studio/src/production-client.test.ts (32 tests | 3 failed) 786ms
+     × waits for persisted asset_id after provider completion, allowing ingest reconciliation without resubmission 3ms
+     × waits for persisted local_path after provider completion, allowing ingest reconciliation without resubmission 1ms
+     × keeps a permanently missing media receipt unverified only after the existing poll limit 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/video-studio/src/production-client.test.ts > service production client > waits for persisted asset_id after provider completion, allowing ingest reconciliation without resubmission
+ FAIL  packages/video-studio/src/production-client.test.ts > service production client > waits for persisted local_path after provider completion, allowing ingest reconciliation without resubmission
+AssertionError: expected 'unverified' to be 'done' // Object.is equality
+
+Expected: "done"
+Received: "unverified"
+
+ ❯ packages/video-studio/src/production-client.test.ts:134:27
+    132|       ? [{ ...(value as object[])[0], [key]: null, result_url: "https:…
+    133|     const result = await run(f, { pollRounds: 2, onProgress: value => …
+    134|     expect(result.status).toBe("done"); expect(result.shots[0]?.assetI…
+       |                           ^
+    135|     expect(f.calls.filter(call => call.route === "video.render.submit"…
+    136|     expect(f.calls.filter(call => call.route === "video.render.poll"))…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  packages/video-studio/src/production-client.test.ts > service production client > keeps a permanently missing media receipt unverified only after the existing poll limit
+AssertionError: expected { mode: 'service-production', …(7) } to match object { status: 'unverified', …(1) }
+(20 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "shots": [
+      {
+-       "error": StringContaining "POLL_LIMIT",
++       "error": "MEDIA_UNVERIFIED: Generation has no persisted media receipt",
+        "status": "unknown",
+      },
+    ],
+    "status": "unverified",
+  }
+
+ ❯ packages/video-studio/src/production-client.test.ts:143:20
+    141|     const f = fixture((call, value) => call.route.endsWith("jobs") ? […
+    142|     const result = await run(f, { pollRounds: 3 });
+    143|     expect(result).toMatchObject({ status: "unverified", shots: [{ sta…
+       |                    ^
+    144|     expect(f.calls.filter(call => call.route === "video.render.poll"))…
+    145|     expect(f.calls.filter(call => call.route === "video.render.submit"…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 29 passed (32)
+   Start at  09:37:51
+   Duration  906ms (transform 34ms, setup 0ms, import 53ms, tests 786ms, environment 0ms)
+

@@ -13,6 +13,11 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
+import { ArchiveStore } from "@hyperreality/video-studio";
+import { archiveWorkDir, readProjectMeta } from "./archive-host.js";
+import { captureStudioResumeInput } from "./studio-resume-input.js";
+import { resolveScenePolicyForIntent } from "./scene-policy-routing.js";
+import { resolvePlatformForIntent } from "./platform-routing.js";
 
 process.env.DATABASE_URL ??= "postgres://postgres:workloom@localhost:5432/workloom";
 process.env.DATABASE_APP_URL ??= "postgres://workloom_app:workloom_dev_app@localhost:5432/workloom";
@@ -130,6 +135,19 @@ describe.runIf(RUN_DB)("制片档案活库契约", () => {
        VALUES ('SR-run1',$1,$2,'preproduction',1,'running')`,
       [workspaceId, projectId],
     );
+    const project = await readProjectMeta(scope, projectId);
+    if (!project) throw new Error("fixture project missing");
+    const originalIntent = "续跑契约用例的完整原始需求";
+    const metadata = { aspectRatio: "16:9", noMusic: true };
+    const archive = new ArchiveStore(archiveWorkDir(), workspaceId, projectId);
+    await archive.writeJsonAtomic("stages/preproduction/attempt-1.input.json", { input: {
+      resumeInput: captureStudioResumeInput(scope, { projectId, intent: originalIntent, metadata }, {
+        projectCreatedAt: project.createdAt, requiresDelegation: false,
+        scenePolicy: resolveScenePolicyForIntent(originalIntent, metadata),
+        platformId: resolvePlatformForIntent(originalIntent, metadata).decision.id,
+      }),
+    } });
+    await owner.query("UPDATE production_stage_runs SET input_ref=$3 WHERE workspace_id=$1 AND project_id=$2 AND id='SR-run1'", [workspaceId, projectId, "stages/preproduction/attempt-1.input.json"]);
     const started: Array<Record<string, unknown>> = [];
     const result = await resumeProject(scope, {
       projectId,
@@ -142,7 +160,7 @@ describe.runIf(RUN_DB)("制片档案活库契约", () => {
     });
     expect(result.kind).toBe("resumed");
     if (result.kind === "resumed") expect(result.runId).toBe("RUN-RESUMED");
-    expect(started[0]).toMatchObject({ projectId, intent: "续跑契约用例", isMarketing: false });
+    expect(started[0]).toMatchObject({ projectId, intent: "续跑契约用例", metadata, isMarketing: false });
     const rows = await owner.query<{ status: string }>(
       `SELECT status FROM production_stage_runs WHERE workspace_id=$1 AND project_id=$2`,
       [workspaceId, projectId],

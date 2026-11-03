@@ -93,9 +93,10 @@ vi.mock("@hyperreality/video-studio", async (importOriginal) => ({
   },
   reviewStage: doubles.review,
   WorkloomLLMEngine: { fromEnv: () => ({ attachRouter: vi.fn(), attachConfiguredRouter: vi.fn() }) },
-  installVendorEngineBridge: vi.fn(),
-  installVendorRenderCompatBridge: vi.fn(),
-  installVendorPortraitBindingBridge: () => doubles.uninstall,
+  withVendorEngineBridge: (_engine: unknown, run: () => Promise<unknown>) => run(),
+  withVendorPortraitBindingBridge: async (_options: unknown, run: () => Promise<unknown>) => {
+    try { return await run(); } finally { doubles.uninstall(); }
+  },
   attachStructuredLog: () => doubles.detach,
 }));
 
@@ -230,6 +231,68 @@ async function archiveOutput(projectId: string, attempt: number) {
 }
 
 describe("预生产原始结果与诚实终态", () => {
+  it("并发预生产只归档当前运行日志，结束顺序不影响另一个工作区", async () => {
+    useNarrativeProject();
+    const scopeB = { tenantId: "tenant-logs-b", workspaceId: "ws-logs-b" };
+    const projectA = `VID-log-a-${++projectSequence}`;
+    const projectB = `VID-log-b-${++projectSequence}`;
+    function signal() {
+      let resolve!: () => void;
+      const promise = new Promise<void>((done) => { resolve = done; });
+      return { promise, resolve };
+    }
+    const a = signal();
+    const b = signal();
+    const aReady = signal();
+    const bReady = signal();
+    doubles.runPreproduction
+      .mockImplementationOnce(async () => {
+        console.log("run-a-private-before"); aReady.resolve();
+        await a.promise; console.warn("run-a-private-after"); return rejected();
+      })
+      .mockImplementationOnce(async () => {
+        console.log("run-b-private-before"); bReady.resolve();
+        await b.promise; console.error("run-b-private-after"); return rejected();
+      });
+    const originals = [console.log, console.warn, console.error];
+    const runA = worker.startRun(scope, { projectId: projectA, intent: "山间日出" });
+    let runB: string | undefined;
+    try {
+      await aReady.promise;
+      runB = worker.startRun(scopeB, { projectId: projectB, intent: "海边日落" });
+      await bReady.promise;
+      console.log("unscoped-server-log");
+      a.resolve();
+      await vi.waitFor(() => expect(worker.getRun(runA, scope.workspaceId)?.finishedAt).toBeTruthy());
+    } finally {
+      a.resolve();
+      b.resolve();
+      if (runB) await vi.waitFor(() => expect(worker.getRun(runB!, scopeB.workspaceId)?.finishedAt).toBeTruthy());
+    }
+    const [logA, logB] = await Promise.all([projectA, projectB].map((id) =>
+      readFile(path.join(doubles.workDir, "logs", `${id}.log`), "utf8")));
+    expect(logA).toContain("run-a-private-before");
+    expect(logA).toContain("run-a-private-after");
+    expect(logA).not.toMatch(/run-b-private|unscoped-server-log/);
+    expect(logB).toContain("run-b-private-before");
+    expect(logB).toContain("run-b-private-after");
+    expect(logB).not.toMatch(/run-a-private|unscoped-server-log/);
+    expect([console.log, console.warn, console.error]).toEqual(originals);
+  });
+
+  it("执行前输入快照保留原始需求与metadata供恢复，不能只保存加工正文", async () => {
+    useNarrativeProject(); doubles.runPreproduction.mockResolvedValue(success());
+    const projectId = `VID-resume-source-${++projectSequence}`;
+    const intent = `山间风景。${"保留紫色花与自然光。".repeat(35)}`;
+    const metadata = { aspectRatio: "16:9", noMusic: true, brief: { audience: "游客" } };
+    const runId = worker.startRun(scope, { projectId, intent, rawIntent: "用户原话", metadata });
+    await vi.waitFor(() => expect(worker.getRun(runId, scope.workspaceId)?.finishedAt).not.toBeNull(), { timeout: 3_000, interval: 10 });
+    const file = path.join(doubles.workDir, "archive", scope.workspaceId, projectId, "stages/preproduction/attempt-1.input.json");
+    const saved = JSON.parse(await readFile(file, "utf8"));
+    expect(saved.input.resumeInput).toMatchObject({ schemaVersion: "workloom.studio-resume-input/v1", ...scope, projectId,
+      intent, rawIntent: "用户原话", metadata, isMarketing: false, requiresDelegation: false });
+  });
+
   it("建项目之前拦截显式未知片型，未触及数据库和供应商", async () => {
     await expect(worker.startVideoProjectRun(scope, {
       intent: "给陈卓拍一条正式商务短片",
@@ -365,7 +428,7 @@ describe("预生产原始结果与诚实终态", () => {
     expect(doubles.project.mock.calls[0]?.[3].dossierRoot).toBe(path.join(projectRoot, "stages/preproduction/attempt-2.marketing-dossier"));
     expect(worker.getRun(runId, "another-workspace")).toBeNull();
     expect(doubles.release).toHaveBeenCalledTimes(1);
-    expect(doubles.uninstall).toHaveBeenCalledTimes(1);
+    expect(doubles.uninstall).toHaveBeenCalledTimes(2);
   });
 
   it("默认：监制打回即停，不自动重跑（不再把 AI 打回变成重复烧钱）", async () => {
@@ -417,7 +480,7 @@ describe("预生产原始结果与诚实终态", () => {
     expect(doubles.lease).not.toHaveBeenCalled();
   });
 
-  it.each(["busy", "error"])("租约 %s 不会无锁执行，并清理已安装的桥", async (failure) => {
+  it.each(["busy", "error"])("租约 %s 不会安装供应商绑定桥或无锁执行", async (failure) => {
     if (failure === "busy") doubles.lease.mockResolvedValue(null);
     else doubles.lease.mockRejectedValue(new Error("lease network failed"));
     const { entry } = await runToTerminal();
@@ -425,7 +488,7 @@ describe("预生产原始结果与诚实终态", () => {
     expect(doubles.runPreproduction).not.toHaveBeenCalled();
     expect(doubles.meta).not.toHaveBeenCalled();
     expect(doubles.finish).not.toHaveBeenCalled();
-    expect(doubles.uninstall).toHaveBeenCalledTimes(1);
+    expect(doubles.uninstall).not.toHaveBeenCalled();
     expect(doubles.release).not.toHaveBeenCalled();
   });
 
@@ -440,7 +503,7 @@ describe("预生产原始结果与诚实终态", () => {
     expect(entry.status).toBe("failed");
     expect(doubles.runPreproduction).not.toHaveBeenCalled();
     expect(doubles.release).toHaveBeenCalledTimes(1);
-    expect(doubles.uninstall).toHaveBeenCalledTimes(1);
+    expect(doubles.uninstall).not.toHaveBeenCalled();
     if (failure !== "archive") {
       await expect(readFile(path.join(doubles.workDir, "archive", scope.workspaceId, projectId, "context-bundle.json"))).rejects.toMatchObject({ code: "ENOENT" });
     }
@@ -456,7 +519,7 @@ describe("预生产原始结果与诚实终态", () => {
     expect(doubles.release).toHaveBeenCalledTimes(1);
   });
 
-  it("解锁和日志清理抛错仍清理绑定桥并写终态", async () => {
+  it("绑定桥先随 vendor 退出，后续日志和解锁失败仍记录终态", async () => {
     doubles.runPreproduction.mockResolvedValue(success());
     doubles.detach.mockImplementation(() => { throw new Error("detach failed"); });
     doubles.release.mockRejectedValue(new Error("unlock failed"));

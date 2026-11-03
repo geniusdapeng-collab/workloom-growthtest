@@ -1,0 +1,236 @@
+{
+  "actor": "/root",
+  "files": [
+    {
+      "path": "apps/server/src/video/archive-host.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 314
+    },
+    {
+      "path": "apps/server/src/video/archive-resume.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 458
+    },
+    {
+      "path": "apps/server/src/video/archive-access.test.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 56
+    },
+    {
+      "path": "apps/server/src/video/archive-access.pg.test.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 60
+    },
+    {
+      "path": "apps/server/src/video/archive-resume.test.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 153
+    },
+    {
+      "path": "apps/server/src/video/archive.pg.test.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 334
+    },
+    {
+      "path": "apps/server/src/video/archive-resume-input.test.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 72
+    },
+    {
+      "path": "apps/server/src/video/studio-resume-input.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 98
+    },
+    {
+      "path": "apps/server/src/video/studio-worker.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 1799
+    },
+    {
+      "path": "apps/server/src/video/studio-worker.test.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 792
+    },
+    {
+      "path": "apps/server/src/video/scene-policy-routing.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 105
+    },
+    {
+      "path": "apps/server/src/video/platform-routing.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 62
+    },
+    {
+      "path": "apps/server/src/video/pipeline-control-plane.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 832
+    },
+    {
+      "path": "apps/server/src/video/pipeline-control-concurrency.pg.test.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 79
+    },
+    {
+      "path": "packages/db/src/client.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 96
+    },
+    {
+      "path": "packages/db/src/index.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 6
+    },
+    {
+      "path": "packages/video-studio/src/archive/store.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 307
+    },
+    {
+      "path": "packages/video-studio/src/archive/store.test.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 160
+    },
+    {
+      "path": "packages/video-studio/src/archive/context-bundle.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 153
+    },
+    {
+      "path": "packages/video-studio/src/archive/stage-runner.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 337
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/index.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 9
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/contracts.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 265
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/repository.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 64
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/state.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 109
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/compiler.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 460
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/projection.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 185
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/coordinator.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 994
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/lease.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 44
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/shadow.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 328
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/in-memory-repository.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 275
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/auto-approval-projection.test.ts",
+      "level": "A",
+      "read": "full",
+      "reason": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。",
+      "lines": 36
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/pipeline-control-plane.test.ts",
+      "level": "B",
+      "read": "test-execution-only",
+      "reason": "全套回归实际运行，未逐行语义阅读全文件。",
+      "lines": 576
+    },
+    {
+      "path": "apps/server/src/video/pipeline-control-plane.pg.test.ts",
+      "level": "B",
+      "read": "test-execution-only",
+      "reason": "全套回归实际运行，未逐行语义阅读全文件。",
+      "lines": 334
+    }
+  ]
+}

@@ -722,7 +722,10 @@ export async function handleChannelRequest(ctx: RunContext, frame: FilmChannelRe
     await ledger.recordComponentFailure(component.id, ctx.ownerToken, {
       state: !(error instanceof SubmissionError) || /UNKNOWN|TIMEOUT|DEADLINE/.test(error.code) ? "unknown" : "failed",
       failureClass,
-      evidence: { message: error instanceof Error ? error.message.slice(0, 400) : String(error).slice(0, 400) },
+      evidence: { message: error instanceof Error ? error.message.slice(0, 400) : String(error).slice(0, 400),
+        ...(error instanceof SubmissionError && error.details?.taskId ? {
+          providerTaskId: error.details.taskId, providerRequestHash: error.details.requestHash,
+        } : {}) },
     }).catch(() => undefined);
     throw error;
   }
@@ -1036,6 +1039,35 @@ async function anchorsToDataUrls(ctx: RunContext, refs: unknown): Promise<string
   return out;
 }
 
+async function retainProviderAcceptance(ctx: RunContext, frame: FilmChannelRequestFrame, componentId: string,
+  provider: string, providerModel: string, taskId: string, providerRequestHash: string): Promise<void> {
+  const receipt = { provider, providerModel, taskId, providerRequestHash };
+  try {
+    await ctx.ledger.recordProviderAcceptance(componentId, ctx.ownerToken, receipt);
+  } catch (cause) {
+    let recovered = false;
+    // Keep this retry inside the provider continuation: an already cancelled channel
+    // cannot receive this error or merge its task ID into the deadline receipt.
+    // The ledger update binds the same owner, task and hash, so a lost commit
+    // acknowledgement also makes this retry safe. It never resubmits the provider call.
+    if (!(cause instanceof SubmissionError)) {
+      try {
+        await ctx.ledger.recordProviderAcceptance(componentId, ctx.ownerToken, receipt);
+        recovered = true;
+      } catch (retryError) {
+        ctx.log(`供应商接受回执补写失败（组件 ${componentId}；${retryError instanceof Error ? retryError.name : "unknown"}），需人工对账`);
+      }
+    }
+    const error = new SubmissionError("PROVIDER_ACCEPTANCE_UNKNOWN", recovered
+      ? "供应商已接受且任务号已补写，当前请求需对账，禁止重发"
+      : "供应商已接受，回执入账尚未核实，必须核对已有任务，禁止重发", {
+      submissionId: componentId, key: frame.idempotencyKey, requestHash: providerRequestHash, taskId, provider,
+    });
+    error.cause = cause;
+    throw error;
+  }
+}
+
 async function runImage(ctx: RunContext, frame: FilmChannelRequestFrame, componentId: string): Promise<unknown> {
   const params = record(frame.params);
   const prompt = text(params.prompt, "image.generate 需要非空 prompt", 20_000);
@@ -1064,6 +1096,7 @@ async function runImage(ctx: RunContext, frame: FilmChannelRequestFrame, compone
   const started = Date.now();
   await ctx.ledger.recordDispatch(componentId, ctx.ownerToken, "seedream", model);
   const submitted = await provider.submit(genRequest);
+  await retainProviderAcceptance(ctx, frame, componentId, "seedream", model, submitted.taskId, compiled.payloadHash);
   const polled = await provider.poll(submitted.taskId);
   if (polled.status !== "succeeded" || !polled.uri) fail("PROVIDER_FAILED", `出图未成功：${polled.error ?? polled.status}`);
   const written = await fetchToFile(ctx, polled.uri, targetRef);
@@ -1191,6 +1224,7 @@ async function runVideo(ctx: RunContext, frame: FilmChannelRequestFrame, compone
   const started = Date.now();
   await ctx.ledger.recordDispatch(componentId, ctx.ownerToken, "seedance", model);
   const submitted = await provider.submit(genRequest);
+  await retainProviderAcceptance(ctx, frame, componentId, "seedance", model, submitted.taskId, compiled.payloadHash);
   const deadline = Date.now() + VIDEO_POLL_DEADLINE_MS;
   let last: Awaited<ReturnType<ArkVideoProvider["poll"]>> = { status: "submitted" };
   while (Date.now() < deadline) {

@@ -1,0 +1,41 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2
+
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+ ❯ packages/video-studio/src/vendor-discovery-await.test.ts (2 tests | 2 failed) 409ms
+     × G3 receives resolved requirements and downstream metadata (hostBridge=false) 225ms
+     × G3 receives resolved requirements and downstream metadata (hostBridge=true) 184ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/video-studio/src/vendor-discovery-await.test.ts > real create waits for discovery conversion before the G3 confirmation > G3 receives resolved requirements and downstream metadata (hostBridge=false)
+ FAIL  packages/video-studio/src/vendor-discovery-await.test.ts > real create waits for discovery conversion before the G3 confirmation > G3 receives resolved requirements and downstream metadata (hostBridge=true)
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ packages/video-studio/src/vendor-discovery-await.test.ts:83:41
+     81|     expect(result.errors).toEqual([]);
+     82|     expect(result.confirmations).toEqual(["creative-theme", "requireme…
+     83|     expect(result.profileCompletedAtG3).toBe(true);
+       |                                         ^
+     84|     expect(result.isPromise).toBe(false);
+     85|     expect(result.title).toBe("灯光亮起");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+   Start at  09:36:00
+   Duration  492ms (transform 10ms, setup 0ms, import 16ms, tests 409ms, environment 0ms)
+

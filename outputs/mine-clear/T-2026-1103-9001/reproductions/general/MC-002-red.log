@@ -1,0 +1,32 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2
+
+ ❯ packages/video-studio/src/vendor-runtime-agent-config.test.ts (2 tests | 2 failed) 442ms
+     × real Phase1/Phase2 consume the current models, timeout and deadline (healthMonitor=false) 280ms
+     × real Phase1/Phase2 consume the current models, timeout and deadline (healthMonitor=true) 161ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/video-studio/src/vendor-runtime-agent-config.test.ts > runtime agent configuration reaches the actual production phases > real Phase1/Phase2 consume the current models, timeout and deadline (healthMonitor=false)
+ FAIL  packages/video-studio/src/vendor-runtime-agent-config.test.ts > runtime agent configuration reaches the actual production phases > real Phase1/Phase2 consume the current models, timeout and deadline (healthMonitor=true)
+AssertionError: expected 'old' to be 'new' // Object.is equality
+
+Expected: "new"
+Received: "old"
+
+ ❯ packages/video-studio/src/vendor-runtime-agent-config.test.ts:69:31
+     67|     expect(result.calls).toHaveLength(5);
+     68|     for (const call of result.calls) {
+     69|       expect(call.generation).toBe("new");
+       |                               ^
+     70|       expect(call.model).toBe(call.role === "sceneDesign" || call.role…
+     71|       expect(call.deadline).toBe(result.deadline);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+   Start at  09:21:02
+   Duration  539ms (transform 16ms, setup 0ms, import 22ms, tests 442ms, environment 0ms)
+

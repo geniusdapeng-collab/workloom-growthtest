@@ -740,7 +740,9 @@ class HyperrealitySystem {
 
       // 同时保留原有的 RequirementListBuilder 输出（兼容下游）
       // 将 discoveryResult 转换为 requirementList 格式
-      const requirementList = this._convertDiscoveryToRequirementList(discoveryResult, upstreamFields);
+      // WorkLoom modification [T-2026-1103-9001]: the profile-backed conversion
+      // is asynchronous; G3 and all downstream metadata must consume its result.
+      const requirementList = await this._convertDiscoveryToRequirementList(discoveryResult, upstreamFields);
 
       // 【2026-07-17 修复】创意指数优先级：用户直传 > 主题确认值 > 默认
       // 原实现只读 upstreamFields.creative_style，metadata.creativeIntensity 直传被丢弃

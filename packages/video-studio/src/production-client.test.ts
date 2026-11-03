@@ -125,6 +125,25 @@ describe("service production client", () => {
     expect(r).toMatchObject({ status: "unverified", shots: [{ status: "unknown" }] });
     expect(timeout.calls.filter(c => c.route.endsWith("submit"))).toHaveLength(1);
   });
+  it.each(["asset_id", "local_path"])("waits for persisted %s after provider completion, allowing ingest reconciliation without resubmission", async key => {
+    let reads = 0;
+    const snapshots: ProductionProjectResult[] = [];
+    const f = fixture((call, value) => call.route.endsWith("jobs") && reads++ === 0
+      ? [{ ...(value as object[])[0], [key]: null, result_url: "https://cdn.example.test/accepted.mp4" }] : value);
+    const result = await run(f, { pollRounds: 2, onProgress: value => { snapshots.push(value); } });
+    expect(result.status).toBe("done"); expect(result.shots[0]?.assetId).toBe("A-S1");
+    expect(f.calls.filter(call => call.route === "video.render.submit")).toHaveLength(1);
+    expect(f.calls.filter(call => call.route === "video.render.poll")).toHaveLength(2);
+    expect(snapshots.some(snapshot => snapshot.shots[0]?.status === "rendering")).toBe(true);
+    expect(result.shots[0]?.error).toBeUndefined();
+  });
+  it("keeps a permanently missing media receipt unverified only after the existing poll limit", async () => {
+    const f = fixture((call, value) => call.route.endsWith("jobs") ? [{ ...(value as object[])[0], asset_id: null }] : value);
+    const result = await run(f, { pollRounds: 3 });
+    expect(result).toMatchObject({ status: "unverified", shots: [{ status: "unknown", error: expect.stringContaining("POLL_LIMIT") }] });
+    expect(f.calls.filter(call => call.route === "video.render.poll")).toHaveLength(3);
+    expect(f.calls.filter(call => call.route === "video.render.submit")).toHaveLength(1);
+  });
   it("failed local persistence prevents starting paid work", async () => {
     const f = fixture(); await expect(run(f, { onProgress: () => { throw new Error("disk full"); } })).rejects.toThrow("disk full");
     expect(f.calls.every(c => c.method === "GET")).toBe(true);

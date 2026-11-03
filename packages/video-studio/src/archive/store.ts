@@ -75,6 +75,11 @@ export class ArchiveStore {
     readonly pipelineKind: PipelineKind = "narrative",
     readonly routeMeta?: Record<string, unknown>,
   ) {
+    for (const component of [workspaceId, projectId]) {
+      if (!component || component === "." || component === ".." || /[/\\\0]/.test(component)) {
+        throw new Error("ARCHIVE_SCOPE_INVALID: 档案工作区与项目标识必须是单个目录组件");
+      }
+    }
     // 路径监狱：与 dossiers 同口径收在 workDir 下，不接受外部传入的绝对路径
     this.root = path.join(workDir, "archive", workspaceId, projectId);
   }

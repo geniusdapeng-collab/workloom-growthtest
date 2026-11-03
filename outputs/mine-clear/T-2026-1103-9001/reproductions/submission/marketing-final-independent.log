@@ -1,0 +1,13 @@
+cde51696e54df8ec2ba821c33f232e00d782bdf2
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2
+
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+
+ Test Files  12 passed (12)
+      Tests  202 passed (202)
+   Start at  10:16:53
+   Duration  5.12s (transform 621ms, setup 0ms, import 562ms, tests 3.82s, environment 0ms)
+

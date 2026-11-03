@@ -1,0 +1,38 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-016-0-1793673649060",
+  "command": "RUN_DB_TESTS=1 node node_modules/vitest/vitest.mjs run apps/server/src/video/film-provider-receipt.pg.test.ts --maxWorkers=2",
+  "exec": {
+    "file": "node",
+    "args": [
+      "node_modules/vitest/vitest.mjs",
+      "run",
+      "apps/server/src/video/film-provider-receipt.pg.test.ts",
+      "--maxWorkers=2"
+    ]
+  },
+  "actor": "/root/general_audit",
+  "role": "acceptance",
+  "subject": {
+    "card_id": "MC-016",
+    "assertion_index": 0
+  },
+  "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-03T02:40:49.060Z",
+  "finished_at": "2026-11-03T02:40:50.599Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-016-0-1793673649060.txt",
+      "sha256": "ff68b322fa9f1de49e052bf789c19e053d9d4c7c39f270dc39fda2b1e0256d88",
+      "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+    }
+  ]
+}

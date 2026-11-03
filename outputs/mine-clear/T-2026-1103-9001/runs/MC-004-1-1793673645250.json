@@ -1,0 +1,75 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-004-1-1793673645250",
+  "command": "node --test scripts/tools/film-render-task.test.mjs",
+  "exec": {
+    "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "args": [
+      "--test-reporter=/Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2/scripts/delivery/node-test-reporter.mjs",
+      "--test-reporter-destination=/Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2/outputs/mine-clear/T-2026-1103-9001/evidence/MC-004-1-1793673645250-node-tests.jsonl",
+      "--test-reporter=tap",
+      "--test-reporter-destination=stdout",
+      "--test",
+      "scripts/tools/film-render-task.test.mjs"
+    ]
+  },
+  "requested_exec": {
+    "file": "node",
+    "args": [
+      "--test",
+      "scripts/tools/film-render-task.test.mjs"
+    ]
+  },
+  "node_observer": {
+    "schema": "workloom.node-test-observer/v1",
+    "reporter_path": "/Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2/scripts/delivery/node-test-reporter.mjs",
+    "reporter_sha256": "286448a4dee571759fc1703564477d27bf5319bcb05ff66db2186deda60bc78f",
+    "destination": "/Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2/outputs/mine-clear/T-2026-1103-9001/evidence/MC-004-1-1793673645250-node-tests.jsonl",
+    "summary": {
+      "path": "evidence/MC-004-1-1793673645250-node-tests.jsonl",
+      "sha256": "9efe3e9712ad696b59d359506f20610b79847a22a794daa130d4d8fffdcd9a24",
+      "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+    }
+  },
+  "node_executable": {
+    "path": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "sha256": "7d2b4ed360d609a4de6485b0cbea57370eee4dba157877799e83104db570cbdd"
+  },
+  "actor": "/root/general_audit",
+  "role": "acceptance",
+  "subject": {
+    "card_id": "MC-004",
+    "assertion_index": 1
+  },
+  "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-03T02:40:45.250Z",
+  "finished_at": "2026-11-03T02:40:45.564Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": [],
+    "testSummary": {
+      "total": 17,
+      "passed": 17,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    }
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-004-1-1793673645250.txt",
+      "sha256": "0b75f3e27211b430c06c490887bbce77406389e7f326807f82e6eba6963651f5",
+      "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+    },
+    {
+      "path": "evidence/MC-004-1-1793673645250-node-tests.jsonl",
+      "sha256": "9efe3e9712ad696b59d359506f20610b79847a22a794daa130d4d8fffdcd9a24",
+      "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+    }
+  ]
+}

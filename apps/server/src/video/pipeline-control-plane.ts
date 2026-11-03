@@ -10,6 +10,7 @@ import {
   LEGACY_STAGE_ADAPTERS,
   PipelineCoordinator,
   PipelineShadowSession,
+  pipelineControlCommandLockKey,
   pipelineControlStateLockKey,
   parseAndCompilePipeline,
   pipelineSha256,
@@ -80,6 +81,13 @@ class PostgresPipelineTransaction implements PipelineTransaction {
     if (scope.tenantId !== this.scope.tenantId || scope.workspaceId !== this.scope.workspaceId) {
       throw new Error("PIPELINE_SCOPE_MISMATCH");
     }
+  }
+
+  async lockCommand(scope: PipelineScope, idempotencyKey: string): Promise<void> {
+    this.assertScope(scope);
+    await this.client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
+      pipelineControlCommandLockKey(scope, idempotencyKey),
+    ]);
   }
 
   async lockProject(scope: PipelineScope, projectId: string): Promise<void> {

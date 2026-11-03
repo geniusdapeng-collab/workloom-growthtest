@@ -1,0 +1,1957 @@
+{
+  "schema": "workloom.mine-clear/ledger@1",
+  "task_id": "T-2026-1103-9001",
+  "repo": "geniusdapeng-collab/workloom-growthtest",
+  "repo_path": "/Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2",
+  "title": "",
+  "created_at": "2026-11-03T01:12:34.414Z",
+  "updated_at": "2026-11-03T02:45:41.825Z",
+  "baseline": {
+    "audit": {
+      "commit": "c028118de87f80b4ff0726c758b1ca0d964b9a63",
+      "branch": "task/T-2026-1103-9001",
+      "remote": "origin",
+      "fetched_at": "2026-11-03T01:12:34.316Z",
+      "fetch_status": "success",
+      "notes": ""
+    },
+    "repair": {
+      "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+      "reverified_problem_ids": [
+        "MC-001",
+        "MC-002",
+        "MC-003",
+        "MC-004",
+        "MC-005",
+        "MC-006",
+        "MC-007",
+        "MC-008",
+        "MC-009",
+        "MC-010",
+        "MC-011",
+        "MC-012",
+        "MC-013",
+        "MC-014",
+        "MC-015",
+        "MC-016",
+        "MC-017",
+        "MC-018",
+        "MC-019",
+        "MC-020",
+        "MC-021"
+      ]
+    },
+    "acceptance": {
+      "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+      "is_descendant_of_repair": true
+    }
+  },
+  "environment": {
+    "kind": "local-preview",
+    "notes": ""
+  },
+  "invariants": [
+    {
+      "id": "INV-1",
+      "text": "租户边界覆盖数据库 RLS、运行时上下文、事件、缓存和外部连接器。",
+      "source": "AGENTS.md#4.1"
+    },
+    {
+      "id": "INV-2",
+      "text": "经营事件、审批和关键回执只增不改；纠正通过新事件表达，不静默覆盖证据。",
+      "source": "AGENTS.md#4.2"
+    },
+    {
+      "id": "INV-3",
+      "text": "所有外部或变更性动作及其子调用，统一经过权限、PII、围栏和审批链路。",
+      "source": "AGENTS.md#4.3"
+    },
+    {
+      "id": "INV-4",
+      "text": "涉钱、敏感数据、群发、公开发布、交易和破坏性变更必须按高风险处理并由人审批。",
+      "source": "AGENTS.md#4.4"
+    },
+    {
+      "id": "INV-5",
+      "text": "没有真实回执就不能标记完成；mock、模拟和体验模式在数据结构与界面上都要明确区分。",
+      "source": "AGENTS.md#4.5"
+    },
+    {
+      "id": "INV-6",
+      "text": "客户原始经营数据不得上行；蜂群只接受白名单化、最小化、匿名化且可审计的元数据或派生经验。",
+      "source": "AGENTS.md#4.6"
+    },
+    {
+      "id": "INV-7",
+      "text": "租户覆盖层只能收紧围栏，不能放宽平台不可变红线。",
+      "source": "AGENTS.md#4.7"
+    },
+    {
+      "id": "INV-8",
+      "text": "模型、提示词、技能、bundle、策略和热更新必须先评测再灰度，且始终可回滚。",
+      "source": "AGENTS.md#4.8"
+    },
+    {
+      "id": "INV-9",
+      "text": "platform-ops、平台账户运营和平台秘密只属于 Andromeda。",
+      "source": "AGENTS.md#4.9"
+    },
+    {
+      "id": "INV-10",
+      "text": "Tiger 在获得单独的合规审查和用户明确授权前，只能模拟或纸面交易。",
+      "source": "AGENTS.md#4.10"
+    },
+    {
+      "id": "INV-11",
+      "text": "令牌、密码、API key、私钥、客户凭证和私密客户数据不得进入源码、文档、上下文、提示词、日志或提交。",
+      "source": "AGENTS.md#4.11"
+    },
+    {
+      "id": "INV-12",
+      "text": "个性化与行业扩展不得形成公共机制的第二事实源。",
+      "source": "AGENTS.md#4.12"
+    }
+  ],
+  "cards": [
+    {
+      "id": "MC-001",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P1",
+      "batch": 1,
+      "state": "verified",
+      "title": "制片档案先读文件后校验项目，路径段可越出工作区",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/archive-resume.ts:278@c028118de87f80b4ff0726c758b1ca0d964b9a63",
+          "sha256": "17fe6949ac7f8b0990fa824d0ea5de4d3567b84bca9448a8f9bde3b624edb5a9",
+          "note": "A: readArchiveSummary先构造ArchiveStore并读取manifest/context/events，之后才按RLS读PG；ArchiveStore构造projectId可含../。"
+        }
+      ],
+      "root_cause": {
+        "file": "apps/server/src/video/archive-resume.ts",
+        "line": 278,
+        "commit": "c028118de87f80b4ff0726c758b1ca0d964b9a63",
+        "symbol": "readArchiveSummary"
+      },
+      "trigger_path": "已登录ws-attacker调用archive，projectId=../ws-victim/VID-secret；PG无可见项目仍返回目标文件manifest/context/events。",
+      "fix_plan": "任何档案文件读取前RLS核验项目；ArchiveStore根目录组件拒绝路径分隔符与点段。",
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "跨工作区/不存在项目或带路径逃逸ID",
+          "expect": "拒绝且不读manifest/context/events；合法本工作区项目仍读到真实档案。",
+          "command": "RUN_DB_TESTS=1 node node_modules/vitest/vitest.mjs run apps/server/src/video/archive-access.test.ts apps/server/src/video/archive-access.pg.test.ts apps/server/src/video/archive-resume.test.ts apps/server/src/video/archive.pg.test.ts packages/video-studio/src/archive/store.test.ts --maxWorkers=2",
+          "exec": {
+            "file": "node",
+            "args": [
+              "node_modules/vitest/vitest.mjs",
+              "run",
+              "apps/server/src/video/archive-access.test.ts",
+              "apps/server/src/video/archive-access.pg.test.ts",
+              "apps/server/src/video/archive-resume.test.ts",
+              "apps/server/src/video/archive.pg.test.ts",
+              "packages/video-studio/src/archive/store.test.ts",
+              "--maxWorkers=2"
+            ]
+          },
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-001-0-1793673813507.json",
+            "sha256": "8b312efe9f9d59b86f0c9cc95f72c41a05b14131731ef9402501d2f3614b6a13",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          },
+          "evidence": {
+            "path": "evidence/MC-001-0-1793673813507.txt",
+            "sha256": "ba8b0b0516b82b00e9e976b39e30f22e253f3b0cb730eff6c2ce7281e4076e52",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        }
+      ],
+      "regression": {
+        "command": "RUN_DB_TESTS=1 node node_modules/vitest/vitest.mjs run apps/server/src/video/archive-access.test.ts apps/server/src/video/archive-access.pg.test.ts apps/server/src/video/archive-resume.test.ts apps/server/src/video/archive.pg.test.ts packages/video-studio/src/archive/store.test.ts --maxWorkers=2"
+      },
+      "rollback": "通过新revert PR回滚本卡提交，不改历史档案。",
+      "repair_actor": "/root",
+      "verified_by": "/root/marketing_audit",
+      "verified_at": "2026-11-03T02:43:35.060Z",
+      "verification_evidence": {
+        "path": "runs/MC-001-0-1793673813507.json",
+        "sha256": "8b312efe9f9d59b86f0c9cc95f72c41a05b14131731ef9402501d2f3614b6a13",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "last_assertion_attempt": {
+        "actor": "/root/marketing_audit",
+        "role": "acceptance",
+        "result": "pass",
+        "at": "2026-11-03T02:43:33.506Z",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+        "finished_at": "2026-11-03T02:43:35.060Z"
+      },
+      "fixed_by": "/root",
+      "last_verification_attempt": {
+        "actor": "/root/marketing_audit",
+        "result": "pass",
+        "at": "2026-11-03T02:43:35.060Z",
+        "runs": [
+          {
+            "path": "runs/MC-001-0-1793673813507.json",
+            "sha256": "8b312efe9f9d59b86f0c9cc95f72c41a05b14131731ef9402501d2f3614b6a13",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        ]
+      }
+    },
+    {
+      "id": "MC-002",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P1",
+      "batch": 2,
+      "state": "verified",
+      "title": "运行时更新production agents后各Phase仍调用旧实例，模型与截止策略失效",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "vendor/supermickey/hyperreality-system/engines/production-engine/production-engine.js:228@c028118de87f80b4ff0726c758b1ca0d964b9a63",
+          "sha256": "6c5feb471b10eede541d637cfc3b75cd7e46f71c3a367a9c22eba01bdcc01e37",
+          "note": "A: _initAgents替换this.agents，已构造Phase仍持旧对象；主链每次调用updateAgentConfig。"
+        }
+      ],
+      "root_cause": {
+        "file": "vendor/supermickey/hyperreality-system/engines/production-engine/production-engine.js",
+        "line": 228,
+        "commit": "c028118de87f80b4ff0726c758b1ca0d964b9a63",
+        "symbol": "updateAgentConfig"
+      },
+      "trigger_path": "index每次更新配置，随后produce二次更新；Phase调用旧model/timeout实例，deadline设置在新实例而实际调用者deadline=null。",
+      "fix_plan": "既有宿主兼容桥内使Phase绑定更新后的agents，保持vendor源字节不改。",
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "before配置初始化后更新model/timeout/deadline再真实执行Phase1/Phase2",
+          "expect": "真实Phase使用新实例与配置，Phase3/3.5同源；合法运行不回退旧实例。",
+          "command": "node node_modules/vitest/vitest.mjs run packages/video-studio/src/vendor-runtime-agent-config.test.ts packages/video-studio/src/vendor-runtime-agent-config-independent.test.ts --maxWorkers=2",
+          "exec": {
+            "file": "node",
+            "args": [
+              "node_modules/vitest/vitest.mjs",
+              "run",
+              "packages/video-studio/src/vendor-runtime-agent-config.test.ts",
+              "packages/video-studio/src/vendor-runtime-agent-config-independent.test.ts",
+              "--maxWorkers=2"
+            ]
+          },
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-002-0-1793673552976.json",
+            "sha256": "e66b17db839f0d649c502a79054d3ee64eef4257970451295ab651489550f860",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          },
+          "evidence": {
+            "path": "evidence/MC-002-0-1793673552976.txt",
+            "sha256": "0d723c31acc8a678c19d82b3b12e58f167ac3e25936edb7bd05388d451083563",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        }
+      ],
+      "regression": {
+        "command": "node node_modules/vitest/vitest.mjs run packages/video-studio/src/vendor-runtime-agent-config.test.ts packages/video-studio/src/vendor-runtime-agent-config-independent.test.ts --maxWorkers=2"
+      },
+      "rollback": "新revert PR回滚本卡提交，不重写历史。",
+      "repair_actor": "/root/general_audit",
+      "verified_by": "/root/submission_audit",
+      "verified_at": "2026-11-03T02:39:13.899Z",
+      "verification_evidence": {
+        "path": "runs/MC-002-0-1793673552976.json",
+        "sha256": "e66b17db839f0d649c502a79054d3ee64eef4257970451295ab651489550f860",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "last_assertion_attempt": {
+        "actor": "/root/submission_audit",
+        "role": "acceptance",
+        "result": "pass",
+        "at": "2026-11-03T02:39:12.976Z",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+        "finished_at": "2026-11-03T02:39:13.899Z"
+      },
+      "fixed_by": "/root/general_audit",
+      "last_verification_attempt": {
+        "actor": "/root/submission_audit",
+        "result": "pass",
+        "at": "2026-11-03T02:39:13.899Z",
+        "runs": [
+          {
+            "path": "runs/MC-002-0-1793673552976.json",
+            "sha256": "e66b17db839f0d649c502a79054d3ee64eef4257970451295ab651489550f860",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        ]
+      }
+    },
+    {
+      "id": "MC-003",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P1",
+      "batch": 2,
+      "state": "verified",
+      "title": "查询失败或无法核实的响应被当作视频任务终态失败",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/gen/providers.ts:114@c028118de87f80b4ff0726c758b1ca0d964b9a63",
+          "sha256": "37781dc8d2033f02a50408e9d936ce2867a5cfe74ab2bd738adea1322921ce02",
+          "note": "A: 对应实现与调用链精读；修前真实失败断言保留在各角色证据目录。"
+        }
+      ],
+      "root_cause": {
+        "file": "apps/server/src/video/gen/providers.ts",
+        "line": 114,
+        "commit": "c028118de87f80b4ff0726c758b1ca0d964b9a63"
+      },
+      "trigger_path": "已受理任务GET返回401/404/429/5xx或未知状态、成功缺产物URI，调用方误认为任务已失败或成功",
+      "fix_plan": "保持查询错误/未知回执为可恢复未核实，只有明确供应商终态可翻转状态；任务ID作为URL单段编码",
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "已受理任务GET返回401/404/429/5xx或未知状态、成功缺产物URI，调用方误认为任务已失败或成功",
+          "expect": "合法来源/任务回执正常消费；查询错误或来源不匹配不得伪报任务终态或事实已核实。",
+          "command": "node node_modules/vitest/vitest.mjs run apps/server/src/video/gen/provider-polling.test.ts apps/server/src/video/gen/domestic-provider-polling.test.ts --maxWorkers=2",
+          "exec": {
+            "file": "node",
+            "args": [
+              "node_modules/vitest/vitest.mjs",
+              "run",
+              "apps/server/src/video/gen/provider-polling.test.ts",
+              "apps/server/src/video/gen/domestic-provider-polling.test.ts",
+              "--maxWorkers=2"
+            ]
+          },
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-003-0-1793673642710.json",
+            "sha256": "714c9dbf52270a9c5db1196ebdb935b586ebb49053ec39a79518b61128819153",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          },
+          "evidence": {
+            "path": "evidence/MC-003-0-1793673642710.txt",
+            "sha256": "4be48d12c1ce19487689674aa2a2fdd146d82122999a1aea54a4048a13b14a20",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        }
+      ],
+      "regression": {
+        "command": "node node_modules/vitest/vitest.mjs run apps/server/src/video/gen/provider-polling.test.ts apps/server/src/video/gen/domestic-provider-polling.test.ts --maxWorkers=2"
+      },
+      "rollback": "普通revert PR回滚对应提交，不改外部任务和历史事件。",
+      "repair_actor": "/root/submission_audit",
+      "verified_by": "/root/general_audit",
+      "verified_at": "2026-11-03T02:40:43.302Z",
+      "verification_evidence": {
+        "path": "runs/MC-003-0-1793673642710.json",
+        "sha256": "714c9dbf52270a9c5db1196ebdb935b586ebb49053ec39a79518b61128819153",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "last_assertion_attempt": {
+        "actor": "/root/general_audit",
+        "role": "acceptance",
+        "result": "pass",
+        "at": "2026-11-03T02:40:42.709Z",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+        "finished_at": "2026-11-03T02:40:43.302Z"
+      },
+      "fixed_by": "/root/submission_audit",
+      "last_verification_attempt": {
+        "actor": "/root/general_audit",
+        "result": "pass",
+        "at": "2026-11-03T02:40:43.302Z",
+        "runs": [
+          {
+            "path": "runs/MC-003-0-1793673642710.json",
+            "sha256": "714c9dbf52270a9c5db1196ebdb935b586ebb49053ec39a79518b61128819153",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        ]
+      }
+    },
+    {
+      "id": "MC-004",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P1",
+      "batch": 2,
+      "state": "verified",
+      "title": "成功任务入库失败后不再恢复，重叠轮询可重复终结且异常漏连接",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/render-poller.ts:149@c028118de87f80b4ff0726c758b1ca0d964b9a63",
+          "sha256": "2ad8ca7e875702f8921759ecf2dceb71c67127fc382f678fe3a44e682984f151",
+          "note": "A: 实际实现与调用链精读；反例与回归见角色原始证据。"
+        }
+      ],
+      "root_cause": {
+        "file": "apps/server/src/video/render-poller.ts",
+        "line": 149,
+        "commit": "c028118de87f80b4ff0726c758b1ca0d964b9a63"
+      },
+      "trigger_path": "provider已成功但下载或落账失败后job=done不再扫描；两批并发终结同任务；gateway异常连接未释放",
+      "fix_plan": "保留provider成功事实，补扫待入库done任务并复用持久URL；逐任务锁后重读；终态和入库回执分开幂等，连接finally释放",
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "provider已成功但下载或落账失败后job=done不再扫描；两批并发终结同任务；gateway异常连接未释放",
+          "expect": "遵守来源/状态/幂等/回执不变量，合法正常路径保留。",
+          "command": "RUN_DB_TESTS=1 node node_modules/vitest/vitest.mjs run apps/server/src/video/render-poller.pg.test.ts packages/video-studio/src/production-client.test.ts --maxWorkers=2",
+          "exec": {
+            "file": "node",
+            "args": [
+              "node_modules/vitest/vitest.mjs",
+              "run",
+              "apps/server/src/video/render-poller.pg.test.ts",
+              "packages/video-studio/src/production-client.test.ts",
+              "--maxWorkers=2"
+            ]
+          },
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-004-0-1793673643431.json",
+            "sha256": "dc35551bee6f2c5b311c0dfe2315545c87a08b97b3a7c7de5a8a5a7da88399e9",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          },
+          "evidence": {
+            "path": "evidence/MC-004-0-1793673643431.txt",
+            "sha256": "4bb7a7d3a6b0386ffd573655681b58c5c166d7b7c65af32daf553d83fb04f62f",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        },
+        {
+          "kind": "sample",
+          "given": "供应商状态完成，媒体文件尚未归档。",
+          "expect": "生产 CLI 等待可读取的持久媒体引用；失败与超时明确。",
+          "command": "node --test scripts/tools/film-render-task.test.mjs",
+          "exec": {
+            "file": "node",
+            "args": [
+              "--test",
+              "scripts/tools/film-render-task.test.mjs"
+            ]
+          },
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-004-1-1793673645250.json",
+            "sha256": "e0c389a7658a0fe1e20f5164c8ea733fdd0d31a586cfa27c6b9caac7bb9f069f",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          },
+          "evidence": {
+            "path": "evidence/MC-004-1-1793673645250.txt",
+            "sha256": "0b75f3e27211b430c06c490887bbce77406389e7f326807f82e6eba6963651f5",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        }
+      ],
+      "regression": {
+        "command": "RUN_DB_TESTS=1 node node_modules/vitest/vitest.mjs run apps/server/src/video/render-poller.pg.test.ts packages/video-studio/src/production-client.test.ts --maxWorkers=2 && node --test scripts/tools/film-render-task.test.mjs"
+      },
+      "rollback": "普通revert PR回滚本卡提交，不改历史业务回执。",
+      "repair_actor": "/root/submission_audit",
+      "verified_by": "/root/general_audit",
+      "verified_at": "2026-11-03T02:40:45.604Z",
+      "verification_evidence": {
+        "path": "runs/MC-004-0-1793673643431.json",
+        "sha256": "dc35551bee6f2c5b311c0dfe2315545c87a08b97b3a7c7de5a8a5a7da88399e9",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "last_assertion_attempt": {
+        "actor": "/root/general_audit",
+        "role": "acceptance",
+        "result": "pass",
+        "at": "2026-11-03T02:40:43.431Z",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+        "finished_at": "2026-11-03T02:40:45.604Z"
+      },
+      "fixed_by": "/root/submission_audit",
+      "last_verification_attempt": {
+        "actor": "/root/general_audit",
+        "result": "pass",
+        "at": "2026-11-03T02:40:45.604Z",
+        "runs": [
+          {
+            "path": "runs/MC-004-0-1793673643431.json",
+            "sha256": "dc35551bee6f2c5b311c0dfe2315545c87a08b97b3a7c7de5a8a5a7da88399e9",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          },
+          {
+            "path": "runs/MC-004-1-1793673645250.json",
+            "sha256": "e0c389a7658a0fe1e20f5164c8ea733fdd0d31a586cfa27c6b9caac7bb9f069f",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        ]
+      }
+    },
+    {
+      "id": "MC-005",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P1",
+      "batch": 2,
+      "state": "verified",
+      "title": "轮询running及缺provider超时更新未设置事务RLS，报告与真库状态不符",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/render-poller.ts:173@c028118de87f80b4ff0726c758b1ca0d964b9a63",
+          "sha256": "2ad8ca7e875702f8921759ecf2dceb71c67127fc382f678fe3a44e682984f151",
+          "note": "A: 实际实现与调用链精读；反例与回归见角色原始证据。"
+        }
+      ],
+      "root_cause": {
+        "file": "apps/server/src/video/render-poller.ts",
+        "line": 173,
+        "commit": "c028118de87f80b4ff0726c758b1ca0d964b9a63"
+      },
+      "trigger_path": "真实app角色无事务set_config时UPDATE为0行但报告running/failed",
+      "fix_plan": "所有状态更新在scoped事务内并核对开放态，超时事件与状态同事务",
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "真实app角色无事务set_config时UPDATE为0行但报告running/failed",
+          "expect": "遵守来源/状态/幂等/回执不变量，合法正常路径保留。",
+          "command": "RUN_DB_TESTS=1 node node_modules/vitest/vitest.mjs run apps/server/src/video/render-poller.pg.test.ts --maxWorkers=2",
+          "exec": {
+            "file": "node",
+            "args": [
+              "node_modules/vitest/vitest.mjs",
+              "run",
+              "apps/server/src/video/render-poller.pg.test.ts",
+              "--maxWorkers=2"
+            ]
+          },
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-005-0-1793673645739.json",
+            "sha256": "36b91a791f87d406f3476f9eb6ebe288b962ee93f01b239155e5c89743f36c49",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          },
+          "evidence": {
+            "path": "evidence/MC-005-0-1793673645739.txt",
+            "sha256": "69191cc04524058a2605fcba72c2e7975a7a24b2509299ba0268c6e7ef1f9a4a",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        }
+      ],
+      "regression": {
+        "command": "RUN_DB_TESTS=1 node node_modules/vitest/vitest.mjs run apps/server/src/video/render-poller.pg.test.ts --maxWorkers=2"
+      },
+      "rollback": "普通revert PR回滚本卡提交，不改历史业务回执。",
+      "repair_actor": "/root/submission_audit",
+      "verified_by": "/root/general_audit",
+      "verified_at": "2026-11-03T02:40:47.314Z",
+      "verification_evidence": {
+        "path": "runs/MC-005-0-1793673645739.json",
+        "sha256": "36b91a791f87d406f3476f9eb6ebe288b962ee93f01b239155e5c89743f36c49",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "last_assertion_attempt": {
+        "actor": "/root/general_audit",
+        "role": "acceptance",
+        "result": "pass",
+        "at": "2026-11-03T02:40:45.739Z",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+        "finished_at": "2026-11-03T02:40:47.314Z"
+      },
+      "fixed_by": "/root/submission_audit",
+      "last_verification_attempt": {
+        "actor": "/root/general_audit",
+        "result": "pass",
+        "at": "2026-11-03T02:40:47.314Z",
+        "runs": [
+          {
+            "path": "runs/MC-005-0-1793673645739.json",
+            "sha256": "36b91a791f87d406f3476f9eb6ebe288b962ee93f01b239155e5c89743f36c49",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        ]
+      }
+    },
+    {
+      "id": "MC-006",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P0",
+      "batch": 1,
+      "state": "verified",
+      "title": "真实生成任务可能被自动Mock轮询并记成真实成功",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/render-poller.ts:118@c028118de87f80b4ff0726c758b1ca0d964b9a63",
+          "sha256": "2ad8ca7e875702f8921759ecf2dceb71c67127fc382f678fe3a44e682984f151",
+          "note": "A: 实际实现与调用链精读；反例与回归见角色原始证据。"
+        }
+      ],
+      "root_cause": {
+        "file": "apps/server/src/video/render-poller.ts",
+        "line": 118,
+        "commit": "c028118de87f80b4ff0726c758b1ca0d964b9a63"
+      },
+      "trigger_path": "Ark密钥缺失后realPool混入mock seedance；任务ID前缀盖过row.mock，真实作业收到mock://产物",
+      "fix_plan": "真实池只含显式配置provider，模拟身份以DB事实为准；mock URI不能完成真实作业",
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "Ark密钥缺失后realPool混入mock seedance；任务ID前缀盖过row.mock，真实作业收到mock://产物",
+          "expect": "遵守来源/状态/幂等/回执不变量，合法正常路径保留。",
+          "command": "RUN_DB_TESTS=1 node node_modules/vitest/vitest.mjs run apps/server/src/video/render-poller.pg.test.ts --maxWorkers=2",
+          "exec": {
+            "file": "node",
+            "args": [
+              "node_modules/vitest/vitest.mjs",
+              "run",
+              "apps/server/src/video/render-poller.pg.test.ts",
+              "--maxWorkers=2"
+            ]
+          },
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-006-0-1793673647450.json",
+            "sha256": "7e3ca8d5841b20d6b478d085c2a0921e7ad30ff8e1c719673c639face9d2e836",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          },
+          "evidence": {
+            "path": "evidence/MC-006-0-1793673647450.txt",
+            "sha256": "aced7d6fde94ffc1fa41a328a896d020c509e4ef272731179b2ba1c426e74bbd",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        }
+      ],
+      "regression": {
+        "command": "RUN_DB_TESTS=1 node node_modules/vitest/vitest.mjs run apps/server/src/video/render-poller.pg.test.ts --maxWorkers=2"
+      },
+      "rollback": "普通revert PR回滚本卡提交，不改历史业务回执。",
+      "repair_actor": "/root/submission_audit",
+      "verified_by": "/root/general_audit",
+      "verified_at": "2026-11-03T02:40:48.926Z",
+      "verification_evidence": {
+        "path": "runs/MC-006-0-1793673647450.json",
+        "sha256": "7e3ca8d5841b20d6b478d085c2a0921e7ad30ff8e1c719673c639face9d2e836",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "last_assertion_attempt": {
+        "actor": "/root/general_audit",
+        "role": "acceptance",
+        "result": "pass",
+        "at": "2026-11-03T02:40:47.448Z",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+        "finished_at": "2026-11-03T02:40:48.926Z"
+      },
+      "fixed_by": "/root/submission_audit",
+      "last_verification_attempt": {
+        "actor": "/root/general_audit",
+        "result": "pass",
+        "at": "2026-11-03T02:40:48.926Z",
+        "runs": [
+          {
+            "path": "runs/MC-006-0-1793673647450.json",
+            "sha256": "7e3ca8d5841b20d6b478d085c2a0921e7ad30ff8e1c719673c639face9d2e836",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        ]
+      }
+    },
+    {
+      "id": "MC-007",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P1",
+      "batch": 2,
+      "state": "verified",
+      "title": "营销事实引用可错归属来源，重定向别名覆盖有效快照",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/marketing-facts.ts:135@c028118de87f80b4ff0726c758b1ca0d964b9a63",
+          "sha256": "747695104a6c5c50579a7e2a58a106de0807e5d0583d8d3ee0a6bcff5d2c518d",
+          "note": "A: 对应实现与调用链精读；修前真实失败断言保留在各角色证据目录。"
+        }
+      ],
+      "root_cause": {
+        "file": "apps/server/src/video/marketing-facts.ts",
+        "line": 135,
+        "commit": "c028118de87f80b4ff0726c758b1ca0d964b9a63"
+      },
+      "trigger_path": "卖点/评价/竞品URL与citation.sourceId指向不同来源仍被纳入事实；同finalURL的多请求快照覆盖造成误拒或observedAt错取",
+      "fix_plan": "逐主张绑定所引sourceId和条目URL，别名保留多快照并按来源身份取证，不抹掉合法跳转",
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "卖点/评价/竞品URL与citation.sourceId指向不同来源仍被纳入事实；同finalURL的多请求快照覆盖造成误拒或observedAt错取",
+          "expect": "合法来源/任务回执正常消费；查询错误或来源不匹配不得伪报任务终态或事实已核实。",
+          "command": "node node_modules/vitest/vitest.mjs run apps/server/src/video/marketing-source-attribution.test.ts apps/server/src/video/marketing-source-attribution-independent.test.ts --maxWorkers=2",
+          "exec": {
+            "file": "node",
+            "args": [
+              "node_modules/vitest/vitest.mjs",
+              "run",
+              "apps/server/src/video/marketing-source-attribution.test.ts",
+              "apps/server/src/video/marketing-source-attribution-independent.test.ts",
+              "--maxWorkers=2"
+            ]
+          },
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-007-0-1793673554075.json",
+            "sha256": "9d45d7ed63e90956971d806f8cc1073f5bde95f7ed1e87354e6c270034f6d056",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          },
+          "evidence": {
+            "path": "evidence/MC-007-0-1793673554075.txt",
+            "sha256": "601766b47a0d935cfc659d8905fa97b174fa89244d234d7878a222dcb361dc17",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        }
+      ],
+      "regression": {
+        "command": "node node_modules/vitest/vitest.mjs run apps/server/src/video/marketing-source-attribution.test.ts apps/server/src/video/marketing-source-attribution-independent.test.ts --maxWorkers=2"
+      },
+      "rollback": "普通revert PR回滚对应提交，不改外部任务和历史事件。",
+      "repair_actor": "/root/marketing_audit",
+      "verified_by": "/root/submission_audit",
+      "verified_at": "2026-11-03T02:39:14.601Z",
+      "verification_evidence": {
+        "path": "runs/MC-007-0-1793673554075.json",
+        "sha256": "9d45d7ed63e90956971d806f8cc1073f5bde95f7ed1e87354e6c270034f6d056",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "last_assertion_attempt": {
+        "actor": "/root/submission_audit",
+        "role": "acceptance",
+        "result": "pass",
+        "at": "2026-11-03T02:39:14.074Z",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+        "finished_at": "2026-11-03T02:39:14.601Z"
+      },
+      "fixed_by": "/root/marketing_audit",
+      "last_verification_attempt": {
+        "actor": "/root/submission_audit",
+        "result": "pass",
+        "at": "2026-11-03T02:39:14.601Z",
+        "runs": [
+          {
+            "path": "runs/MC-007-0-1793673554075.json",
+            "sha256": "9d45d7ed63e90956971d806f8cc1073f5bde95f7ed1e87354e6c270034f6d056",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        ]
+      }
+    },
+    {
+      "id": "MC-008",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P1",
+      "batch": 2,
+      "state": "verified",
+      "title": "营销检索线索被兜底成已审商品身份并进入创作卡片",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/product-info-collector.js:154@c028118de87f80b4ff0726c758b1ca0d964b9a63",
+          "sha256": "de479bd1f9e702968791faabe6938baca138ed991734ca96c2fb92df026bafb3",
+          "note": "A: 实际实现与调用链精读；反例与回归见角色原始证据。"
+        }
+      ],
+      "root_cause": {
+        "file": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/product-info-collector.js",
+        "line": 154,
+        "commit": "c028118de87f80b4ff0726c758b1ca0d964b9a63"
+      },
+      "trigger_path": "A1正文未给brand/category/model，但queryHints被装订器和Studio当已核实身份消费",
+      "fix_plan": "已审A1是装订身份唯一事实源；检索线索仍留作线索，不晋升为事实",
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "A1正文未给brand/category/model，但queryHints被装订器和Studio当已核实身份消费",
+          "expect": "遵守来源/状态/幂等/回执不变量，合法正常路径保留。",
+          "command": "node node_modules/vitest/vitest.mjs run apps/server/src/video/marketing-authority.test.ts packages/video-studio/src/studio-marketing-input.test.ts --maxWorkers=2",
+          "exec": {
+            "file": "node",
+            "args": [
+              "node_modules/vitest/vitest.mjs",
+              "run",
+              "apps/server/src/video/marketing-authority.test.ts",
+              "packages/video-studio/src/studio-marketing-input.test.ts",
+              "--maxWorkers=2"
+            ]
+          },
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-008-0-1793673554765.json",
+            "sha256": "b32906a8238f430c61ae7c5504ed8730fa4e839eabcacba92e4d4ae8f35431ca",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          },
+          "evidence": {
+            "path": "evidence/MC-008-0-1793673554765.txt",
+            "sha256": "2dcf7e120c14b410458c454808b5232c977d60f09edba3c1a8f1ec4156b42fed",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        }
+      ],
+      "regression": {
+        "command": "node node_modules/vitest/vitest.mjs run apps/server/src/video/marketing-authority.test.ts packages/video-studio/src/studio-marketing-input.test.ts --maxWorkers=2"
+      },
+      "rollback": "普通revert PR回滚本卡提交，不改历史业务回执。",
+      "repair_actor": "/root/marketing_audit",
+      "verified_by": "/root/submission_audit",
+      "verified_at": "2026-11-03T02:39:16.438Z",
+      "verification_evidence": {
+        "path": "runs/MC-008-0-1793673554765.json",
+        "sha256": "b32906a8238f430c61ae7c5504ed8730fa4e839eabcacba92e4d4ae8f35431ca",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "last_assertion_attempt": {
+        "actor": "/root/submission_audit",
+        "role": "acceptance",
+        "result": "pass",
+        "at": "2026-11-03T02:39:14.764Z",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+        "finished_at": "2026-11-03T02:39:16.438Z"
+      },
+      "fixed_by": "/root/marketing_audit",
+      "last_verification_attempt": {
+        "actor": "/root/submission_audit",
+        "result": "pass",
+        "at": "2026-11-03T02:39:16.438Z",
+        "runs": [
+          {
+            "path": "runs/MC-008-0-1793673554765.json",
+            "sha256": "b32906a8238f430c61ae7c5504ed8730fa4e839eabcacba92e4d4ae8f35431ca",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        ]
+      }
+    },
+    {
+      "id": "MC-009",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P1",
+      "batch": 2,
+      "state": "verified",
+      "title": "竞品无证据仍把全部己方卖点标成差异化空位",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/competitor-scout.js:175@c028118de87f80b4ff0726c758b1ca0d964b9a63",
+          "sha256": "a4e8c92172890c1076bf4fba6626cc6709f7191c5b8d82e7586e6d2ce584978e",
+          "note": "A: 实际实现与调用链精读；反例与回归见角色原始证据。"
+        }
+      ],
+      "root_cause": {
+        "file": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/competitor-scout.js",
+        "line": 175,
+        "commit": "c028118de87f80b4ff0726c758b1ca0d964b9a63"
+      },
+      "trigger_path": "competitors为空，ourPoints与空集合求补集后生成our_opening进入摘要卡及创作消费",
+      "fix_plan": "空竞品证据不产生差异化结论，保留己方已审事实并标记竞品未知",
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "competitors为空，ourPoints与空集合求补集后生成our_opening进入摘要卡及创作消费",
+          "expect": "遵守来源/状态/幂等/回执不变量，合法正常路径保留。",
+          "command": "node node_modules/vitest/vitest.mjs run packages/video-studio/src/studio-marketing-input.test.ts --maxWorkers=2",
+          "exec": {
+            "file": "node",
+            "args": [
+              "node_modules/vitest/vitest.mjs",
+              "run",
+              "packages/video-studio/src/studio-marketing-input.test.ts",
+              "--maxWorkers=2"
+            ]
+          },
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-009-0-1793673556588.json",
+            "sha256": "7a729be4196cbdb865416c23a4626e2afce657f7f5c9ad85981b802efd2316a8",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          },
+          "evidence": {
+            "path": "evidence/MC-009-0-1793673556588.txt",
+            "sha256": "5c11bc7df5ef5dfc9091f30955059f164bf54fa369b7b11f66ab19af6265e312",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        }
+      ],
+      "regression": {
+        "command": "node node_modules/vitest/vitest.mjs run packages/video-studio/src/studio-marketing-input.test.ts --maxWorkers=2"
+      },
+      "rollback": "普通revert PR回滚本卡提交，不改历史业务回执。",
+      "repair_actor": "/root/marketing_audit",
+      "verified_by": "/root/submission_audit",
+      "verified_at": "2026-11-03T02:39:17.414Z",
+      "verification_evidence": {
+        "path": "runs/MC-009-0-1793673556588.json",
+        "sha256": "7a729be4196cbdb865416c23a4626e2afce657f7f5c9ad85981b802efd2316a8",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "last_assertion_attempt": {
+        "actor": "/root/submission_audit",
+        "role": "acceptance",
+        "result": "pass",
+        "at": "2026-11-03T02:39:16.587Z",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+        "finished_at": "2026-11-03T02:39:17.414Z"
+      },
+      "fixed_by": "/root/marketing_audit",
+      "last_verification_attempt": {
+        "actor": "/root/submission_audit",
+        "result": "pass",
+        "at": "2026-11-03T02:39:17.414Z",
+        "runs": [
+          {
+            "path": "runs/MC-009-0-1793673556588.json",
+            "sha256": "7a729be4196cbdb865416c23a4626e2afce657f7f5c9ad85981b802efd2316a8",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        ]
+      }
+    },
+    {
+      "id": "MC-010",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P1",
+      "batch": 2,
+      "state": "verified",
+      "title": "控制面同幂等命令并发重复执行，后到请求唯一键失败",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "packages/video-studio/src/pipeline-control-plane/coordinator.ts:238@c028118de87f80b4ff0726c758b1ca0d964b9a63",
+          "sha256": "303052860a3f5a6a56bbd7bf9002c427aeb22c61b0621a663399e8430de56b95",
+          "note": "A: 实际实现与调用链精读；反例与回归见角色原始证据。"
+        }
+      ],
+      "root_cause": {
+        "file": "packages/video-studio/src/pipeline-control-plane/coordinator.ts",
+        "line": 238,
+        "commit": "c028118de87f80b4ff0726c758b1ca0d964b9a63"
+      },
+      "trigger_path": "两个事务先读不到receipt后在project锁排队，后到事务未重读，重复insertArtifact导致唯一键失败；应回读相同持久回执。",
+      "fix_plan": "在receipt读取前按scope和命令键串行，冲突/重放不重复写并返回已持久化原回执",
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "两个事务先查不到receipt后在project锁排队，后到事务未重读receipt仍执行副作用",
+          "expect": "遵守来源/状态/幂等/回执不变量，合法正常路径保留。",
+          "command": "RUN_DB_TESTS=1 node node_modules/vitest/vitest.mjs run apps/server/src/video/pipeline-control-concurrency.pg.test.ts --maxWorkers=2",
+          "exec": {
+            "file": "node",
+            "args": [
+              "node_modules/vitest/vitest.mjs",
+              "run",
+              "apps/server/src/video/pipeline-control-concurrency.pg.test.ts",
+              "--maxWorkers=2"
+            ]
+          },
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-010-0-1793673815197.json",
+            "sha256": "d74fde51d8ce3e44b5ae9df694229e2cc7ee89ee25bc4fd0803708ac99f0398d",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          },
+          "evidence": {
+            "path": "evidence/MC-010-0-1793673815197.txt",
+            "sha256": "9f12dd7bba36ef2e0fca996db482d52b09dd1363f5b37ca17e01a7f6a2766016",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        }
+      ],
+      "regression": {
+        "command": "RUN_DB_TESTS=1 node node_modules/vitest/vitest.mjs run apps/server/src/video/pipeline-control-concurrency.pg.test.ts --maxWorkers=2"
+      },
+      "rollback": "普通revert PR回滚本卡提交，不改历史业务回执。",
+      "repair_actor": "/root",
+      "verified_by": "/root/marketing_audit",
+      "verified_at": "2026-11-03T02:43:36.274Z",
+      "verification_evidence": {
+        "path": "runs/MC-010-0-1793673815197.json",
+        "sha256": "d74fde51d8ce3e44b5ae9df694229e2cc7ee89ee25bc4fd0803708ac99f0398d",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "last_assertion_attempt": {
+        "actor": "/root/marketing_audit",
+        "role": "acceptance",
+        "result": "pass",
+        "at": "2026-11-03T02:43:35.197Z",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+        "finished_at": "2026-11-03T02:43:36.274Z"
+      },
+      "fixed_by": "/root",
+      "last_verification_attempt": {
+        "actor": "/root/marketing_audit",
+        "result": "pass",
+        "at": "2026-11-03T02:43:36.274Z",
+        "runs": [
+          {
+            "path": "runs/MC-010-0-1793673815197.json",
+            "sha256": "d74fde51d8ce3e44b5ae9df694229e2cc7ee89ee25bc4fd0803708ac99f0398d",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        ]
+      }
+    },
+    {
+      "id": "MC-011",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P1",
+      "batch": 2,
+      "state": "verified",
+      "title": "控制面投影忽略自动门裁决，状态与下一动作不符",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "packages/video-studio/src/pipeline-control-plane/projection.ts:117@c028118de87f80b4ff0726c758b1ca0d964b9a63",
+          "sha256": "aee737357a1b0befdce51b2e82776ab9ffdd6957980ba8bc7a25372598b3842f",
+          "note": "A: 仅消费gate.decided未消费gate.auto_approved，而coordinator真实系统裁决事件使用后者。"
+        }
+      ],
+      "root_cause": {
+        "file": "packages/video-studio/src/pipeline-control-plane/projection.ts",
+        "line": 117,
+        "commit": "c028118de87f80b4ff0726c758b1ca0d964b9a63"
+      },
+      "trigger_path": "requestGate系统裁决passed/rejected/unverified后权威stage已改变，readProjection仍not_run并可能给出run_node。",
+      "fix_plan": "同语义消费真实自动裁决事件，保留gateDecisionId及continue/repair/reconcile。",
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "真实Coordinator自动门裁决三种结果",
+          "expect": "投影verificationStatus/disposition/nextAction及gateDecisionId与已持久化裁决一致。",
+          "command": "node node_modules/vitest/vitest.mjs run packages/video-studio/src/pipeline-control-plane/auto-approval-projection.test.ts --maxWorkers=2",
+          "exec": {
+            "file": "node",
+            "args": [
+              "node_modules/vitest/vitest.mjs",
+              "run",
+              "packages/video-studio/src/pipeline-control-plane/auto-approval-projection.test.ts",
+              "--maxWorkers=2"
+            ]
+          },
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-011-0-1793673816408.json",
+            "sha256": "7e2c5c7ca15854f343fb430ef51557f44e201e8c5c343d9908c3b0ab515c40e8",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          },
+          "evidence": {
+            "path": "evidence/MC-011-0-1793673816408.txt",
+            "sha256": "7c2792833792f3aae34270becf539cfe898686113d857ca2f6fa6afad95413d6",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        }
+      ],
+      "regression": {
+        "command": "node node_modules/vitest/vitest.mjs run packages/video-studio/src/pipeline-control-plane/auto-approval-projection.test.ts --maxWorkers=2"
+      },
+      "rollback": "普通revert PR回滚本卡提交。",
+      "repair_actor": "/root",
+      "verified_by": "/root/marketing_audit",
+      "verified_at": "2026-11-03T02:43:36.858Z",
+      "verification_evidence": {
+        "path": "runs/MC-011-0-1793673816408.json",
+        "sha256": "7e2c5c7ca15854f343fb430ef51557f44e201e8c5c343d9908c3b0ab515c40e8",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "last_assertion_attempt": {
+        "actor": "/root/marketing_audit",
+        "role": "acceptance",
+        "result": "pass",
+        "at": "2026-11-03T02:43:36.407Z",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+        "finished_at": "2026-11-03T02:43:36.858Z"
+      },
+      "fixed_by": "/root",
+      "last_verification_attempt": {
+        "actor": "/root/marketing_audit",
+        "result": "pass",
+        "at": "2026-11-03T02:43:36.858Z",
+        "runs": [
+          {
+            "path": "runs/MC-011-0-1793673816408.json",
+            "sha256": "7e2c5c7ca15854f343fb430ef51557f44e201e8c5c343d9908c3b0ab515c40e8",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        ]
+      }
+    },
+    {
+      "id": "MC-012",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P1",
+      "batch": 2,
+      "state": "verified",
+      "title": "异步需求清单转换未等待，G3与PRD消费Promise",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "vendor/supermickey/hyperreality-system/index.js:743@c028118de87f80b4ff0726c758b1ca0d964b9a63",
+          "sha256": "acb46563f99b61babb1156858fb83c083a258b052ff21169d3b3e7d5bddec5cf",
+          "note": "A: 真实调用链与实现精读，修前反例原文另存角色证据目录。"
+        }
+      ],
+      "root_cause": {
+        "file": "vendor/supermickey/hyperreality-system/index.js",
+        "line": 743,
+        "commit": "c028118de87f80b4ff0726c758b1ca0d964b9a63"
+      },
+      "trigger_path": "create主链把async _convertDiscoveryToRequirementList返回值直接赋给discovery.requirementList",
+      "fix_plan": "在原真实调用点等待转换，保留需求清单对象后再进入G3与下游",
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "create主链把async _convertDiscoveryToRequirementList返回值直接赋给discovery.requirementList",
+          "expect": "已等待的需求对象/恢复后健康来源被真实消费，不把未完成转换或失败空结果当可用事实。",
+          "command": "node node_modules/vitest/vitest.mjs run packages/video-studio/src/vendor-discovery-await.test.ts --maxWorkers=2",
+          "exec": {
+            "file": "node",
+            "args": [
+              "node_modules/vitest/vitest.mjs",
+              "run",
+              "packages/video-studio/src/vendor-discovery-await.test.ts",
+              "--maxWorkers=2"
+            ]
+          },
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-012-0-1793673557555.json",
+            "sha256": "e42e4d5ad74a3f52708560a2a36fb3642c12fadbf5967e629c18e50612e468d9",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          },
+          "evidence": {
+            "path": "evidence/MC-012-0-1793673557555.txt",
+            "sha256": "8df52e0fc3899ce96d4346cdf785b0e7f5f406b582fecbffacab5bc1ed2fc8ff",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        }
+      ],
+      "regression": {
+        "command": "node node_modules/vitest/vitest.mjs run packages/video-studio/src/vendor-discovery-await.test.ts --maxWorkers=2"
+      },
+      "rollback": "普通revert PR回滚本卡提交，不改历史回执。",
+      "repair_actor": "/root/general_audit",
+      "verified_by": "/root/submission_audit",
+      "verified_at": "2026-11-03T02:39:18.625Z",
+      "verification_evidence": {
+        "path": "runs/MC-012-0-1793673557555.json",
+        "sha256": "e42e4d5ad74a3f52708560a2a36fb3642c12fadbf5967e629c18e50612e468d9",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "last_assertion_attempt": {
+        "actor": "/root/submission_audit",
+        "role": "acceptance",
+        "result": "pass",
+        "at": "2026-11-03T02:39:17.554Z",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+        "finished_at": "2026-11-03T02:39:18.625Z"
+      },
+      "fixed_by": "/root/general_audit",
+      "last_verification_attempt": {
+        "actor": "/root/submission_audit",
+        "result": "pass",
+        "at": "2026-11-03T02:39:18.625Z",
+        "runs": [
+          {
+            "path": "runs/MC-012-0-1793673557555.json",
+            "sha256": "e42e4d5ad74a3f52708560a2a36fb3642c12fadbf5967e629c18e50612e468d9",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        ]
+      }
+    },
+    {
+      "id": "MC-013",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P1",
+      "batch": 2,
+      "state": "verified",
+      "title": "检索短暂失败被缓存为空结果导致12小时无法恢复",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/data-mining-executor.ts:248@c028118de87f80b4ff0726c758b1ca0d964b9a63",
+          "sha256": "0d9c571255b82213d8b2b6b7aa19b55386d22fd8dd69a4c68417a0abc8187636",
+          "note": "A: 真实调用链与实现精读，修前反例原文另存角色证据目录。"
+        }
+      ],
+      "root_cause": {
+        "file": "apps/server/src/video/data-mining-executor.ts",
+        "line": 248,
+        "commit": "c028118de87f80b4ff0726c758b1ca0d964b9a63"
+      },
+      "trigger_path": "API500/网络异常/坏JSON/错误信封或网页检索500后结果缓存12h；同实例和重启后健康来源零出站",
+      "fix_plan": "失败与真实零结果分开，不缓存失败；保留正常空缓存与429冷却",
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "API500/网络异常/坏JSON/错误信封或网页检索500后结果缓存12h；同实例和重启后健康来源零出站",
+          "expect": "已等待的需求对象/恢复后健康来源被真实消费，不把未完成转换或失败空结果当可用事实。",
+          "command": "node node_modules/vitest/vitest.mjs run apps/server/src/video/data-mining-search-recovery.test.ts apps/server/src/video/data-mining-search-recovery-independent.test.ts --maxWorkers=2",
+          "exec": {
+            "file": "node",
+            "args": [
+              "node_modules/vitest/vitest.mjs",
+              "run",
+              "apps/server/src/video/data-mining-search-recovery.test.ts",
+              "apps/server/src/video/data-mining-search-recovery-independent.test.ts",
+              "--maxWorkers=2"
+            ]
+          },
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-013-0-1793673558776.json",
+            "sha256": "d5e48d106eee1988df76e619261c316701a816de2b66d614c9e579cf6abc200f",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          },
+          "evidence": {
+            "path": "evidence/MC-013-0-1793673558776.txt",
+            "sha256": "c2f5ec62a7736eae555280e012f6716410735068f2afa68873ee8be57954629c",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        }
+      ],
+      "regression": {
+        "command": "node node_modules/vitest/vitest.mjs run apps/server/src/video/data-mining-search-recovery.test.ts apps/server/src/video/data-mining-search-recovery-independent.test.ts --maxWorkers=2"
+      },
+      "rollback": "普通revert PR回滚本卡提交，不改历史回执。",
+      "repair_actor": "/root/marketing_audit",
+      "verified_by": "/root/submission_audit",
+      "verified_at": "2026-11-03T02:39:19.284Z",
+      "verification_evidence": {
+        "path": "runs/MC-013-0-1793673558776.json",
+        "sha256": "d5e48d106eee1988df76e619261c316701a816de2b66d614c9e579cf6abc200f",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "last_assertion_attempt": {
+        "actor": "/root/submission_audit",
+        "role": "acceptance",
+        "result": "pass",
+        "at": "2026-11-03T02:39:18.775Z",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+        "finished_at": "2026-11-03T02:39:19.284Z"
+      },
+      "fixed_by": "/root/marketing_audit",
+      "last_verification_attempt": {
+        "actor": "/root/submission_audit",
+        "result": "pass",
+        "at": "2026-11-03T02:39:19.284Z",
+        "runs": [
+          {
+            "path": "runs/MC-013-0-1793673558776.json",
+            "sha256": "d5e48d106eee1988df76e619261c316701a816de2b66d614c9e579cf6abc200f",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        ]
+      }
+    },
+    {
+      "id": "MC-014",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P1",
+      "batch": 2,
+      "state": "verified",
+      "title": "已审规格来源在Studio重装订时丢失",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/marketing-authority.ts:194@c028118de87f80b4ff0726c758b1ca0d964b9a63",
+          "sha256": "c7078f6bba0af5746316f252d13578e0ef54c4693c1ffe5ca06da5839b476956",
+          "note": "A: 实际实现及调用链精读；真实失败回归独立留存。"
+        }
+      ],
+      "root_cause": {
+        "file": "apps/server/src/video/marketing-authority.ts",
+        "line": 194,
+        "commit": "c028118de87f80b4ff0726c758b1ca0d964b9a63"
+      },
+      "trigger_path": "首次G1装订给primitive specs补来源，worker向Studio传原raw后同目录重装订覆盖该来源",
+      "fix_plan": "首次及重装订共用同一已审来源投影，保留原raw/hash",
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "首次G1装订给primitive specs补来源，worker向Studio传原raw后同目录重装订覆盖该来源",
+          "expect": "来源/恢复输入/已受理回执保持完整准确，不以错误默认值或丢失回执重做付费动作。",
+          "command": "node node_modules/vitest/vitest.mjs run apps/server/src/video/marketing-dossier-consumption.test.ts packages/video-studio/src/marketing-dossier-input.test.ts --maxWorkers=2",
+          "exec": {
+            "file": "node",
+            "args": [
+              "node_modules/vitest/vitest.mjs",
+              "run",
+              "apps/server/src/video/marketing-dossier-consumption.test.ts",
+              "packages/video-studio/src/marketing-dossier-input.test.ts",
+              "--maxWorkers=2"
+            ]
+          },
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-014-0-1793673559421.json",
+            "sha256": "8c70c807ad635feeb0820dd0e4baffc4e86a84a16384da8141eafdb753c37151",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          },
+          "evidence": {
+            "path": "evidence/MC-014-0-1793673559421.txt",
+            "sha256": "670316e8784fbec911f4942859218bfc81fe5a9d2ce49b7455c24ecb89618744",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        }
+      ],
+      "regression": {
+        "command": "node node_modules/vitest/vitest.mjs run apps/server/src/video/marketing-dossier-consumption.test.ts packages/video-studio/src/marketing-dossier-input.test.ts --maxWorkers=2"
+      },
+      "rollback": "普通revert PR回滚对应修复，数据库恢复兼容并保留已知受理事实。",
+      "repair_actor": "/root/marketing_audit",
+      "verified_by": "/root/submission_audit",
+      "verified_at": "2026-11-03T02:39:20.127Z",
+      "verification_evidence": {
+        "path": "runs/MC-014-0-1793673559421.json",
+        "sha256": "8c70c807ad635feeb0820dd0e4baffc4e86a84a16384da8141eafdb753c37151",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "last_assertion_attempt": {
+        "actor": "/root/submission_audit",
+        "role": "acceptance",
+        "result": "pass",
+        "at": "2026-11-03T02:39:19.421Z",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+        "finished_at": "2026-11-03T02:39:20.127Z"
+      },
+      "fixed_by": "/root/marketing_audit",
+      "last_verification_attempt": {
+        "actor": "/root/submission_audit",
+        "result": "pass",
+        "at": "2026-11-03T02:39:20.127Z",
+        "runs": [
+          {
+            "path": "runs/MC-014-0-1793673559421.json",
+            "sha256": "8c70c807ad635feeb0820dd0e4baffc4e86a84a16384da8141eafdb753c37151",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        ]
+      }
+    },
+    {
+      "id": "MC-015",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P1",
+      "batch": 2,
+      "state": "verified",
+      "title": "档案恢复改用截断标题且遗漏原metadata和导演委托边界",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/archive-resume.ts:226@c028118de87f80b4ff0726c758b1ca0d964b9a63",
+          "sha256": "17fe6949ac7f8b0990fa824d0ea5de4d3567b84bca9448a8f9bde3b624edb5a9",
+          "note": "A: 实际实现及调用链精读；真实失败回归独立留存。"
+        }
+      ],
+      "root_cause": {
+        "file": "apps/server/src/video/archive-resume.ts",
+        "line": 226,
+        "commit": "c028118de87f80b4ff0726c758b1ca0d964b9a63"
+      },
+      "trigger_path": "原需求超过200字或画幅/声音/商品等只在metadata，恢复只用project.title并不带metadata；导演任务可变成普通任务",
+      "fix_plan": "在执行前快照完整可恢复输入；恢复核验版本及原输入、显式保留metadata；不能安全重建的历史/导演委托任务不静默降级启动",
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "原需求超过200字或画幅/声音/商品等只在metadata，恢复只用project.title并不带metadata；导演任务可变成普通任务",
+          "expect": "来源/恢复输入/已受理回执保持完整准确，不以错误默认值或丢失回执重做付费动作。",
+          "command": "RUN_DB_TESTS=1 node node_modules/vitest/vitest.mjs run apps/server/src/video/archive-resume-input.test.ts apps/server/src/video/studio-worker.test.ts apps/server/src/video/archive.pg.test.ts --maxWorkers=2",
+          "exec": {
+            "file": "node",
+            "args": [
+              "node_modules/vitest/vitest.mjs",
+              "run",
+              "apps/server/src/video/archive-resume-input.test.ts",
+              "apps/server/src/video/studio-worker.test.ts",
+              "apps/server/src/video/archive.pg.test.ts",
+              "--maxWorkers=2"
+            ]
+          },
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-015-0-1793673816992.json",
+            "sha256": "96ad96914940247e4da09ee50e61b9f1607dad796d9266ef35bd70c9570ad36a",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          },
+          "evidence": {
+            "path": "evidence/MC-015-0-1793673816992.txt",
+            "sha256": "1abcc5e5ebd1248144fe3288e54e907a33e02e4769ba06c3d8e31e8ce3e78af7",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        }
+      ],
+      "regression": {
+        "command": "RUN_DB_TESTS=1 node node_modules/vitest/vitest.mjs run apps/server/src/video/archive-resume-input.test.ts apps/server/src/video/studio-worker.test.ts apps/server/src/video/archive.pg.test.ts --maxWorkers=2"
+      },
+      "rollback": "普通revert PR回滚对应修复，数据库恢复兼容并保留已知受理事实。",
+      "repair_actor": "/root",
+      "verified_by": "/root/marketing_audit",
+      "verified_at": "2026-11-03T02:43:38.592Z",
+      "verification_evidence": {
+        "path": "runs/MC-015-0-1793673816992.json",
+        "sha256": "96ad96914940247e4da09ee50e61b9f1607dad796d9266ef35bd70c9570ad36a",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "last_assertion_attempt": {
+        "actor": "/root/marketing_audit",
+        "role": "acceptance",
+        "result": "pass",
+        "at": "2026-11-03T02:43:36.991Z",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+        "finished_at": "2026-11-03T02:43:38.592Z"
+      },
+      "fixed_by": "/root",
+      "last_verification_attempt": {
+        "actor": "/root/marketing_audit",
+        "result": "pass",
+        "at": "2026-11-03T02:43:38.592Z",
+        "runs": [
+          {
+            "path": "runs/MC-015-0-1793673816992.json",
+            "sha256": "96ad96914940247e4da09ee50e61b9f1607dad796d9266ef35bd70c9570ad36a",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        ]
+      }
+    },
+    {
+      "id": "MC-016",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P1",
+      "batch": 2,
+      "state": "verified",
+      "title": "film组件受理回执未及时持久化且失败写覆盖已知taskId",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/film-worker.ts:1192@c028118de87f80b4ff0726c758b1ca0d964b9a63",
+          "sha256": "7c820b2673e6ba32f62eee6576f159761b0771e2fb2ee96102f713646bcc1b75",
+          "note": "A: 实际实现及调用链精读；真实失败回归独立留存。"
+        }
+      ],
+      "root_cause": {
+        "file": "apps/server/src/video/film-worker.ts",
+        "line": 1192,
+        "commit": "c028118de87f80b4ff0726c758b1ca0d964b9a63"
+      },
+      "trigger_path": "视频POST受理后取消或轮询失败，生图下载503，unknown后迟到taskId，evidence只剩失败消息",
+      "fix_plan": "受理立即增量保存providerTaskId/hash，unknown允许迟到同值补证，失败/完成保留受理回执并用DB防换绑",
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "视频POST受理后取消或轮询失败，生图下载503，unknown后迟到taskId，evidence只剩失败消息",
+          "expect": "来源/恢复输入/已受理回执保持完整准确，不以错误默认值或丢失回执重做付费动作。",
+          "command": "RUN_DB_TESTS=1 node node_modules/vitest/vitest.mjs run apps/server/src/video/film-provider-receipt.pg.test.ts --maxWorkers=2",
+          "exec": {
+            "file": "node",
+            "args": [
+              "node_modules/vitest/vitest.mjs",
+              "run",
+              "apps/server/src/video/film-provider-receipt.pg.test.ts",
+              "--maxWorkers=2"
+            ]
+          },
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-016-0-1793673649060.json",
+            "sha256": "4b1f649f7c29a79d5b0318aec33ad42e82a001c3e7625c5d12e2faa3f56cf0a9",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          },
+          "evidence": {
+            "path": "evidence/MC-016-0-1793673649060.txt",
+            "sha256": "ff68b322fa9f1de49e052bf789c19e053d9d4c7c39f270dc39fda2b1e0256d88",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        }
+      ],
+      "regression": {
+        "command": "RUN_DB_TESTS=1 node node_modules/vitest/vitest.mjs run apps/server/src/video/film-provider-receipt.pg.test.ts --maxWorkers=2"
+      },
+      "rollback": "普通revert PR回滚对应修复，数据库恢复兼容并保留已知受理事实。",
+      "repair_actor": "/root/submission_audit",
+      "verified_by": "/root/general_audit",
+      "verified_at": "2026-11-03T02:40:50.640Z",
+      "verification_evidence": {
+        "path": "runs/MC-016-0-1793673649060.json",
+        "sha256": "4b1f649f7c29a79d5b0318aec33ad42e82a001c3e7625c5d12e2faa3f56cf0a9",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "last_assertion_attempt": {
+        "actor": "/root/general_audit",
+        "role": "acceptance",
+        "result": "pass",
+        "at": "2026-11-03T02:40:49.059Z",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+        "finished_at": "2026-11-03T02:40:50.640Z"
+      },
+      "fixed_by": "/root/submission_audit",
+      "last_verification_attempt": {
+        "actor": "/root/general_audit",
+        "result": "pass",
+        "at": "2026-11-03T02:40:50.640Z",
+        "runs": [
+          {
+            "path": "runs/MC-016-0-1793673649060.json",
+            "sha256": "4b1f649f7c29a79d5b0318aec33ad42e82a001c3e7625c5d12e2faa3f56cf0a9",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        ]
+      }
+    },
+    {
+      "id": "MC-017",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P0",
+      "batch": 0,
+      "state": "verified",
+      "title": "情报商品图下载允许被重定向至私网",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/media/products.ts:169@c028118de87f80b4ff0726c758b1ca0d964b9a63",
+          "sha256": "c5e938fa084d6dcd3cc6e8dfc03288f6fb084a01d9068c87f349c0bfc91fb0e4",
+          "note": "A：根因代码和调用链。独立失败与转绿回执另存。"
+        }
+      ],
+      "root_cause": {
+        "file": "apps/server/src/video/media/products.ts",
+        "line": 169,
+        "commit": "c028118de87f80b4ff0726c758b1ca0d964b9a63"
+      },
+      "trigger_path": "可信来源页面提取的商品图 URL 指向环回/私网或重定向到私网。",
+      "fix_plan": "首跳和重定向均检查公网地址并固定解析结果，流式限制响应字节。",
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "可信来源页面提取的商品图 URL 指向环回/私网或重定向到私网。",
+          "expect": "恶意目标服务器收到零请求；受控公开来源正确下载；超长响应停止。",
+          "last_result": "pass",
+          "command": "RUN_DB_TESTS=1 node node_modules/vitest/vitest.mjs run apps/server/src/video/media/products-source-safety.test.ts apps/server/src/video/media/media.pg.test.ts --maxWorkers=2",
+          "exec": {
+            "file": "node",
+            "args": [
+              "node_modules/vitest/vitest.mjs",
+              "run",
+              "apps/server/src/video/media/products-source-safety.test.ts",
+              "apps/server/src/video/media/media.pg.test.ts",
+              "--maxWorkers=2"
+            ]
+          },
+          "run": {
+            "path": "runs/MC-017-0-1793673560265.json",
+            "sha256": "5ecd750a78efd6ce1dc7bfc4f3121580a6fda10969009636851a2def4fb7c7b7",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          },
+          "evidence": {
+            "path": "evidence/MC-017-0-1793673560265.txt",
+            "sha256": "e208cd30a7eba502d160a2f0dd8bb5e8a04489836cc353d57b082984591f71c5",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        }
+      ],
+      "regression": {
+        "command": "RUN_DB_TESTS=1 node node_modules/vitest/vitest.mjs run apps/server/src/video/media/products-source-safety.test.ts apps/server/src/video/media/media.pg.test.ts --maxWorkers=2"
+      },
+      "rollback": "普通 revert PR；保留账本和外部受理事实。",
+      "repair_actor": "/root/marketing_audit",
+      "verified_by": "/root/submission_audit",
+      "verified_at": "2026-11-03T02:39:23.225Z",
+      "verification_evidence": {
+        "path": "runs/MC-017-0-1793673560265.json",
+        "sha256": "5ecd750a78efd6ce1dc7bfc4f3121580a6fda10969009636851a2def4fb7c7b7",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "last_assertion_attempt": {
+        "actor": "/root/submission_audit",
+        "role": "acceptance",
+        "result": "pass",
+        "at": "2026-11-03T02:39:20.264Z",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+        "finished_at": "2026-11-03T02:39:23.225Z"
+      },
+      "fixed_by": "/root/marketing_audit",
+      "last_verification_attempt": {
+        "actor": "/root/submission_audit",
+        "result": "pass",
+        "at": "2026-11-03T02:39:23.225Z",
+        "runs": [
+          {
+            "path": "runs/MC-017-0-1793673560265.json",
+            "sha256": "5ecd750a78efd6ce1dc7bfc4f3121580a6fda10969009636851a2def4fb7c7b7",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        ]
+      }
+    },
+    {
+      "id": "MC-018",
+      "kind": "problem",
+      "level": "L4",
+      "severity": "P1",
+      "batch": 2,
+      "state": "verified",
+      "title": "预生产审计日志跨运行混写",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/studio-worker.ts:190@c028118de87f80b4ff0726c758b1ca0d964b9a63",
+          "sha256": "7b90196a5d3deecd6254000c44dd13accf38e8493fb203f73f8ca83e945bc22a",
+          "note": "A：根因代码和调用链。独立失败与转绿回执另存。"
+        }
+      ],
+      "root_cause": {
+        "file": "apps/server/src/video/studio-worker.ts",
+        "line": 190,
+        "commit": "c028118de87f80b4ff0726c758b1ca0d964b9a63"
+      },
+      "trigger_path": "两个工作区并行启动，A 先结束，期间进程有无运行上下文日志。",
+      "fix_plan": "按异步运行标识为 console 副本路由，租户与项目授权后才注册文件。",
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "两个工作区并行启动，A 先结束，期间进程有无运行上下文日志。",
+          "expect": "实际项目文件仅见各自标识；外部日志不落项目；乱序完成后原 console 恢复。",
+          "last_result": "pass",
+          "command": "node node_modules/vitest/vitest.mjs run apps/server/src/video/studio-worker.test.ts --maxWorkers=2",
+          "exec": {
+            "file": "node",
+            "args": [
+              "node_modules/vitest/vitest.mjs",
+              "run",
+              "apps/server/src/video/studio-worker.test.ts",
+              "--maxWorkers=2"
+            ]
+          },
+          "run": {
+            "path": "runs/MC-018-0-1793673818727.json",
+            "sha256": "2f7beb5c4e6fe4be558d5b2c104dba4279a3faa679c236c8b14df5916af7133f",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          },
+          "evidence": {
+            "path": "evidence/MC-018-0-1793673818727.txt",
+            "sha256": "ea74dcea91a964cd8181d121e0a0a395ffb1804189d595067c5727ee63371b7b",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        }
+      ],
+      "regression": {
+        "command": "node node_modules/vitest/vitest.mjs run apps/server/src/video/studio-worker.test.ts --maxWorkers=2"
+      },
+      "rollback": "普通 revert PR；保留账本和外部受理事实。",
+      "repair_actor": "/root",
+      "verified_by": "/root/marketing_audit",
+      "verified_at": "2026-11-03T02:43:40.327Z",
+      "verification_evidence": {
+        "path": "runs/MC-018-0-1793673818727.json",
+        "sha256": "2f7beb5c4e6fe4be558d5b2c104dba4279a3faa679c236c8b14df5916af7133f",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "last_assertion_attempt": {
+        "actor": "/root/marketing_audit",
+        "role": "acceptance",
+        "result": "pass",
+        "at": "2026-11-03T02:43:38.726Z",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+        "finished_at": "2026-11-03T02:43:40.327Z"
+      },
+      "fixed_by": "/root",
+      "last_verification_attempt": {
+        "actor": "/root/marketing_audit",
+        "result": "pass",
+        "at": "2026-11-03T02:43:40.327Z",
+        "runs": [
+          {
+            "path": "runs/MC-018-0-1793673818727.json",
+            "sha256": "2f7beb5c4e6fe4be558d5b2c104dba4279a3faa679c236c8b14df5916af7133f",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        ]
+      }
+    },
+    {
+      "id": "MC-019",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P1",
+      "batch": 2,
+      "state": "verified",
+      "title": "PRD 缺乏有效审批时仍消耗剧本阶段",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "vendor/supermickey/hyperreality-system/index.js:1049@c028118de87f80b4ff0726c758b1ca0d964b9a63",
+          "sha256": "acb46563f99b61babb1156858fb83c083a258b052ff21169d3b3e7d5bddec5cf",
+          "note": "A：根因代码和调用链。独立失败与转绿回执另存。"
+        }
+      ],
+      "root_cause": {
+        "file": "vendor/supermickey/hyperreality-system/index.js",
+        "line": 1049,
+        "commit": "c028118de87f80b4ff0726c758b1ca0d964b9a63"
+      },
+      "trigger_path": "PRD 生成异常或 G4 审批回调异常、事件写入异常。",
+      "fix_plan": "在宿主预生产范围拒绝未经核实的 PRD，阻断剧本及后续阶段，保留原始错误。",
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "PRD 生成异常或 G4 审批回调异常、事件写入异常。",
+          "expect": "实际 vendor 的剧本调用为零，宿主返回原错误，并发独立 preview 仍遵循原规则。",
+          "last_result": "pass",
+          "command": "node node_modules/vitest/vitest.mjs run packages/video-studio/src/vendor-prd-approval-failure.test.ts --maxWorkers=2",
+          "exec": {
+            "file": "node",
+            "args": [
+              "node_modules/vitest/vitest.mjs",
+              "run",
+              "packages/video-studio/src/vendor-prd-approval-failure.test.ts",
+              "--maxWorkers=2"
+            ]
+          },
+          "run": {
+            "path": "runs/MC-019-0-1793673563363.json",
+            "sha256": "778d087a9a3d855db148fd17c3eb2aadf64c908e3f440048418f5286f89eb4c0",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          },
+          "evidence": {
+            "path": "evidence/MC-019-0-1793673563363.txt",
+            "sha256": "d7c5293cc0d24ebda394e4ce0a1e5f0c9d825dcf3dbd77336286425dd082c76c",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        }
+      ],
+      "regression": {
+        "command": "node node_modules/vitest/vitest.mjs run packages/video-studio/src/vendor-prd-approval-failure.test.ts --maxWorkers=2"
+      },
+      "rollback": "普通 revert PR；保留账本和外部受理事实。",
+      "repair_actor": "/root/general_audit",
+      "verified_by": "/root/submission_audit",
+      "verified_at": "2026-11-03T02:39:24.962Z",
+      "verification_evidence": {
+        "path": "runs/MC-019-0-1793673563363.json",
+        "sha256": "778d087a9a3d855db148fd17c3eb2aadf64c908e3f440048418f5286f89eb4c0",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "last_assertion_attempt": {
+        "actor": "/root/submission_audit",
+        "role": "acceptance",
+        "result": "pass",
+        "at": "2026-11-03T02:39:23.362Z",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+        "finished_at": "2026-11-03T02:39:24.962Z"
+      },
+      "fixed_by": "/root/general_audit",
+      "last_verification_attempt": {
+        "actor": "/root/submission_audit",
+        "result": "pass",
+        "at": "2026-11-03T02:39:24.962Z",
+        "runs": [
+          {
+            "path": "runs/MC-019-0-1793673563363.json",
+            "sha256": "778d087a9a3d855db148fd17c3eb2aadf64c908e3f440048418f5286f89eb4c0",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        ]
+      }
+    },
+    {
+      "id": "MC-020",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P0",
+      "batch": 0,
+      "state": "verified",
+      "title": "并发 vendor 子引擎复用其他工作区的模型适配器",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "packages/video-studio/src/llm-adapter.ts:461@c028118de87f80b4ff0726c758b1ca0d964b9a63",
+          "sha256": "1721d0df978d94837a88004fc837d1b815a0fbdccc5c0108402636a686c319ae",
+          "note": "A：根因代码和调用链。独立失败与转绿回执另存。"
+        }
+      ],
+      "root_cause": {
+        "file": "packages/video-studio/src/llm-adapter.ts",
+        "line": 461,
+        "commit": "c028118de87f80b4ff0726c758b1ca0d964b9a63"
+      },
+      "trigger_path": "A 已启动，B 随后启动；A 触发 vendor 原型调用并先完成。",
+      "fix_plan": "模型桥只安装一次，以异步上下文绑定原始适配器；关闭的作用域拒绝迟到调用。",
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "A 已启动，B 随后启动；A 触发 vendor 原型调用并先完成。",
+          "expect": "同一个真实 vendor 原型的两次请求分别计入 A 与 B；关闭后无额外本机 HTTP 请求。",
+          "last_result": "pass",
+          "command": "node node_modules/vitest/vitest.mjs run packages/video-studio/src/routed-generation.test.ts apps/server/src/video/studio-worker.test.ts --maxWorkers=2",
+          "exec": {
+            "file": "node",
+            "args": [
+              "node_modules/vitest/vitest.mjs",
+              "run",
+              "packages/video-studio/src/routed-generation.test.ts",
+              "apps/server/src/video/studio-worker.test.ts",
+              "--maxWorkers=2"
+            ]
+          },
+          "run": {
+            "path": "runs/MC-020-0-1793673650772.json",
+            "sha256": "c7ca237792fa9ada642d31c4c6b6e04a5955671f5845875d594668b7a4aca76f",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          },
+          "evidence": {
+            "path": "evidence/MC-020-0-1793673650772.txt",
+            "sha256": "2ceacfbb311c36ef436b24b3c1dd320c37fbef3837d82030135acc14f1d3c97e",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        }
+      ],
+      "regression": {
+        "command": "node node_modules/vitest/vitest.mjs run packages/video-studio/src/routed-generation.test.ts apps/server/src/video/studio-worker.test.ts --maxWorkers=2"
+      },
+      "rollback": "普通 revert PR；保留账本和外部受理事实。",
+      "repair_actor": "/root",
+      "verified_by": "/root/general_audit",
+      "verified_at": "2026-11-03T02:40:52.364Z",
+      "verification_evidence": {
+        "path": "runs/MC-020-0-1793673650772.json",
+        "sha256": "c7ca237792fa9ada642d31c4c6b6e04a5955671f5845875d594668b7a4aca76f",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "last_assertion_attempt": {
+        "actor": "/root/general_audit",
+        "role": "acceptance",
+        "result": "pass",
+        "at": "2026-11-03T02:40:50.771Z",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+        "finished_at": "2026-11-03T02:40:52.364Z"
+      },
+      "fixed_by": "/root",
+      "last_verification_attempt": {
+        "actor": "/root/general_audit",
+        "result": "pass",
+        "at": "2026-11-03T02:40:52.364Z",
+        "runs": [
+          {
+            "path": "runs/MC-020-0-1793673650772.json",
+            "sha256": "c7ca237792fa9ada642d31c4c6b6e04a5955671f5845875d594668b7a4aca76f",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        ]
+      }
+    },
+    {
+      "id": "MC-021",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P1",
+      "batch": 2,
+      "state": "verified",
+      "title": "并发 vendor 渲染共用最新定妆索引",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/studio-worker.ts:627@c028118de87f80b4ff0726c758b1ca0d964b9a63",
+          "sha256": "7b90196a5d3deecd6254000c44dd13accf38e8493fb203f73f8ca83e945bc22a",
+          "note": "A：根因代码和调用链。独立失败与转绿回执另存。"
+        }
+      ],
+      "root_cause": {
+        "file": "apps/server/src/video/studio-worker.ts",
+        "line": 627,
+        "commit": "c028118de87f80b4ff0726c758b1ca0d964b9a63"
+      },
+      "trigger_path": "未设置片型硬闸、启用 vendor 直渲；不同项目并发生成并以不同顺序结束。",
+      "fix_plan": "保留逐角度字节核验；只在真实渲染运行的上下文解析本次项目索引并独立摘除。",
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "未设置片型硬闸、启用 vendor 直渲；不同项目并发生成并以不同顺序结束。",
+          "expect": "两个真实 vendor 提交体各含本项目四角度字节，乱序退出后恢复原型。",
+          "last_result": "pass",
+          "command": "node node_modules/vitest/vitest.mjs run packages/video-studio/src/vendor-portrait-binding-concurrency.test.ts packages/video-studio/src/vendor-compat.test.ts packages/video-studio/src/portrait-binding.test.ts apps/server/src/video/studio-worker.test.ts --maxWorkers=2",
+          "exec": {
+            "file": "node",
+            "args": [
+              "node_modules/vitest/vitest.mjs",
+              "run",
+              "packages/video-studio/src/vendor-portrait-binding-concurrency.test.ts",
+              "packages/video-studio/src/vendor-compat.test.ts",
+              "packages/video-studio/src/portrait-binding.test.ts",
+              "apps/server/src/video/studio-worker.test.ts",
+              "--maxWorkers=2"
+            ]
+          },
+          "run": {
+            "path": "runs/MC-021-0-1793673565099.json",
+            "sha256": "f32ad531be435ca215c7e6c06fd7f0b9e1539bc75fa62cffd9af7b6f212c419d",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          },
+          "evidence": {
+            "path": "evidence/MC-021-0-1793673565099.txt",
+            "sha256": "39665c8febebdbd48a9b788098022f7e69722f94b3694f9968da31e9ba03d359",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        }
+      ],
+      "regression": {
+        "command": "node node_modules/vitest/vitest.mjs run packages/video-studio/src/vendor-portrait-binding-concurrency.test.ts packages/video-studio/src/vendor-compat.test.ts packages/video-studio/src/portrait-binding.test.ts apps/server/src/video/studio-worker.test.ts --maxWorkers=2"
+      },
+      "rollback": "普通 revert PR；保留账本和外部受理事实。",
+      "repair_actor": "/root/marketing_audit",
+      "verified_by": "/root/submission_audit",
+      "verified_at": "2026-11-03T02:39:31.522Z",
+      "verification_evidence": {
+        "path": "runs/MC-021-0-1793673565099.json",
+        "sha256": "f32ad531be435ca215c7e6c06fd7f0b9e1539bc75fa62cffd9af7b6f212c419d",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "last_assertion_attempt": {
+        "actor": "/root/submission_audit",
+        "role": "acceptance",
+        "result": "pass",
+        "at": "2026-11-03T02:39:25.098Z",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+        "finished_at": "2026-11-03T02:39:31.522Z"
+      },
+      "fixed_by": "/root/marketing_audit",
+      "last_verification_attempt": {
+        "actor": "/root/submission_audit",
+        "result": "pass",
+        "at": "2026-11-03T02:39:31.522Z",
+        "runs": [
+          {
+            "path": "runs/MC-021-0-1793673565099.json",
+            "sha256": "f32ad531be435ca215c7e6c06fd7f0b9e1539bc75fa62cffd9af7b6f212c419d",
+            "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+          }
+        ]
+      }
+    }
+  ],
+  "gates": [],
+  "handoff": {
+    "generated_at": "2026-11-03T02:45:41.825Z",
+    "acceptance_command": "node scripts/acceptance/fleet-run.mjs --repo geniusdapeng-collab/workloom-growthtest --env local-preview",
+    "open_problem_ids": []
+  }
+}

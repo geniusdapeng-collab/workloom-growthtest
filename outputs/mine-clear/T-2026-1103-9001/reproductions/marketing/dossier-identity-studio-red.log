@@ -1,0 +1,44 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2/packages/video-studio
+
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+ ❯ src/studio-marketing-input.test.ts (1 test | 1 failed) 286ms
+   × Studio重装订只消费已审A1身份，不把检索品牌、类别或型号变成商品事实 285ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/studio-marketing-input.test.ts > Studio重装订只消费已审A1身份，不把检索品牌、类别或型号变成商品事实
+AssertionError: expected { name: '已核实 F3', brand: '检索品牌', …(6) } to match object { name: '已核实 F3', brand: '', …(2) }
+(5 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "brand": "",
+-   "category": "",
+-   "model": "",
++   "brand": "检索品牌",
++   "category": "检索服务",
++   "model": "检索型号",
+    "name": "已核实 F3",
+  }
+
+ ❯ src/studio-marketing-input.test.ts:54:53
+     52|     expect(line).toBeDefined();
+     53|     const result = JSON.parse(line!.slice(7));
+     54|     expect(result.dataMining.data.dossier.identity).toMatchObject({ na…
+       |                                                     ^
+     55|     expect(result.dataMining.data.cards.brief_card.category).toBe("");
+     56|     expect(result.consumption.theme).not.toContain("检索服务");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  09:26:45
+   Duration  367ms (transform 10ms, setup 0ms, import 15ms, tests 286ms, environment 0ms)
+

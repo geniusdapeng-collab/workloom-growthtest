@@ -1,0 +1,385 @@
+{
+  "task": "T-2026-1103-9001",
+  "baseline": "c028118de87f80b4ff0726c758b1ca0d964b9a63",
+  "files": [
+    {
+      "file": "apps/server/src/video/data-mining-executor.test.ts",
+      "lines": 252,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "59442bc3b9c0d7017e3c9e2ee13f9927cc13556e75f5d3bfa683afdb00487428"
+    },
+    {
+      "file": "apps/server/src/video/data-mining-executor.ts",
+      "lines": 879,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "162a607ff4f677ccf0755f7a53956af9c5e074b51eba20d4569e3d5ba7562d3a"
+    },
+    {
+      "file": "apps/server/src/video/data-mining-pacing.test.ts",
+      "lines": 78,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "67f9267f616220e55f1cebb804f8ed9d631c9b17b6f6543d78b51a739dc6613d"
+    },
+    {
+      "file": "apps/server/src/video/data-mining-search-recovery-independent.test.ts",
+      "lines": 28,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "4108d1dc85de80a86936bdb604c8c3729573a5e92170bd145081f2c3d2dc7863"
+    },
+    {
+      "file": "apps/server/src/video/data-mining-search-recovery.test.ts",
+      "lines": 135,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "1cabca1802e7a4b7d89ce50a4da3f83a2f531d7c0f62ccb00dd8a371351d3eca"
+    },
+    {
+      "file": "apps/server/src/video/gen/compiled-request.ts",
+      "lines": 154,
+      "sha256": "8eef97897d6da113c56f2543098c0f27f0fbda171443869db29095ff965f181a",
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round"
+    },
+    {
+      "file": "apps/server/src/video/marketing-authority.test.ts",
+      "lines": 231,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "66e1574d02d90ab490407ab94eecac9b0bf4b5c86f1e77cb53d468ffabdc3df8"
+    },
+    {
+      "file": "apps/server/src/video/marketing-authority.ts",
+      "lines": 306,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "60313d303539a4f11307d34266bbe3edc07ae69ce920ae2110a76f5b44e34868"
+    },
+    {
+      "file": "apps/server/src/video/marketing-dossier-consumption.test.ts",
+      "lines": 70,
+      "sha256": "db84e40350e4bb267552d9728cdaa5d648ad5507d91a34b1dfad621744174f29",
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round"
+    },
+    {
+      "file": "apps/server/src/video/marketing-facts.test.ts",
+      "lines": 157,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "abe2c155a2be36bdb31898e5b4a8100821591d7ee9e1c66cdba769fb78131005"
+    },
+    {
+      "file": "apps/server/src/video/marketing-facts.ts",
+      "lines": 252,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "682d50ef9fc1ff7c6a5e092dffa05877067977d2355fa9d1962eecc152020fe8"
+    },
+    {
+      "file": "apps/server/src/video/marketing-source-attribution-independent.test.ts",
+      "lines": 27,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "2b1d432e7b00f8fd107f6e5bde1d791cfa1ca4b7cb9c3aad6c0cebd28c555854"
+    },
+    {
+      "file": "apps/server/src/video/marketing-source-attribution.test.ts",
+      "lines": 108,
+      "sha256": "1c2ff74505831dd4dc97c51bd17fa5763479d3152a13142c5616a5c0dd42e06b",
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round"
+    },
+    {
+      "file": "apps/server/src/video/marketing-source-fetcher.test.ts",
+      "lines": 85,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "cd6023fef9af24c5d0688a285d865b09af26508b47517c5917b8fab03db913fd"
+    },
+    {
+      "file": "apps/server/src/video/marketing-source-fetcher.ts",
+      "lines": 231,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "9ecd1578afaa7d7b372ac9b0f02a8fba4a19d185a369b6adcf092860baee9a1f"
+    },
+    {
+      "file": "apps/server/src/video/media/media.pg.test.ts",
+      "lines": 816,
+      "sha256": "862d597104767e22ec7a4a9c70aaa27e5c57307503730c04769e30c1f2497819",
+      "mode": "C",
+      "reason": "Product projection setup and source/rename regression sections read; complete suite executed as B evidence",
+      "ranges": [
+        "1-170",
+        "290-335",
+        "620-685"
+      ]
+    },
+    {
+      "file": "apps/server/src/video/media/paths.ts",
+      "lines": 45,
+      "sha256": "492dd3777fc3a27b4f377c9755c5820bddd2cdd10b599435ad19ae499dc196e1",
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round"
+    },
+    {
+      "file": "apps/server/src/video/media/products-source-safety.test.ts",
+      "lines": 153,
+      "sha256": "ddb62aebcf08123d15a5b7adb6b4173740958fb4e0536083158870b725726a92",
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round"
+    },
+    {
+      "file": "apps/server/src/video/media/products.ts",
+      "lines": 345,
+      "sha256": "fccc9f7aa84acc5225c3f48e89cc0d77ae23c5a2115bff5026415345f8513509",
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round"
+    },
+    {
+      "file": "apps/server/src/video/media/register-local.ts",
+      "lines": 264,
+      "sha256": "7aa54392058e9b7756fc755ebffdd38871bd2e78c9ad79edfbb431fd8001d10f",
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round"
+    },
+    {
+      "file": "apps/server/src/video/studio-worker.ts",
+      "lines": 1780,
+      "mode": "A",
+      "reason": "全文精读并复读冻结源码前的所有后续差异",
+      "sha256": "4a321bccdca32f10430d577a6e7b3da26093a9757529cacb6f09cc889e524ecb"
+    },
+    {
+      "file": "packages/video-studio/src/data-mining-engine.test.ts",
+      "lines": 206,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "4e36ae85e7a2d6518f8418e705b8a6cca1838b53420279c94e13ce7255c9f12f"
+    },
+    {
+      "file": "packages/video-studio/src/index.ts",
+      "lines": 78,
+      "sha256": "7fe7b6d7d2f8995034c6a8a843b9e0318885feb146aad7ae1ba868594bd010a6",
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round"
+    },
+    {
+      "file": "packages/video-studio/src/marketing-dossier-input.test.ts",
+      "lines": 27,
+      "sha256": "22ccd1702beef213ed41b3ffc2823f8337683aad74a6d54a9ef75c22371a055c",
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round"
+    },
+    {
+      "file": "packages/video-studio/src/marketing-dossier-input.ts",
+      "lines": 49,
+      "sha256": "e73c175506fbf92351210066c7e706c6aeeda37ddd3993c4a0a78a697f6ab2a4",
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round"
+    },
+    {
+      "file": "packages/video-studio/src/marketing-price-contract.test.ts",
+      "lines": 38,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "eb3110c167845e475f171ad01a34ef86994fecb1e2b8d5a81a52a01a66141ba2"
+    },
+    {
+      "file": "packages/video-studio/src/marketing-price-contract.ts",
+      "lines": 85,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "b3e2eab4daa8bff5a3c0b000db0f372aa292d559da1854c201e959f34c4ccaab"
+    },
+    {
+      "file": "packages/video-studio/src/portrait-runtime.ts",
+      "mode": "C",
+      "reason": "读取1–95行定妆索引、角度与收据类型；不据此宣称出图实现全读",
+      "lines": 562,
+      "sha256": "9f104e885899c9bdadbdee0ec27c276db8c7c572a668d049b8d43e03f47082fb"
+    },
+    {
+      "file": "packages/video-studio/src/product-archive.ts",
+      "lines": 423,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "48b278c7cca3aeb117fd327010ff484d7315dde3c43b2265f35a63c00442acdc"
+    },
+    {
+      "file": "packages/video-studio/src/runtime-root.ts",
+      "mode": "A",
+      "reason": "全文读取，vendor真实运行根解析",
+      "lines": 16,
+      "sha256": "dfdafa3f2d2f7805c967900e8e7bb0ce36c12202b38849056565c4f45c94488b"
+    },
+    {
+      "file": "packages/video-studio/src/studio-marketing-input.test.ts",
+      "lines": 67,
+      "sha256": "9490f244bbf2838ac026bcf8f1e0c8c9fa98d006a39406ca22f71c6c94d6a638",
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round"
+    },
+    {
+      "file": "packages/video-studio/src/studio.ts",
+      "lines": 729,
+      "mode": "A",
+      "reason": "全文精读并复读冻结源码前的所有后续差异",
+      "sha256": "44d72847197f9a9bd0b36b5860dfabb6808babb7ad481313f62f9f1738ade4c5"
+    },
+    {
+      "file": "packages/video-studio/src/vendor-compat.test.ts",
+      "mode": "C",
+      "reason": "聚焦既有1–290行定妆照CJS消费/失败测试，整套107例实际执行B",
+      "lines": 4180,
+      "sha256": "58b2622e2febc050818bf6321ac46d90dc418b4820536a85c644c2364389159f"
+    },
+    {
+      "file": "packages/video-studio/src/vendor-compat.ts",
+      "mode": "C",
+      "reason": "完整精读定妆绑定/Parser桥约111–460行及营销桥区域；超大文件其余由通用审计范围处理。",
+      "lines": 8006,
+      "sha256": "8bf749e807700b409c1540644b45e8e446362977e03b5a33cae475ccf85a0cbe"
+    },
+    {
+      "file": "packages/video-studio/src/vendor-portrait-binding-concurrency.test.ts",
+      "mode": "A",
+      "reason": "全文编写与实际Node/CJS验证",
+      "lines": 133,
+      "sha256": "89b8f95c41d28069f4ed88fd6b92eca5eb6d0bc24b67d7def3fc32dcfecaf1cd"
+    },
+    {
+      "file": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/competitor-scout.js",
+      "lines": 200,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "a4e8c92172890c1076bf4fba6626cc6709f7191c5b8d82e7586e6d2ce584978e"
+    },
+    {
+      "file": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/cross-verifier.js",
+      "lines": 184,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "083116bb4b9113d3fd0f76bc4d0215ddf74756c81b93b8fbace3555635d3d055"
+    },
+    {
+      "file": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/dossier-binder.js",
+      "lines": 149,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "c8d3ea0e94ec2742f83d4f7fa940fa54aef2b905d3506e911c9badf866d496d9"
+    },
+    {
+      "file": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/product-info-collector.js",
+      "lines": 285,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "de479bd1f9e702968791faabe6938baca138ed991734ca96c2fb92df026bafb3"
+    },
+    {
+      "file": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/review-miner.js",
+      "lines": 283,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "19880ec8c72be34ad11aa5cfc800af198b365821601f37e2e62bbf9ab5ea003b"
+    },
+    {
+      "file": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/card-consumers.js",
+      "lines": 133,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "fd02bd7d971e8d5dcaec2498fd3cf47a96a994f17a337fee346e801410741a9f"
+    },
+    {
+      "file": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/contracts/confirmation-sheet.js",
+      "lines": 81,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "c23fe0dfe12feb2f5782512ca8e292cdac40bcd4692fb8d7384478dc9f61c414"
+    },
+    {
+      "file": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/contracts/dossier-schema.js",
+      "lines": 184,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "76f967520bbd6640ea93678c38a97c6f24463167a1f482571b9ce5e76e7a61fe"
+    },
+    {
+      "file": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/contracts/summary-cards.js",
+      "lines": 185,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "5fd20d336d229477dd0660b6de776556f3c0875c29497bba402eeb7df4b1ed7b"
+    },
+    {
+      "file": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/index.js",
+      "lines": 280,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "fdfb26ca8a788478ca03a502777208b0e43f0f3f86a00c46ebc2db04a231e172"
+    },
+    {
+      "file": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/pipeline/dossier-store.js",
+      "lines": 137,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "cbec8551f5bd01f035f6bfd463565c17ff702831cb9a2742249ad12b06ec37f2"
+    },
+    {
+      "file": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/pipeline/evidence-ledger.js",
+      "lines": 152,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "b04b1da20c705024c55169b754de2478c07efb222a6f120f9dabe0154bdd9064"
+    },
+    {
+      "file": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/pipeline/handoff-validator.js",
+      "lines": 136,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "3f6d8aed6e43f3d8ae3d89c359f20076580a9f29aa3482d8cf03845fb3eadbb1"
+    },
+    {
+      "file": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/pipeline/message-envelope.js",
+      "lines": 122,
+      "mode": "A",
+      "reason": "Full source read or authored and reviewed in this round",
+      "sha256": "e51f52a9a48660b0665f4488ee8c3de98bca27f6b0668d8c5c9c66028a0375e7"
+    },
+    {
+      "file": "vendor/supermickey/hyperreality-system/engines/rendering-engine/rendering-engine.js",
+      "mode": "C",
+      "reason": "读1–217及343–420行构造/渲染和真实manifest实现，执行实际引擎",
+      "lines": 529,
+      "sha256": "c91e4b867fc59a512e5a7a64d696afaed03e12851ddfeab29591e3781d7b1ce7"
+    },
+    {
+      "file": "vendor/supermickey/hyperreality-system/index.js",
+      "mode": "C",
+      "reason": "读2282–2327行Layer3渲染分支，供宿主可达性核对",
+      "lines": 4126,
+      "sha256": "c8719217200cca1c36dc4743455323d9290198950c929620cf698a055a121109"
+    },
+    {
+      "file": "vendor/supermickey/scripts/render-submitter-core.js",
+      "mode": "C",
+      "reason": "读1–125及284–384行真实submit和payload，执行实际验证与本地构建",
+      "lines": 477,
+      "sha256": "07dba0fadb4a8ad0a60026d50b1d0cd18f11934b2ca0f68162428f290b0b7cd0"
+    }
+  ],
+  "coverage": {
+    "total": 52,
+    "A": 45,
+    "B": 0,
+    "C": 7,
+    "D": 0,
+    "unread": 0
+  },
+  "limitations": "Explicit scope only; broad non-marketing Studio dependency implementations belong to other review scopes and are not claimed fully read here. No real paid model/media calls.",
+  "source_commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+}

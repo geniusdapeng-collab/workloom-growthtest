@@ -1,0 +1,47 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2
+
+ ❯ apps/server/src/video/data-mining-search-recovery-independent.test.ts (6 tests | 6 failed) 20ms
+     × the next healthy response is requested after restart=false 15ms
+     × the next healthy response is requested after restart=true 1ms
+     × the next healthy response is requested after restart=false 1ms
+     × the next healthy response is requested after restart=true 1ms
+     × the next healthy response is requested after restart=false 1ms
+     × the next healthy response is requested after restart=true 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/server/src/video/data-mining-search-recovery-independent.test.ts > html-shell does not become a 12-hour success-empty cache > the next healthy response is requested after restart=false
+ FAIL  apps/server/src/video/data-mining-search-recovery-independent.test.ts > html-shell does not become a 12-hour success-empty cache > the next healthy response is requested after restart=true
+ FAIL  apps/server/src/video/data-mining-search-recovery-independent.test.ts > invalid-rss does not become a 12-hour success-empty cache > the next healthy response is requested after restart=false
+ FAIL  apps/server/src/video/data-mining-search-recovery-independent.test.ts > invalid-rss does not become a 12-hour success-empty cache > the next healthy response is requested after restart=true
+ FAIL  apps/server/src/video/data-mining-search-recovery-independent.test.ts > invalid-api-rows does not become a 12-hour success-empty cache > the next healthy response is requested after restart=false
+ FAIL  apps/server/src/video/data-mining-search-recovery-independent.test.ts > invalid-api-rows does not become a 12-hour success-empty cache > the next healthy response is requested after restart=true
+AssertionError: expected [] to match object [ { url: 'https://example.test/f3' } ]
+
+- Expected
++ Received
+
+- [
+-   {
+-     "url": "https://example.test/f3",
+-   },
+- ]
++ []
+
+ ❯ apps/server/src/video/data-mining-search-recovery-independent.test.ts:25:77
+     23|     const search = createWebSearch(options);
+     24|     expect(await search("星野 F3", 5)).toEqual([]);
+     25|     expect(await (restart ? createWebSearch(options) : search)("星野 F3"…
+       |                                                                             ^
+     26|     expect(fetch).toHaveBeenCalledTimes(2);
+     27|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  6 failed (6)
+   Start at  10:07:21
+   Duration  147ms (transform 36ms, setup 0ms, import 46ms, tests 20ms, environment 0ms)
+

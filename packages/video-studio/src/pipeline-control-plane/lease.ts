@@ -2,6 +2,16 @@ import type { PipelineScope } from "./contracts.js";
 
 export const PROJECT_EXECUTION_LEASE_NAMESPACE = "project-run" as const;
 export const PIPELINE_CONTROL_STATE_LOCK_NAMESPACE = "pipeline-control-state" as const;
+export const PIPELINE_CONTROL_COMMAND_LOCK_NAMESPACE = "pipeline-control-command" as const;
+
+/** 命令回执读取与业务写入共用事务锁，避免同幂等键并发先读空再重复执行。 */
+export function pipelineControlCommandLockKey(scope: PipelineScope, idempotencyKey: string): string {
+  if (![scope.tenantId, scope.workspaceId, idempotencyKey].every((value) =>
+    typeof value === "string" && value.trim().length > 0)) {
+    throw new Error("PIPELINE_CONTROL_COMMAND_LOCK_SCOPE_INVALID");
+  }
+  return JSON.stringify([PIPELINE_CONTROL_COMMAND_LOCK_NAMESPACE, scope.tenantId, scope.workspaceId, idempotencyKey]);
+}
 
 /**
  * 全链路项目执行租约键。Studio、Director、FilmWorker、CLI 补跑和渲染修复必须使用同一编码。

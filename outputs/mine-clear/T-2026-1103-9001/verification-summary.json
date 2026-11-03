@@ -1,0 +1,38 @@
+{
+  "source": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+  "stats": {
+    "serverFiles": 53,
+    "serverPass": 1241,
+    "serverSkip": 1,
+    "studioFiles": 117,
+    "studioPass": 1980,
+    "nodePass": 21,
+    "pipelines": 6,
+    "releasePass": 11
+  },
+  "checks": {
+    "typecheck-final.log": "a7a88211c87a2a7f304dadd34c0e018cd91f774ab55b0cb5df16a7b6d98a431e",
+    "server-video-final.log": "ba325af887059477e7d4097ee80edcdcf9821f2e0295f088d17fc10b3bd58e05",
+    "video-studio-final.log": "7f31de6298e1053adc1b4e388bbede9c437777a1af22471d71a7dcdf026b1fe8",
+    "node-boundary-final.log": "a61dfea6d5bff7bda2e249ad8d501d9369466b8204f17bccc6112e31907bf41e",
+    "release-gate-final.log": "42cb859aa86f7841c8e3c5c7da8abfc6c58bd122d3080835d4b5de88ceb4dab6",
+    "capabilities-final.log": "2bd4fc2bee6109f866f990e5486d7c895e66344eed6d0ea924c467ab7d2ad371",
+    "pipelines-final.log": "9d698cb654071c2cdbbfb2b0c996e0216399d0e0ef18724c595fafcde801c790",
+    "health.json": "3c6a216fe5dba7c21455df7ccb1fb6fc3008a013e37bec001610b7a2d1ba3b79",
+    "migrate.log": "9e341418cde3a5c99419fe71526fe98d0ea7e98ab2b99c0967270c7b72fca772",
+    "gate-final.log": "bf2f2cc6158f0aff7c92db8af2c7044bbe227f3621eb684bb4f4206c9a78bbb8",
+    "baseline-final.json": "b66f4f25457debe2503ed186112ff0159879a6277d249afcf0261abd4f7836b4",
+    "status-final.json": "32eff0c515bb4bb859f1d31860190dceb18e34d8f49bcbd3eafcdb449851cce1",
+    "source-verification.json": "664bd5f522ce6588b2a722023ee07cad7fd13e89af1a1ecb38b26e07608519b1"
+  },
+  "totalCards": 21,
+  "acceptedCards": 21,
+  "assertions": 22,
+  "primaryEvidence": [
+    "ledger.json",
+    "runs/",
+    "evidence/",
+    "reproductions/",
+    "handoff.json"
+  ]
+}

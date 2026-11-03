@@ -66,6 +66,13 @@ class MemoryTransaction implements PipelineTransaction {
 
   async lockProject(_scope: PipelineScope, _projectId: string): Promise<void> {}
 
+  async lockCommand(scope: PipelineScope, idempotencyKey: string): Promise<void> {
+    // Memory仓储已串行整个事务；此处保留与持久仓储相同的输入校验。
+    if (!scope.tenantId.trim() || !scope.workspaceId.trim() || !idempotencyKey.trim()) {
+      throw new PipelineRepositoryError("COMMAND_SCOPE_INVALID", idempotencyKey);
+    }
+  }
+
   async getRun(scope: PipelineScope, id: string): Promise<PipelineRun | null> {
     const run = this.state.runs.get(id);
     return run && sameScope(run, scope) ? structuredClone(run) : null;
@@ -249,15 +256,20 @@ class MemoryTransaction implements PipelineTransaction {
  */
 export class InMemoryPipelineRepository implements PipelineRepository {
   private state = emptyState();
+  private tail: Promise<void> = Promise.resolve();
 
   async transaction<T>(_scope: PipelineScope, fn: (tx: PipelineTransaction) => Promise<T>): Promise<T> {
-    const working = cloneState(this.state);
+    const previous = this.tail;
+    let release!: () => void;
+    this.tail = new Promise<void>((resolve) => { release = resolve; });
+    await previous;
     try {
+      const working = cloneState(this.state);
       const result = await fn(new MemoryTransaction(working));
       this.state = working;
       return result;
-    } catch (error) {
-      throw error;
+    } finally {
+      release();
     }
   }
 }

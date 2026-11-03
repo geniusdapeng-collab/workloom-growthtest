@@ -1,0 +1,38 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-012-0-1793673257265",
+  "command": "node node_modules/vitest/vitest.mjs run packages/video-studio/src/vendor-discovery-await.test.ts --maxWorkers=2",
+  "exec": {
+    "file": "node",
+    "args": [
+      "node_modules/vitest/vitest.mjs",
+      "run",
+      "packages/video-studio/src/vendor-discovery-await.test.ts",
+      "--maxWorkers=2"
+    ]
+  },
+  "actor": "/root/general_audit",
+  "role": "repair",
+  "subject": {
+    "card_id": "MC-012",
+    "assertion_index": 0
+  },
+  "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-03T02:34:17.265Z",
+  "finished_at": "2026-11-03T02:34:18.302Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-012-0-1793673257265.txt",
+      "sha256": "a2f9c92df3e09bf3efc8819aea74a2b8309929c88554a3cab045886daa3741b8",
+      "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+    }
+  ]
+}

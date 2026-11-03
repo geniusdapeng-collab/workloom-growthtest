@@ -86,12 +86,35 @@ async function postCompiled(compiled: CompiledProviderRequest, headers: Record<s
   catch { throw new ProviderError("PROVIDER_FAILED", "供应商响应不是有效 JSON"); }
 }
 
-async function getJson(url: string, headers: Record<string, string>): Promise<{ ok: boolean; status: number; body: unknown; text: string }> {
-  const res = await fetch(url, { method: "GET", headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }); // C-06
-  const text = await res.text();
-  let body: unknown = null;
-  try { body = JSON.parse(text) as unknown; } catch { body = null; }
-  return { ok: res.ok, status: res.status, body, text };
+/** A lookup failure cannot establish failure of an already accepted generation. */
+async function getPollJson(url: string, headers: Record<string, string>, provider: string): Promise<Record<string, unknown>> {
+  let res: Response;
+  let text: string;
+  try {
+    res = await fetch(url, { method: "GET", headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }); // C-06
+    text = await res.text();
+  } catch (err) {
+    throw new ProviderError("PROVIDER_FAILED", `${provider} 查询未核实：${err instanceof Error ? err.message : String(err)}`, undefined, "unknown");
+  }
+  if (!res.ok) throw new ProviderError("PROVIDER_FAILED", `${provider} 查询未核实：HTTP ${res.status}`, res.status, "unknown");
+  let body: unknown;
+  try { body = JSON.parse(text) as unknown; }
+  catch { throw new ProviderError("PROVIDER_FAILED", `${provider} 查询响应不是有效 JSON`, res.status, "unknown"); }
+  if (!body || typeof body !== "object" || Array.isArray(body) || typeof (body as Record<string, unknown>).status !== "string") {
+    throw new ProviderError("PROVIDER_FAILED", `${provider} 查询响应缺少有效任务状态`, res.status, "unknown");
+  }
+  return body as Record<string, unknown>;
+}
+
+function unverifiedPollState(provider: string, state: unknown): never {
+  throw new ProviderError("PROVIDER_FAILED", `${provider} 返回未知任务状态：${String(state).slice(0, 80)}`, undefined, "unknown");
+}
+
+function completedMediaUri(provider: string, uri: unknown): string {
+  if (typeof uri !== "string" || !uri.trim()) {
+    throw new ProviderError("PROVIDER_FAILED", `${provider} 任务完成但产物地址尚未核实`, undefined, "unknown");
+  }
+  return uri;
 }
 
 /* ================= 火山方舟 · Seedance（视频，任务制异步） ================= */
@@ -111,14 +134,17 @@ export class ArkVideoProvider implements GenProvider {
     return { taskId: data.id };
   }
   async poll(taskId: string): Promise<{ status: GenTaskStatus; uri?: string; actualUnits?: number; error?: string }> {
-    const r = await getJson(`${this.base()}/contents/generations/tasks/${taskId}`, { authorization: `Bearer ${this.cfg.apiKey}` });
-    if (!r.ok) return { status: "failed", error: `Seedance 查询失败：HTTP ${r.status} ${r.text.slice(0, 120)}` };
-    const d = r.body as { status?: string; content?: { video_url?: string }; error?: { message?: string }; usage?: { completion_tokens?: number } };
-    if (d.status === "succeeded") return { status: "succeeded", uri: d.content?.video_url };
-    if (d.status === "failed" || d.status === "cancelled" || d.status === "canceled") {
+    const d = await getPollJson(`${this.base()}/contents/generations/tasks/${encodeURIComponent(taskId)}`, { authorization: `Bearer ${this.cfg.apiKey}` }, "Seedance") as {
+      status: string; content?: { video_url?: unknown }; error?: { message?: string }; duration?: unknown;
+    };
+    if (d.status === "succeeded") return { status: "succeeded", uri: completedMediaUri("Seedance", d.content?.video_url),
+      ...(typeof d.duration === "number" && Number.isFinite(d.duration) && d.duration > 0 ? { actualUnits: d.duration } : {}) };
+    if (["failed", "cancelled", "canceled", "expired"].includes(d.status)) {
       return { status: "failed", error: d.error?.message ?? `生成失败（${d.status}）` };
     }
-    return { status: d.status === "running" || d.status === "processing" ? "running" : "submitted" };
+    if (d.status === "running" || d.status === "processing") return { status: "running" };
+    if (d.status === "queued" || d.status === "submitted") return { status: "submitted" };
+    return unverifiedPollState("Seedance", d.status);
   }
 }
 
@@ -174,18 +200,18 @@ export class HiggsfieldProvider implements GenProvider {
   }
 
   async poll(taskId: string): Promise<{ status: GenTaskStatus; uri?: string; error?: string }> {
-    const r = await getJson(`${this.base()}/requests/${taskId}/status`, this.auth());
-    if (!r.ok) return { status: "failed", error: `Higgsfield 查询失败：HTTP ${r.status} ${r.text.slice(0, 120)}` };
-    const d = r.body as {
+    const d = await getPollJson(`${this.base()}/requests/${encodeURIComponent(taskId)}/status`, this.auth(), "Higgsfield") as {
       status?: string; error?: unknown;
       video?: { url?: string }; images?: Array<{ url?: string }>; payload?: { video?: { url?: string } };
     };
     const uri = d.video?.url ?? d.images?.[0]?.url ?? d.payload?.video?.url;
-    if (d.status === "completed") return { status: "succeeded", uri };
+    if (d.status === "completed") return { status: "succeeded", uri: completedMediaUri("Higgsfield", uri) };
     if (d.status === "failed" || d.status === "nsfw" || d.status === "canceled") {
       return { status: "failed", error: d.status === "nsfw" ? "内容审核未通过（nsfw，不计费）" : String(d.error ?? d.status) };
     }
-    return { status: d.status === "in_progress" ? "running" : "submitted" };
+    if (d.status === "in_progress") return { status: "running" };
+    if (d.status === "queued") return { status: "submitted" };
+    return unverifiedPollState("Higgsfield", d.status);
   }
 
   /** 官方报价：POST /estimate/<endpoint> → { credits, usd } */
@@ -217,14 +243,14 @@ export class MuapiProvider implements GenProvider {
     return { taskId };
   }
   async poll(taskId: string): Promise<{ status: GenTaskStatus; uri?: string; error?: string }> {
-    const r = await getJson(`${this.base()}/api/v1/predictions/${taskId}/result`, { "x-api-key": this.cfg.apiKey });
-    if (!r.ok) return { status: "failed", error: `MuAPI 查询失败：HTTP ${r.status}` };
-    const d = r.body as { status?: string; url?: string; outputs?: string[]; error?: string };
+    const d = await getPollJson(`${this.base()}/api/v1/predictions/${encodeURIComponent(taskId)}/result`, { "x-api-key": this.cfg.apiKey }, "MuAPI") as { status: string; url?: string; outputs?: string[]; error?: string };
     const uri = d.url ?? d.outputs?.[0];
     const st = (d.status ?? "").toLowerCase();
-    if (["completed", "succeeded", "success"].includes(st)) return { status: "succeeded", uri };
-    if (["failed", "error"].includes(st)) return { status: "failed", error: d.error ?? "生成失败" };
-    return { status: "running" };
+    if (["completed", "succeeded", "success"].includes(st)) return { status: "succeeded", uri: completedMediaUri("MuAPI", uri) };
+    if (["failed", "error", "cancelled", "canceled"].includes(st)) return { status: "failed", error: d.error ?? `生成失败（${st}）` };
+    if (["queued", "pending", "submitted"].includes(st)) return { status: "submitted" };
+    if (["running", "processing", "in_progress"].includes(st)) return { status: "running" };
+    return unverifiedPollState("MuAPI", d.status);
   }
 }
 

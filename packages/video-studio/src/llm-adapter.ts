@@ -21,6 +21,7 @@ import {
   type ModelProvider,
   type PlanId,
 } from "@workloom/base/model-router";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve as resolvePath } from "node:path";
@@ -431,52 +432,74 @@ export class WorkloomLLMEngine {
 }
 
 /**
- * vendor 自建 LLMEngine 的「原型桥」（2026-09-21 真机修复）
- *
- * 问题：vendor 多条链路（剧本引擎、需求洞察子引擎、提示词/微动作…）会**自己** `new LLMEngine({...})`，
- * 读的是 vendor 自己的旧环境变量与历史模型名。
- * 宿主注入的适配器只在主流水线生效，于是这些环节全部失败：
- *   `[ScriptGenerator] LLM引擎返回失败: API Key 未配置` → 剧本生成重试 3 次 → 预生产 pipeline.failed。
- *
- * 做法：**不改 vendor 目录**（只读纪律），在运行时把 vendor LLMEngine 原型的四个调用点
- * （reason / reasonRaw / reasonStructured / chat）重定向到宿主适配器 —— 这些方法被整体替换，
- * 构造函数里那句 `_noApiKey` 判断自然失效，模型/端点/计量/事件留痕全部走 WorkLoom 模型路由。
- *
- * 幂等：重复调用只覆盖一次；返回摘除函数（恢复原方法），便于测试与热重载。
+ * Vendor 子引擎会自行 new LLMEngine。共享原型只安装一个分派器；模型、租户计量及事件
+ * sink 从当前异步运行读取。旧 CLI 可继续在独立进程内安装默认适配器。
  */
+const vendorEngineScope = new AsyncLocalStorage<{ engine: WorkloomLLMEngine | null }>();
+const cliEngines = new Map<symbol, WorkloomLLMEngine>();
+let uninstallVendorDispatch: (() => void) | null = null;
+let scopedDispatchInstalled = false;
+
+function ensureVendorEngineDispatch(): void {
+  if (uninstallVendorDispatch) return;
+  const repoRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), "../../..");
+  const vendorRequire = createRequire(resolvePath(repoRoot, "package.json"));
+  const enginePath = resolvePath(repoRoot, "vendor/supermickey/systems/llm-reasoning-engine.js");
+  if (!existsSync(enginePath)) throw new Error("VENDOR_ENGINE_UNAVAILABLE: 缺少模型分派入口");
+  const mod = vendorRequire(enginePath) as { LLMEngine?: { prototype: Record<string, unknown> } };
+  const prototype = mod.LLMEngine?.prototype;
+  if (!prototype) throw new Error("VENDOR_ENGINE_UNAVAILABLE: 缺少模型引擎");
+  const patched: Array<[string, (...args: unknown[]) => unknown]> = [];
+  const redirect = (name: string, impl: (engine: WorkloomLLMEngine, ...args: unknown[]) => unknown) => {
+    const original = prototype[name];
+    if (typeof original !== "function") return;
+    const fallback = original as (...args: unknown[]) => unknown;
+    patched.push([name, fallback]);
+    prototype[name] = function dispatch(this: unknown, ...args: unknown[]) {
+      const scope = vendorEngineScope.getStore();
+      if (scope) {
+        if (!scope.engine) throw new Error("VENDOR_ENGINE_SCOPE_CLOSED: 预生产运行已结束");
+        return impl(scope.engine, ...args);
+      }
+      const cli = Array.from(cliEngines.values()).at(-1);
+      return cli ? impl(cli, ...args) : fallback.apply(this, args);
+    };
+  };
+  redirect("reason", (engine, prompt, options = {}) =>
+    engine.reason(String(prompt ?? ""), options as LLMReasonOptions));
+  redirect("reasonRaw", (engine, prompt, options = {}) =>
+    engine.reasonRaw(String(prompt ?? ""), options as LLMReasonOptions));
+  redirect("reasonStructured", (engine, prompt, schema, options = {}) =>
+    engine.reasonStructured(String(prompt ?? ""), schema, options as LLMReasonOptions));
+  redirect("chat", (engine, systemPrompt, userPrompt, temperature = 1) => {
+    const parsedTemperature = Number(temperature);
+    return engine.chat(String(systemPrompt ?? ""), String(userPrompt ?? ""), Number.isFinite(parsedTemperature) ? parsedTemperature : 1);
+  });
+  redirect("generate", (engine, prompt, options = {}) =>
+    engine.generate(String(prompt ?? ""), options as LLMReasonOptions));
+  uninstallVendorDispatch = () => {
+    for (const [name, original] of patched) prototype[name] = original;
+    uninstallVendorDispatch = null;
+  };
+}
+
+/** Standalone CLI compatibility; service runs must use the asynchronous scope below. */
 export function installVendorEngineBridge(engine: WorkloomLLMEngine): () => void {
-  try {
-    // 仓库根按**本模块位置**解析（服务进程 cwd 是 apps/server，用 cwd 会找不到 vendor）
-    const repoRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), "../../..");
-    const vendorRequire = createRequire(resolvePath(repoRoot, "package.json"));
-    const enginePath = resolvePath(repoRoot, "vendor/supermickey/systems/llm-reasoning-engine.js");
-    if (!existsSync(enginePath)) return () => undefined;
-    const mod = vendorRequire(enginePath) as { LLMEngine?: { prototype: Record<string, unknown> } };
-    const prototype = mod?.LLMEngine?.prototype;
-    if (!prototype) return () => undefined;
-    const patched: Array<[string, unknown]> = [];
-    const redirect = (name: string, impl: (...args: unknown[]) => unknown) => {
-      if (typeof prototype[name] !== "function") return;
-      patched.push([name, prototype[name]]);
-      prototype[name] = impl;
-    };
-    redirect("reason", (prompt: unknown, options: unknown = {}) =>
-      engine.reason(String(prompt ?? ""), options as LLMReasonOptions));
-    redirect("reasonRaw", (prompt: unknown, options: unknown = {}) =>
-      engine.reasonRaw(String(prompt ?? ""), options as LLMReasonOptions));
-    redirect("reasonStructured", (prompt: unknown, schema: unknown, options: unknown = {}) =>
-      engine.reasonStructured(String(prompt ?? ""), schema, options as LLMReasonOptions));
-    redirect("chat", (systemPrompt: unknown, userPrompt: unknown, temperature: unknown = 1) => {
-      const parsedTemperature = Number(temperature);
-      return engine.chat(String(systemPrompt ?? ""), String(userPrompt ?? ""), Number.isFinite(parsedTemperature) ? parsedTemperature : 1);
-    });
-    redirect("generate", (prompt: unknown, options: unknown = {}) =>
-      engine.generate(String(prompt ?? ""), options as LLMReasonOptions));
-    return () => {
-      for (const [name, original] of patched) prototype[name] = original;
-    };
-  } catch {
-    // vendor 不在（例如只跑单测）时静默：桥接是增强，不是启动前置
-    return () => undefined;
-  }
+  ensureVendorEngineDispatch();
+  const token = Symbol();
+  cliEngines.set(token, engine);
+  return () => {
+    cliEngines.delete(token);
+    if (!scopedDispatchInstalled && cliEngines.size === 0) uninstallVendorDispatch?.();
+  };
+}
+
+export async function withVendorEngineBridge<T>(engine: WorkloomLLMEngine, run: () => Promise<T>): Promise<T> {
+  ensureVendorEngineDispatch();
+  scopedDispatchInstalled = true;
+  const scope: { engine: WorkloomLLMEngine | null } = { engine };
+  return vendorEngineScope.run(scope, async () => {
+    try { return await run(); }
+    finally { scope.engine = null; }
+  });
 }

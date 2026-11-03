@@ -1,0 +1,47 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2/packages/video-studio
+
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+ ❯ src/studio-marketing-input.test.ts (2 tests | 2 failed) 569ms
+   × Studio重装订只消费已审A1身份，保留已审身份=false 326ms
+   × Studio重装订只消费已审A1身份，保留已审身份=true 243ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/studio-marketing-input.test.ts > Studio重装订只消费已审A1身份，保留已审身份=false
+ FAIL  src/studio-marketing-input.test.ts > Studio重装订只消费已审A1身份，保留已审身份=true
+AssertionError: expected { our_opening: [ '风量 9 档' ], …(2) } to deeply equal { our_opening: [], …(2) }
+
+- Expected
++ Received
+
+  {
+    "crowded_points": [],
+-   "our_opening": [],
++   "our_opening": [
++     "风量 9 档",
++   ],
+    "weakness_openings": [],
+  }
+
+ ❯ src/studio-marketing-input.test.ts:61:60
+     59|     expect(result.consumption.input).toMatchObject({ name: "已核实 F3" });
+     60|     for (const field of ["brand", "category", "model"] as const) expec…
+     61|     expect(result.dataMining.data.dossier.differentiation).toEqual({ o…
+       |                                                            ^
+     62|     expect(result.dataMining.data.cards.theme_card.differentiation_spa…
+     63|     expect(result.consumption.theme).not.toContain("差异化空位");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+   Start at  09:29:45
+   Duration  655ms (transform 10ms, setup 0ms, import 16ms, tests 569ms, environment 0ms)
+

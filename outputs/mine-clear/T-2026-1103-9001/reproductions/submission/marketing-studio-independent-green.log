@@ -1,0 +1,68 @@
+
+ RUN  v3.2.7 /Users/mac/Documents/Codex/2026-11-02/edit-ai-n-n-ai-github-3/work/growthtest-round2/packages/video-studio
+
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+ ✓ src/studio-marketing-input.test.ts (2 tests) 519ms
+ ✓ src/data-mining-engine.test.ts (5 tests) 14ms
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+stdout | src/vendor-discovery-await.test.ts > real create waits for discovery conversion before the G3 confirmation > G3 receives resolved requirements and downstream metadata (hostBridge=false)
+discovery observation {
+  withHostBridge: false,
+  confirmations: [ 'creative-theme', 'requirement' ],
+  profileCompletedAtG3: true,
+  isPromise: false,
+  title: '灯光亮起',
+  genre: '展台纪实',
+  targetDuration: 30,
+  aspectRatio: '9:16',
+  scriptDuration: 30,
+  rejected: 'probe-complete',
+  errors: [],
+  released: true
+}
+
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+stdout | src/vendor-discovery-await.test.ts > real create waits for discovery conversion before the G3 confirmation > G3 receives resolved requirements and downstream metadata (hostBridge=true)
+discovery observation {
+  withHostBridge: true,
+  confirmations: [ 'creative-theme', 'requirement' ],
+  profileCompletedAtG3: true,
+  isPromise: false,
+  title: '灯光亮起',
+  genre: '展台纪实',
+  targetDuration: 30,
+  aspectRatio: '9:16',
+  scriptDuration: 30,
+  rejected: 'probe-complete',
+  errors: [],
+  released: true
+}
+
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+
+❌ [系统错误] DISCOVERY_PROFILE_CONVERSION_FAILED
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+
+❌ [系统错误] DISCOVERY_PROFILE_CONVERSION_FAILED
+ ✓ src/vendor-discovery-await.test.ts (4 tests) 694ms
+ ✓ src/marketing-price-contract.test.ts (3 tests) 5ms
+ ✓ src/marketing-dossier-input.test.ts (4 tests) 2ms
+
+ Test Files  5 passed (5)
+      Tests  18 passed (18)
+   Start at  10:13:32
+   Duration  1.94s (transform 194ms, setup 0ms, collect 239ms, tests 1.23s, environment 0ms, prepare 127ms)
+

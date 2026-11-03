@@ -1,0 +1,176 @@
+{
+  "head": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+  "fetch_status": "success",
+  "freshness_errors": [],
+  "rows": [
+    {
+      "id": "MC-001",
+      "state": "verified",
+      "base_commit": "c028118d",
+      "status": "current",
+      "file": "apps/server/src/video/archive-resume.ts",
+      "changed_files": 1
+    },
+    {
+      "id": "MC-002",
+      "state": "verified",
+      "base_commit": "c028118d",
+      "status": "current",
+      "file": "vendor/supermickey/hyperreality-system/engines/production-engine/production-engine.js",
+      "changed_files": null
+    },
+    {
+      "id": "MC-003",
+      "state": "verified",
+      "base_commit": "c028118d",
+      "status": "current",
+      "file": "apps/server/src/video/gen/providers.ts",
+      "changed_files": 1
+    },
+    {
+      "id": "MC-004",
+      "state": "verified",
+      "base_commit": "c028118d",
+      "status": "current",
+      "file": "apps/server/src/video/render-poller.ts",
+      "changed_files": 1
+    },
+    {
+      "id": "MC-005",
+      "state": "verified",
+      "base_commit": "c028118d",
+      "status": "current",
+      "file": "apps/server/src/video/render-poller.ts",
+      "changed_files": 1
+    },
+    {
+      "id": "MC-006",
+      "state": "verified",
+      "base_commit": "c028118d",
+      "status": "current",
+      "file": "apps/server/src/video/render-poller.ts",
+      "changed_files": 1
+    },
+    {
+      "id": "MC-007",
+      "state": "verified",
+      "base_commit": "c028118d",
+      "status": "current",
+      "file": "apps/server/src/video/marketing-facts.ts",
+      "changed_files": 1
+    },
+    {
+      "id": "MC-008",
+      "state": "verified",
+      "base_commit": "c028118d",
+      "status": "current",
+      "file": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/product-info-collector.js",
+      "changed_files": null
+    },
+    {
+      "id": "MC-009",
+      "state": "verified",
+      "base_commit": "c028118d",
+      "status": "current",
+      "file": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/competitor-scout.js",
+      "changed_files": null
+    },
+    {
+      "id": "MC-010",
+      "state": "verified",
+      "base_commit": "c028118d",
+      "status": "current",
+      "file": "packages/video-studio/src/pipeline-control-plane/coordinator.ts",
+      "changed_files": 1
+    },
+    {
+      "id": "MC-011",
+      "state": "verified",
+      "base_commit": "c028118d",
+      "status": "current",
+      "file": "packages/video-studio/src/pipeline-control-plane/projection.ts",
+      "changed_files": 1
+    },
+    {
+      "id": "MC-012",
+      "state": "verified",
+      "base_commit": "c028118d",
+      "status": "current",
+      "file": "vendor/supermickey/hyperreality-system/index.js",
+      "changed_files": 1
+    },
+    {
+      "id": "MC-013",
+      "state": "verified",
+      "base_commit": "c028118d",
+      "status": "current",
+      "file": "apps/server/src/video/data-mining-executor.ts",
+      "changed_files": 1
+    },
+    {
+      "id": "MC-014",
+      "state": "verified",
+      "base_commit": "c028118d",
+      "status": "current",
+      "file": "apps/server/src/video/marketing-authority.ts",
+      "changed_files": 1
+    },
+    {
+      "id": "MC-015",
+      "state": "verified",
+      "base_commit": "c028118d",
+      "status": "current",
+      "file": "apps/server/src/video/archive-resume.ts",
+      "changed_files": 1
+    },
+    {
+      "id": "MC-016",
+      "state": "verified",
+      "base_commit": "c028118d",
+      "status": "current",
+      "file": "apps/server/src/video/film-worker.ts",
+      "changed_files": 1
+    },
+    {
+      "id": "MC-017",
+      "state": "verified",
+      "base_commit": "c028118d",
+      "status": "current",
+      "file": "apps/server/src/video/media/products.ts",
+      "changed_files": 1
+    },
+    {
+      "id": "MC-018",
+      "state": "verified",
+      "base_commit": "c028118d",
+      "status": "current",
+      "file": "apps/server/src/video/studio-worker.ts",
+      "changed_files": 1
+    },
+    {
+      "id": "MC-019",
+      "state": "verified",
+      "base_commit": "c028118d",
+      "status": "current",
+      "file": "vendor/supermickey/hyperreality-system/index.js",
+      "changed_files": 1
+    },
+    {
+      "id": "MC-020",
+      "state": "verified",
+      "base_commit": "c028118d",
+      "status": "current",
+      "file": "packages/video-studio/src/llm-adapter.ts",
+      "changed_files": 1
+    },
+    {
+      "id": "MC-021",
+      "state": "verified",
+      "base_commit": "c028118d",
+      "status": "current",
+      "file": "apps/server/src/video/studio-worker.ts",
+      "changed_files": 1
+    }
+  ],
+  "stale": 0
+}

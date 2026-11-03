@@ -1,0 +1,183 @@
+{
+  "task": "T-2026-1103-9001",
+  "actor": "/root/submission_audit",
+  "baseline": "c028118de87f80b4ff0726c758b1ca0d964b9a63",
+  "evidenceLevel": "A code read plus real PG or controlled outbound regression",
+  "cards": [
+    {
+      "id": "MC-003",
+      "finder": "submission_audit; general_audit independently found remaining domestic adapters",
+      "severity": "严重",
+      "baselineLocations": [
+        "apps/server/src/video/gen/providers.ts:114-123,177-194,220-234",
+        "packages/base/model-router/gen-pool.ts:139-150,182-193,238-255"
+      ],
+      "problem": "Transport/auth/HTTP/JSON failures during a lookup were converted into provider task failure or invented progress, making accepted paid tasks unrecoverable or misleading. Missing completed media and opaque IDs were also unchecked.",
+      "fix": "All six remote query adapters preserve acceptance unknown and forbid fallback on lookup failure; recognized snapshot states and complete URI are required; opaque path IDs are encoded. Documented terminal states and Ark actual duration are preserved.",
+      "commits": [
+        "4b6de3d3",
+        "9b058d80"
+      ],
+      "tests": [
+        "apps/server/src/video/gen/provider-polling.test.ts",
+        "apps/server/src/video/gen/domestic-provider-polling.test.ts",
+        "apps/server/src/video/render-poller.pg.test.ts"
+      ],
+      "red": [
+        "provider-polling-expanded-red.log:51 failed,10 passed",
+        "../general/MC-003-independent-domestic-red.log:15 failed",
+        "domestic-provider-expanded-red.log:34 failed,8 passed"
+      ],
+      "green": [
+        "provider-polling-green.log:3 suites126 passed",
+        "domestic-provider-final-green.log:5 suites202 passed including real PG16"
+      ],
+      "limits": "Official HTTP schemas plus fixtures; real account access and paid remote execution were intentionally not exercised."
+    },
+    {
+      "id": "MC-004",
+      "finder": "submission_audit",
+      "severity": "严重",
+      "baselineLocations": [
+        "apps/server/src/video/render-poller.ts:149,169,228-237,314-406",
+        "packages/video-studio/src/production-client.ts:154-157"
+      ],
+      "problem": "A generated job was marked done despite download/cost failure, then excluded from every future scan. Overlapping polls could double finalize; a failed gateway transaction leaked its client. CLI stopped before ingestion could recover.",
+      "fix": "Scan completed jobs with missing durable media or cost records, reuse the existing receipt and stored accounting values without another provider submission, emit one completion and separate ingest repair. Serialize per job using a session advisory lock, reread eligibility under lock, guard terminal UPDATE, and always release the connection. CLI waits within its existing poll window for persistent media.",
+      "commits": [
+        "67834592",
+        "1d9ed551"
+      ],
+      "tests": [
+        "apps/server/src/video/render-poller.pg.test.ts",
+        "packages/video-studio/src/production-client.test.ts"
+      ],
+      "red": [
+        "render-poller-red.log:8 failed,1 passed across 004/005/006",
+        "render-poller-recovery-red.log:5 failed,7 passed",
+        "production-client-ingest-red.log:3 failed,29 passed"
+      ],
+      "green": [
+        "render-poller-final-green.log:5 suites157 passed",
+        "render-poller-post-review-green.log:PG16 passed",
+        "production-client-ingest-green.log:32 passed"
+      ],
+      "dimensions": [
+        "retry after HTTP503 media failure",
+        "provider credentials absent on reconciliation",
+        "cost write failure",
+        "one- and two-connection concurrent gateway pools",
+        "external terminal change while lookup is in flight",
+        "terminal SQL failure",
+        "terminal COMMIT acknowledgement loss",
+        "cross-workspace negative control"
+      ]
+    },
+    {
+      "id": "MC-005",
+      "finder": "submission_audit",
+      "severity": "严重",
+      "baselineLocations": [
+        "apps/server/src/video/render-poller.ts:173-181,372-376,201-207"
+      ],
+      "problem": "Bare app-role UPDATEs lacked transaction-local RLS context, wrote zero rows, yet reports claimed progress or timeout failure; queued tasks also escaped the age cutoff.",
+      "fix": "Use explicit scoped transactions, atomically emit timeout failure only for a changed open row, and apply the existing age policy to queued/submitted as well as running snapshots.",
+      "commits": [
+        "06fabc6e",
+        "67834592"
+      ],
+      "tests": [
+        "apps/server/src/video/render-poller.pg.test.ts"
+      ],
+      "red": [
+        "render-poller-red.log:running and missing-provider timeout both retained submitted rows",
+        "render-poller-recovery-red.log:queued timeout returned failed=0"
+      ],
+      "green": [
+        "render-poller-scope-green.log:3 PG passed",
+        "render-poller-post-review-green.log:16 PG passed"
+      ]
+    },
+    {
+      "id": "MC-006",
+      "finder": "submission_audit",
+      "severity": "严重",
+      "baselineLocations": [
+        "apps/server/src/video/render-poller.ts:78-83,118,292-334"
+      ],
+      "problem": "The real provider pool inherited a no-key MockGenProvider, and task-ID prefix heuristics replaced persisted mock identity, allowing a real row to produce mock:// media with a synced external receipt.",
+      "fix": "Build the real pool only from configured video providers; use row.mock for provider resolution, receipt and cost identity; refuse nonmock success containing simulated or missing media.",
+      "commits": [
+        "802584c6"
+      ],
+      "tests": [
+        "apps/server/src/video/render-poller.pg.test.ts"
+      ],
+      "red": [
+        "render-poller-mock-red.log:4 failed,3 passed"
+      ],
+      "green": [
+        "render-poller-mock-green.log:3 suites118 passed"
+      ]
+    },
+    {
+      "id": "MC-016",
+      "finder": "submission_audit",
+      "severity": "严重",
+      "baselineLocations": [
+        "apps/server/src/video/film-worker.ts:1065-1079,1192-1223",
+        "apps/server/src/video/film-ledger.ts:453-487"
+      ],
+      "problem": "The fixed film parent retained a paid provider task only after polling and media download completed. Cancellation, late acknowledgement, or download failure left unknown/failed component evidence without the accepted task. Failure writes overwrote existing evidence.",
+      "fix": "Persist task ID, exact compiled request hash and acceptance time immediately in the existing evidence JSON; allow same-owner late evidence for unknown rows, preserve it through completion/failure, reject conflicting bindings, expose a scoped reconciliation summary, and add a database guard against replacement/removal. Retry the same receipt once from the provider continuation even after the waiting channel was cancelled; retain the failure state and forbid retrying the paid POST.",
+      "commits": [
+        "f1e9dd33",
+        "0a692c86"
+      ],
+      "migration": "packages/db/migrations/0060_film_provider_receipts.sql (applied successfully to isolated task DB)",
+      "tests": [
+        "apps/server/src/video/film-provider-receipt.pg.test.ts",
+        "apps/server/src/video/film-ledger.pg.test.ts",
+        "apps/server/src/video/film-worker-identity.test.ts",
+        "apps/server/src/video/film-worker.test.ts"
+      ],
+      "red": [
+        "film-provider-receipt-expanded-red.log:4 failed",
+        "../general/MC-016-late-write-independent-red.log:late provider acknowledgement + first SQL write fault after cancellation; one real PG case failed"
+      ],
+      "green": [
+        "film-provider-receipt-final-green.log:4 suites143 passed",
+        "film-receipt-typecheck.log:server tsc exit0",
+        "MC-016-late-write-green.log:5 suites / 144 passed including original independent test",
+        "MC-016-late-write-typecheck.log:server tsc exit 0"
+      ],
+      "dimensions": [
+        "accepted then cancelled",
+        "sync image accepted then media HTTP503",
+        "late acknowledgement after unknown",
+        "transient receipt-write SQL fault",
+        "normal completion and status read-back",
+        "conflicting task/hash/model/provider/owner/tenant",
+        "database replacement/removal guard",
+        "late provider acknowledgement + one local SQL write fault after timeout"
+      ],
+      "limit": "One bounded local SQL retry. A database unavailable across both attempts requires manual reconciliation; no provider POST replay."
+    }
+  ],
+  "coverageFile": "coverage.json",
+  "authorValidationOnly": true,
+  "independentAcceptance": "Root/general coordinate MCD acceptance; author tests do not constitute independent acceptance.",
+  "autonomousAdditions": [
+    "ProductionClient waiting for durable media was a required caller repair for MC004.",
+    "Persisted film acceptance and a JSON guard were necessary for the existing no-blind-resubmission contract.",
+    "Legacy configured providers were added after general_audit independent counterexample."
+  ],
+  "assumptions": [
+    "render_jobs.done records provider generation success; a durable asset receipt is independently required for client delivery.",
+    "The existing 24-hour job-age cutoff remains policy; this work does not authorize resubmitting an expired or unverified paid task."
+  ],
+  "uncovered": [
+    "No real paid supplier execution or account cancellation was attempted.",
+    "The prior autonomous default-CLI input-to-reference selection architecture gap remains outside this repair batch."
+  ]
+}

@@ -1,0 +1,290 @@
+{
+  "actor": "/root/submission_audit",
+  "task": "T-2026-1103-9001",
+  "scope": "Independent cross-card code review and runtime checks (not the MCD CLI ledger).",
+  "results": [
+    {
+      "file": "marketing-final-independent.log",
+      "sourceHead": "cde51696e54df8ec2ba821c33f232e00d782bdf2",
+      "suites": 12,
+      "passed": 202,
+      "cards": [
+        "MC-007",
+        "MC-008",
+        "MC-009",
+        "MC-013",
+        "MC-014",
+        "MC-017"
+      ],
+      "sha256": "81350999ccafce35f8c5704c9a1a9720ff1d8a096b01c90e96f5f09f41550f93",
+      "level": "B",
+      "result": "pass"
+    },
+    {
+      "file": "marketing-studio-independent-green.log",
+      "sourceHead": null,
+      "suites": 5,
+      "passed": 18,
+      "cards": [
+        "MC-008",
+        "MC-009",
+        "MC-012",
+        "MC-014"
+      ],
+      "sha256": "7a370086b9983e87c66aacdf88b29f668c5032e019c6db2d63cd5d94eb374932",
+      "level": "B",
+      "result": "pass"
+    },
+    {
+      "file": "MC-002-012-019-final-independent.log",
+      "sourceHead": "2a0e6e2161fbf0f8696bd0fe0a0b0613464ef7e2",
+      "suites": 5,
+      "passed": 120,
+      "cards": [
+        "MC-002",
+        "MC-012",
+        "MC-019"
+      ],
+      "sha256": "16e9f3775016e93cc9fc3a615b9c3a1b67a0ac10d4a43065c155fddbfaf9afbb",
+      "level": "B",
+      "result": "pass"
+    },
+    {
+      "file": "MC-019-events-independent.log",
+      "sourceHead": null,
+      "suites": null,
+      "passed": 2,
+      "cards": [
+        "MC-019"
+      ],
+      "sha256": "b83ad4a796a71ee45cac7161c25489343cba35d3bf6b412abdc9af986ecc3f2d",
+      "level": "B",
+      "result": "pass"
+    }
+  ],
+  "files": [
+    {
+      "path": "packages/video-studio/src/vendor-runtime-agent-config.test.ts",
+      "sha256": "ec8e8b435df216b662d705c312804af253c8bc64ed7532215e02d2b52ae35d0e",
+      "lines": 79,
+      "level": "A"
+    },
+    {
+      "path": "packages/video-studio/src/vendor-runtime-agent-config-independent.test.ts",
+      "sha256": "fbd6a8a9ee492f8bcd2e33e3fae655381f665e00b8fd7a788f417427ca2352aa",
+      "lines": 53,
+      "level": "A"
+    },
+    {
+      "path": "packages/video-studio/src/vendor-discovery-await.test.ts",
+      "sha256": "175458a19dac47d3566c0d3405cda626ad2050c69c08781c9655652e7927808c",
+      "lines": 109,
+      "level": "A"
+    },
+    {
+      "path": "packages/video-studio/src/vendor-prd-approval-failure.test.ts",
+      "sha256": "462665023bc0530724d84198396352af01c204ae628d939a39fb74b00ce3985d",
+      "lines": 151,
+      "level": "A"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/field-quality/index.js",
+      "sha256": "2f0949b92933b836f40631e465bd329f551e5ccd5fb1f34328ab5927213f17ad",
+      "lines": 31,
+      "level": "A"
+    },
+    {
+      "path": "apps/server/src/video/marketing-facts.ts",
+      "sha256": "682d50ef9fc1ff7c6a5e092dffa05877067977d2355fa9d1962eecc152020fe8",
+      "lines": 252,
+      "level": "A"
+    },
+    {
+      "path": "apps/server/src/video/marketing-authority.ts",
+      "sha256": "60313d303539a4f11307d34266bbe3edc07ae69ce920ae2110a76f5b44e34868",
+      "lines": 306,
+      "level": "A"
+    },
+    {
+      "path": "apps/server/src/video/marketing-authority.test.ts",
+      "sha256": "66e1574d02d90ab490407ab94eecac9b0bf4b5c86f1e77cb53d468ffabdc3df8",
+      "lines": 231,
+      "level": "A"
+    },
+    {
+      "path": "apps/server/src/video/marketing-source-attribution.test.ts",
+      "sha256": "1c2ff74505831dd4dc97c51bd17fa5763479d3152a13142c5616a5c0dd42e06b",
+      "lines": 108,
+      "level": "A"
+    },
+    {
+      "path": "apps/server/src/video/marketing-source-attribution-independent.test.ts",
+      "sha256": "2b1d432e7b00f8fd107f6e5bde1d791cfa1ca4b7cb9c3aad6c0cebd28c555854",
+      "lines": 27,
+      "level": "A"
+    },
+    {
+      "path": "apps/server/src/video/marketing-dossier-consumption.test.ts",
+      "sha256": "db84e40350e4bb267552d9728cdaa5d648ad5507d91a34b1dfad621744174f29",
+      "lines": 70,
+      "level": "A"
+    },
+    {
+      "path": "apps/server/src/video/data-mining-executor.ts",
+      "sha256": "162a607ff4f677ccf0755f7a53956af9c5e074b51eba20d4569e3d5ba7562d3a",
+      "lines": 879,
+      "level": "A"
+    },
+    {
+      "path": "apps/server/src/video/data-mining-search-recovery.test.ts",
+      "sha256": "1cabca1802e7a4b7d89ce50a4da3f83a2f531d7c0f62ccb00dd8a371351d3eca",
+      "lines": 135,
+      "level": "A"
+    },
+    {
+      "path": "apps/server/src/video/data-mining-search-recovery-independent.test.ts",
+      "sha256": "4108d1dc85de80a86936bdb604c8c3729573a5e92170bd145081f2c3d2dc7863",
+      "lines": 28,
+      "level": "A"
+    },
+    {
+      "path": "apps/server/src/video/marketing-source-fetcher.ts",
+      "sha256": "9ecd1578afaa7d7b372ac9b0f02a8fba4a19d185a369b6adcf092860baee9a1f",
+      "lines": 231,
+      "level": "A"
+    },
+    {
+      "path": "apps/server/src/video/marketing-source-fetcher.test.ts",
+      "sha256": "cd6023fef9af24c5d0688a285d865b09af26508b47517c5917b8fab03db913fd",
+      "lines": 85,
+      "level": "A"
+    },
+    {
+      "path": "apps/server/src/video/media/products-source-safety.test.ts",
+      "sha256": "ddb62aebcf08123d15a5b7adb6b4173740958fb4e0536083158870b725726a92",
+      "lines": 153,
+      "level": "A"
+    },
+    {
+      "path": "packages/video-studio/src/marketing-dossier-input.ts",
+      "sha256": "e73c175506fbf92351210066c7e706c6aeeda37ddd3993c4a0a78a697f6ab2a4",
+      "lines": 49,
+      "level": "A"
+    },
+    {
+      "path": "packages/video-studio/src/marketing-dossier-input.test.ts",
+      "sha256": "22ccd1702beef213ed41b3ffc2823f8337683aad74a6d54a9ef75c22371a055c",
+      "lines": 27,
+      "level": "A"
+    },
+    {
+      "path": "packages/video-studio/src/studio-marketing-input.test.ts",
+      "sha256": "9490f244bbf2838ac026bcf8f1e0c8c9fa98d006a39406ca22f71c6c94d6a638",
+      "lines": 67,
+      "level": "A"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/product-info-collector.js",
+      "sha256": "de479bd1f9e702968791faabe6938baca138ed991734ca96c2fb92df026bafb3",
+      "lines": 285,
+      "level": "A"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/competitor-scout.js",
+      "sha256": "a4e8c92172890c1076bf4fba6626cc6709f7191c5b8d82e7586e6d2ce584978e",
+      "lines": 200,
+      "level": "A"
+    },
+    {
+      "path": "packages/video-studio/src/vendor-compat.ts",
+      "sha256": "dbc9167df5c9e831ca078eaa3e9720c37f71e875aa56773dd46099048b660de8",
+      "lines": 7910,
+      "level": "C",
+      "limit": "MC002/012/019 target bridge function portions, runtime diff; entire large file was not independently read."
+    },
+    {
+      "path": "packages/video-studio/src/studio.ts",
+      "sha256": "44d72847197f9a9bd0b36b5860dfabb6808babb7ad481313f62f9f1738ade4c5",
+      "lines": 729,
+      "level": "C",
+      "limit": "Complete runPreproduction approval callback, G4 error and shared bridge scope diff; unrelated setup/results were not independently read."
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/index.js",
+      "sha256": "c8719217200cca1c36dc4743455323d9290198950c929620cf698a055a121109",
+      "lines": 4126,
+      "level": "C",
+      "limit": "Actual create G3/4, PRD failure/script entry and external-confirmation call chain, not independent entire file."
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/production-engine/production-engine.js",
+      "sha256": "6c5feb471b10eede541d637cfc3b75cd7e46f71c3a367a9c22eba01bdcc01e37",
+      "lines": 1825,
+      "level": "C",
+      "limit": "Target init/config/monitor/deadline functions; entire large file not independently read."
+    },
+    {
+      "path": "apps/server/src/video/media/products.ts",
+      "sha256": "fccc9f7aa84acc5225c3f48e89cc0d77ae23c5a2115bff5026415345f8513509",
+      "lines": 345,
+      "level": "C",
+      "limit": "Hero download and upsert call site; unrelated projection functions not independently read."
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/production-engine/phases/phase-1-scene-design.js",
+      "lines": 212,
+      "sha256": "a2484d2914b2db1c2d154f69b83521d7d668d6e3e47c3d70f6dce39ec164c48b",
+      "level": "A"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/production-engine/phases/phase-2-visual-audio.js",
+      "lines": 154,
+      "sha256": "5cc80e7c18e191b1d551912dda6bef2a2b1f0975749990ab3b42b17b862d14c2",
+      "level": "A"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/production-engine/phases/phase-3-5-field-quality.js",
+      "lines": 86,
+      "sha256": "52a608ee1172a0d6778d499e3890ff10f0b2df8533f9e43327b189f0e8c0ceb7",
+      "level": "A"
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/engines/production-engine/phases/phase-executor.js",
+      "lines": 62,
+      "sha256": "04f4dbc3947ab1ceea8829d2b286222a42586a96beda700fccd0c4c1ea3480d6",
+      "level": "A"
+    }
+  ],
+  "extraCounterexamples": [
+    {
+      "card": "MC-002",
+      "red": "MC-002-phase35-independent-red.log",
+      "fix": "2a0e6e21",
+      "result": "Two independently authored Phase3.5 model cases pass, both monitor installation orders."
+    },
+    {
+      "card": "MC-007",
+      "red": "MC-007-image-attribution-independent-red.log",
+      "fix": "3447bd2e",
+      "result": "Original shared final URL/different image angle case passes alongside positive archive revalidation."
+    },
+    {
+      "card": "MC-013",
+      "red": "MC-013-search-protocol-independent-red.log",
+      "fix": "24c2467e",
+      "result": "All six original protocol recovery cases pass across the same instance and after reload."
+    },
+    {
+      "card": "MC-019",
+      "probe": "probe-prd-events.cjs",
+      "result": "Two actual Studio/vendor executions block ScriptEngine after G4 requested/resolved event sink failure, retain error, release run lock and bridges."
+    }
+  ],
+  "limitations": "Source HTTP uses isolated local sockets, external language and generation protocols are fixtures. No paid submissions. Shared large-file review is limited to named branches and diffs; broad project acceptance remains root-owned.",
+  "coverage": {
+    "A": 26,
+    "B": 0,
+    "C": 5,
+    "D": 0
+  }
+}

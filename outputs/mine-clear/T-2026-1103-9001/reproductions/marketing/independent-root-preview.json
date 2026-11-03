@@ -1,0 +1,281 @@
+{
+  "task": "T-2026-1103-9001",
+  "kind": "independent-local-preview",
+  "actor": "/root/marketing_audit",
+  "repair_actor": "/root",
+  "scope": "MC-001, MC-010, MC-011, MC-015, MC-018",
+  "inventory_head_at_write": "03635718180b24656b9ca5c06965b45a08d5f63a",
+  "source_snapshot_note": "各运行时工作树另有其他人并行文件，日志为预验实际结果，不冒充冻结源CLI验收。",
+  "coverage": {
+    "total": 31,
+    "A": 22,
+    "B": 5,
+    "C": 4,
+    "D": 0,
+    "unread": 0
+  },
+  "files": [
+    {
+      "file": "apps/server/src/video/archive-access.pg.test.ts",
+      "mode": "A",
+      "reason": "全文独立精读",
+      "lines": 60,
+      "sha256": "b6febddb753dade1ea86ed9a4a2b6f674fba8010783b7c116f4b685698dbaf35"
+    },
+    {
+      "file": "apps/server/src/video/archive-access.test.ts",
+      "mode": "A",
+      "reason": "全文独立精读",
+      "lines": 56,
+      "sha256": "0257162885fecee9dde9d758c869791e06103a154498746ec21002ad993d2715"
+    },
+    {
+      "file": "apps/server/src/video/archive-host.ts",
+      "mode": "A",
+      "reason": "全文独立精读",
+      "lines": 314,
+      "sha256": "6e13130845e2b3af66033e29a4155ba18ccd145c9ba99a005d753b0b69c56664"
+    },
+    {
+      "file": "apps/server/src/video/archive-resume-input.test.ts",
+      "mode": "A",
+      "reason": "全文独立精读",
+      "lines": 83,
+      "sha256": "2f4b3aff044dc315de186e56b3514190112e8935fca8c6554692adea20393e02"
+    },
+    {
+      "file": "apps/server/src/video/archive-resume.test.ts",
+      "mode": "B",
+      "reason": "实际执行既有档案回归，未声明逐行独验",
+      "lines": 153,
+      "sha256": "b8fd05c91570c5ac3aaf7b60ba08f3110c7373cd85ac701b65ff8fae92702a48"
+    },
+    {
+      "file": "apps/server/src/video/archive-resume.ts",
+      "mode": "A",
+      "reason": "全文独立精读",
+      "lines": 465,
+      "sha256": "fcaaba4f09affad8b05d3bda4188281a16cc41a2a2a670bc5799fc4201a72cde"
+    },
+    {
+      "file": "apps/server/src/video/archive.pg.test.ts",
+      "mode": "B",
+      "reason": "实际执行真实PG档案回归，未声明逐行独验",
+      "lines": 352,
+      "sha256": "fad60cd7d77779ff6323ed314a38cf04f520f6493f52c8c144a7edc3af30939a"
+    },
+    {
+      "file": "apps/server/src/video/pipeline-control-concurrency.pg.test.ts",
+      "mode": "A",
+      "reason": "全文独立精读",
+      "lines": 79,
+      "sha256": "d2d7ffc2064aebee69acb1d6efc86a392dd63b418cf1ff4a1ae17fbd61190ec2"
+    },
+    {
+      "file": "apps/server/src/video/pipeline-control-plane.pg.test.ts",
+      "mode": "B",
+      "reason": "实际执行既有真实PG控制面回归，未声明逐行独验",
+      "lines": 334,
+      "sha256": "aa942f58a623c43551e1874ba00d71cff2771a61070d18fd78b66ded192b555e"
+    },
+    {
+      "file": "apps/server/src/video/pipeline-control-plane.ts",
+      "mode": "A",
+      "reason": "全文独立精读",
+      "lines": 832,
+      "sha256": "21052ce554cdd3bdd0adef6b40b672ab5a93426017bf8511f18bc5b68ca6d124"
+    },
+    {
+      "file": "apps/server/src/video/platform-routing.ts",
+      "mode": "A",
+      "reason": "全文独立精读",
+      "lines": 62,
+      "sha256": "9f727f8bf94d102a80f25166200313ecc5c766062a7ccea351fc2a5394defc80"
+    },
+    {
+      "file": "apps/server/src/video/scene-policy-routing.ts",
+      "mode": "A",
+      "reason": "全文独立精读",
+      "lines": 105,
+      "sha256": "7c32ee723debaadd912f1ebda3046b3664120431ea17a366bc1c8869c612a9ae"
+    },
+    {
+      "file": "apps/server/src/video/studio-resume-input.ts",
+      "mode": "A",
+      "reason": "全文独立精读",
+      "lines": 98,
+      "sha256": "3251cda8ae28260796133bfed38f8b5927bad476907a04b9e67ed55c9143c9aa"
+    },
+    {
+      "file": "apps/server/src/video/studio-worker.test.ts",
+      "mode": "C",
+      "reason": "读取并验证预生产输入快照及并发日志隔离新例；整套实际运行B",
+      "lines": 841,
+      "sha256": "eaf7f0215ea77850b46a311756a55edeb2b42af6512783f18000814375ef0c32"
+    },
+    {
+      "file": "apps/server/src/video/studio-worker.ts",
+      "mode": "C",
+      "reason": "本次独验聚焦原始输入采集及AsyncLocalStorage日志订阅、授权后安装、finally拆卸；另见同角色营销原始通读记录",
+      "lines": 1787,
+      "sha256": "5cd3d31d5f7b8fa54c2551577820d22324bf6bae492ed8831da5b5a94e453134"
+    },
+    {
+      "file": "packages/db/migrations/0009_video_studio.sql",
+      "mode": "C",
+      "reason": "读项目主键和工作区定义，确认日志路径中项目ID全局唯一；其余DDL不据此算全读",
+      "lines": 207,
+      "sha256": "c60a4a7eed08dd0013314afc21713e4ded8c5f3d829f4a57057b986d423ff679"
+    },
+    {
+      "file": "packages/db/src/client.ts",
+      "mode": "A",
+      "reason": "全文独立精读",
+      "lines": 96,
+      "sha256": "67b8b3b34049046cb4449e9e05975cb8549f81acbb856b6e91b425ef20798e7d"
+    },
+    {
+      "file": "packages/video-studio/src/archive/context-bundle.ts",
+      "mode": "A",
+      "reason": "全文独立精读",
+      "lines": 153,
+      "sha256": "1c707522e41703128bb89d5a9f131571034bdd9adea1917b9477dca0f1490a45"
+    },
+    {
+      "file": "packages/video-studio/src/archive/store.test.ts",
+      "mode": "B",
+      "reason": "实际执行既有ArchiveStore回归，未声明逐行独验",
+      "lines": 160,
+      "sha256": "00230f47a184bbf6c3a11186ad59beb000549606ac33656620a4547c2cba7160"
+    },
+    {
+      "file": "packages/video-studio/src/archive/store.ts",
+      "mode": "A",
+      "reason": "全文独立精读",
+      "lines": 307,
+      "sha256": "6bdf671ce7c7427e978f64bdf44861e5a7e752c04fb8fbcd375d7f2fbb8e6aea"
+    },
+    {
+      "file": "packages/video-studio/src/pipeline-control-plane/auto-approval-projection.test.ts",
+      "mode": "A",
+      "reason": "全文独立精读",
+      "lines": 36,
+      "sha256": "736e833a3ab1fdb3ac81f212492926af3b1cca4ae4ef8a7d654e9c49ba32db9c"
+    },
+    {
+      "file": "packages/video-studio/src/pipeline-control-plane/compiler.ts",
+      "mode": "A",
+      "reason": "全文独立精读",
+      "lines": 460,
+      "sha256": "8bb82d455baca3641b09d428fcd0866ce8c159e91170b3c74f59f87bdb2518b1"
+    },
+    {
+      "file": "packages/video-studio/src/pipeline-control-plane/contracts.ts",
+      "mode": "A",
+      "reason": "全文独立精读",
+      "lines": 265,
+      "sha256": "756b7e1cd82af30c7ee17c8fc0bebf8f05e2611ce54b4e82556cdb50bf7fcd28"
+    },
+    {
+      "file": "packages/video-studio/src/pipeline-control-plane/coordinator.ts",
+      "mode": "A",
+      "reason": "全文独立精读",
+      "lines": 994,
+      "sha256": "f71ffca36161324a9acd3ba7f34d7585dde29a43959c614a56315913475eb041"
+    },
+    {
+      "file": "packages/video-studio/src/pipeline-control-plane/in-memory-repository.ts",
+      "mode": "A",
+      "reason": "全文独立精读",
+      "lines": 275,
+      "sha256": "0d9939edcd1420940097cb9ecacb7e3ac3b7b8bc257830abc45ac3548fc8974e"
+    },
+    {
+      "file": "packages/video-studio/src/pipeline-control-plane/lease.ts",
+      "mode": "A",
+      "reason": "全文独立精读",
+      "lines": 44,
+      "sha256": "f04836af890dd9055b64ba24d4ca711372dd7e9de762b1c44ff41bce4336f1df"
+    },
+    {
+      "file": "packages/video-studio/src/pipeline-control-plane/pipeline-control-plane.test.ts",
+      "mode": "B",
+      "reason": "实际执行既有包级控制面回归，未声明逐行独验",
+      "lines": 576,
+      "sha256": "86e2de28f07c3bd5629ad753930df7920a377907c8d4e6235edd60c8a76124c8"
+    },
+    {
+      "file": "packages/video-studio/src/pipeline-control-plane/projection.ts",
+      "mode": "A",
+      "reason": "全文独立精读",
+      "lines": 185,
+      "sha256": "0830dd3ad9ecf3cef738a707e7a20c4e896c16c89233608530e4be9623ae16e1"
+    },
+    {
+      "file": "packages/video-studio/src/pipeline-control-plane/repository.ts",
+      "mode": "A",
+      "reason": "全文独立精读",
+      "lines": 64,
+      "sha256": "8f8725c72b0ed1308eefb1c3d531b065cc005941db483cd2bcf8ede12ac9c4e1"
+    },
+    {
+      "file": "packages/video-studio/src/pipeline-control-plane/shadow.ts",
+      "mode": "C",
+      "reason": "读190–260行 gateResolved 及 stageFinished 入口；校对在线passed/rejected/unverified三态分支",
+      "lines": 328,
+      "sha256": "f8e81195589b32fa9856ef391e943003be6ee4b7fae74392b364d4923e8fa4bd"
+    },
+    {
+      "file": "packages/video-studio/src/pipeline-control-plane/state.ts",
+      "mode": "A",
+      "reason": "全文独立精读",
+      "lines": 109,
+      "sha256": "97125ce8ceafb6d50adae2b7eed34a01aae6b87b7c90635f1a9557d0ac0b9540"
+    }
+  ],
+  "runs": [
+    {
+      "cards": [
+        "MC-010",
+        "MC-011"
+      ],
+      "log": "independent-control-green.log",
+      "files": 4,
+      "passed": 27,
+      "run_db_tests": true,
+      "exit_code": 0,
+      "sha256": "1dcc29f42de037fe733e28c89ee803935d7cc7c3fa87b9136b9dd6d446366eff"
+    },
+    {
+      "cards": [
+        "MC-001",
+        "MC-015"
+      ],
+      "log": "independent-archive-green.log",
+      "files": 6,
+      "passed": 56,
+      "run_db_tests": true,
+      "exit_code": 0,
+      "sha256": "912dbf0a368ca97d294c0431f6604a2f7ab474a052e15f48e4bc449a5b98a40a"
+    },
+    {
+      "cards": [
+        "MC-015",
+        "MC-018"
+      ],
+      "log": "independent-studio-worker-green.log",
+      "files": 1,
+      "passed": 157,
+      "run_db_tests": true,
+      "exit_code": 0,
+      "sha256": "35841c1d449002be81d7db6be74f4f1a21e2e7ef9235f400f16e687e17c7f370"
+    }
+  ],
+  "counterexamples_reviewed": {
+    "MC-001": "跨工作区真实PG、路径逃逸及无可见项目不读取磁盘；同工作区真实读保留。",
+    "MC-010": "真实PG重叠事务同命令回读相同回执且产物仅一次；同键不同请求拒绝。",
+    "MC-011": "passed/rejected/unverified独立核对状态、下一步及裁决ID；正式影子宿主决策与结果本身保持不变。",
+    "MC-015": "旧格式、错误版本、项目指纹和导演委托不自动降级启动；保留完整意图、metadata、无片型、显式重跑和PG档案写回。",
+    "MC-018": "真实磁盘同时两运行，阻止其他运行/无scope的控制台消息入档，原console恢复。根红例实际出现B与unscoped marker。"
+  }
+}

@@ -1,0 +1,1327 @@
+{
+  "schema": "workloom.video-audit-review/v1",
+  "repository": "geniusdapeng-collab/workloom-growthtest",
+  "task": "T-2026-1103-9001",
+  "sourceCommit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb",
+  "baseCommit": "c028118de87f80b4ff0726c758b1ca0d964b9a63",
+  "environment": "local-preview",
+  "roles": {
+    "MC-001": {
+      "repair": "/root",
+      "acceptance": "/root/marketing_audit",
+      "acceptanceRun": {
+        "path": "runs/MC-001-0-1793673813507.json",
+        "sha256": "8b312efe9f9d59b86f0c9cc95f72c41a05b14131731ef9402501d2f3614b6a13",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "acceptanceAt": "2026-11-03T02:43:35.060Z"
+    },
+    "MC-002": {
+      "repair": "/root/general_audit",
+      "acceptance": "/root/submission_audit",
+      "acceptanceRun": {
+        "path": "runs/MC-002-0-1793673552976.json",
+        "sha256": "e66b17db839f0d649c502a79054d3ee64eef4257970451295ab651489550f860",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "acceptanceAt": "2026-11-03T02:39:13.899Z"
+    },
+    "MC-003": {
+      "repair": "/root/submission_audit",
+      "acceptance": "/root/general_audit",
+      "acceptanceRun": {
+        "path": "runs/MC-003-0-1793673642710.json",
+        "sha256": "714c9dbf52270a9c5db1196ebdb935b586ebb49053ec39a79518b61128819153",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "acceptanceAt": "2026-11-03T02:40:43.302Z"
+    },
+    "MC-004": {
+      "repair": "/root/submission_audit",
+      "acceptance": "/root/general_audit",
+      "acceptanceRun": {
+        "path": "runs/MC-004-0-1793673643431.json",
+        "sha256": "dc35551bee6f2c5b311c0dfe2315545c87a08b97b3a7c7de5a8a5a7da88399e9",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "acceptanceAt": "2026-11-03T02:40:45.604Z"
+    },
+    "MC-005": {
+      "repair": "/root/submission_audit",
+      "acceptance": "/root/general_audit",
+      "acceptanceRun": {
+        "path": "runs/MC-005-0-1793673645739.json",
+        "sha256": "36b91a791f87d406f3476f9eb6ebe288b962ee93f01b239155e5c89743f36c49",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "acceptanceAt": "2026-11-03T02:40:47.314Z"
+    },
+    "MC-006": {
+      "repair": "/root/submission_audit",
+      "acceptance": "/root/general_audit",
+      "acceptanceRun": {
+        "path": "runs/MC-006-0-1793673647450.json",
+        "sha256": "7e3ca8d5841b20d6b478d085c2a0921e7ad30ff8e1c719673c639face9d2e836",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "acceptanceAt": "2026-11-03T02:40:48.926Z"
+    },
+    "MC-007": {
+      "repair": "/root/marketing_audit",
+      "acceptance": "/root/submission_audit",
+      "acceptanceRun": {
+        "path": "runs/MC-007-0-1793673554075.json",
+        "sha256": "9d45d7ed63e90956971d806f8cc1073f5bde95f7ed1e87354e6c270034f6d056",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "acceptanceAt": "2026-11-03T02:39:14.601Z"
+    },
+    "MC-008": {
+      "repair": "/root/marketing_audit",
+      "acceptance": "/root/submission_audit",
+      "acceptanceRun": {
+        "path": "runs/MC-008-0-1793673554765.json",
+        "sha256": "b32906a8238f430c61ae7c5504ed8730fa4e839eabcacba92e4d4ae8f35431ca",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "acceptanceAt": "2026-11-03T02:39:16.438Z"
+    },
+    "MC-009": {
+      "repair": "/root/marketing_audit",
+      "acceptance": "/root/submission_audit",
+      "acceptanceRun": {
+        "path": "runs/MC-009-0-1793673556588.json",
+        "sha256": "7a729be4196cbdb865416c23a4626e2afce657f7f5c9ad85981b802efd2316a8",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "acceptanceAt": "2026-11-03T02:39:17.414Z"
+    },
+    "MC-010": {
+      "repair": "/root",
+      "acceptance": "/root/marketing_audit",
+      "acceptanceRun": {
+        "path": "runs/MC-010-0-1793673815197.json",
+        "sha256": "d74fde51d8ce3e44b5ae9df694229e2cc7ee89ee25bc4fd0803708ac99f0398d",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "acceptanceAt": "2026-11-03T02:43:36.274Z"
+    },
+    "MC-011": {
+      "repair": "/root",
+      "acceptance": "/root/marketing_audit",
+      "acceptanceRun": {
+        "path": "runs/MC-011-0-1793673816408.json",
+        "sha256": "7e2c5c7ca15854f343fb430ef51557f44e201e8c5c343d9908c3b0ab515c40e8",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "acceptanceAt": "2026-11-03T02:43:36.858Z"
+    },
+    "MC-012": {
+      "repair": "/root/general_audit",
+      "acceptance": "/root/submission_audit",
+      "acceptanceRun": {
+        "path": "runs/MC-012-0-1793673557555.json",
+        "sha256": "e42e4d5ad74a3f52708560a2a36fb3642c12fadbf5967e629c18e50612e468d9",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "acceptanceAt": "2026-11-03T02:39:18.625Z"
+    },
+    "MC-013": {
+      "repair": "/root/marketing_audit",
+      "acceptance": "/root/submission_audit",
+      "acceptanceRun": {
+        "path": "runs/MC-013-0-1793673558776.json",
+        "sha256": "d5e48d106eee1988df76e619261c316701a816de2b66d614c9e579cf6abc200f",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "acceptanceAt": "2026-11-03T02:39:19.284Z"
+    },
+    "MC-014": {
+      "repair": "/root/marketing_audit",
+      "acceptance": "/root/submission_audit",
+      "acceptanceRun": {
+        "path": "runs/MC-014-0-1793673559421.json",
+        "sha256": "8c70c807ad635feeb0820dd0e4baffc4e86a84a16384da8141eafdb753c37151",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "acceptanceAt": "2026-11-03T02:39:20.127Z"
+    },
+    "MC-015": {
+      "repair": "/root",
+      "acceptance": "/root/marketing_audit",
+      "acceptanceRun": {
+        "path": "runs/MC-015-0-1793673816992.json",
+        "sha256": "96ad96914940247e4da09ee50e61b9f1607dad796d9266ef35bd70c9570ad36a",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "acceptanceAt": "2026-11-03T02:43:38.592Z"
+    },
+    "MC-016": {
+      "repair": "/root/submission_audit",
+      "acceptance": "/root/general_audit",
+      "acceptanceRun": {
+        "path": "runs/MC-016-0-1793673649060.json",
+        "sha256": "4b1f649f7c29a79d5b0318aec33ad42e82a001c3e7625c5d12e2faa3f56cf0a9",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "acceptanceAt": "2026-11-03T02:40:50.640Z"
+    },
+    "MC-017": {
+      "repair": "/root/marketing_audit",
+      "acceptance": "/root/submission_audit",
+      "acceptanceRun": {
+        "path": "runs/MC-017-0-1793673560265.json",
+        "sha256": "5ecd750a78efd6ce1dc7bfc4f3121580a6fda10969009636851a2def4fb7c7b7",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "acceptanceAt": "2026-11-03T02:39:23.225Z"
+    },
+    "MC-018": {
+      "repair": "/root",
+      "acceptance": "/root/marketing_audit",
+      "acceptanceRun": {
+        "path": "runs/MC-018-0-1793673818727.json",
+        "sha256": "2f7beb5c4e6fe4be558d5b2c104dba4279a3faa679c236c8b14df5916af7133f",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "acceptanceAt": "2026-11-03T02:43:40.327Z"
+    },
+    "MC-019": {
+      "repair": "/root/general_audit",
+      "acceptance": "/root/submission_audit",
+      "acceptanceRun": {
+        "path": "runs/MC-019-0-1793673563363.json",
+        "sha256": "778d087a9a3d855db148fd17c3eb2aadf64c908e3f440048418f5286f89eb4c0",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "acceptanceAt": "2026-11-03T02:39:24.962Z"
+    },
+    "MC-020": {
+      "repair": "/root",
+      "acceptance": "/root/general_audit",
+      "acceptanceRun": {
+        "path": "runs/MC-020-0-1793673650772.json",
+        "sha256": "c7ca237792fa9ada642d31c4c6b6e04a5955671f5845875d594668b7a4aca76f",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "acceptanceAt": "2026-11-03T02:40:52.364Z"
+    },
+    "MC-021": {
+      "repair": "/root/marketing_audit",
+      "acceptance": "/root/submission_audit",
+      "acceptanceRun": {
+        "path": "runs/MC-021-0-1793673565099.json",
+        "sha256": "f32ad531be435ca215c7e6c06fd7f0b9e1539bc75fa62cffd9af7b6f212c419d",
+        "commit": "16fc646d15e3bf7c65274abd1cf0b2af000320cb"
+      },
+      "acceptanceAt": "2026-11-03T02:39:31.522Z"
+    }
+  },
+  "changedFiles": [
+    {
+      "path": "apps/server/src/video/archive-access.pg.test.ts",
+      "level": "A",
+      "lines": 60,
+      "sha256": "b6febddb753dade1ea86ed9a4a2b6f674fba8010783b7c116f4b685698dbaf35",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/archive-access.test.ts",
+      "level": "A",
+      "lines": 56,
+      "sha256": "0257162885fecee9dde9d758c869791e06103a154498746ec21002ad993d2715",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/archive-resume-input.test.ts",
+      "level": "A",
+      "lines": 83,
+      "sha256": "2f4b3aff044dc315de186e56b3514190112e8935fca8c6554692adea20393e02",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/archive-resume.ts",
+      "level": "A",
+      "lines": 465,
+      "sha256": "fcaaba4f09affad8b05d3bda4188281a16cc41a2a2a670bc5799fc4201a72cde",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        },
+        {
+          "role": "root",
+          "level": "A",
+          "notes": "本轮完整读或编写并审查最终差异。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/archive.pg.test.ts",
+      "level": "A",
+      "lines": 352,
+      "sha256": "fad60cd7d77779ff6323ed314a38cf04f520f6493f52c8c144a7edc3af30939a",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/data-mining-executor.ts",
+      "level": "A",
+      "lines": 879,
+      "sha256": "162a607ff4f677ccf0755f7a53956af9c5e074b51eba20d4569e3d5ba7562d3a",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "162a607ff4f677ccf0755f7a53956af9c5e074b51eba20d4569e3d5ba7562d3a",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/data-mining-search-recovery-independent.test.ts",
+      "level": "A",
+      "lines": 28,
+      "sha256": "4108d1dc85de80a86936bdb604c8c3729573a5e92170bd145081f2c3d2dc7863",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "4108d1dc85de80a86936bdb604c8c3729573a5e92170bd145081f2c3d2dc7863",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/data-mining-search-recovery.test.ts",
+      "level": "A",
+      "lines": 135,
+      "sha256": "1cabca1802e7a4b7d89ce50a4da3f83a2f531d7c0f62ccb00dd8a371351d3eca",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "1cabca1802e7a4b7d89ce50a4da3f83a2f531d7c0f62ccb00dd8a371351d3eca",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/film-ledger.ts",
+      "level": "A",
+      "lines": 596,
+      "sha256": "a2a7cb3dec8b2614acc77c0b6da9c7c94975b4cfa5206c1714f47778102ae916",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "a2a7cb3dec8b2614acc77c0b6da9c7c94975b4cfa5206c1714f47778102ae916",
+          "notes": "independent-film-ledger"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "a2a7cb3dec8b2614acc77c0b6da9c7c94975b4cfa5206c1714f47778102ae916",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/film-provider-receipt.pg.test.ts",
+      "level": "A",
+      "lines": 185,
+      "sha256": "b8f740f6cf12b0043b1a90a8018892f161a897459880143c564eea08833fc80c",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "b8f740f6cf12b0043b1a90a8018892f161a897459880143c564eea08833fc80c",
+          "notes": "independent-film-ledger"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "b8f740f6cf12b0043b1a90a8018892f161a897459880143c564eea08833fc80c",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/film-worker-identity.test.ts",
+      "level": "A",
+      "lines": 604,
+      "sha256": "976eb43a2b58419c2434b91f8354bce6c6bc7ef8dadc8798f257b9d36358a2fa",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "976eb43a2b58419c2434b91f8354bce6c6bc7ef8dadc8798f257b9d36358a2fa",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/film-worker.ts",
+      "level": "A",
+      "lines": 1438,
+      "sha256": "2dc111c29796808f0b42bf1071130de8c79784193f706a4f180bc3db26e2beda",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "2dc111c29796808f0b42bf1071130de8c79784193f706a4f180bc3db26e2beda",
+          "notes": "independent-film-ledger"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "2dc111c29796808f0b42bf1071130de8c79784193f706a4f180bc3db26e2beda",
+          "notes": "core"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/gen/domestic-provider-polling.test.ts",
+      "level": "A",
+      "lines": 89,
+      "sha256": "ccc081f88174574fc04f6bd8bdea56b7525efef3910c9ea2f125995bd1625a3c",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "ccc081f88174574fc04f6bd8bdea56b7525efef3910c9ea2f125995bd1625a3c",
+          "notes": "independent-implementation"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "ccc081f88174574fc04f6bd8bdea56b7525efef3910c9ea2f125995bd1625a3c",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/gen/provider-polling.test.ts",
+      "level": "A",
+      "lines": 92,
+      "sha256": "e84a6acb0988896ee98ecd1f0ceb8e4dcf316b00adcec6092e708dd5d2b57d04",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "e84a6acb0988896ee98ecd1f0ceb8e4dcf316b00adcec6092e708dd5d2b57d04",
+          "notes": "independent-implementation"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "e84a6acb0988896ee98ecd1f0ceb8e4dcf316b00adcec6092e708dd5d2b57d04",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/gen/providers.ts",
+      "level": "A",
+      "lines": 337,
+      "sha256": "1910893a24a52e9071c172225a602edad1106179160fdaee82dbdaa29b41e590",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "1910893a24a52e9071c172225a602edad1106179160fdaee82dbdaa29b41e590",
+          "notes": "independent-implementation"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "1910893a24a52e9071c172225a602edad1106179160fdaee82dbdaa29b41e590",
+          "notes": "core"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/marketing-authority.test.ts",
+      "level": "A",
+      "lines": 231,
+      "sha256": "66e1574d02d90ab490407ab94eecac9b0bf4b5c86f1e77cb53d468ffabdc3df8",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "66e1574d02d90ab490407ab94eecac9b0bf4b5c86f1e77cb53d468ffabdc3df8",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/marketing-authority.ts",
+      "level": "A",
+      "lines": 306,
+      "sha256": "60313d303539a4f11307d34266bbe3edc07ae69ce920ae2110a76f5b44e34868",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "60313d303539a4f11307d34266bbe3edc07ae69ce920ae2110a76f5b44e34868",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/marketing-dossier-consumption.test.ts",
+      "level": "A",
+      "lines": 70,
+      "sha256": "db84e40350e4bb267552d9728cdaa5d648ad5507d91a34b1dfad621744174f29",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "db84e40350e4bb267552d9728cdaa5d648ad5507d91a34b1dfad621744174f29",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/marketing-facts.ts",
+      "level": "A",
+      "lines": 252,
+      "sha256": "682d50ef9fc1ff7c6a5e092dffa05877067977d2355fa9d1962eecc152020fe8",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "682d50ef9fc1ff7c6a5e092dffa05877067977d2355fa9d1962eecc152020fe8",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/marketing-source-attribution-independent.test.ts",
+      "level": "A",
+      "lines": 27,
+      "sha256": "2b1d432e7b00f8fd107f6e5bde1d791cfa1ca4b7cb9c3aad6c0cebd28c555854",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "2b1d432e7b00f8fd107f6e5bde1d791cfa1ca4b7cb9c3aad6c0cebd28c555854",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/marketing-source-attribution.test.ts",
+      "level": "A",
+      "lines": 108,
+      "sha256": "1c2ff74505831dd4dc97c51bd17fa5763479d3152a13142c5616a5c0dd42e06b",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "1c2ff74505831dd4dc97c51bd17fa5763479d3152a13142c5616a5c0dd42e06b",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/marketing-source-fetcher.ts",
+      "level": "A",
+      "lines": 231,
+      "sha256": "9ecd1578afaa7d7b372ac9b0f02a8fba4a19d185a369b6adcf092860baee9a1f",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "9ecd1578afaa7d7b372ac9b0f02a8fba4a19d185a369b6adcf092860baee9a1f",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/media/products-source-safety.test.ts",
+      "level": "A",
+      "lines": 153,
+      "sha256": "ddb62aebcf08123d15a5b7adb6b4173740958fb4e0536083158870b725726a92",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "ddb62aebcf08123d15a5b7adb6b4173740958fb4e0536083158870b725726a92",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/media/products.ts",
+      "level": "A",
+      "lines": 345,
+      "sha256": "fccc9f7aa84acc5225c3f48e89cc0d77ae23c5a2115bff5026415345f8513509",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "fccc9f7aa84acc5225c3f48e89cc0d77ae23c5a2115bff5026415345f8513509",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/pipeline-control-concurrency.pg.test.ts",
+      "level": "A",
+      "lines": 79,
+      "sha256": "d2d7ffc2064aebee69acb1d6efc86a392dd63b418cf1ff4a1ae17fbd61190ec2",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/pipeline-control-plane.ts",
+      "level": "A",
+      "lines": 832,
+      "sha256": "21052ce554cdd3bdd0adef6b40b672ab5a93426017bf8511f18bc5b68ca6d124",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/render-poller.pg.test.ts",
+      "level": "A",
+      "lines": 232,
+      "sha256": "c806619e89dfa17859563dfd8cd2e849e2a6ae7e72e558f462cf94cc7facd060",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "c806619e89dfa17859563dfd8cd2e849e2a6ae7e72e558f462cf94cc7facd060",
+          "notes": "independent-implementation"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "c806619e89dfa17859563dfd8cd2e849e2a6ae7e72e558f462cf94cc7facd060",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/render-poller.ts",
+      "level": "A",
+      "lines": 489,
+      "sha256": "09495ef3535113f270c592bd3c1e25afad2908e80077f5198d5ca16a3a0e6bce",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "09495ef3535113f270c592bd3c1e25afad2908e80077f5198d5ca16a3a0e6bce",
+          "notes": "independent-implementation"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "09495ef3535113f270c592bd3c1e25afad2908e80077f5198d5ca16a3a0e6bce",
+          "notes": "core"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/studio-resume-input.ts",
+      "level": "A",
+      "lines": 98,
+      "sha256": "3251cda8ae28260796133bfed38f8b5927bad476907a04b9e67ed55c9143c9aa",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/studio-worker.test.ts",
+      "level": "A",
+      "lines": 842,
+      "sha256": "075a63665c55192232b89703ce4fedbcb01602288e8ef0b486a7004902b31cc3",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        },
+        {
+          "role": "root",
+          "level": "A",
+          "notes": "本轮完整读或编写并审查最终差异。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "apps/server/src/video/studio-worker.ts",
+      "level": "A",
+      "lines": 1780,
+      "sha256": "4a321bccdca32f10430d577a6e7b3da26093a9757529cacb6f09cc889e524ecb",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        },
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "4a321bccdca32f10430d577a6e7b3da26093a9757529cacb6f09cc889e524ecb",
+          "notes": "全文精读并复读冻结源码前的所有后续差异"
+        },
+        {
+          "role": "root",
+          "level": "A",
+          "notes": "本轮完整读或编写并审查最终差异。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/base/model-router/gen-pool.ts",
+      "level": "A",
+      "lines": 438,
+      "sha256": "e5c3979f9ad9d27a9741ee16a3e9e042f256f6f1ff43b3d7e0d8b2cc40465ce5",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "e5c3979f9ad9d27a9741ee16a3e9e042f256f6f1ff43b3d7e0d8b2cc40465ce5",
+          "notes": "independent-implementation"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "e5c3979f9ad9d27a9741ee16a3e9e042f256f6f1ff43b3d7e0d8b2cc40465ce5",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/db/migrations/0060_film_provider_receipts.sql",
+      "level": "A",
+      "lines": 20,
+      "sha256": "a3cf98f7a537176a76553fe00d04b130b54f33409efc6ea25590fd90c2e320cc",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "a3cf98f7a537176a76553fe00d04b130b54f33409efc6ea25590fd90c2e320cc",
+          "notes": "independent-film-ledger"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "a3cf98f7a537176a76553fe00d04b130b54f33409efc6ea25590fd90c2e320cc",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/archive/store.test.ts",
+      "level": "A",
+      "lines": 160,
+      "sha256": "00230f47a184bbf6c3a11186ad59beb000549606ac33656620a4547c2cba7160",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/archive/store.ts",
+      "level": "A",
+      "lines": 307,
+      "sha256": "6bdf671ce7c7427e978f64bdf44861e5a7e752c04fb8fbcd375d7f2fbb8e6aea",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/index.ts",
+      "level": "A",
+      "lines": 78,
+      "sha256": "7fe7b6d7d2f8995034c6a8a843b9e0318885feb146aad7ae1ba868594bd010a6",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "7fe7b6d7d2f8995034c6a8a843b9e0318885feb146aad7ae1ba868594bd010a6",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/llm-adapter.ts",
+      "level": "A",
+      "lines": 505,
+      "sha256": "235a42381a78e61b3f5cc4d4999713e9fa86bff77471162475268ac75e0a2663",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "235a42381a78e61b3f5cc4d4999713e9fa86bff77471162475268ac75e0a2663",
+          "notes": "independent-vendor-model-routing"
+        },
+        {
+          "role": "root",
+          "level": "A",
+          "notes": "本轮完整读或编写并审查最终差异。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/marketing-dossier-input.test.ts",
+      "level": "A",
+      "lines": 27,
+      "sha256": "22ccd1702beef213ed41b3ffc2823f8337683aad74a6d54a9ef75c22371a055c",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "22ccd1702beef213ed41b3ffc2823f8337683aad74a6d54a9ef75c22371a055c",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/marketing-dossier-input.ts",
+      "level": "A",
+      "lines": 49,
+      "sha256": "e73c175506fbf92351210066c7e706c6aeeda37ddd3993c4a0a78a697f6ab2a4",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "e73c175506fbf92351210066c7e706c6aeeda37ddd3993c4a0a78a697f6ab2a4",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/auto-approval-projection.test.ts",
+      "level": "A",
+      "lines": 36,
+      "sha256": "736e833a3ab1fdb3ac81f212492926af3b1cca4ae4ef8a7d654e9c49ba32db9c",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/coordinator.ts",
+      "level": "A",
+      "lines": 994,
+      "sha256": "f71ffca36161324a9acd3ba7f34d7585dde29a43959c614a56315913475eb041",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/in-memory-repository.ts",
+      "level": "A",
+      "lines": 275,
+      "sha256": "0d9939edcd1420940097cb9ecacb7e3ac3b7b8bc257830abc45ac3548fc8974e",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/lease.ts",
+      "level": "A",
+      "lines": 44,
+      "sha256": "f04836af890dd9055b64ba24d4ca711372dd7e9de762b1c44ff41bce4336f1df",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/projection.ts",
+      "level": "A",
+      "lines": 185,
+      "sha256": "0830dd3ad9ecf3cef738a707e7a20c4e896c16c89233608530e4be9623ae16e1",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/pipeline-control-plane/repository.ts",
+      "level": "A",
+      "lines": 64,
+      "sha256": "8f8725c72b0ed1308eefb1c3d531b065cc005941db483cd2bcf8ede12ac9c4e1",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "root",
+          "level": "A",
+          "reviewed_sha256": null,
+          "notes": "本轮全文分段读取到末尾，或本轮完整编写并逐项核对。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/production-client.test.ts",
+      "level": "A",
+      "lines": 186,
+      "sha256": "310b4e5f21db8d4cb22a49945c6931da86e46a91400e8c31e28cd92c86d42d4a",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "310b4e5f21db8d4cb22a49945c6931da86e46a91400e8c31e28cd92c86d42d4a",
+          "notes": "independent-implementation"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "310b4e5f21db8d4cb22a49945c6931da86e46a91400e8c31e28cd92c86d42d4a",
+          "notes": "dependency-or-test"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/production-client.ts",
+      "level": "A",
+      "lines": 180,
+      "sha256": "396ee4835feb0687afb7fa6be77da71f5ba003c5e2eb93ba4fcd3e68bf72e19c",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "396ee4835feb0687afb7fa6be77da71f5ba003c5e2eb93ba4fcd3e68bf72e19c",
+          "notes": "independent-implementation"
+        },
+        {
+          "role": "submission",
+          "level": "A",
+          "reviewed_sha256": "396ee4835feb0687afb7fa6be77da71f5ba003c5e2eb93ba4fcd3e68bf72e19c",
+          "notes": "core"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/routed-generation.test.ts",
+      "level": "A",
+      "lines": 197,
+      "sha256": "cfd9331153ba1801d108b91f2394dfa6d85cb811929ae2a0cf7fa0a4ecd61fc0",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "cfd9331153ba1801d108b91f2394dfa6d85cb811929ae2a0cf7fa0a4ecd61fc0",
+          "notes": "independent-vendor-model-routing"
+        },
+        {
+          "role": "root",
+          "level": "A",
+          "notes": "本轮完整读或编写并审查最终差异。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/studio-marketing-input.test.ts",
+      "level": "A",
+      "lines": 67,
+      "sha256": "9490f244bbf2838ac026bcf8f1e0c8c9fa98d006a39406ca22f71c6c94d6a638",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "9490f244bbf2838ac026bcf8f1e0c8c9fa98d006a39406ca22f71c6c94d6a638",
+          "notes": "Full source read or authored and reviewed in this round"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/studio.ts",
+      "level": "A",
+      "lines": 729,
+      "sha256": "44d72847197f9a9bd0b36b5860dfabb6808babb7ad481313f62f9f1738ade4c5",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "44d72847197f9a9bd0b36b5860dfabb6808babb7ad481313f62f9f1738ade4c5",
+          "notes": "host-runtime-and-independent-proofs"
+        },
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "44d72847197f9a9bd0b36b5860dfabb6808babb7ad481313f62f9f1738ade4c5",
+          "notes": "全文精读并复读冻结源码前的所有后续差异"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/vendor-compat.ts",
+      "level": "A",
+      "lines": 8006,
+      "sha256": "8bf749e807700b409c1540644b45e8e446362977e03b5a33cae475ccf85a0cbe",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "8bf749e807700b409c1540644b45e8e446362977e03b5a33cae475ccf85a0cbe",
+          "notes": "host-runtime-and-independent-proofs"
+        },
+        {
+          "role": "marketing",
+          "level": "C",
+          "reviewed_sha256": "8bf749e807700b409c1540644b45e8e446362977e03b5a33cae475ccf85a0cbe",
+          "notes": "完整精读定妆绑定/Parser桥约111–460行及营销桥区域；超大文件其余由通用审计范围处理。"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/vendor-discovery-await.test.ts",
+      "level": "A",
+      "lines": 109,
+      "sha256": "175458a19dac47d3566c0d3405cda626ad2050c69c08781c9655652e7927808c",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "175458a19dac47d3566c0d3405cda626ad2050c69c08781c9655652e7927808c",
+          "notes": "formal-regression"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/vendor-portrait-binding-concurrency.test.ts",
+      "level": "A",
+      "lines": 133,
+      "sha256": "89b8f95c41d28069f4ed88fd6b92eca5eb6d0bc24b67d7def3fc32dcfecaf1cd",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "marketing",
+          "level": "A",
+          "reviewed_sha256": "89b8f95c41d28069f4ed88fd6b92eca5eb6d0bc24b67d7def3fc32dcfecaf1cd",
+          "notes": "全文编写与实际Node/CJS验证"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/vendor-prd-approval-failure.test.ts",
+      "level": "A",
+      "lines": 151,
+      "sha256": "462665023bc0530724d84198396352af01c204ae628d939a39fb74b00ce3985d",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "462665023bc0530724d84198396352af01c204ae628d939a39fb74b00ce3985d",
+          "notes": "host-runtime-and-independent-proofs"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/vendor-runtime-agent-config-independent.test.ts",
+      "level": "A",
+      "lines": 53,
+      "sha256": "fbd6a8a9ee492f8bcd2e33e3fae655381f665e00b8fd7a788f417427ca2352aa",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "fbd6a8a9ee492f8bcd2e33e3fae655381f665e00b8fd7a788f417427ca2352aa",
+          "notes": "host-runtime-and-independent-proofs"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "packages/video-studio/src/vendor-runtime-agent-config.test.ts",
+      "level": "A",
+      "lines": 79,
+      "sha256": "ec8e8b435df216b662d705c312804af253c8bc64ed7532215e02d2b52ae35d0e",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "ec8e8b435df216b662d705c312804af253c8bc64ed7532215e02d2b52ae35d0e",
+          "notes": "formal-regression"
+        }
+      ],
+      "import_reference_scan": []
+    },
+    {
+      "path": "vendor/supermickey/hyperreality-system/index.js",
+      "level": "A",
+      "lines": 4126,
+      "sha256": "c8719217200cca1c36dc4743455323d9290198950c929620cf698a055a121109",
+      "changed": true,
+      "reason": "按文件记录的本轮全文阅读或完整编写；变化文件再对照候选差异。",
+      "read_receipts": [
+        {
+          "role": "general",
+          "level": "A",
+          "reviewed_sha256": "c8719217200cca1c36dc4743455323d9290198950c929620cf698a055a121109",
+          "notes": "direct-dependency"
+        },
+        {
+          "role": "marketing",
+          "level": "C",
+          "reviewed_sha256": "c8719217200cca1c36dc4743455323d9290198950c929620cf698a055a121109",
+          "notes": "读2282–2327行Layer3渲染分支，供宿主可达性核对"
+        }
+      ],
+      "import_reference_scan": []
+    }
+  ],
+  "stats": {
+    "serverFiles": 53,
+    "serverPass": 1241,
+    "serverSkip": 1,
+    "studioFiles": 117,
+    "studioPass": 1980,
+    "nodePass": 21,
+    "pipelines": 6,
+    "releasePass": 11
+  },
+  "limits": [
+    "本机真实数据库/磁盘/供应商协议替身",
+    "无付费供应商实单",
+    "不等同生产 RDAS/P 域"
+  ]
+}

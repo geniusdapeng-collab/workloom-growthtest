@@ -144,6 +144,7 @@ function parseH3Results(html: string, base: string, limit: number): SearchHit[] 
     } catch {
       continue;
     }
+    if (!isSearchResultUrl(url)) continue;
     const after = html.slice((match.index ?? 0) + match[0].length, (match.index ?? 0) + match[0].length + 1_200);
     const snippet = decodeEntities(after).slice(0, 240);
     out.push({ title, url, snippet });
@@ -151,17 +152,31 @@ function parseH3Results(html: string, base: string, limit: number): SearchHit[] 
   return out;
 }
 
+interface SearchProviderResult { hits: SearchHit[]; blocked: boolean; failed?: boolean }
+
+function isSearchResultUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
 /** Bing 公开 RSS（keyless）：返回的是真实目标 URL（不是跳转链接），作为补充通道 */
-async function searchBingRss(query: string, limit: number, timeoutMs: number): Promise<{ hits: SearchHit[]; blocked: boolean }> {
+async function searchBingRss(query: string, limit: number, timeoutMs: number): Promise<SearchProviderResult> {
   const url = `https://www.bing.com/search?q=${encodeURIComponent(query.slice(0, 80))}&format=rss&count=${Math.max(1, Math.min(limit, 10))}`;
   const res = await fetch(url, {
     signal: AbortSignal.timeout(timeoutMs),
     headers: { "user-agent": "WorkLoom/1.0 (+jenny-loom-research)" },
     redirect: "follow",
   });
-  if (!res.ok) return { hits: [], blocked: res.status === 403 || res.status === 429 };
+  if (!res.ok) return { hits: [], blocked: res.status === 403 || res.status === 429, failed: true };
   const xml = await res.text();
-  const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, limit);
+  if (!/^\s*(?:<\?xml[^>]*>\s*)?<rss\b[^>]*>[\s\S]*<\/rss>\s*$/iu.test(xml)) {
+    return { hits: [], blocked: false, failed: true };
+  }
+  const items = [...xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item\s*>/giu)];
   const hits: SearchHit[] = [];
   for (const item of items) {
     const pick = (tag: string) => {
@@ -170,7 +185,12 @@ async function searchBingRss(query: string, limit: number, timeoutMs: number): P
     };
     const title = pick("title");
     const link = pick("link");
-    if (title && link) hits.push({ title, url: link, snippet: pick("description") });
+    if (title && isSearchResultUrl(link)) hits.push({ title, url: link, snippet: pick("description") });
+    if (hits.length >= limit) break;
+  }
+  // 只有明确的空 RSS channel 能证明“无结果”；非空但全坏的条目属于协议失败。
+  if (!hits.length && (/<item\b/iu.test(xml) || !/<channel\b[^>]*>[\s\S]*<\/channel>/iu.test(xml))) {
+    return { hits: [], blocked: false, failed: true };
   }
   return { hits, blocked: false };
 }
@@ -194,7 +214,7 @@ export interface ApiSearchConfig {
 export interface ApiSearchRunner {
   enabled: boolean;
   label: string | null;
-  search: (query: string, limit: number) => Promise<{ hits: SearchHit[]; blocked: boolean }>;
+  search: (query: string, limit: number) => Promise<SearchProviderResult>;
 }
 
 /** 从环境解析 API 检索配置：`TAVILY_API_KEY` 或 `WL_SEARCH_API_URL`+`WL_SEARCH_API_KEY` */
@@ -247,29 +267,41 @@ export function createApiSearchRunner(config: ApiSearchConfig = {}): ApiSearchRu
         });
         if (!res.ok) {
           log(`[intel] API 检索非 200（${res.status}，provider=${resolved.provider}）`);
-          return { hits: [], blocked: res.status === 403 || res.status === 429 };
+          return { hits: [], blocked: res.status === 403 || res.status === 429, failed: true };
         }
-        const json = await res.json() as Record<string, unknown>;
+        const json = asRecord(await res.json());
+        if (!json || json.success === false || json.ok === false || json.error) {
+          log(`[intel] API 检索返回失败信封（provider=${resolved.provider}）`);
+          return { hits: [], blocked: false, failed: true };
+        }
         /** 结果数组位置兼容：`results` / `items` / `data[]` / `data.items[]`（网关风格不统一） */
         const candidates: unknown[] = [json.results, json.items, json.data];
         const dataObj = (json.data && typeof json.data === "object") ? json.data as Record<string, unknown> : null;
         if (dataObj) candidates.push(dataObj.results, dataObj.items, dataObj.list);
         const rows = candidates.find((candidate) => Array.isArray(candidate)) as unknown[] | undefined;
-        const list = rows ?? [];
+        if (!rows) {
+          log(`[intel] API 检索响应缺少结果数组（provider=${resolved.provider}）`);
+          return { hits: [], blocked: false, failed: true };
+        }
+        const list = rows;
         const hits: SearchHit[] = [];
         for (const row of list) {
           const record = (row && typeof row === "object") ? row as Record<string, unknown> : {};
-          const title = String(record.title ?? record.name ?? "").trim();
-          const url = String(record.url ?? record.link ?? "").trim();
-          const snippet = String(record.content ?? record.snippet ?? record.description ?? record.summary ?? "").trim();
-          if (!title || !url) continue;
+          const title = asString(record.title ?? record.name);
+          const url = asString(record.url ?? record.link);
+          const snippet = asString(record.content ?? record.snippet ?? record.description ?? record.summary);
+          if (!title || !isSearchResultUrl(url)) continue;
           hits.push({ title, url, snippet: snippet.slice(0, 400) });
           if (hits.length >= limit) break;
+        }
+        if (list.length > 0 && hits.length === 0) {
+          log(`[intel] API 检索非空结果数组没有合法条目（provider=${resolved.provider}）`);
+          return { hits: [], blocked: false, failed: true };
         }
         return { hits, blocked: false };
       } catch (err) {
         log(`[intel] API 检索异常（provider=${resolved.provider}）：${err instanceof Error ? err.message : String(err)}`);
-        return { hits: [], blocked: false };
+        return { hits: [], blocked: false, failed: true };
       }
     },
   };
@@ -287,7 +319,7 @@ async function searchOneProvider(
   query: string,
   limit: number,
   timeoutMs: number,
-): Promise<{ hits: SearchHit[]; blocked: boolean }> {
+): Promise<SearchProviderResult> {
   if (provider === "bing") return searchBingRss(query, limit, timeoutMs);
   if (provider === "api") return { hits: [], blocked: false }; // API 通道由 createApiSearchRunner 独立处理
   const { base, ua } = PROVIDER_CONFIG[provider];
@@ -296,11 +328,13 @@ async function searchOneProvider(
     headers: { "user-agent": ua, "accept-language": "zh-CN,zh;q=0.9" },
     redirect: "follow",
   });
-  if (!res.ok) return { hits: [], blocked: res.status === 403 || res.status === 429 };
+  if (!res.ok) return { hits: [], blocked: res.status === 403 || res.status === 429, failed: true };
   const html = await res.text();
   // 人机校验页 / 前端渲染空壳：明确识别，按熔断处理（不是"查询无结果"）
   if (BLOCK_PAGE_PATTERN.test(html)) return { hits: [], blocked: true };
-  return { hits: parseH3Results(html, base, limit), blocked: false };
+  const hits = parseH3Results(html, base, limit);
+  // 无结果块不能区分真正零结果、维护页和前端壳。缺少可核验协议时不持久化负缓存。
+  return { hits, blocked: false, ...(hits.length ? {} : { failed: true }) };
 }
 
 /** 人机校验页特征（百度安全验证 / 验证码 / 滑块等） */
@@ -426,7 +460,7 @@ export function createWebSearch(options: {
         if (Date.now() < until) { perProvider.push("api=cooldown"); continue; }
         await pace("api");
         if (Date.now() < (cooldownUntil.get("api") ?? 0)) { perProvider.push("api=cooldown"); continue; }
-        const { hits, blocked } = await apiRunner.search(query, limit);
+        const { hits, blocked, failed } = await apiRunner.search(query, limit);
         if (blocked) {
           const minutes = 15;
           cooldownUntil.set("api", Date.now() + minutes * 60_000);
@@ -434,6 +468,7 @@ export function createWebSearch(options: {
           perProvider.push("api=blocked");
           continue;
         }
+        if (failed) { perProvider.push("api=error"); continue; }
         writeCachedHits(cache, "api", query, hits);
         take("api", hits);
         continue;
@@ -455,7 +490,7 @@ export function createWebSearch(options: {
           perProvider.push(`${provider}=cooldown`);
           continue;
         }
-        const { hits, blocked } = await searchOneProvider(provider, query, limit, timeoutMs);
+        const { hits, blocked, failed } = await searchOneProvider(provider, query, limit, timeoutMs);
         if (blocked) {
           const minutes = 15;
           cooldownUntil.set(provider, Date.now() + minutes * 60_000);
@@ -463,6 +498,7 @@ export function createWebSearch(options: {
           perProvider.push(`${provider}=blocked`);
           continue;
         }
+        if (failed) { perProvider.push(`${provider}=error`); continue; }
         writeCachedHits(cache, provider, query, hits);
         take(provider, hits);
       } catch (err) {
@@ -486,6 +522,10 @@ export function createWebSearch(options: {
 export interface SearchCacheEntry {
   at: string;
   hits: SearchHit[];
+  /** 旧缓存把请求失败也存为空；只有成功标记的线上空结果可复用。 */
+  outcome?: "success";
+  /** 此版本先核验结果协议再写空缓存；旧 success 空缓存仍可能来自维护页。 */
+  emptyProtocolVersion?: 1;
 }
 export interface SearchCache {
   version: 1;
@@ -520,13 +560,17 @@ export function saveSearchCache(file: string | undefined, cache: SearchCache): v
 function readCachedHits(cache: SearchCache, provider: string, query: string, ttlMs: number): SearchHit[] | null {
   const entry = cache.entries[searchCacheKey(provider, query)];
   if (!entry || !Array.isArray(entry.hits)) return null;
+  if (provider !== FIXTURE_PROVIDER && entry.hits.length === 0
+    && (entry.outcome !== "success" || entry.emptyProtocolVersion !== 1)) return null;
   const age = Date.now() - new Date(entry.at).getTime();
   if (!Number.isFinite(age) || age > ttlMs) return null;
   return entry.hits;
 }
 
 function writeCachedHits(cache: SearchCache, provider: string, query: string, hits: SearchHit[]): void {
-  cache.entries[searchCacheKey(provider, query)] = { at: new Date().toISOString(), hits };
+  cache.entries[searchCacheKey(provider, query)] = {
+    at: new Date().toISOString(), hits, outcome: "success", ...(hits.length ? {} : { emptyProtocolVersion: 1 }),
+  };
 }
 
 /**
