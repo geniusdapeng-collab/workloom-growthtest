@@ -26,12 +26,18 @@ interface Scope { tenantId: string; workspaceId: string }
 
 interface OpenJob {
   id: string;
+  status: "submitted" | "rendering" | "done";
   task_id: string;
   script_id: string;
   project_id: string;
   provider_model: string | null;
   provider: string | null;
   mock: boolean;
+  result_url: string | null;
+  asset_id: string | null;
+  actual_seconds: number | null;
+  actual_usd: string | null;
+  actual_cny: string | null;
   est_cny: string | null;
   est_usd: string | null;
   created_at: string;
@@ -39,10 +45,43 @@ interface OpenJob {
   submit_payload: { decision?: { after?: { provider?: string; request?: { aspectRatio?: string } } } } | null;
 }
 
+/** Missing local assets or cost rows remain durable retry work after generation succeeds. */
+async function readPollJobs(client: pg.PoolClient, scope: Scope, input: { limit: number; ingest: boolean; jobId?: string }): Promise<OpenJob[]> {
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
+    await client.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]);
+    const rows = await client.query<OpenJob>(
+      `SELECT j.id, j.status, j.task_id, j.script_id, j.project_id, j.provider_model, j.provider, j.mock,
+              j.result_url, j.asset_id, j.actual_seconds, j.actual_usd, j.actual_cny,
+              j.est_cny, j.est_usd, j.created_at,
+              (SELECT e.payload FROM biz_events e
+                WHERE e.workspace_id=j.workspace_id
+                  AND e.payload->'decision'->>'action'='render.submit'
+                  AND e.payload->'decision'->'after'->>'jobId'=j.id
+                ORDER BY e.seq DESC LIMIT 1) AS submit_payload
+         FROM render_jobs j
+        WHERE j.workspace_id=$1 AND j.task_id IS NOT NULL
+          AND ($4::text IS NULL OR j.id=$4)
+          AND (j.status IN ('submitted','rendering') OR (j.status='done' AND (
+            ($3::boolean AND NOT j.mock AND j.asset_id IS NULL AND j.result_url IS NOT NULL)
+            OR NOT EXISTS (SELECT 1 FROM budget_ledger b WHERE b.workspace_id=j.workspace_id
+                            AND b.idempotency_key='render:' || j.id))))
+        ORDER BY (j.status='done') ASC, j.created_at ASC LIMIT $2`,
+      [scope.workspaceId, input.limit, input.ingest, input.jobId ?? null],
+    );
+    await client.query("COMMIT");
+    return rows.rows;
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw err;
+  }
+}
+
 /**
  * C-04 修复：渲染任务终态超时（小时）。此前 provider.poll 任何异常都被当作"仍在跑"，
  * 供应商网关持续故障时作业永远卡 submitted/rendering（无出口状态，实锤见排雷台账）。
- * 超龄任务无论 poll 返回什么都判 failed（原因留痕），给交付链一个终态出口。
+ * 超龄且仍未核实终态的任务判 failed（原因留痕），给交付链一个终态出口。
  * 默认 24h（长片型渲染最慢以小时计）；可用 RENDER_JOB_TIMEOUT_H 调整，0 关闭。
  */
 const RENDER_JOB_TIMEOUT_H = Number(process.env.RENDER_JOB_TIMEOUT_H ?? 24);
@@ -130,305 +169,321 @@ export async function pollRenderJobs(
   const client = await app.connect();
   let jobs: OpenJob[];
   try {
-    // 事务级 RLS 上下文必须在显式事务内设置（编码铁律）
-    await client.query("BEGIN");
-    await client.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
-    await client.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]);
-    // 开放任务 + 提交事件留痕的供应商（event 回放取 provider，无留痕回退推断）
-    const rows = await client.query<OpenJob>(
-      `SELECT j.id, j.task_id, j.script_id, j.project_id, j.provider_model, j.provider, j.mock, j.est_cny, j.est_usd, j.created_at,
-              (SELECT e.payload
-                 FROM biz_events e
-                WHERE e.workspace_id=j.workspace_id
-                  AND e.payload->'decision'->>'action'='render.submit'
-                  AND e.payload->'decision'->'after'->>'jobId'=j.id
-                ORDER BY e.seq DESC LIMIT 1) AS submit_payload
-         FROM render_jobs j
-        WHERE j.workspace_id=$1 AND j.status IN ('submitted','rendering') AND j.task_id IS NOT NULL
-        ORDER BY j.created_at ASC
-        LIMIT $2`,
-      [scope.workspaceId, opts.limit ?? 20],
-    );
-    jobs = rows.rows;
-    await client.query("COMMIT");
-  } catch (err) {
-    await client.query("ROLLBACK").catch(() => undefined);
-    throw err;
+    jobs = await readPollJobs(client, scope, { limit: opts.limit ?? 20, ingest: opts.ingest !== false });
   } finally {
     client.release();
   }
 
-  const gw = await gateway.connect();
-  for (const job of jobs) {
-    report.checked += 1;
-    const provider = resolveProvider(realPool, job, mockPool);
-    if (!provider) {
-      // C-04：供应商未配置也不能让作业永远悬停——超龄判 failed（有终态出口）
-      if (renderJobTimedOut(job)) {
-        const error = `供应商未配置且已超 ${RENDER_JOB_TIMEOUT_H}h（C-04 超时判死）`;
+  for (const candidate of jobs) {
+    const gw = await gateway.connect();
+    const lockKey = `render-poller:${scope.workspaceId}:${candidate.id}`;
+    let locked = false;
+    let discard = false;
+    try {
+      // The session lock spans network I/O without leaving a database transaction open.
+      locked = (await gw.query<{ locked: boolean }>("SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS locked", [lockKey])).rows[0]?.locked === true;
+      if (!locked) continue;
+      // A stale batch can resume after another poller completed this job; recheck under the lock.
+      const [job] = await readPollJobs(gw, scope, { limit: 1, ingest: opts.ingest !== false, jobId: candidate.id });
+      if (!job) continue;
+      report.checked += 1;
+      const provider = resolveProvider(realPool, job, mockPool);
+      const providerId = job.submit_payload?.decision?.after?.provider ?? job.provider ?? provider?.providerId ?? "seedance";
+      const reconciling = job.status === "done";
+      if (!provider && !reconciling) {
+        // C-04：供应商未配置也不能让作业永远悬停——超龄判 failed（有终态出口）
+        if (renderJobTimedOut(job)) {
+          const error = `供应商未配置且已超 ${RENDER_JOB_TIMEOUT_H}h（C-04 超时判死）`;
+          try {
+            await gw.query("BEGIN");
+            await gw.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
+            await gw.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]);
+            const updated = await gw.query(
+              `UPDATE render_jobs SET status='failed', updated_at=now()
+                WHERE id=$1 AND workspace_id=$2 AND status IN ('submitted','rendering') RETURNING id`,
+              [job.id, scope.workspaceId],
+            );
+            if (updated.rowCount) {
+              await gatewayAppendOnClient(gw, { ...scope, actor: { id: "render-poller", type: "system" } }, {
+                who: { type: "system", id: "render-poller" },
+                context: { tenant_id: scope.tenantId, workspace_id: scope.workspaceId, time: new Date().toISOString() },
+                object: { type: "render_job", id: job.id },
+                decision: { action: "render.failed", after: { task_id: job.task_id, error }, basis: [error] },
+                rule_impact: [], receipt: { synced: false },
+              });
+            }
+            await gw.query("COMMIT");
+            if (updated.rowCount) {
+              report.failed += 1;
+              report.details.push({ jobId: job.id, status: "failed", error });
+            }
+          } catch (err) {
+            await gw.query("ROLLBACK").catch(() => undefined);
+            throw err;
+          }
+        } else {
+          report.details.push({
+            jobId: job.id,
+            status: "skip",
+            error: `供应商 ${job.submit_payload?.decision?.after?.provider ?? job.provider ?? "seedance"} 未配置`,
+          });
+        }
+        continue;
+      }
+      let result: { status: string; uri?: string; actualUnits?: number; error?: string };
+      if (reconciling) {
+        result = { status: "succeeded", uri: job.result_url ?? undefined, actualUnits: job.actual_seconds ?? undefined };
+      } else {
         try {
-          await gw.query("BEGIN");
-          await gw.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
-          await gw.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]);
-          const updated = await gw.query(
-            `UPDATE render_jobs SET status='failed', updated_at=now()
-              WHERE id=$1 AND workspace_id=$2 AND status IN ('submitted','rendering') RETURNING id`,
-            [job.id, scope.workspaceId],
-          );
-          if (updated.rowCount) {
+          result = await provider!.poll(job.task_id);
+        } catch (err) {
+          result = { status: "running", error: err instanceof Error ? err.message : String(err) };
+        }
+      }
+      if (result.status === "succeeded" && (typeof result.uri !== "string" || !result.uri.trim()
+        || (!job.mock && /^mock:/i.test(result.uri)))) {
+        if (reconciling) {
+          report.details.push({ jobId: job.id, status: "skip", error: "已完成任务缺少可核实的持久化产物地址，须对账" });
+          continue;
+        }
+        result = { status: "running", error: "供应商完成响应缺少可核实的真实产物地址" };
+      }
+      // C-04：超龄且仍未核实终态时判 failed——查询持续异常/供应商挂起不再永远悬停
+      if (!reconciling && ["running", "submitted"].includes(result.status) && renderJobTimedOut(job)) {
+        result = {
+          status: "failed",
+          error: `渲染超时判死（已超 ${RENDER_JOB_TIMEOUT_H}h；${result.error ?? "供应商持续无终态"}）`,
+        };
+      }
+
+      if (result.status === "succeeded" || result.status === "failed") {
+        const done = result.status === "succeeded";
+
+        /* ---- ① 素材入库（T-2026-0921-0002 → T-2026-0926-0007 粒度修正）：
+                  下载 → sha256 → video_assets(kind=clip)（sha256 幂等去重）+ prompt/pipeline/时长/画幅 ---- */
+        let ingested: { assetId: string; localPath: string; sha256: string; bytes: number } | null = null;
+        let ingestError: string | null = null;
+        if (done && result.uri && !job.asset_id && !job.mock && opts.ingest !== false) {
+          try {
+            const media = await downloadToMediaStore(result.uri, {
+              workspaceId: scope.workspaceId,
+              fetchImpl: opts.fetchImpl,
+            });
+            /**
+             * 单镜 job 的产物是**镜头片段**（clip），不是成片（final_cut）。
+             * 提示词从 render_scripts.md 冗余进素材（检索与复用匹配的唯一可用语料），
+             * 管线类型取 video_projects.kind（双管线过滤口径）。
+             */
+            const scriptRow = await scopedQuery<{ md: string | null }>(app, scope,
+              `SELECT md FROM render_scripts WHERE workspace_id=$1 AND id=$2`,
+              [scope.workspaceId, job.script_id]);
+            const projectRow = await scopedQuery<{ kind: string | null }>(app, scope,
+              `SELECT kind FROM video_projects WHERE workspace_id=$1 AND id=$2`,
+              [scope.workspaceId, job.project_id]);
+            const reg = await registerRenderedClip(app, gateway, scope, {
+              assetId: newId("VA"),
+              kind: "clip",
+              projectId: job.project_id,
+              sha256: media.sha256,
+              sourceUrl: result.uri,
+              localRelPath: media.relPath,
+              provider: providerId,
+              providerModel: job.provider_model ?? "",
+              jobId: job.id,
+              scriptId: job.script_id,
+              seconds: result.actualUnits ?? null,
+              title: `${job.project_id} · ${job.script_id}`,
+              prompt: (scriptRow[0]?.md ?? "").slice(0, 4000) || null,
+              /** 片型如实回填（T-2026-0926-0020；口径收在 pipelineKindOf，带单测） */
+              pipelineKind: pipelineKindOf(projectRow[0]?.kind),
+              aspectRatio: job.submit_payload?.decision?.after?.request?.aspectRatio ?? null,
+              by: "render-poller",
+            });
+            ingested = { assetId: reg.assetId, localPath: media.relPath, sha256: media.sha256, bytes: media.bytes };
+          } catch (err) {
+            // 保留生成成功事实；done 欠入库扫描会复用既有回执重试，不再提交生成。
+            ingestError = err instanceof Error ? err.message : String(err);
+          }
+        }
+
+        /* ---- ② 实际成本（目录价 × 实际秒数；未核价 → 0 元入账并标 pricing=unknown） ---- */
+        const catalogModel = job.submit_payload?.decision?.after?.provider
+          ? findModelByProviderModel(providerId, job.provider_model ?? "")
+          : null;
+        const actualUnits = result.actualUnits ?? null;
+        let actualUsd: number | null = reconciling && job.actual_usd !== null ? Number(job.actual_usd) : null;
+        let actualCny: number | null = reconciling && job.actual_cny !== null ? Number(job.actual_cny) : null;
+        let pricingMode: "catalog" | "unknown" = actualUsd === null ? "unknown" : "catalog";
+        if (!reconciling && done && catalogModel?.pricing?.usd != null && actualUnits !== null) {
+          actualUsd = Math.round(catalogModel.pricing.usd * actualUnits * 10000) / 10000;
+          actualCny = Math.round(actualUsd * usdCnyRate() * 100) / 100;
+          pricingMode = "catalog";
+        }
+
+        if (!reconciling || ingested) {
+          try {
+            await gw.query("BEGIN");
+            await gw.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
+            await gw.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]);
+            const updated = await gw.query(
+              `UPDATE render_jobs
+                  SET status=$3, result_url=$4, asset_id=COALESCE($5, asset_id),
+                      actual_seconds=$6, actual_usd=$7, actual_cny=$8, updated_at=now()
+                WHERE id=$1 AND workspace_id=$2
+                  AND (($9::boolean AND status='done') OR (NOT $9::boolean AND status IN ('submitted','rendering')))
+                RETURNING id`,
+              [
+                job.id, scope.workspaceId, done ? "done" : "failed", result.uri ?? null,
+                ingested?.assetId ?? null, actualUnits, actualUsd, actualCny, reconciling,
+              ],
+            );
+            if (!updated.rowCount) {
+              await gw.query("COMMIT");
+              report.details.push({ jobId: job.id, status: "skip", error: "任务状态已变化，本轮结果未覆盖终态" });
+              continue;
+            }
             await gatewayAppendOnClient(gw, { ...scope, actor: { id: "render-poller", type: "system" } }, {
               who: { type: "system", id: "render-poller" },
               context: { tenant_id: scope.tenantId, workspace_id: scope.workspaceId, time: new Date().toISOString() },
               object: { type: "render_job", id: job.id },
-              decision: { action: "render.failed", after: { task_id: job.task_id, error }, basis: [error] },
-              rule_impact: [], receipt: { synced: false },
+              decision: {
+                action: reconciling ? "render.ingested" : done ? "render.complete" : "render.failed",
+                after: {
+                  task_id: job.task_id, provider: providerId,
+                  /** C-01 修复：mock 产物必须可辨识——此前只能靠 task_id 前缀推断，事件面与真实成片同形 */
+                  mock: job.mock,
+                  result_url: result.uri ?? null, error: result.error ?? null,
+                  actual_seconds: actualUnits,
+                  est_cny: job.est_cny === null ? null : Number(job.est_cny),
+                  actual_usd: actualUsd, actual_cny: actualCny, pricing: pricingMode,
+                  asset_id: ingested?.assetId ?? job.asset_id,
+                  local_path: ingested?.localPath ?? null,
+                  /** 入库结果三态：ok / 失败原因 / 未尝试（mock 或已入库） */
+                  ingest: done
+                    ? (ingestError ? { ok: false, error: ingestError } : ingested ? { ok: true, bytes: ingested.bytes } : { ok: false, error: "无产物 URL 或入库已关闭" })
+                    : null,
+                },
+                basis: [reconciling ? "恢复入库：复用既有供应商回执，不重复生成或完成事件"
+                  : done ? "轮询回填：渲染成功（异步任务制第二步）" : `轮询回填：渲染失败（${result.error ?? "未知原因"}；不静默）`],
+              },
+              rule_impact: [],
+              /**
+               * 2026-09-20 真机测试修复：渲染完成必须带**外部回执**（无回执不算完成）。
+               * 成功=Seedance 返回的成片 URL（synced:true，可回溯到供应商对象）；失败=无回执并标原因。
+               * C-01 修复：mock 任务的"成功"是本地模拟，不得携带 synced:true 假回执——
+               * 此前 mock 完成事件写 synced:true+verified_at，账本层面与真实外部回执无法区分（假交付）。
+               */
+              ...(done && result.uri && !job.mock
+                ? { receipt: { synced: true, snapshot_uri: result.uri, verified_at: new Date().toISOString() } }
+                : done && result.uri
+                  ? { receipt: { synced: false, mode: "simulated", snapshot_uri: result.uri } }
+                  : { receipt: { synced: false } }),
             });
+            await gw.query("COMMIT");
+          } catch (err) {
+            await gw.query("ROLLBACK").catch(() => undefined);
+            throw err;
           }
-          await gw.query("COMMIT");
-          if (updated.rowCount) {
-            report.failed += 1;
-            report.details.push({ jobId: job.id, status: "failed", error });
-          }
-        } catch (err) {
-          await gw.query("ROLLBACK").catch(() => undefined);
-          throw err;
         }
-      } else {
-        report.details.push({
-          jobId: job.id,
-          status: "skip",
-          error: `供应商 ${job.submit_payload?.decision?.after?.provider ?? job.provider ?? "seedance"} 未配置`,
-        });
-      }
-      continue;
-    }
-    let result: { status: string; uri?: string; actualUnits?: number; error?: string };
-    try {
-      result = await provider.poll(job.task_id);
-    } catch (err) {
-      result = { status: "running", error: err instanceof Error ? err.message : String(err) };
-    }
-    if (result.status === "succeeded" && (typeof result.uri !== "string" || !result.uri.trim()
-      || (!job.mock && /^mock:/i.test(result.uri)))) {
-      result = { status: "running", error: "供应商完成响应缺少可核实的真实产物地址" };
-    }
-    // C-04：超龄任务无论 poll 返回什么都判 failed——poll 持续异常/供应商挂起不再永远悬停
-    if (result.status === "running" && renderJobTimedOut(job)) {
-      result = {
-        status: "failed",
-        error: `渲染超时判死（已超 ${RENDER_JOB_TIMEOUT_H}h；${result.error ?? "供应商持续无终态"}）`,
-      };
-    }
 
-    if (result.status === "succeeded" || result.status === "failed") {
-      const done = result.status === "succeeded";
-
-      /* ---- ① 素材入库（T-2026-0921-0002 → T-2026-0926-0007 粒度修正）：
-                下载 → sha256 → video_assets(kind=clip)（sha256 幂等去重）+ prompt/pipeline/时长/画幅 ---- */
-      let ingested: { assetId: string; localPath: string; sha256: string; bytes: number } | null = null;
-      let ingestError: string | null = null;
-      if (done && result.uri && opts.ingest !== false) {
-        try {
-          const media = await downloadToMediaStore(result.uri, {
-            workspaceId: scope.workspaceId,
-            fetchImpl: opts.fetchImpl,
-          });
-          /**
-           * 单镜 job 的产物是**镜头片段**（clip），不是成片（final_cut）。
-           * 提示词从 render_scripts.md 冗余进素材（检索与复用匹配的唯一可用语料），
-           * 管线类型取 video_projects.kind（双管线过滤口径）。
-           */
-          const scriptRow = await scopedQuery<{ md: string | null }>(app, scope,
-            `SELECT md FROM render_scripts WHERE workspace_id=$1 AND id=$2`,
-            [scope.workspaceId, job.script_id]);
-          const projectRow = await scopedQuery<{ kind: string | null }>(app, scope,
-            `SELECT kind FROM video_projects WHERE workspace_id=$1 AND id=$2`,
-            [scope.workspaceId, job.project_id]);
-          const reg = await registerRenderedClip(app, gateway, scope, {
-            assetId: newId("VA"),
-            kind: "clip",
-            projectId: job.project_id,
-            sha256: media.sha256,
-            sourceUrl: result.uri,
-            localRelPath: media.relPath,
-            provider: provider.providerId,
-            providerModel: job.provider_model ?? "",
-            jobId: job.id,
-            scriptId: job.script_id,
-            seconds: result.actualUnits ?? null,
-            title: `${job.project_id} · ${job.script_id}`,
-            prompt: (scriptRow[0]?.md ?? "").slice(0, 4000) || null,
-            /** 片型如实回填（T-2026-0926-0020；口径收在 pipelineKindOf，带单测） */
-            pipelineKind: pipelineKindOf(projectRow[0]?.kind),
-            aspectRatio: job.submit_payload?.decision?.after?.request?.aspectRatio ?? null,
-            by: "render-poller",
-          });
-          ingested = { assetId: reg.assetId, localPath: media.relPath, sha256: media.sha256, bytes: media.bytes };
-        } catch (err) {
-          // 入库失败不推翻"生成成功"事实（产物仍在供应商侧 7 天）；失败原因进事件与报告，可重试
-          ingestError = err instanceof Error ? err.message : String(err);
-        }
-      }
-
-      /* ---- ② 实际成本（目录价 × 实际秒数；未核价 → 0 元入账并标 pricing=unknown） ---- */
-      const catalogModel = job.submit_payload?.decision?.after?.provider
-        ? findModelByProviderModel(provider.providerId, job.provider_model ?? "")
-        : null;
-      const actualUnits = result.actualUnits ?? null;
-      let actualUsd: number | null = null;
-      let actualCny: number | null = null;
-      let pricingMode: "catalog" | "unknown" = "unknown";
-      if (done && catalogModel?.pricing?.usd != null && actualUnits !== null) {
-        actualUsd = Math.round(catalogModel.pricing.usd * actualUnits * 10000) / 10000;
-        actualCny = Math.round(actualUsd * usdCnyRate() * 100) / 100;
-        pricingMode = "catalog";
-      }
-
-      try {
-        await gw.query("BEGIN");
-        await gw.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
-        await gw.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]);
-        await gw.query(
-          `UPDATE render_jobs
-              SET status=$3, result_url=$4, asset_id=COALESCE($5, asset_id),
-                  actual_seconds=$6, actual_usd=$7, actual_cny=$8, updated_at=now()
-            WHERE id=$1 AND workspace_id=$2`,
-          [
-            job.id, scope.workspaceId, done ? "done" : "failed", result.uri ?? null,
-            ingested?.assetId ?? null, actualUnits, actualUsd, actualCny,
-          ],
-        );
-        await gatewayAppendOnClient(gw, { ...scope, actor: { id: "render-poller", type: "system" } }, {
-          who: { type: "system", id: "render-poller" },
-          context: { tenant_id: scope.tenantId, workspace_id: scope.workspaceId, time: new Date().toISOString() },
-          object: { type: "render_job", id: job.id },
-          decision: {
-            action: done ? "render.complete" : "render.failed",
-            after: {
-              task_id: job.task_id, provider: provider.providerId,
-              /** C-01 修复：mock 产物必须可辨识——此前只能靠 task_id 前缀推断，事件面与真实成片同形 */
+        /* ---- ③ 成本入账（幂等键 render:<jobId>；失败不推翻已完成事实，但必须留痕） ---- */
+        let costError: string | null = null;
+        if (done) {
+          try {
+            await recordRenderCost(app, gateway, scope, {
+              jobId: job.id,
+              projectId: job.project_id,
+              amountCny: actualCny ?? 0,
+              usd: actualUsd,
+              provider: providerId,
+              providerModel: job.provider_model ?? "",
+              seconds: actualUnits,
               mock: job.mock,
-              result_url: result.uri ?? null, error: result.error ?? null,
-              actual_seconds: actualUnits,
-              est_cny: job.est_cny === null ? null : Number(job.est_cny),
-              actual_usd: actualUsd, actual_cny: actualCny, pricing: pricingMode,
-              asset_id: ingested?.assetId ?? null,
-              local_path: ingested?.localPath ?? null,
-              /** 入库结果三态：ok / 失败原因 / 未尝试（mock 或已入库） */
-              ingest: done
-                ? (ingestError ? { ok: false, error: ingestError } : ingested ? { ok: true, bytes: ingested.bytes } : { ok: false, error: "无产物 URL 或入库已关闭" })
-                : null,
-            },
-            basis: [done ? "轮询回填：渲染成功（异步任务制第二步）" : `轮询回填：渲染失败（${result.error ?? "未知原因"}；不静默）`],
-          },
-          rule_impact: [],
-          /**
-           * 2026-09-20 真机测试修复：渲染完成必须带**外部回执**（无回执不算完成）。
-           * 成功=Seedance 返回的成片 URL（synced:true，可回溯到供应商对象）；失败=无回执并标原因。
-           * C-01 修复：mock 任务的"成功"是本地模拟，不得携带 synced:true 假回执——
-           * 此前 mock 完成事件写 synced:true+verified_at，账本层面与真实外部回执无法区分（假交付）。
-           */
-          ...(done && result.uri && !job.mock
-            ? { receipt: { synced: true, snapshot_uri: result.uri, verified_at: new Date().toISOString() } }
-            : done && result.uri
-              ? { receipt: { synced: false, mode: "simulated", snapshot_uri: result.uri } }
-              : { receipt: { synced: false } }),
-        });
-        await gw.query("COMMIT");
-      } catch (err) {
-        await gw.query("ROLLBACK").catch(() => undefined);
-        throw err;
-      }
-
-      /* ---- ③ 成本入账（幂等键 render:<jobId>；失败不推翻已完成事实，但必须留痕） ---- */
-      let costError: string | null = null;
-      if (done) {
-        try {
-          await recordRenderCost(app, gateway, scope, {
-            jobId: job.id,
-            projectId: job.project_id,
-            amountCny: actualCny ?? 0,
-            usd: actualUsd,
-            provider: provider.providerId,
-            providerModel: job.provider_model ?? "",
-            seconds: actualUnits,
-            mock: job.mock,
-            by: "render-poller",
-          });
-        } catch (err) {
-          costError = err instanceof Error ? err.message : String(err);
-          console.error(`[render-poller] 成本入账失败 job=${job.id}：${costError}`);
+              by: "render-poller",
+            });
+          } catch (err) {
+            costError = err instanceof Error ? err.message : String(err);
+            console.error(`[render-poller] 成本入账失败 job=${job.id}：${costError}`);
+          }
         }
-      }
 
-      if (done) report.done += 1; else report.failed += 1;
-      if (ingested) report.ingested += 1;
+        if (done) report.done += 1; else report.failed += 1;
+        if (ingested) report.ingested += 1;
 
-      /* ---- ④ 环节台账（T-2026-0926-0002）：每个 job 的终态迁移记一次 attempt（append-only） ---- */
-      const archiveWriter = archiveFor(job.project_id);
-      if (archiveWriter) {
-        try {
-          await logStageOutcome(archiveWriter.store, archiveWriter.ledger, {
-            stageId: "renderPoll",
-            status: done ? "done" : "failed",
-            input: { jobId: job.id, taskId: job.task_id, provider: provider.providerId, scriptId: job.script_id },
-            output: {
+        /* ---- ④ 环节台账（T-2026-0926-0002）：每个 job 的终态迁移记一次 attempt（append-only） ---- */
+        const archiveWriter = reconciling ? null : archiveFor(job.project_id);
+        if (archiveWriter) {
+          try {
+            await logStageOutcome(archiveWriter.store, archiveWriter.ledger, {
+              stageId: "renderPoll",
+              status: done ? "done" : "failed",
+              input: { jobId: job.id, taskId: job.task_id, provider: providerId, scriptId: job.script_id },
+              output: {
+                jobId: job.id,
+                taskId: job.task_id,
+                assetId: ingested?.assetId ?? null,
+                provider: providerId,
+                providerModel: job.provider_model ?? null,
+                actualSeconds: actualUnits,
+                actualCny: actualCny,
+                pricing: pricingMode,
+                resultUrl: result.uri ?? null,
+                ingest: done ? (ingestError ? { ok: false, error: ingestError } : { ok: Boolean(ingested) }) : null,
+              },
+              errorClass: done ? null : classifyProviderError(result.error ?? "provider failed"),
+              errorMsg: done ? null : (result.error ?? "供应商返回 failed（无原因文本）"),
+              cost: { cashCny: actualCny },
+              runId: null,
+            });
+          } catch (err) {
+            console.error(`[render-poller] 档案记账失败（不影响回填）job=${job.id}：${(err as Error).message}`);
+          }
+        }
+
+        report.details.push({
+          jobId: job.id, status: done ? "done" : "failed", uri: result.uri,
+          error: result.error, assetId: ingested?.assetId ?? job.asset_id ?? undefined,
+          ingestError: ingestError ?? undefined, costError: costError ?? undefined,
+        });
+      } else {
+        // 仍在生成：状态推进 rendering（幂等）
+        await scopedQuery(app, scope,
+          `UPDATE render_jobs SET status='rendering', updated_at=now() WHERE id=$1 AND workspace_id=$2 AND status='submitted' RETURNING id`,
+          [job.id, scope.workspaceId],
+        );
+        /**
+         * 进度心跳（T-2026-0926-0002，规格书 §6.2 改动 B）：
+         * "慢" 与 "死" 必须可区分——in-flight 只写档案事件（带 jobId/taskId），不开新 attempt，
+         * 避免每拍轮询都污染台账（台账只记终态迁移）。
+         */
+        const heartbeatArchive = archiveFor(job.project_id);
+        if (heartbeatArchive) {
+          try {
+            await heartbeatArchive.store.appendJsonl("events.jsonl", {
+              kind: "stage.heartbeat",
+              stageId: "renderPoll",
               jobId: job.id,
               taskId: job.task_id,
-              assetId: ingested?.assetId ?? null,
-              provider: provider.providerId,
-              providerModel: job.provider_model ?? null,
-              actualSeconds: actualUnits,
-              actualCny: actualCny,
-              pricing: pricingMode,
-              resultUrl: result.uri ?? null,
-              ingest: done ? (ingestError ? { ok: false, error: ingestError } : { ok: Boolean(ingested) }) : null,
-            },
-            errorClass: done ? null : classifyProviderError(result.error ?? "provider failed"),
-            errorMsg: done ? null : (result.error ?? "供应商返回 failed（无原因文本）"),
-            cost: { cashCny: actualCny },
-            runId: null,
-          });
-        } catch (err) {
-          console.error(`[render-poller] 档案记账失败（不影响回填）job=${job.id}：${(err as Error).message}`);
+              provider: providerId,
+              status: "rendering",
+            });
+          } catch (err) {
+            console.error(`[render-poller] 档案心跳写入失败（不影响回填）job=${job.id}：${(err as Error).message}`);
+          }
+        }
+        report.running += 1;
+        report.details.push({ jobId: job.id, status: "running", error: result.error });
+      }
+    } finally {
+      if (locked) {
+        try { await gw.query("SELECT pg_advisory_unlock(hashtextextended($1,0))", [lockKey]); }
+        catch (err) {
+          discard = true; // Closing the session releases its advisory lock even when the connection failed.
+          console.error(`[render-poller] 轮询锁释放失败，丢弃连接 job=${candidate.id}：${err instanceof Error ? err.message : String(err)}`);
         }
       }
-
-      report.details.push({
-        jobId: job.id, status: done ? "done" : "failed", uri: result.uri,
-        error: result.error, assetId: ingested?.assetId,
-        ingestError: ingestError ?? undefined, costError: costError ?? undefined,
-      });
-    } else {
-      // 仍在生成：状态推进 rendering（幂等）
-      await scopedQuery(app, scope,
-        `UPDATE render_jobs SET status='rendering', updated_at=now() WHERE id=$1 AND workspace_id=$2 AND status='submitted' RETURNING id`,
-        [job.id, scope.workspaceId],
-      );
-      /**
-       * 进度心跳（T-2026-0926-0002，规格书 §6.2 改动 B）：
-       * "慢" 与 "死" 必须可区分——in-flight 只写档案事件（带 jobId/taskId），不开新 attempt，
-       * 避免每拍轮询都污染台账（台账只记终态迁移）。
-       */
-      const heartbeatArchive = archiveFor(job.project_id);
-      if (heartbeatArchive) {
-        try {
-          await heartbeatArchive.store.appendJsonl("events.jsonl", {
-            kind: "stage.heartbeat",
-            stageId: "renderPoll",
-            jobId: job.id,
-            taskId: job.task_id,
-            provider: provider.providerId,
-            status: "rendering",
-          });
-        } catch (err) {
-          console.error(`[render-poller] 档案心跳写入失败（不影响回填）job=${job.id}：${(err as Error).message}`);
-        }
-      }
-      report.running += 1;
-      report.details.push({ jobId: job.id, status: "running" });
+      gw.release(discard);
     }
   }
-  gw.release();
   return report;
 }

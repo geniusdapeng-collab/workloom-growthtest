@@ -1,9 +1,13 @@
 /** Real PG/RLS with provider and download fixtures; never creates a paid generation. */
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import pg from "pg";
 import { newId } from "@workloom/shared";
 import type { GenProvider } from "@workloom/base/model-router";
 import { pollRenderJobs } from "./render-poller.js";
+import { ArkVideoProvider } from "./gen/providers.js";
 
 const RUN_DB = process.env.RUN_DB_TESTS === "1" && Boolean(process.env.DATABASE_APP_URL);
 
@@ -15,6 +19,7 @@ describe.runIf(RUN_DB)("render poller persisted recovery and isolation", () => {
   let projectId: string;
   let scriptId: string;
   let jobId: string;
+  let mediaDir: string;
   const uri = "https://cdn.example.test/poller-fixture.mp4";
   const provider = (poll: GenProvider["poll"]): GenProvider => ({ providerId: "seedance", kind: "video",
     healthy: async () => true, submit: async () => { throw new Error("polling must never submit"); }, poll });
@@ -23,7 +28,9 @@ describe.runIf(RUN_DB)("render poller persisted recovery and isolation", () => {
   const actions = async () => (await owner.query<{ action: string }>(`SELECT payload->'decision'->>'action' AS action
     FROM biz_events WHERE workspace_id=$1 AND payload->'object'->>'id'=$2 ORDER BY seq`, [scope.workspaceId, jobId])).rows.map(row => row.action);
 
+  beforeAll(() => { mediaDir = mkdtempSync(join(tmpdir(), "workloom-poller-test-")); });
   beforeEach(async () => {
+    vi.stubEnv("WORKLOOM_MEDIA_DIR", mediaDir);
     const suffix = newId("poll");
     scope = { tenantId: `tenant-${suffix}`, workspaceId: `ws-${suffix}` };
     projectId = `VID-${suffix}`; scriptId = `RS-${suffix}`; jobId = `RJ-${suffix}`;
@@ -37,7 +44,7 @@ describe.runIf(RUN_DB)("render poller persisted recovery and isolation", () => {
   });
   afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
   // Evidence events are append-only; keep the isolated test tenants for inspection.
-  afterAll(async () => { await Promise.all([owner.end(), app.end(), gateway.end()]); });
+  afterAll(async () => { await Promise.all([owner.end(), app.end(), gateway.end()]); rmSync(mediaDir, { recursive: true, force: true }); });
 
   it("running progress is written with real app-role RLS, rather than a zero-row bare update", async () => {
     const report = await pollRenderJobs(app, gateway, scope, options(async () => ({ status: "running" })));
@@ -96,5 +103,130 @@ describe.runIf(RUN_DB)("render poller persisted recovery and isolation", () => {
       expect(report.done).toBe(0); expect((await job()).result_url).toBeNull();
       expect(await actions()).toEqual([]);
     }
+  });
+  it("a failed first download is retried from its persisted result without a second generation or completion event", async () => {
+    const poll = vi.fn(async () => ({ status: "succeeded" as const, uri, actualUnits: 5 }));
+    const fetchImpl = vi.fn(async () => new Response("temporary", { status: 503 }));
+    const first = await pollRenderJobs(app, gateway, scope, options(poll, { fetchImpl }));
+    expect(first.details[0]?.ingestError).toContain("503"); expect((await job()).status).toBe("done");
+    // A valid PNG allows the real register/probe/column pipeline to execute without a paid renderer.
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a/ZkAAAAASUVORK5CYII=", "base64");
+    const retryFetch = vi.fn(async () => new Response(png, { headers: { "content-type": "image/png" } }));
+    const second = await pollRenderJobs(app, gateway, scope, { pool: new Map(), archive: null, fetchImpl: retryFetch });
+    expect(second.ingested).toBe(1); expect((await job()).asset_id).toEqual(expect.any(String));
+    expect(poll).toHaveBeenCalledTimes(1); expect(retryFetch).toHaveBeenCalledWith(uri, expect.any(Object));
+    expect((await actions()).filter(action => action === "render.complete")).toHaveLength(1);
+    expect(await actions()).toContain("render.ingested");
+  });
+
+  it("concurrent batches finalize one job once and cannot duplicate its completion event", async () => {
+    let release!: () => void;
+    const held = new Promise<void>(resolve => { release = resolve; });
+    const poll = vi.fn(async () => { await held; return { status: "succeeded" as const, uri, actualUnits: 5 }; });
+    const first = pollRenderJobs(app, gateway, scope, options(poll, { ingest: false }));
+    await vi.waitFor(() => expect(poll).toHaveBeenCalledTimes(1));
+    const second = pollRenderJobs(app, gateway, scope, options(poll, { ingest: false }));
+    await new Promise(resolve => setTimeout(resolve, 30)); release();
+    await Promise.all([first, second]);
+    expect(poll).toHaveBeenCalledTimes(1);
+    expect((await actions()).filter(action => action === "render.complete")).toHaveLength(1);
+  });
+
+  it("terminal transaction failure releases the gateway client and leaves a retryable job", async () => {
+    const client = await gateway.connect(); let released = false;
+    const faultGateway = { connect: async () => ({
+      query: async (sql: string, params?: unknown[]) => { if (sql.includes("UPDATE render_jobs")) throw new Error("injected terminal SQL failure"); return client.query(sql, params); },
+      release: () => { released = true; client.release(); },
+    }) } as unknown as pg.Pool;
+    try {
+      await expect(pollRenderJobs(app, faultGateway, scope, options(async () => ({ status: "failed", error: "provider failed" })))).rejects.toThrow("injected terminal SQL failure");
+      expect(released).toBe(true); expect((await job()).status).toBe("submitted");
+    } finally { if (!released) client.release(); }
+  });
+
+  it("completion with a failed cost write is reconciled once without polling the provider again", async () => {
+    let injected = false;
+    const faultApp = { connect: async () => {
+      const client = await app.connect();
+      return { query: async (sql: string, params?: unknown[]) => {
+        if (!injected && sql.includes("INSERT INTO budget_ledger")) { injected = true; throw new Error("injected cost write failure"); }
+        return client.query(sql, params);
+      }, release: (discard?: boolean) => client.release(discard) };
+    } } as unknown as pg.Pool;
+    const poll = vi.fn(async () => ({ status: "succeeded" as const, uri, actualUnits: 5 }));
+    const first = await pollRenderJobs(faultApp, gateway, scope, options(poll, { ingest: false }));
+    expect(first.details[0]?.costError).toContain("injected cost write failure");
+    await pollRenderJobs(app, gateway, scope, options(poll, { ingest: false }));
+    const costs = await owner.query("SELECT * FROM budget_ledger WHERE workspace_id=$1 AND idempotency_key=$2", [scope.workspaceId, `render:${jobId}`]);
+    expect(costs.rows).toHaveLength(1); expect(poll).toHaveBeenCalledTimes(1);
+    expect((await actions()).filter(action => action === "render.complete")).toHaveLength(1);
+  });
+
+  it("a provider that stays queued beyond the configured job age also reaches a scoped failure", async () => {
+    await owner.query("UPDATE render_jobs SET created_at=now()-interval '30 hours' WHERE id=$1", [jobId]);
+    const report = await pollRenderJobs(app, gateway, scope, options(async () => ({ status: "submitted" })));
+    expect(report.failed).toBe(1); expect((await job()).status).toBe("failed");
+    expect(await actions()).toEqual(["render.failed"]);
+  });
+
+  it("a failed HTTP lookup recovers the accepted provider task on the next batch with no POST", async () => {
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(new Response("unavailable", { status: 503 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: "succeeded", duration: 5, content: { video_url: uri } })));
+    vi.stubGlobal("fetch", fetch);
+    const opts = { pool: new Map([["seedance", new ArkVideoProvider({ apiKey: "test-only" })]]), ingest: false, archive: null };
+    expect((await pollRenderJobs(app, gateway, scope, opts)).running).toBe(1);
+    expect((await job()).status).toBe("rendering");
+    expect((await pollRenderJobs(app, gateway, scope, opts)).done).toBe(1);
+    expect((await job()).actual_seconds).toBe(5);
+    expect(fetch).toHaveBeenCalledTimes(2); expect(fetch.mock.calls.every(call => call[1].method === "GET")).toBe(true);
+    expect(await actions()).toEqual(["render.complete"]);
+  });
+
+  it("a competing poller skips a held job lock without opening another paid lookup", async () => {
+    const wideGateway = new pg.Pool({ connectionString: process.env.DATABASE_GATEWAY_URL, max: 2 });
+    let release!: () => void;
+    const held = new Promise<void>(resolve => { release = resolve; });
+    const poll = vi.fn(async () => { await held; return { status: "succeeded" as const, uri, actualUnits: 5 }; });
+    const first = pollRenderJobs(app, wideGateway, scope, options(poll, { ingest: false }));
+    try {
+      await vi.waitFor(() => expect(poll).toHaveBeenCalledTimes(1));
+      const second = await pollRenderJobs(app, wideGateway, scope, options(poll, { ingest: false }));
+      expect(second.checked).toBe(0); expect(poll).toHaveBeenCalledTimes(1);
+    } finally { release(); await first; await wideGateway.end(); }
+    expect((await actions()).filter(action => action === "render.complete")).toHaveLength(1);
+  });
+
+  it("an external terminal change while polling cannot be overwritten by a stale success", async () => {
+    let release!: () => void;
+    const held = new Promise<void>(resolve => { release = resolve; });
+    const poll = vi.fn(async () => { await held; return { status: "succeeded" as const, uri, actualUnits: 5 }; });
+    const pending = pollRenderJobs(app, gateway, scope, options(poll, { ingest: false }));
+    await vi.waitFor(() => expect(poll).toHaveBeenCalledTimes(1));
+    await owner.query("UPDATE render_jobs SET status='failed' WHERE id=$1", [jobId]);
+    release(); const report = await pending;
+    expect(report.done).toBe(0); expect((await job()).status).toBe("failed");
+    expect(await actions()).toEqual([]);
+  });
+
+  it("a lost terminal COMMIT acknowledgement is reconciled from the persisted receipt without polling again", async () => {
+    const client = await gateway.connect(); let armed = false; let injected = false; let released = false;
+    const faultGateway = { connect: async () => ({
+      query: async (sql: string, params?: unknown[]) => {
+        if (sql.includes("UPDATE render_jobs")) armed = true;
+        const result = await client.query(sql, params);
+        if (!injected && armed && sql === "COMMIT") { injected = true; throw new Error("injected COMMIT acknowledgement lost"); }
+        return result;
+      }, release: (discard?: boolean) => { released = true; client.release(discard); },
+    }) } as unknown as pg.Pool;
+    const poll = vi.fn(async () => ({ status: "succeeded" as const, uri, actualUnits: 5 }));
+    try {
+      await expect(pollRenderJobs(app, faultGateway, scope, options(poll, { ingest: false }))).rejects.toThrow("COMMIT acknowledgement lost");
+      expect(released).toBe(true); expect((await job()).status).toBe("done");
+    } finally { if (!released) client.release(); }
+    await pollRenderJobs(app, gateway, scope, { pool: new Map(), ingest: false, archive: null });
+    expect(poll).toHaveBeenCalledTimes(1); expect(await actions()).toEqual(["render.complete"]);
+    const costs = await owner.query("SELECT id FROM budget_ledger WHERE workspace_id=$1 AND idempotency_key=$2", [scope.workspaceId, `render:${jobId}`]);
+    expect(costs.rows).toHaveLength(1);
   });
 });
