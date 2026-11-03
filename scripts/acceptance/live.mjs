@@ -51,7 +51,7 @@ import { startStubProvider } from "./lib/live/stub-provider.mjs";
 import { assertSafeTaskId } from "./lib/live/media.mjs";
 import { verifyExpectations } from "./lib/live/verification.mjs";
 import { buildLiveChecks } from "./lib/live/checks.mjs";
-import { recordEvidenceRun, writeAcceptanceItems } from "../delivery/evidence.mjs";
+import { INDEX_SCHEMA, recordEvidenceRun, revisionOf, writeAcceptanceItems } from "../delivery/evidence.mjs";
 
 const RUN_ID = `live-${randomUUID()}`;
 const RUN_STARTED_AT = new Date().toISOString();
@@ -99,13 +99,33 @@ const KEYS_FROM_CLIENT = !has("--no-keys-from-client");
 /** 自动发现封存凭据（默认开；--no-auto-keys 关闭） */
 const AUTO_KEYS = !has("--no-auto-keys");
 
+function acquireRunLock(path, message) {
+  try { mkdirSync(path); }
+  catch (error) { if (error.code === "EEXIST") throw new Error(message); throw error; }
+  process.on("exit", () => rmSync(path, { recursive: true, force: true }));
+}
+
+mkdirSync(EVIDENCE_ROOT, { recursive: true });
+// Different output directories can still share one index. Hold its lock until
+// evidence is written so two live runs cannot race past the same precheck.
+acquireRunLock(join(EVIDENCE_ROOT, ".live-run-lock"), "live 证据根已有运行或未清理的运行锁；请等待原作业或使用独立 --evidence-root，尚未调用模型");
+const { commit: evidenceCommit } = revisionOf(REPO_ROOT, { ignorePaths: [EVIDENCE_ROOT] });
+const indexPath = join(EVIDENCE_ROOT, "evidence-index.json");
+const indexStat = lstatSync(indexPath, { throwIfNoEntry: false });
+if (indexStat) {
+  const invalidIndex = "live evidence-index 无法读取或格式无效；请保留原证据并指定独立 --evidence-root，尚未调用模型";
+  if (!indexStat.isFile()) throw new Error(invalidIndex);
+  let index;
+  try { index = JSON.parse(readFileSync(indexPath, "utf8")); }
+  catch { throw new Error(invalidIndex); }
+  if (index?.schema !== INDEX_SCHEMA || !Array.isArray(index.runs) || !Array.isArray(index.artifacts)) throw new Error(invalidIndex);
+  if (index.commit !== evidenceCommit) throw new Error("不能混写不同提交的 evidence-index；请为当前提交指定独立 --evidence-root，并将 --out 设在其下，尚未调用模型");
+}
+mkdirSync(dirname(OUT_DIR), { recursive: true });
+acquireRunLock(`${OUT_DIR}.run-lock`, "live 输出目录已有运行或未清理的运行锁；尚未调用模型，禁止并发覆盖证据");
 mkdirSync(join(OUT_DIR, "artifacts"), { recursive: true });
 mkdirSync(join(OUT_DIR, "receipts"), { recursive: true });
 mkdirSync(join(OUT_DIR, "transcripts"), { recursive: true });
-const outputLock = `${OUT_DIR}.run-lock`;
-try { mkdirSync(outputLock); }
-catch (error) { if (error.code === "EEXIST") throw new Error("live 输出目录已有运行或未清理的运行锁；尚未调用模型，禁止并发覆盖证据"); throw error; }
-process.on("exit", () => rmSync(outputLock, { recursive: true, force: true }));
 
 const { profile, warnings: profileWarnings } = loadProfile(REPO_ROOT, args.profilePath);
 const liveProfile = profile.live ?? {};

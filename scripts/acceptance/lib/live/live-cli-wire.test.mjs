@@ -4,11 +4,12 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fixture, fixtureNodePath, llm, model, report, run } from "./cli-fixtures.mjs";
 import { PNG_BYTES, MP4_BYTES } from "./test-fixtures.mjs";
 import { createBudget } from "./budget.mjs";
+import { INDEX_SCHEMA } from "../../../delivery/evidence.mjs";
 
 async function server(t, reply, { healthStatus = 200, healthy = true } = {}) {
   const calls = []; const instance = http.createServer(async (req, res) => {
@@ -116,6 +117,64 @@ const imageTask = { id: "IMG-01", kind: "image", model: imageModel.id, title: "s
 const videoTask = { id: "VID-01", kind: "video", model: videoModel.id, title: "synthetic video", prompt: "synthetic", durationSeconds: 12 };
 const mediaProfile = (url, tasks) => ({ environment: { kind: "local-preview", target: { apiUrl: url, pcUrl: url, bMobileUrl: url, cMobileUrl: url }, timeouts: { healthMs: 500 } },
   live: { enabled: true, models: [model, imageModel, videoModel], tasks } });
+
+test("live CLI evidence admission: an index for another commit or unreadable index stops before network or budget activity", async (t) => {
+  const target = await server(t, () => { throw new Error("unexpected target POST"); });
+  const provider = await mediaServer(t, "image-http");
+  const f = fixture(t, mediaProfile(target.url, [imageTask]));
+  const root = dirname(f.out);
+  const index = join(root, "evidence-index.json");
+  const secret = "synthetic-evidence-admission-fixture";
+  mkdirSync(root, { recursive: true });
+  for (const [original, expected] of [
+    [JSON.stringify({ schema: INDEX_SCHEMA, commit: "0".repeat(40), runs: [], artifacts: [] }), /不能混写不同提交的 evidence-index.*--evidence-root/],
+    [`malformed ${secret}`, /evidence-index 无法读取或格式无效.*--evidence-root/],
+  ]) {
+    writeFileSync(index, original);
+    const result = await child(f, [], { SYNTHETIC_API_KEY: secret, SYNTHETIC_BASE_URL: provider.url });
+    assert.equal(result.status, 1);
+    assert.deepEqual(target.calls, []);
+    assert.deepEqual(provider.calls, []);
+    assert.match(result.stderr, expected);
+    assert.equal((result.stdout + result.stderr).includes(secret), false);
+    assert.equal(existsSync(f.out), false);
+    assert.equal(existsSync(join(root, "runs")), false);
+    assert.equal(readFileSync(index, "utf8"), original);
+  }
+});
+
+test("live CLI evidence admission: a shared root lock prevents another output run, then the same commit appends", async (t) => {
+  const target = await server(t, () => { throw new Error("unexpected target POST"); });
+  const provider = await mediaServer(t, "image-http");
+  const f = fixture(t, mediaProfile(target.url, [imageTask]));
+  const root = dirname(f.out);
+  const lock = join(root, ".live-run-lock");
+  const index = join(root, "evidence-index.json");
+  const second = { ...f, out: join(root, "second") };
+  const env = { SYNTHETIC_API_KEY: "synthetic-evidence-fixture", SYNTHETIC_BASE_URL: provider.url };
+  mkdirSync(lock, { recursive: true });
+  const locked = await child(second, [], env);
+  assert.equal(locked.status, 1);
+  assert.match(locked.stderr, /证据根.*运行锁.*--evidence-root/);
+  assert.deepEqual(target.calls, []);
+  assert.deepEqual(provider.calls, []);
+  assert.equal(existsSync(lock), true);
+  rmSync(lock, { recursive: true });
+
+  const first = await child(f);
+  assert.equal(first.status, 2, first.stderr);
+  const previous = JSON.parse(readFileSync(index, "utf8"));
+  assert.equal(previous.runs.length, 1);
+  assert.deepEqual(provider.calls, []);
+  const next = await child(second, [], env);
+  assert.equal(next.status, 2, next.stderr);
+  assert.deepEqual(provider.calls.map(({ method, url }) => [method, url]), [["POST", "/images/generations"]]);
+  const current = JSON.parse(readFileSync(index, "utf8"));
+  assert.equal(current.commit, previous.commit);
+  assert.equal(current.runs.length, 2);
+  assert.deepEqual(current.runs[0], previous.runs[0]);
+  assert.equal(existsSync(lock), false);
+});
 
 function runtimeIdentity(t, status) {
   const supportDir = mkdtempSync(join(tmpdir(), "workloom-live-runtime-"));
