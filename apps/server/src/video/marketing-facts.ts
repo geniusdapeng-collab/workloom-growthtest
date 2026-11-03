@@ -110,22 +110,25 @@ function sourceHasUrl(source: SourceSnapshot, value: unknown): boolean {
 }
 
 /** 只有schema明确定义的来源字段参与归属；specs里名为url/source的商品事实不是元数据。 */
-function attributedUrl(payload: Record<string, unknown>, pointer: string): unknown {
+function citationMatchesSource(payload: Record<string, unknown>, pointer: string, source: SourceSnapshot): boolean {
   const parts = pointer.split("/").slice(1);
   let parent: unknown = payload;
   for (const part of parts.slice(0, -1)) {
-    if (!parent || typeof parent !== "object") return undefined;
+    if (!parent || typeof parent !== "object") return false;
     parent = (parent as Record<string, unknown>)[part.replace(/~1/g, "/").replace(/~0/g, "~")];
   }
-  if (!parent || typeof parent !== "object") return undefined;
+  if (!parent || typeof parent !== "object") return false;
   const record = parent as Record<string, unknown>;
   if (/^\/identity\/(?:prices|official_selling_points)\/\d+\//u.test(pointer)
-    || /^\/competitors\/\d+\/(?:selling_points|viral_patterns)\/\d+\//u.test(pointer)) return record.source_url;
-  if (/^\/reviews\/\d+\//u.test(pointer)) return record.url;
-  if (/^\/images\/\d+\/angle$/u.test(pointer)) return record.page_url;
-  if (/^\/competitors\/\d+\/price_band$/u.test(pointer)) return record.price_source_url ?? null;
-  if (/^\/competitors\/\d+\/visual_style$/u.test(pointer)) return record.visual_source_url ?? null;
-  return undefined;
+    || /^\/competitors\/\d+\/(?:selling_points|viral_patterns)\/\d+\//u.test(pointer)) return sourceHasUrl(source, record.source_url);
+  if (/^\/reviews\/\d+\//u.test(pointer)) return sourceHasUrl(source, record.url);
+  if (/^\/images\/\d+\/angle$/u.test(pointer)) {
+    // 同一终点URL可能对应两次不同快照。角度引文必须属于确实含这张图的那一次。
+    return sourceHasUrl(source, record.page_url) && typeof record.url === "string" && source.assetUrls.includes(record.url);
+  }
+  if (/^\/competitors\/\d+\/price_band$/u.test(pointer)) return sourceHasUrl(source, record.price_source_url);
+  if (/^\/competitors\/\d+\/visual_style$/u.test(pointer)) return sourceHasUrl(source, record.visual_source_url);
+  return true;
 }
 
 export function validateStageFacts(stage: IntelStage, raw: unknown, sources: SourceSnapshot[]): ValidatedStageFacts {
@@ -160,8 +163,7 @@ export function validateStageFacts(stage: IntelStage, raw: unknown, sources: Sou
     if (!leaves.has(citation.pointer) || covered.has(citation.pointer)) throw new Error(`MARKETING_CITATION_INVALID：主张路径不存在或重复 ${citation.pointer}`);
     const source = sourceMap.get(citation.sourceId);
     if (!source) throw new Error("MARKETING_CITATION_INVALID：主张引用了未知来源");
-    const recordUrl = attributedUrl(payload, citation.pointer);
-    if (recordUrl !== undefined && !sourceHasUrl(source, recordUrl)) {
+    if (!citationMatchesSource(payload, citation.pointer, source)) {
       throw new Error(`MARKETING_CITATION_SOURCE_MISMATCH：${citation.pointer}引证与条目来源不是同一次抓取来源`);
     }
     if (renderSha256(source.text) !== source.textSha256) throw new Error("MARKETING_FACTS_CHANGED：主张引用的正文摘要已变化");
