@@ -108,6 +108,7 @@ function fixture(policy = "blocking", options: { multiCharacter?: boolean; only?
     reserveComponent: vi.fn(async (..._args: Parameters<FilmLedger["reserveComponent"]>) => ({ row: { id: `component-${++sequence}`, state: "reserved" } as FilmComponentRow, deduped: false })),
     claimComponent: vi.fn(async (id: string, _owner: string) => ({ id, state: "dispatched" } as FilmComponentRow)),
     recordDispatch: vi.fn(async (..._args: Parameters<FilmLedger["recordDispatch"]>) => undefined),
+    recordProviderAcceptance: vi.fn(async (..._args: Parameters<FilmLedger["recordProviderAcceptance"]>) => undefined),
     recordComponentAccepted: vi.fn(async (..._args: Parameters<FilmLedger["recordComponentAccepted"]>) => undefined),
     recordComponentFailure: vi.fn(async (..._args: Parameters<FilmLedger["recordComponentFailure"]>) => undefined),
   };

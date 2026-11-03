@@ -91,6 +91,10 @@ export interface FilmComponentSummary {
   state: FilmComponentState;
   reservedCny: number;
   actualCny: number | null;
+  provider: string | null;
+  providerModel: string | null;
+  providerTaskId: string | null;
+  providerRequestHash: string | null;
   updatedAt: string;
 }
 
@@ -450,6 +454,29 @@ export class FilmLedger {
     });
   }
 
+  /** Task acceptance is retained before polling/downloading, even if cancellation already marked unknown. */
+  async recordProviderAcceptance(id: string, ownerToken: string, receipt: {
+    provider: string; providerModel: string; taskId: string; providerRequestHash: string;
+  }): Promise<void> {
+    if (!receipt.taskId?.trim() || !receipt.provider?.trim() || !receipt.providerModel?.trim()
+      || !/^[a-f0-9]{64}$/.test(receipt.providerRequestHash)) fail("FILM_COMPONENT_RECEIPT_INVALID", "供应商接受回执缺任务号或最终请求摘要");
+    await this.transaction(async client => {
+      const result = await client.query(
+        `UPDATE film_component_requests SET evidence=evidence || jsonb_build_object(
+            'providerTaskId',$5::text,'providerRequestHash',$6::text,
+            'providerAcceptedAt',COALESCE(evidence->>'providerAcceptedAt',$9::text)), updated_at=now()
+          WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3 AND owner_token=$4
+            AND state IN ('dispatched','unknown') AND provider=$7 AND provider_model=$8
+            AND (NOT evidence ? 'providerTaskId' OR evidence->>'providerTaskId'=$5)
+            AND (NOT evidence ? 'providerRequestHash' OR evidence->>'providerRequestHash'=$6)
+          RETURNING id`,
+        [this.scope.tenantId, this.scope.workspaceId, id, ownerToken, receipt.taskId, receipt.providerRequestHash,
+          receipt.provider, receipt.providerModel, new Date().toISOString()],
+      );
+      this.requireChanged(result.rowCount);
+    });
+  }
+
   async recordComponentAccepted(id: string, ownerToken: string, receipt: {
     provider: string;
     providerModel: string;
@@ -462,8 +489,12 @@ export class FilmLedger {
     await this.transaction(async (client) => {
       const result = await client.query(
         `UPDATE film_component_requests
-            SET state='accepted', provider=$5, provider_model=$6, actual_cny=$7, evidence=$8::jsonb, updated_at=now()
-          WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3 AND owner_token=$4 AND state='dispatched' RETURNING id`,
+            SET state='accepted', provider=$5, provider_model=$6, actual_cny=$7, evidence=$8::jsonb || evidence, updated_at=now()
+          WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3 AND owner_token=$4 AND state='dispatched'
+            AND (NOT evidence ? 'providerTaskId' OR (provider=$5 AND provider_model=$6))
+            AND (NOT evidence ? 'providerTaskId' OR NOT $8::jsonb ? 'providerTaskId' OR evidence->>'providerTaskId'=$8::jsonb->>'providerTaskId')
+            AND (NOT evidence ? 'providerRequestHash' OR NOT $8::jsonb ? 'providerRequestHash' OR evidence->>'providerRequestHash'=$8::jsonb->>'providerRequestHash')
+          RETURNING id`,
         [this.scope.tenantId, this.scope.workspaceId, id, ownerToken,
           receipt.provider, receipt.providerModel,
           receipt.actualCny === null || receipt.actualCny === undefined ? null : receipt.actualCny,
@@ -483,7 +514,7 @@ export class FilmLedger {
     await this.transaction(async (client) => {
       const result = await client.query(
         `UPDATE film_component_requests
-            SET state=$5, actual_cny=$6, evidence=$7::jsonb || jsonb_build_object('failureClass',$8::text), updated_at=now()
+            SET state=$5, actual_cny=$6, evidence=$7::jsonb || evidence || jsonb_build_object('failureClass',$8::text), updated_at=now()
           WHERE tenant_id=$1 AND workspace_id=$2 AND id=$3 AND owner_token=$4 AND state IN ('dispatched','reserved') RETURNING id`,
         [this.scope.tenantId, this.scope.workspaceId, id, ownerToken, receipt.state,
           receipt.actualCny === null || receipt.actualCny === undefined ? null : receipt.actualCny,
@@ -531,6 +562,10 @@ export class FilmLedger {
           state: component.state,
           reservedCny,
           actualCny,
+          provider: component.provider,
+          providerModel: component.provider_model,
+          providerTaskId: typeof component.evidence.providerTaskId === "string" ? component.evidence.providerTaskId : null,
+          providerRequestHash: typeof component.evidence.providerRequestHash === "string" ? component.evidence.providerRequestHash : null,
           updatedAt: iso(component.updated_at),
         };
       });
