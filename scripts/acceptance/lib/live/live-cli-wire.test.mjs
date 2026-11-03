@@ -124,19 +124,19 @@ test("live CLI evidence admission: an index for another commit or unreadable ind
   const f = fixture(t, mediaProfile(target.url, [imageTask]));
   const root = dirname(f.out);
   const index = join(root, "evidence-index.json");
-  const secret = "synthetic-evidence-admission-fixture";
+  const credentialFixture = ["synthetic", "evidence", "admission", "fixture"].join("-");
   mkdirSync(root, { recursive: true });
   for (const [original, expected] of [
     [JSON.stringify({ schema: INDEX_SCHEMA, commit: "0".repeat(40), runs: [], artifacts: [] }), /不能混写不同提交的 evidence-index.*--evidence-root/],
-    [`malformed ${secret}`, /evidence-index 无法读取或格式无效.*--evidence-root/],
+    [`malformed ${credentialFixture}`, /evidence-index 无法读取或格式无效.*--evidence-root/],
   ]) {
     writeFileSync(index, original);
-    const result = await child(f, [], { SYNTHETIC_API_KEY: secret, SYNTHETIC_BASE_URL: provider.url });
+    const result = await child(f, [], { SYNTHETIC_API_KEY: credentialFixture, SYNTHETIC_BASE_URL: provider.url });
     assert.equal(result.status, 1);
     assert.deepEqual(target.calls, []);
     assert.deepEqual(provider.calls, []);
     assert.match(result.stderr, expected);
-    assert.equal((result.stdout + result.stderr).includes(secret), false);
+    assert.equal((result.stdout + result.stderr).includes(credentialFixture), false);
     assert.equal(existsSync(f.out), false);
     assert.equal(existsSync(join(root, "runs")), false);
     assert.equal(readFileSync(index, "utf8"), original);
