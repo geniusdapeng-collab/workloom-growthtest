@@ -464,6 +464,27 @@ function ensureVendorEngineDispatch(): void {
   const mod = vendorRequire(enginePath) as { LLMEngine?: { prototype: Record<string, unknown> } };
   const prototype = mod.LLMEngine?.prototype;
   if (!prototype) throw new Error("VENDOR_ENGINE_UNAVAILABLE: 缺少模型引擎");
+  const agentsPath = resolvePath(repoRoot, "vendor/supermickey/hyperreality-system/engines/production-engine/agents");
+  const { BaseAgent } = vendorRequire(resolvePath(agentsPath, "base-agent.js")) as {
+    BaseAgent?: { prototype: Record<string, unknown> };
+  };
+  const { ErrorClassifier } = vendorRequire(resolvePath(agentsPath, "error-classifier.js")) as {
+    ErrorClassifier?: { shouldShrinkPrompt: (classification: unknown) => boolean };
+  };
+  const basePrototype = BaseAgent?.prototype;
+  const originalCall = basePrototype?._callLLM;
+  const originalShouldShrink = ErrorClassifier?.shouldShrinkPrompt;
+  if (!basePrototype || typeof originalCall !== "function" || !ErrorClassifier || typeof originalShouldShrink !== "function") {
+    throw new Error("VENDOR_ENGINE_UNAVAILABLE: 缺少制作代理完整输入约束入口");
+  }
+  const hostManaged = () => vendorEngineScope.getStore() !== undefined || cliEngines.size > 0;
+  basePrototype._callLLM = function (this: unknown, prompt: unknown, schema: unknown, fallback: unknown, options?: Record<string, unknown>) {
+    // Legacy critical fallbacks switch engines or send a shortened prompt.
+    return originalCall.call(this, prompt, schema, fallback, hostManaged() ? { ...options, critical: false } : options);
+  };
+  ErrorClassifier.shouldShrinkPrompt = function (classification) {
+    return !hostManaged() && originalShouldShrink.call(this, classification);
+  };
   const patched: Array<[string, (...args: unknown[]) => unknown]> = [];
   const redirect = (name: string, impl: (engine: WorkloomLLMEngine, ...args: unknown[]) => unknown) => {
     const original = prototype[name];
@@ -495,6 +516,8 @@ function ensureVendorEngineDispatch(): void {
     engine.generate(String(prompt ?? ""), options as LLMReasonOptions));
   uninstallVendorDispatch = () => {
     for (const [name, original] of patched) prototype[name] = original;
+    basePrototype._callLLM = originalCall;
+    ErrorClassifier.shouldShrinkPrompt = originalShouldShrink;
     uninstallVendorDispatch = null;
   };
 }

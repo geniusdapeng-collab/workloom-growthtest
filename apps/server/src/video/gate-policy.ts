@@ -11,7 +11,7 @@
  * G8/G9/G10/G12/G15 继续执行原有 review/block 检查后交给系统自动裁决；
  * G11 项目算力预算门触发后确定性暂停，不进入自动放行。
  */
-import type { GateKey } from "@hyperreality/video-studio";
+import type { GateKey, GateVerdict, ProducerVerdict } from "@hyperreality/video-studio";
 import type { ProducerStage } from "@hyperreality/video-studio";
 import { existsSync, mkdirSync, writeFileSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -146,24 +146,32 @@ export function writeGateArtifact(
   return { path: file, chars: (contentMd ?? "").length };
 }
 
-/**
- * 判断一次预生产结果是否属于「AI 监制打回（内部门不合格）」。
- *
- * 用途：门语义是"打回重跑"，而不是"打回停线"（`docs/pipeline-stages-and-gates-2026-09-24.md`
- * 里 CLI 侧就是逐环节重跑）。宿主据此做**有上限的自动重跑**，超限才停线并上报。
- */
+/** 仅完整的模型裁决允许发起一轮新的预生产。证据未核实或评审不可用时停线。 */
+export function producerFailure(
+  gate: GateKey,
+  verdict?: Pick<ProducerVerdict, "approved" | "status" | "via" | "degraded" | "score" | "model" | "reason" | "suggestions"> | null,
+): GateVerdict {
+  const rejected = verdict?.approved === false && verdict.status === "failed" && verdict.via === "llm"
+    && verdict.degraded === false && Boolean(verdict.model?.trim());
+  const result = rejected ? `producer-rejected(${gate} · score=${verdict.score})` : `producer-unavailable(${gate})`;
+  return {
+    approved: false,
+    reason: verdict?.reason ? `${result}：${verdict.reason}` : result,
+    suggestions: verdict?.suggestions ?? [],
+    fatal: rejected ? "producer_rejected" : "producer_unavailable",
+  };
+}
+
+/** Vendor 确认单保留 reason。只有所有失败门均已取得明确的监制打回时，才允许重跑。 */
 export function isProducerRejection(result: {
   success?: boolean;
   confirmations?: Record<string, unknown>;
 }): boolean {
   if (result?.success) return false;
-  const confirmations = result?.confirmations ?? {};
-  return Object.values(confirmations).some((value) => {
-    const record = (value && typeof value === "object") ? value as Record<string, unknown> : null;
-    if (!record || record.approved !== false) return false;
-    const reason = String(record.reason ?? "");
-    return reason.includes("producer-rejected") || reason.includes("producer_unavailable");
-  });
+  const failed = Object.values(result?.confirmations ?? {}).filter(
+    (value): value is GateVerdict => Boolean(value && typeof value === "object" && (value as GateVerdict).approved === false),
+  );
+  return failed.length > 0 && failed.every((verdict) => typeof verdict.reason === "string" && verdict.reason.startsWith("producer-rejected("));
 }
 
 
