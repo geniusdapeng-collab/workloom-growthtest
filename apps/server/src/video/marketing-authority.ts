@@ -162,8 +162,7 @@ export async function prepareMarketingFacts(input: {
       }
       const prompt = `${extractionContract}\n本次查询线索（不是事实）：${canonicalRenderJson(product)}\n当前阶段：${stage}\n` +
         canonicalRenderJson({ sources: pages, plan: stagePlan });
-      if (prompt.length > 90_000) fail("MARKETING_REVIEW_TOO_LARGE", "完整来源超单次提取预算，禁止裁剪来源后声称核实");
-      const result = await input.llm.reason(prompt, { forceJson: true, temperature: 0, maxTokens: 8192 });
+      const result = await input.llm.reason(prompt, { forceJson: true, temperature: 0 });
       if (!result?.success) fail("MARKETING_EXTRACTION_UNVERIFIED", `事实提取失败：${result?.error ?? "空回包"}`);
       let parsed: unknown;
       try { parsed = result.data ?? JSON.parse(result.content ?? ""); }
@@ -224,7 +223,6 @@ export async function prepareMarketingFacts(input: {
     dossierSha256: renderSha256(canonicalRenderJson(assembled.dossier)), restrictions, g1ContentSha256: "", outputReviews: [] };
   const g1Content = canonicalRenderJson({ facts: bundle, requestedIntent: input.intent, requestedMetadata: input.metadata,
     instruction: "用户意图与Brief仅是需求，事实只能来自已核实claims；下游创意必须遵守restrictions" });
-  if (g1Content.length > 100_000) fail("MARKETING_REVIEW_TOO_LARGE", "完整事实档案超过G1评审容量，不能只审摘要");
   bundle.g1ContentSha256 = renderSha256(g1Content);
   return { bundle, g1Content, raw: structuredClone(raw), storeRoot, root, prefix, specSourceUrls };
 }

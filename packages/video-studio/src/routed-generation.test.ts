@@ -2,6 +2,7 @@ import { createServer, type Server } from "node:http";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { resetCircuit } from "@workloom/base/model-router";
 import { WorkloomLLMEngine, installVendorEngineBridge, withVendorEngineBridge } from "./llm-adapter.js";
 
 const repoRoot = fileURLToPath(new URL("../../../", import.meta.url));
@@ -9,12 +10,14 @@ let server: Server;
 let origin: string;
 let bodies: Array<Record<string, unknown>>;
 let reply = '{"ok":true}';
+let finishReason = "stop";
 let status = 200;
 let delayMs = 0;
 
 beforeEach(async () => {
   bodies = [];
   reply = '{"ok":true}';
+  finishReason = "stop";
   status = 200;
   delayMs = 0;
   server = createServer(async (request, response) => {
@@ -36,7 +39,7 @@ beforeEach(async () => {
     response.end(JSON.stringify({
       id: "fixture-response",
       model: "deepseek-flash",
-      choices: [{ finish_reason: "stop", message: { content: reply } }],
+      choices: [{ finish_reason: finishReason, message: { content: reply } }],
       usage: {
         prompt_tokens: 100,
         completion_tokens: 30,
@@ -52,6 +55,7 @@ beforeEach(async () => {
 afterEach(async () => {
   server.closeAllConnections();
   await new Promise<void>((resolve) => server.close(() => resolve()));
+  resetCircuit();
   vi.restoreAllMocks();
 });
 
@@ -77,7 +81,7 @@ describe("video adapter canonical dispatch", () => {
     expect(result).toMatchObject({
       success: true,
       data: { ok: true },
-      usage: { promptTokens: 100, completionTokens: 30 },
+      usage: { promptTokens: 100, completionTokens: 30, totalTokens: 130, reasoningTokens: 10 },
     });
     expect(bodies).toHaveLength(1);
     expect(bodies[0]).toMatchObject({
@@ -112,12 +116,66 @@ describe("video adapter canonical dispatch", () => {
     expect(bodies).toHaveLength(1);
   });
 
+  it("parses complete structured JSON beyond the compatibility scan limit", async () => {
+    const expected = { text: "完整".repeat(105_000), tail: "结尾字段" };
+    reply = JSON.stringify(expected);
+    const result = await engine().reasonStructured("Return JSON", { text: "", tail: "" });
+    expect(result.success).toBe(true);
+    expect(result.content).toBe(reply);
+    expect(result.data).toEqual(expected);
+    expect(bodies).toHaveLength(1);
+  });
+
+  it("rejects an oversized malformed reply instead of accepting a balanced prefix", async () => {
+    reply = '{"ok":true}\n' + "残缺".repeat(105_000);
+    const result = await engine().reasonStructured("Return JSON", { ok: true });
+    expect(result).toMatchObject({ success: false, retryable: false });
+    expect(result.data).toBeUndefined();
+    expect(bodies).toHaveLength(1);
+  });
+
+  it("does not treat a parseable reply with finish_reason=length as complete", async () => {
+    finishReason = "length";
+    const result = await engine().reasonStructured("Return JSON", { ok: true });
+    expect(result).toMatchObject({ success: false, retryable: false });
+    expect(result.error).toContain("length");
+    expect(result.content).toBeUndefined();
+    expect(result.data).toBeUndefined();
+    expect(result.usage).toEqual({ promptTokens: 100, completionTokens: 30, totalTokens: 130, reasoningTokens: 10 });
+    expect(bodies).toHaveLength(1);
+  });
+
   it("provider HTTP errors stay explicit and are not silently retried", async () => {
     status = 500;
     const result = await engine().reason("x");
     expect(result).toMatchObject({ success: false, retryable: false });
     expect(result.error).toContain("HTTP 500");
     expect(bodies).toHaveLength(1);
+  });
+
+  it("a vendor retry cannot dispatch again through an engine with an unresolved result", async () => {
+    status = 500;
+    const adapter = engine();
+    const vendorRequire = createRequire(`${repoRoot}/package.json`);
+    const { LLMEngine } = vendorRequire(`${repoRoot}/vendor/supermickey/systems/llm-reasoning-engine.js`);
+    const native = new LLMEngine();
+    await withVendorEngineBridge(adapter, async () => {
+      const first = await native.reason("original request");
+      expect(first).toMatchObject({ success: false, unknown: true });
+      status = 200;
+      const second = await native.reason("vendor retries with changed prompt");
+      expect(second).toMatchObject({ success: false, unknown: true, retryable: false });
+    });
+    expect(bodies).toHaveLength(1);
+  });
+
+  it("an unresolved result does not block a separate fresh video engine", async () => {
+    const first = engine();
+    status = 500;
+    expect(await first.reason("first run")).toMatchObject({ success: false, unknown: true });
+    status = 200;
+    expect(await engine().reason("independent run")).toMatchObject({ success: true });
+    expect(bodies).toHaveLength(2);
   });
 
   it("caller timeout reaches the HTTP request and fails closed", async () => {
@@ -193,5 +251,20 @@ describe("video adapter canonical dispatch", () => {
     }
     expect(bodies).toHaveLength(3);
     expect(bodies.every((body) => body.model === "deepseek-flash")).toBe(true);
+  });
+
+  it("bridges native vendor parsing of complete responses beyond 200,000 characters", async () => {
+    const adapter = engine();
+    const vendorRequire = createRequire(`${repoRoot}/package.json`);
+    const { LLMEngine } = vendorRequire(`${repoRoot}/vendor/supermickey/systems/llm-reasoning-engine.js`);
+    const native = new LLMEngine();
+    reply = JSON.stringify({ text: "定妆".repeat(105_000), tail: "完整" });
+    const extracted = await withVendorEngineBridge(adapter, async () => {
+      const result = await native.reason("Return JSON", { forceJson: true });
+      expect(result.success).toBe(true);
+      return native._extractJsonObject(result.content);
+    });
+    expect(extracted === reply).toBe(true);
+    expect(bodies).toHaveLength(1);
   });
 });

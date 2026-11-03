@@ -75,6 +75,21 @@ describe("导演语言模型真实链的执行边界与契约",()=>{
     expect(plan.callReceipts[1]?.success).toBe(true);expect(receipts).toHaveLength(5);
     expect(e.prompts[1]).toContain("上次契约错误");
   });
+  it.each(["导演与美术","独立制作复核"])("%s 的请求结果未知时只保留失败回执",async stage=>{
+    const e=engine(), receipts:DirectorCallReceipt[]=[];
+    let unknownCalls=0;
+    const unknownEngine:DirectorPlannerEngine={reasonStructured:async(prompt,schema,options)=>{
+      if(!prompt.includes(`当前岗位：${stage}。`)) return e.value.reasonStructured(prompt,schema,options);
+      unknownCalls++;
+      return {success:false,unknown:true,error:"DIRECTOR_REVIEW_FAILED: 供应商连接中断"};
+    }};
+    await expect(planDirectorFilm({intent,engine:unknownEngine,onProgress:(_stage,rows)=>{
+      receipts.splice(0,receipts.length,...rows);
+    }})).rejects.toThrow("DIRECTOR_MODEL_OUTCOME_UNKNOWN");
+    expect(unknownCalls).toBe(1);
+    expect(receipts).toHaveLength(stage==="导演与美术"?1:4);
+    expect(receipts.at(-1)).toMatchObject({stage,attempt:1,success:false,responseSha256:null,usage:null});
+  });
   it("未知镜头引用两次仍错即终止，不能跑下游复核",async()=>{
     const e=engine((data,stage)=>stage==="剪辑导演"?{versions:targets.targets.map(t=>({...(response(stage).versions as Array<Record<string,unknown>>)[0],variantId:t.variantId,openingShotId:"SC-999"}))}:data);
     await expect(planDirectorFilm({intent,engine:e.value})).rejects.toThrow("DIRECTOR_MODEL_FAILED");

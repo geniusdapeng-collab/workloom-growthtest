@@ -8,6 +8,7 @@ import {
   normalizeUrl,
   resolveApiSearchConfig,
   validateStagePayload,
+  type ExecutorLlm,
   type SearchHit,
 } from "./data-mining-executor.js";
 
@@ -151,6 +152,55 @@ describe("商品情报执行器", () => {
       llm: { reason: async () => ({ success: false, error: "HTTP 500" }) },
     });
     expect(await executor("A3", { queries: [{ q: "竞品" }] })).toBeNull();
+  });
+
+  it("把完整任务书和全部已检索候选交给一次模型调用", async () => {
+    const plan = {
+      queries: Array.from({ length: 5 }, (_, index) => ({ q: String(index) })),
+      fillback_format: { large: "格式要求".repeat(1_100), tail: "合同末尾" },
+      extraction_spec: { tail: "原提取约束" },
+    };
+    const search = async (query: string) => Array.from({ length: 5 }, (_, index) => ({
+      title: `候选 ${query}-${index}`, url: `https://source.example.com/${query}-${index}`,
+      snippet: "原始候选材料".repeat(125) + `候选末尾 ${query}-${index}`,
+    }));
+    const reason = vi.fn(async (_prompt: string, _options?: Parameters<ExecutorLlm["reason"]>[1]) => ({
+      success: true, data: { competitors: [] },
+    }));
+    const executor = createDataMiningExecutor({ search, llm: { reason } });
+    expect(await executor("A3", plan)).toEqual({ competitors: [] });
+    expect(reason).toHaveBeenCalledTimes(1);
+    const [prompt, options] = reason.mock.calls[0]!;
+    expect(prompt.includes(JSON.stringify(plan))).toBe(true);
+    expect(prompt.includes((await search("4"))[4]!.snippet)).toBe(true);
+    expect(prompt).toContain("https://source.example.com/4-4");
+    expect(options).not.toHaveProperty("maxTokens");
+  });
+
+  it("模型结果未知时保留缺站结论且只调用一次", async () => {
+    const reason = vi.fn(async () => ({ success: false, error: "网络结果未知", unknown: true as const }));
+    const log = vi.fn();
+    const executor = createDataMiningExecutor({ search: fakeSearch, llm: { reason }, log });
+    expect(await executor("A3", { queries: [{ q: "竞品" }] })).toBeNull();
+    expect(reason).toHaveBeenCalledTimes(1);
+    expect(log.mock.calls.some(([line]) => String(line).includes("结果未知"))).toBe(true);
+  });
+
+  it("超时后取消在途模型调用，即使替身不响应取消也不会另发请求", async () => {
+    const reason = vi.fn((_prompt: string, _options?: Parameters<ExecutorLlm["reason"]>[1]) => new Promise<never>(() => undefined));
+    const executor = createDataMiningExecutor({ search: fakeSearch, llm: { reason }, llmTimeoutMs: 10 });
+    expect(await executor("A3", { queries: [{ q: "竞品" }] })).toBeNull();
+    expect(reason).toHaveBeenCalledTimes(1);
+    expect(reason.mock.calls[0]![1]?.signal?.aborted).toBe(true);
+  });
+
+  it("把返回的坏 JSON 标记为格式失败，保留与请求结果未知的区别", async () => {
+    const reason = vi.fn(async () => ({ success: true, content: "{bad json" }));
+    const log = vi.fn();
+    const executor = createDataMiningExecutor({ search: fakeSearch, llm: { reason }, log });
+    expect(await executor("A3", { queries: [{ q: "竞品" }] })).toBeNull();
+    expect(reason).toHaveBeenCalledTimes(1);
+    expect(log.mock.calls.some(([line]) => String(line).includes("JSON 无效"))).toBe(true);
   });
 
   it("缺查询矩阵 → 直接缺站（不空跑模型）", async () => {

@@ -14,11 +14,18 @@ const env = { LLM_BASE_URL: "https://api.deepseek.com", LLM_API_KEY: "test-only"
 const sourceUrl = "https://source.example.com/f3";
 const sourceText = "星野 F3 是一款风扇，风量 9 档。尾部注意：9 档是风量档位，不是能耗等级；不得声称静音或市场第一。";
 const currencyText = `${sourceText} 海外规格价格99美元；海外另一规格109美元；国内规格699元；国内另一规格799元；免费试用规格0美元。`;
+const longSourceText = `${sourceText} ${"公开来源正文".repeat(3_800)}正文末尾证据`;
+const longSourceHtml = `<article>${longSourceText}</article>` + Array.from({ length: 50 }, (_, index) =>
+  `<img src="https://source.example.com/product/${"detail-".repeat(25)}${index}.jpg">`).join("");
+const longMetadata = "授权创作背景".repeat(18_000) + "需求末尾证据";
 let server: Server, origin: string, root: string, modelCalls: any[], rejectJudge: boolean, extractionCalls: string[];
 beforeAll(async () => {
   server = createServer((req, res) => {
     if (req.url === "/redirect-a" || req.url === "/redirect-b") {
       res.writeHead(302, { location: "/f3" }); res.end(); return;
+    }
+    if (req.url === "/large") {
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(longSourceHtml); return;
     }
     res.writeHead(200, { "content-type": "text/plain; charset=utf-8" }); res.end(req.url === "/currencies" ? currencyText : sourceText);
   });
@@ -64,10 +71,12 @@ async function prepare(options: {
   mixedCurrencies?: boolean;
   zeroPrice?: boolean;
   fragmentAliases?: boolean;
+  largeSources?: boolean;
+  largeGate?: boolean;
   queryHints?: { brand?: string; category?: string; model?: string };
 } = {}): Promise<PreparedMarketingFacts> {
   let searches = 0;
-  return prepareMarketingFacts({ scope: { ...scope, attempt: options.attempt ?? 1 }, root, intent: "做一条风扇介绍", metadata: { brief: { product: "星野 F3", brand: "星野" }, ...(options.queryHints ? { dataMining: { name: "星野 F3", ...options.queryHints } } : {}) }, env: { ...env, ...(options.mode ? { VM_DATA_MINING_MODE: options.mode } : {}) },
+  return prepareMarketingFacts({ scope: { ...scope, attempt: options.attempt ?? 1 }, root, intent: "做一条风扇介绍", metadata: { brief: { product: "星野 F3", brand: "星野" }, ...(options.queryHints ? { dataMining: { name: "星野 F3", ...options.queryHints } } : {}), ...(options.largeGate ? { notes: longMetadata } : {}) }, env: { ...env, ...(options.mode ? { VM_DATA_MINING_MODE: options.mode } : {}) },
     llm: { reason: async prompt => {
       extractionCalls.push(prompt); if (options.modelFailure) return { success: false, error: "LLM unavailable" };
       const match = /当前阶段：(A[123])\n(.*)$/s.exec(prompt)!; const source = JSON.parse(match[2]!).sources[0];
@@ -86,17 +95,23 @@ async function prepare(options: {
       ...(options.searchCacheFile
         ? { searchCacheFile: options.searchCacheFile }
         : {
-            search: async () => (++searches, options.noSearch || options.noAux && searches > 20
-              ? []
-              : [{ title: "星野规格", url: options.fragmentAliases
+            search: async () => {
+              searches++;
+              if (options.noSearch || options.noAux && searches > 20) return [];
+              if (options.largeSources) return [sourceUrl, `${sourceUrl}-second`, `${sourceUrl}-third`].map(url =>
+                ({ title: "星野规格", url, snippet: "候选摘要" }));
+              return [{ title: "星野规格", url: options.fragmentAliases
                 ? `${sourceUrl}#${searches <= 8 ? "specs" : "reviews"}`
                 : options.redirectAliases
                 ? `https://source.example.com/${searches <= 8 ? "redirect-a" : "redirect-b"}`
-                : sourceUrl, snippet: "故意错误摘要999档，不能当事实" }]),
+                : sourceUrl, snippet: "故意错误摘要999档，不能当事实" }];
+            },
           }),
       fetchSource: async url => {
         if (options.fragmentAliases) await new Promise(resolve => setTimeout(resolve, 5));
-        return fetchMarketingSource(url, { resolver: async () => [{ address: "93.184.216.34", family: 4 }], transport: async (requested, _address, signal) => requestSource(new URL(options.mixedCurrencies ? "/currencies" : requested.pathname, origin), { address: "127.0.0.1", family: 4 }, signal) });
+        const fixturePath = options.largeSources ? "/large" : options.mixedCurrencies ? "/currencies" : undefined;
+        return fetchMarketingSource(url, { resolver: async () => [{ address: "93.184.216.34", family: 4 }], transport: async (requested, _address, signal) =>
+          requestSource(new URL(fixturePath ?? requested.pathname, origin), { address: "127.0.0.1", family: 4 }, signal) });
       },
     } });
 }
@@ -196,6 +211,27 @@ describe("营销事实宿主完整执行", () => {
     const saved = await finalizeMarketingFacts(prepared, shots, env); expect(modelCalls).toHaveLength(4);
     const checked = await verifyMarketingFacts({ root, ...saved, scope, shots }); expect(checked.outputReviews[0]?.promptSha256).toBe(renderSha256(shots[0]!.prompt));
     expect(await readFile(path.join(root, checked.sources[0]!.textRef), "utf8")).toBe(sourceText);
+  });
+  it("组合来源超过旧提取字符上限时仍完整交给模型", async () => {
+    const prepared = await prepare({ largeSources: true });
+    expect(extractionCalls).toHaveLength(3);
+    expect(extractionCalls[0]!.length).toBeGreaterThan(90_000);
+    const sourceJson = /当前阶段：A1\n(.*)$/s.exec(extractionCalls[0]!)![1]!;
+    const sources = (JSON.parse(sourceJson) as { sources: Array<{ text: string }> }).sources;
+    expect(sources).toHaveLength(3);
+    expect(sources.every(source => source.text === longSourceText)).toBe(true);
+    expect(prepared.bundle.stages[0]?.facts.status).toBe("source_bound");
+  });
+  it("超过旧字符上限的 G1 事实包按完整字节送审并绑定", async () => {
+    const prepared = await prepare({ largeGate: true });
+    expect(prepared.g1Content.length).toBeGreaterThan(100_000);
+    const file = path.join(root, "large-g1.json");
+    await writeFile(file, prepared.g1Content);
+    const verdict = await reviewStage({ stage: "script", projectId: scope.projectId, env,
+      artifacts: [{ path: file, kind: "json" }], deterministic: [] });
+    expect(verdict.approved).toBe(true);
+    expect(verdict.evidence?.[0]).toMatchObject({ sha256: prepared.bundle.g1ContentSha256, scope: "complete-text" });
+    expect(JSON.stringify(modelCalls.at(-1)).includes("需求末尾证据")).toBe(true);
   });
   it.each(["spec", "no-search", "bad-quote", "model-failure", "support-rejected"])("%s不能得到可送G1的事实包", async kind => {
     rejectJudge = kind === "support-rejected";

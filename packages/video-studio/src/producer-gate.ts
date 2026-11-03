@@ -46,6 +46,7 @@ import {
 } from "./llm-config.js";
 import { POST_RENDER_STAGES, postProcessingVerdict } from "./post-render-acceptance.js";
 import {
+  ModelProviderError,
   OpenAiCompatibleProvider,
   type ChatResult,
   type ModelContentPart,
@@ -536,8 +537,7 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
       try {
         result = await requestReview();
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (!/(?:content\s*为空|empty\s+content)/iu.test(message)) throw error;
+        if (!(error instanceof ModelProviderError) || error.kind !== "empty" || error.unknown) throw error;
         log(`[producer][${stage}] 评审模型首次返回空正文，按相同证据与 rubric 重试一次`);
         result = await requestReview();
       }
@@ -566,7 +566,6 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
         throw new Error("评审结果结构或语义非法；合法 JSON 不做语义重写，必须重新评审");
       }
       if (parseError) {
-        const malformed = result.text.slice(0, 80_000);
         const issue = parseError instanceof Error ? parseError.message : String(parseError);
         log(`[producer][${stage}] 评审 JSON 语法非法，执行一次仅修复语法与字段结构的重试：${issue}`);
         result = await provider.chat([{
@@ -577,7 +576,7 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
             '{"approved":true|false,"score":0-100,"issues":[],"suggestions":[],"reason":"结论"}',
             "issues 和 suggestions 必须是字符串数组；approved 必须是布尔值；score 必须是数字。",
             "<malformed_result>",
-            malformed,
+            result.text,
             "</malformed_result>",
           ].join("\n"),
         }], {
