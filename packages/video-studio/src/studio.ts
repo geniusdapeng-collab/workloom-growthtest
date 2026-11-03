@@ -46,6 +46,7 @@ import {
 import { AUDIO_DISCIPLINE_CLAUSE, AUDIO_NEGATIVE_TERMS } from "./shot-spec.js";
 import { loadDurationRules } from "./duration-rules.js";
 import { installVendorMarketingPriceBridge } from "./marketing-price-contract.js";
+import { verifiedMarketingDossierInput } from "./marketing-dossier-input.js";
 
 /** 全局桥只安装一次；可变的日志和事件出口属于调用它的异步运行。 */
 interface StudioBridgeScope {
@@ -355,7 +356,7 @@ export class VideoStudio {
         || Object.keys(verified.productQuery).some(key => !["name", "brand", "category", "model"].includes(key))) {
         throw new Error("MARKETING_G1_REQUIRED：商品查询必须来自本次已审事实包");
       }
-      metadata.dataMining = structuredClone(verified.productQuery);
+      metadata.dataMining = verifiedMarketingDossierInput(parsed);
       verifiedRaw = parsed;
     }
     const log = cfg.log ?? ((line: string) => console.log(line));

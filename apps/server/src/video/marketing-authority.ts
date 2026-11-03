@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { constants } from "node:fs";
 import { mkdir, open, realpath, writeFile } from "node:fs/promises";
-import { installVendorMarketingPriceBridge, reviewStage, type ProducerVerdict } from "@hyperreality/video-studio";
+import { installVendorMarketingPriceBridge, verifiedMarketingDossierInput, reviewStage, type ProducerVerdict } from "@hyperreality/video-studio";
 import { createDataMiningExecutor, type DataMiningStagePlan, type ExecutorLlm, type IntelStage, type SearchFn, type SearchHit } from "./data-mining-executor.js";
 import { fetchMarketingSource, sourceUrl, type SourceSnapshot } from "./marketing-source-fetcher.js";
 import { assertMarketingFactsFresh, validateStageFacts, revalidateStageFacts, type ValidatedStageFacts } from "./marketing-facts.js";
@@ -213,7 +213,7 @@ export async function prepareMarketingFacts(input: {
   }
   const restorePriceBridge = installVendorMarketingPriceBridge();
   let assembled: ReturnType<DossierEngine["assemble"]>;
-  try { assembled = collector.assemble(plan.trace_id, product, assemblyRaw); }
+  try { assembled = collector.assemble(plan.trace_id, verifiedMarketingDossierInput(raw), assemblyRaw); }
   finally { restorePriceBridge(); }
   if (assembled.ok !== true || assembled.chain?.ok !== true || !assembled.dossier || !assembled.cards) fail("MARKETING_DOSSIER_UNVERIFIED", "情报五站未完成有效档案装订");
   const restrictions = reports.filter(report => report.facts.status === "no_evidence").map(report => report.stage === "A2"
