@@ -448,7 +448,7 @@ describe("actual master export uses the complete requested picture frame clock",
       // Capture the candidate export that precedes the separately tested delivery stage.
       STAGES: new Set(["master", "deliver"]), DRY_RUN: false, scored: source, OUT_DIR: dir, DELIVERABLE: target,
       OUTPUT_SIZE: { width: 1080, height: 1920 }, FPS: 24, expectedMasterSeconds: 241 / 24,
-      SUBTITLE_MODE: "sidecar", subtitleSidecar: null, POST_DIR: dir, QUALITY: "hd",
+      subtitleBurnRequired: false, subtitleSidecarRequired: false, subtitleSidecar: null, POST_DIR: dir, QUALITY: "hd",
       deliverablePath: "", masterApprovedForUhd: false, masterGenerationQuality: null as unknown,
       // This boundary fixture records current bytes and awaits; it is not a media quality verdict.
       inspectCurrentGeneration: async (phase: string, scope: string, file: string) => {
