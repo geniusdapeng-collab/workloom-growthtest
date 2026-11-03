@@ -154,9 +154,15 @@ export async function renderServiceProject(input: {
         const job = matches[0]!;
         if (matches.length !== 1 || job.project_id !== input.projectId || job.script_id !== row.scriptId || job.script_version !== row.scriptVersion || job.task_id !== row.taskId || job.mock !== false) throw new ProductionClientError("JOB_IDENTITY_MISMATCH", "Job receipt does not match the submitted service revision");
         if (job.status === "done") {
-          if (typeof job.asset_id !== "string" || !job.asset_id || typeof job.local_path !== "string" || !job.local_path) throw new ProductionClientError("MEDIA_UNVERIFIED", "Generation has no persisted media receipt");
+          if (typeof job.asset_id !== "string" || !job.asset_id || typeof job.local_path !== "string" || !job.local_path) {
+            // Provider success and durable local media are separate facts. The next poll repairs ingestion.
+            row.status = "rendering"; row.error = "MEDIA_PENDING: awaiting the persisted media receipt";
+            row.resultUrl = typeof job.result_url === "string" ? job.result_url : null;
+            continue;
+          }
           row.status = "done"; row.assetId = job.asset_id; row.localPath = job.local_path; row.resultUrl = typeof job.result_url === "string" ? job.result_url : null;
           row.actualCny = typeof job.actual_cny === "number" && Number.isFinite(job.actual_cny) ? job.actual_cny : null;
+          delete row.error;
         } else if (job.status === "failed") { row.status = "failed"; row.error = "SERVICE_GENERATION_FAILED: inspect the service job receipt before retry"; }
         else if (["submitted", "rendering"].includes(String(job.status))) row.status = job.status as "submitted" | "rendering";
         else throw new ProductionClientError("JOB_STATUS_UNVERIFIED", `Unrecognized service job state ${String(job.status)}`);
