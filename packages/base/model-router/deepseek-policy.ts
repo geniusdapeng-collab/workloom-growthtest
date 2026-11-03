@@ -87,10 +87,7 @@ export const TEXT_SCENE_POLICIES = Object.freeze({
   "kb-extract": deterministic("json_object"),
   "schema-repair": deterministic("json_object"),
   "pipeline-route": deterministic("json_object"),
-  "workloom.evaluation": {
-    ...review("workloom.evaluation", "generic", "json_object", "high"),
-    temperature: undefined,
-  },
+  "workloom.evaluation": review("generic", "generic", "text", "high"),
 
   "ask-synthesize": generation("ask", "text", "high"),
   "quest-plan": generation("quest", "json_object", "high"),

@@ -141,15 +141,27 @@ describe("AI producer evidence gate", () => {
     expect(verdict.reason).toContain("HTTP 500");
   });
 
-  it("repairs malformed judge JSON once without re-evaluating the artifact", async () => {
+  it("does not retry an unknown HTTP failure that mentions empty content", async () => {
+    const bodies: string[] = [];
+    const verdict = await reviewStage(textOptions({
+      fetchImpl: async (_url, init) => {
+        bodies.push(String(init?.body));
+        return new Response(JSON.stringify({ error: { message: "content 为空" } }), { status: 500 });
+      },
+    }));
+    expect(verdict).toMatchObject({ approved: false, status: "unverified" });
+    expect(bodies).toHaveLength(1);
+  });
+
+  it("repairs the full malformed judge JSON once without re-evaluating the artifact", async () => {
     const bodies: string[] = [];
     let call = 0;
+    const malformed = '{"approved":true,"score":85,"issues":[],"suggestions":["'
+      + "完整证据".repeat(21_000) + '末尾标记"}';
     const fetchImpl = (async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
       bodies.push(String(init?.body));
       call += 1;
-      const content = call === 1
-        ? '{"approved":true,"score":85,"issues":[],"suggestions":["unterminated"}'
-        : JSON.stringify(good);
+      const content = call === 1 ? malformed : JSON.stringify(good);
       return new Response(JSON.stringify({
         id: `repair-${call}`,
         model: "deepseek-flash",
@@ -162,6 +174,8 @@ describe("AI producer evidence gate", () => {
     expect(bodies).toHaveLength(2);
     expect(bodies[1]).toContain("仅修复 JSON");
     expect(bodies[1]).toContain("不得重新判定");
+    const repairPrompt = JSON.parse(bodies[1]!).messages[0].content as string;
+    expect(repairPrompt.includes(malformed)).toBe(true);
     expect(verdict.receipts).toHaveLength(2);
   });
 
@@ -178,7 +192,7 @@ describe("AI producer evidence gate", () => {
           finish_reason: "stop",
           message: { content: call === 1 ? "" : JSON.stringify(good) },
         }],
-        usage: { prompt_tokens: 100, completion_tokens: call === 1 ? 0 : 30, total_tokens: 130 },
+        usage: { prompt_tokens: 100, completion_tokens: call === 1 ? 0 : 30, total_tokens: call === 1 ? 100 : 130 },
       }));
     }) as typeof fetch;
     const verdict = await reviewStage(textOptions({ fetchImpl }));

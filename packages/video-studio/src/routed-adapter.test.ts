@@ -5,7 +5,7 @@
 import { createRequire } from "node:module";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MockProvider, type ChatMessage, type ChatOptions, type ModelProvider } from "@workloom/base/model-router";
-import { WorkloomLLMEngine } from "./llm-adapter.js";
+import { WorkloomLLMEngine, withVendorEngineBridge } from "./llm-adapter.js";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -268,13 +268,15 @@ function fusionFields() {
   ]));
 }
 
-async function fuseThroughAdapter(reply: string | ((messages: ChatMessage[]) => string)) {
+async function fuseThroughAdapter(reply: string | ((messages: ChatMessage[]) => string), fullPrompt?: string) {
   const capture = structuredEngine(reply);
   const agent = new PromptFusionAgent({ semanticRefinement: false, llmMaxRetries: 1, llmTimeout: 300000 });
   agent._llmEngine = capture.adapter;
   agent._llmEngineLoaded = true;
+  if (fullPrompt !== undefined) agent._buildBatchPrompt = () => fullPrompt;
   const shot = { shotId: "SC-05", sceneType: "dialogue", duration: 6, scene: "安静庭院中的完整人物中景", characters: ["offline-character"] };
-  const result = await agent._fuseSingleShot(shot, "9:16", [{ id: "offline-character", name: "离线测试人物" }], { scenes: [shot] }, 300000);
+  const fuse = () => agent._fuseSingleShot(shot, "9:16", [{ id: "offline-character", name: "离线测试人物" }], { scenes: [shot] }, 300000);
+  const result = fullPrompt === undefined ? await fuse() : await withVendorEngineBridge(capture.adapter, fuse);
   return { ...capture, result };
 }
 
@@ -297,6 +299,19 @@ describe("真实 PromptFusion 消费宿主结构化接口", () => {
     expect(result.degradeReason).toBeNull();
     expect(result.fields.scene).toContain("离线结构接口用例");
     expect(requests[0]!.options.maxTokens).toBeUndefined();
+  });
+
+  it("宿主 PromptFusion 不用删掉尾部约束的缩短请求洗白已知格式失败", async () => {
+    const fullPrompt = "输入的剧情事实和镜头合同。".repeat(210) + "尾部约束：不得改变赛车车身标识。";
+    let count = 0;
+    const { requests, result } = await fuseThroughAdapter(
+      () => ++count === 1 ? "确定返回，但格式不正确"
+        : JSON.stringify({ shots: [{ shotId: "SC-05", fields: fusionFields() }] }),
+      fullPrompt,
+    );
+    expect(requests).toHaveLength(1);
+    expect(messageText(requests[0]!.messages.at(-1)!).includes(fullPrompt)).toBe(true);
+    expect(result.degraded).toBe(true);
   });
 
   it.each([

@@ -53,7 +53,8 @@ export interface LLMReasonResult {
   data?: unknown;
   error?: string;
   retryable?: boolean;
-  usage?: { promptTokens?: number; completionTokens?: number };
+  unknown?: true;
+  usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number; reasoningTokens?: number };
 }
 
 export interface WorkloomLLMEngineConfig {
@@ -95,6 +96,7 @@ export class WorkloomLLMEngine {
     thinking?: Record<string, unknown>;
     router?: WorkloomLLMEngineConfig["router"];
   };
+  private outcomeUnknown = false;
   readonly stats = { totalCalls: 0, totalFailures: 0 };
 
   get model(): string {
@@ -158,6 +160,11 @@ export class WorkloomLLMEngine {
   }
 
   private async requestChat(prompt: string, opts: LLMReasonOptions): Promise<LLMReasonResult> {
+    // A video engine belongs to one run. Legacy callers may retry without
+    // inspecting the failure, so stop new dispatches on this engine.
+    if (this.outcomeUnknown) {
+      return { success: false, unknown: true, retryable: false, error: "VIDEO_MODEL_OUTCOME_UNKNOWN: 当前运行已有结果未知的模型请求，未重复提交" };
+    }
     const activeModel = canonicalDeepSeekModel(opts.model ?? this.cfg.model);
     const scene = opts.scene
       ?? this.cfg.router?.scene
@@ -207,17 +214,23 @@ export class WorkloomLLMEngine {
         sink,
         { policy: this.cfg.router?.policy },
       );
+      if (result.failure?.unknown) this.outcomeUnknown = true;
+      const failureReceipt = result.failure?.receipt;
+      const receipt = result.providerResult ?? (failureReceipt?.usageVerified ? failureReceipt : undefined);
+      const usage = typeof receipt?.promptTokens === "number" && typeof receipt.completionTokens === "number"
+        ? {
+            promptTokens: receipt.promptTokens,
+            completionTokens: receipt.completionTokens,
+            totalTokens: receipt.promptTokens + receipt.completionTokens,
+            reasoningTokens: receipt.reasoningTokens,
+          }
+        : undefined;
       if ((result.kind === "answered" || result.kind === "circuit_broken" || result.kind === "reused")
         && result.text) {
         return {
           success: true,
           content: result.text,
-          usage: result.providerResult
-            ? {
-                promptTokens: result.providerResult.promptTokens,
-                completionTokens: result.providerResult.completionTokens,
-              }
-            : undefined,
+          usage,
         };
       }
       return {
@@ -226,6 +239,8 @@ export class WorkloomLLMEngine {
           ?? result.degraded?.at(-1)?.reason
           ?? `模型路由不可用（${result.kind}）`,
         retryable: false,
+        ...(result.failure?.unknown ? { unknown: true } : {}),
+        ...(usage ? { usage } : {}),
       };
     } catch (error) {
       return {
@@ -348,27 +363,27 @@ export class WorkloomLLMEngine {
      * 真机教训（VID-1022）：首版实现返回已解析对象，而
      * `requirement-discovery-engine.js:262` 是 `return JSON.parse(extracted)` →
      * `JSON.parse(对象)` 走 `String(对象)` → `"[object Object]" is not valid JSON`，
-     * SceneArchitect 仍然全失败。此实现含输入截断与扫描预算，避免大响应冻结事件循环。
+     * SceneArchitect 仍然全失败。完整 JSON 优先解析，只对旧版包裹文本限制兼容扫描。
      */
-    if (!text || typeof text !== "string") return null;
-    const MAX_INPUT_LEN = 200_000;
-    const input = text.length > MAX_INPUT_LEN ? text.slice(0, MAX_INPUT_LEN) : text;
+    if (typeof text !== "string") return null;
+    const input = text.trim();
+    if (!input) return null;
+    try {
+      JSON.parse(input);
+      return input;
+    } catch {
+      /* Only the legacy extraction path needs a bounded scan. */
+    }
 
+    // An oversized malformed reply must fail as a whole; a prefix could
+    // contain a valid fragment while dropping the rest of the response.
+    if (input.length > 200_000) return null;
     const fenced = input.match(/```json\s*([\s\S]*?)\s*```/i);
     if (fenced?.[1]) {
       const candidate = fenced[1].trim();
       try {
         JSON.parse(candidate);
         return candidate;
-      } catch {
-        /* 继续 */
-      }
-    }
-    const whole = input.trim();
-    if (whole) {
-      try {
-        JSON.parse(whole);
-        return whole;
       } catch {
         /* 继续 */
       }
@@ -449,6 +464,27 @@ function ensureVendorEngineDispatch(): void {
   const mod = vendorRequire(enginePath) as { LLMEngine?: { prototype: Record<string, unknown> } };
   const prototype = mod.LLMEngine?.prototype;
   if (!prototype) throw new Error("VENDOR_ENGINE_UNAVAILABLE: 缺少模型引擎");
+  const agentsPath = resolvePath(repoRoot, "vendor/supermickey/hyperreality-system/engines/production-engine/agents");
+  const { BaseAgent } = vendorRequire(resolvePath(agentsPath, "base-agent.js")) as {
+    BaseAgent?: { prototype: Record<string, unknown> };
+  };
+  const { ErrorClassifier } = vendorRequire(resolvePath(agentsPath, "error-classifier.js")) as {
+    ErrorClassifier?: { shouldShrinkPrompt: (classification: unknown) => boolean };
+  };
+  const basePrototype = BaseAgent?.prototype;
+  const originalCall = basePrototype?._callLLM;
+  const originalShouldShrink = ErrorClassifier?.shouldShrinkPrompt;
+  if (!basePrototype || typeof originalCall !== "function" || !ErrorClassifier || typeof originalShouldShrink !== "function") {
+    throw new Error("VENDOR_ENGINE_UNAVAILABLE: 缺少制作代理完整输入约束入口");
+  }
+  const hostManaged = () => vendorEngineScope.getStore() !== undefined || cliEngines.size > 0;
+  basePrototype._callLLM = function (this: unknown, prompt: unknown, schema: unknown, fallback: unknown, options?: Record<string, unknown>) {
+    // Legacy critical fallbacks switch engines or send a shortened prompt.
+    return originalCall.call(this, prompt, schema, fallback, hostManaged() ? { ...options, critical: false } : options);
+  };
+  ErrorClassifier.shouldShrinkPrompt = function (classification) {
+    return !hostManaged() && originalShouldShrink.call(this, classification);
+  };
   const patched: Array<[string, (...args: unknown[]) => unknown]> = [];
   const redirect = (name: string, impl: (engine: WorkloomLLMEngine, ...args: unknown[]) => unknown) => {
     const original = prototype[name];
@@ -471,6 +507,7 @@ function ensureVendorEngineDispatch(): void {
     engine.reasonRaw(String(prompt ?? ""), options as LLMReasonOptions));
   redirect("reasonStructured", (engine, prompt, schema, options = {}) =>
     engine.reasonStructured(String(prompt ?? ""), schema, options as LLMReasonOptions));
+  redirect("_extractJsonObject", (engine, content) => engine._extractJsonObject(content));
   redirect("chat", (engine, systemPrompt, userPrompt, temperature = 1) => {
     const parsedTemperature = Number(temperature);
     return engine.chat(String(systemPrompt ?? ""), String(userPrompt ?? ""), Number.isFinite(parsedTemperature) ? parsedTemperature : 1);
@@ -479,6 +516,8 @@ function ensureVendorEngineDispatch(): void {
     engine.generate(String(prompt ?? ""), options as LLMReasonOptions));
   uninstallVendorDispatch = () => {
     for (const [name, original] of patched) prototype[name] = original;
+    basePrototype._callLLM = originalCall;
+    ErrorClassifier.shouldShrinkPrompt = originalShouldShrink;
     uninstallVendorDispatch = null;
   };
 }

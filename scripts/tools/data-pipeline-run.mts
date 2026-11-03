@@ -50,6 +50,7 @@ import {
   GATE_RUBRIC,
   gateDeterministicChecks,
   isProducerRejection,
+  producerFailure,
   writeGateArtifact,
   type ProducerMode,
 } from "../../apps/server/src/video/gate-policy.js";
@@ -277,11 +278,12 @@ const onApproval: ApprovalCallback = async (req) => {
   });
   appendFileSync(gatesFile, `${JSON.stringify(gateRecords[gateRecords.length - 1])}\n`, "utf8");
   log(`  [gate ${gate}] ${portraitGateSkipped ? "审计跳过" : approved ? "放行" : "打回"}（${portraitGateSkipped ? "定妆照未启用，明确记 not_applicable" : verdict ? `监制 ${verdict.score} 分 / via=${verdict.via}` : PRODUCER === "auto" ? "auto" : "无监制"}）`);
+  if (!approved) return producerFailure(gate, verdict);
   return {
     approved,
     reason: portraitGateSkipped
       ? "audit-portrait-gate-not-applicable"
-      : verdict ? `${approved ? "producer-approved" : "producer-rejected"}(${gate} · score=${verdict.score})` : `auto(${gate})`,
+      : verdict ? `producer-approved(${gate} · score=${verdict.score})` : `auto(${gate})`,
     ...(verdict?.suggestions?.length ? { suggestions: verdict.suggestions } : {}),
     ...(portraitGateSkipped ? {
       notApplicable: {
@@ -294,7 +296,6 @@ const onApproval: ApprovalCallback = async (req) => {
         downstreamBoundary: "G8 and rendering remain blocked; visual identity must be checked on generated keyframes before release",
       },
     } : {}),
-    ...(approved ? {} : { fatal: "producer_rejected" }),
   };
 };
 

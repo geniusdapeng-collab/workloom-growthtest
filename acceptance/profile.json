@@ -376,6 +376,7 @@
         "criticality": "P1",
         "title": "模型网关 · 结构化输出",
         "prompt": "只输出一行 JSON：{\"verdict\":\"ok\",\"risk\":\"low\",\"reason\":\"<20 字内>\"}。不要输出任何其他内容。",
+        "responseFormat": "json_object",
         "expect": [
           "verdict"
         ]

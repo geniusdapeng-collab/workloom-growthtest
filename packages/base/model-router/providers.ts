@@ -12,6 +12,7 @@ import {
   DEEPSEEK_FLASH_MODEL_ID,
   DEEPSEEK_FLASH_CONTEXT_TOKENS,
   DEEPSEEK_FLASH_MAX_OUTPUT_TOKENS,
+  DEEPSEEK_REQUEST_BODY_LIMIT_BYTES,
   TEXT_PRIMARY_POLICY_VERSION,
   TEXT_PRIMARY_REGISTRY_VERSION,
   type BudgetMessage,
@@ -77,7 +78,25 @@ export interface ChatOptions extends ChatGenerationOptions {
   signal?: AbortSignal;
   timeoutMs?: number;
   retries?: number;
+  /** Gate the finalized request before each physical provider attempt. */
+  beforeDispatch?: (request: ChatDispatch) => void;
 }
+
+export interface ChatDispatch {
+  modelId: string;
+  requestHash: string;
+  inputTokenEstimate: number;
+  outputCeiling: number;
+  contextTokens: number;
+  maxOutputTokens: number;
+  imageCount: number;
+  attempt: number;
+}
+
+export type ChatFailureReceipt = Omit<Partial<ChatResult>, "finishReason"> & {
+  finishReason?: string;
+  usageVerified?: boolean;
+};
 
 export type ModelProviderErrorKind =
   | "cancelled"
@@ -97,7 +116,7 @@ export class ModelProviderError extends Error {
       status?: number;
       unknown?: boolean;
       cause?: unknown;
-      receipt?: Partial<ChatResult>;
+      receipt?: ChatFailureReceipt;
     } = {},
   ) {
     super(message, options.cause === undefined ? undefined : { cause: options.cause });
@@ -346,7 +365,27 @@ export class OpenAiCompatibleProvider implements ModelProvider {
           }),
     };
     const body = JSON.stringify(requestBody);
+    if (Buffer.byteLength(body, "utf8") > DEEPSEEK_REQUEST_BODY_LIMIT_BYTES) {
+      throw new ModelProviderError("DEEPSEEK_REQUEST_BODY_TOO_LARGE", "protocol", { retryable: false });
+    }
     const requestHash = createHash("sha256").update(body).digest("hex");
+    const dispatch = {
+      modelId: this.modelId,
+      requestHash,
+      inputTokenEstimate: plan.inputTokens,
+      outputCeiling: plan.outputCeiling,
+      imageCount: plan.imageCount,
+      contextTokens: DEEPSEEK_FLASH_CONTEXT_TOKENS,
+      maxOutputTokens: DEEPSEEK_FLASH_MAX_OUTPUT_TOKENS,
+    };
+    const requestReceipt = {
+      ...dispatch,
+      scene: opts.scene ?? "generic",
+      mode,
+      effort,
+      policyVersion: TEXT_PRIMARY_POLICY_VERSION,
+      registryVersion: TEXT_PRIMARY_REGISTRY_VERSION,
+    };
     const timeoutMs = opts.timeoutMs && opts.timeoutMs > 0 ? opts.timeoutMs : 180_000;
     const maxRetries = Number.isSafeInteger(opts.retries) && Number(opts.retries) >= 0
       ? Number(opts.retries)
@@ -354,6 +393,10 @@ export class OpenAiCompatibleProvider implements ModelProvider {
     const attempts: ChatResult["attempts"] = [];
 
     for (let attempt = 1; attempt <= maxRetries + 1; attempt += 1) {
+      if (opts.signal?.aborted) {
+        throw new ModelProviderError("模型调用已取消（调用方 abort）", "cancelled", { retryable: false });
+      }
+      opts.beforeDispatch?.({ ...dispatch, attempt });
       const timeoutSignal = AbortSignal.timeout(timeoutMs);
       const signal = opts.signal
         ? AbortSignal.any([opts.signal, timeoutSignal])
@@ -371,6 +414,8 @@ export class OpenAiCompatibleProvider implements ModelProvider {
         if (opts.signal?.aborted) {
           throw new ModelProviderError("模型调用已取消（调用方 abort）", "cancelled", {
             retryable: false,
+            unknown: true,
+            receipt: requestReceipt,
             cause: error,
           });
         }
@@ -378,12 +423,14 @@ export class OpenAiCompatibleProvider implements ModelProvider {
           throw new ModelProviderError(`模型调用超时（>${Math.round(timeoutMs / 1000)}s）`, "timeout", {
             retryable: false,
             unknown: true,
+            receipt: requestReceipt,
             cause: error,
           });
         }
         throw new ModelProviderError("模型网络结果未知", "network", {
           retryable: false,
           unknown: true,
+          receipt: requestReceipt,
           cause: error,
         });
       }
@@ -411,7 +458,7 @@ export class OpenAiCompatibleProvider implements ModelProvider {
           await new Promise((resolve) => setTimeout(resolve, 250));
           continue;
         }
-        Object.assign(error.options, { receipt: { attempts } });
+        Object.assign(error.options, { receipt: { ...requestReceipt, attempts } });
         throw error;
       }
 
@@ -422,6 +469,8 @@ export class OpenAiCompatibleProvider implements ModelProvider {
         if (opts.signal?.aborted) {
           throw new ModelProviderError("模型调用已取消（调用方 abort）", "cancelled", {
             retryable: false,
+            unknown: true,
+            receipt: requestReceipt,
             cause: error,
           });
         }
@@ -429,77 +478,77 @@ export class OpenAiCompatibleProvider implements ModelProvider {
           throw new ModelProviderError(`模型调用超时（>${Math.round(timeoutMs / 1000)}s）`, "timeout", {
             retryable: false,
             unknown: true,
+            receipt: requestReceipt,
             cause: error,
           });
         }
         throw new ModelProviderError("模型响应读取失败", "network", {
           retryable: false,
           unknown: true,
+          receipt: requestReceipt,
           cause: error,
         });
       }
       const responseHash = createHash("sha256").update(rawBody).digest("hex");
       let data: OpenAiResponse;
       try {
-        data = JSON.parse(rawBody) as OpenAiResponse;
+        const parsed: unknown = JSON.parse(rawBody);
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+          throw new Error("Invalid completion object");
+        }
+        data = parsed as OpenAiResponse;
       } catch (error) {
         throw new ModelProviderError("模型响应不是合法 JSON", "protocol", {
           retryable: false,
+          unknown: true,
+          receipt: { ...requestReceipt, responseHash },
           cause: error,
         });
       }
-      if (data.model !== this.modelId) {
-        throw new ModelProviderError(
-          `模型响应身份 ${data.model ?? "<missing>"} 与请求 ${this.modelId} 不一致`,
-          "protocol",
-          { retryable: false },
-        );
-      }
-      if (data.choices?.length !== 1) {
-        throw new ModelProviderError("模型响应必须包含唯一 choice", "protocol", { retryable: false });
-      }
-      const choice = data.choices[0]!;
-      if (choice.finish_reason !== "stop") {
-        throw new ModelProviderError(
-          `模型未完整结束：${choice.finish_reason ?? "missing"}`,
-          "protocol",
-          { retryable: false },
-        );
-      }
-      if (!thinkingEnabled && String(choice.message?.reasoning_content ?? "").trim()) {
-        throw new ModelProviderError("非思考场景返回了 reasoning_content", "protocol", {
-          retryable: false,
-          unknown: true,
-        });
-      }
-      const text = textFromContent(choice.message?.content);
-      if (!text) throw new ModelProviderError("模型返回 content 为空", "empty", { retryable: false });
-
+      const choice = Array.isArray(data.choices) && data.choices.length === 1 ? data.choices[0] : undefined;
       const promptTokens = data.usage?.prompt_tokens;
       const completionTokens = data.usage?.completion_tokens;
       const totalTokens = data.usage?.total_tokens;
       const reasoningTokens = data.usage?.completion_tokens_details?.reasoning_tokens;
-      if (!safeInteger(promptTokens)
-        || !safeInteger(completionTokens)
-        || !safeInteger(totalTokens)
-        || totalTokens !== promptTokens + completionTokens) {
-        throw new ModelProviderError("模型 usage 缺失或无效", "protocol", { retryable: false });
+      const usageValid = safeInteger(promptTokens) && safeInteger(completionTokens)
+        && safeInteger(totalTokens) && totalTokens === promptTokens + completionTokens;
+      const usageVerified = usageValid && data.model === this.modelId;
+      const responseId = typeof data.id === "string" && data.id.trim() ? data.id : null;
+      const receipt: ChatFailureReceipt = {
+        ...requestReceipt,
+        modelId: typeof data.model === "string" ? data.model : undefined,
+        responseHash,
+        responseId,
+        finishReason: typeof choice?.finish_reason === "string" ? choice.finish_reason : undefined,
+        usageVerified,
+        ...(usageVerified ? { promptTokens, completionTokens } : {}),
+        ...(usageVerified && safeInteger(reasoningTokens) && reasoningTokens <= completionTokens ? { reasoningTokens } : {}),
+      };
+      const failure = (message: string, kind: ModelProviderErrorKind = "protocol") =>
+        new ModelProviderError(message, kind, { retryable: false, unknown: !usageVerified, receipt });
+
+      if (data.model !== this.modelId) {
+        throw failure(`模型响应身份 ${data.model ?? "<missing>"} 与请求 ${this.modelId} 不一致`);
       }
+      if (!choice) throw failure("模型响应必须包含唯一 choice");
+      if (choice.finish_reason !== "stop") {
+        throw failure(`模型未完整结束：${choice.finish_reason ?? "missing"}`);
+      }
+      if (!thinkingEnabled && String(choice.message?.reasoning_content ?? "").trim()) {
+        throw failure("非思考场景返回了 reasoning_content");
+      }
+      const text = textFromContent(choice.message?.content);
+      if (!text) throw failure("模型返回 content 为空", "empty");
+      if (!usageValid) throw failure("模型 usage 缺失或无效");
       if (reasoningTokens !== undefined
         && (!safeInteger(reasoningTokens) || reasoningTokens > completionTokens)) {
-        throw new ModelProviderError("模型 reasoning_tokens 无效", "protocol", { retryable: false });
+        throw failure("模型 reasoning_tokens 无效");
       }
       if (!thinkingEnabled && reasoningTokens !== undefined && reasoningTokens !== 0) {
-        throw new ModelProviderError("非思考场景返回了 reasoning tokens", "protocol", {
-          retryable: false,
-          unknown: true,
-        });
+        throw failure("非思考场景返回了 reasoning tokens");
       }
       if (completionTokens > plan.outputCeiling || totalTokens > DEEPSEEK_FLASH_CONTEXT_TOKENS) {
-        throw new ModelProviderError("模型 usage 超过本次预算", "protocol", {
-          retryable: false,
-          unknown: true,
-        });
+        throw failure("模型 usage 超过本次预算");
       }
 
       return {
@@ -511,7 +560,7 @@ export class OpenAiCompatibleProvider implements ModelProvider {
         reasoningTokens: reasoningTokens ?? 0,
         requestHash,
         responseHash,
-        responseId: data.id ?? null,
+        responseId,
         scene: opts.scene ?? "generic",
         mode,
         effort,

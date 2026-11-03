@@ -20,7 +20,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { LLMReasonResult } from "@hyperreality/video-studio";
+import type { LLMReasonOptions, LLMReasonResult } from "@hyperreality/video-studio";
 
 /** 情报站（与 vendor 的 rawByAgent 键一致） */
 export type IntelStage = "A1" | "A2" | "A3";
@@ -58,12 +58,10 @@ export type SearchFn = (query: string, limit: number) => Promise<SearchHit[]>;
 
 /** 与 @hyperreality/video-studio 的 WorkloomLLMEngine 同形（只依赖 reason 一个方法，便于测试替身） */
 export interface ExecutorLlm {
-  reason(prompt: string, options?: {
-    systemPrompt?: string;
-    forceJson?: boolean;
-    temperature?: number;
-    maxTokens?: number;
-  }): Promise<LLMReasonResult>;
+  reason(
+    prompt: string,
+    options?: Pick<LLMReasonOptions, "systemPrompt" | "forceJson" | "temperature" | "timeoutMs" | "signal">,
+  ): Promise<LLMReasonResult>;
 }
 
 export interface DataMiningExecutorOptions {
@@ -730,9 +728,8 @@ const STAGE_BRIEF: Record<IntelStage, string> = {
 
 function buildPrompt(stage: IntelStage, plan: DataMiningStagePlan, hits: SearchHit[]): string {
   const hitBlock = hits
-    .map((hit, i) => `[${i + 1}] ${hit.title}\nURL: ${hit.url}\n摘要: ${hit.snippet.slice(0, 300)}`)
-    .join("\n\n")
-    .slice(0, 16_000);
+    .map((hit, i) => `[${i + 1}] ${hit.title}\nURL: ${hit.url}\n摘要: ${hit.snippet}`)
+    .join("\n\n");
   return [
     STAGE_BRIEF[stage],
     "",
@@ -740,13 +737,7 @@ function buildPrompt(stage: IntelStage, plan: DataMiningStagePlan, hits: SearchH
     "只输出 JSON，不要输出解释文字。",
     "",
     "<stage_plan>",
-    JSON.stringify({
-      queries: plan.queries ?? [],
-      fillback_format: plan.fillback_format ?? null,
-      discipline: plan.discipline ?? [],
-      sample_target: plan.sample_target ?? null,
-      selection_rule: plan.selection_rule ?? null,
-    }).slice(0, 4_000),
+    JSON.stringify(plan),
     "</stage_plan>",
     "",
     "<search_results>",
@@ -824,42 +815,44 @@ export function createDataMiningExecutor(options: DataMiningExecutorOptions): Da
       return null;
     }
 
-    /**
-     * ② 模型结构化回填。
-     *
-     * 真机现象（VID-AUDIT-M1）：A1 首次回填返回「content 为空」——检索结果多、提示词长时
-     * 模型偶发空响应。处理策略：**半量重试一次**（命中列表砍半、token 上限翻倍），
-     * 仍失败才按缺站处理（不编造、不静默降级）。
-     */
-    const attempt = async (subset: SearchHit[], maxTokens: number): Promise<unknown | null> => {
-      try {
-        const response = await Promise.race([
-          options.llm.reason(buildPrompt(stage, plan, subset), { forceJson: true, temperature: 0.2, maxTokens }),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error("intel-llm-timeout")), llmTimeoutMs)),
-        ]);
-        if (!response?.success) {
-          log(`[intel] ${stage} 模型回填失败：${response?.error ?? "unknown"}（命中 ${subset.length} 条）`);
-          return null;
-        }
-        return response.data ?? JSON.parse(response.content ?? "{}");
-      } catch (err) {
-        log(`[intel] ${stage} 模型回填异常：${err instanceof Error ? err.message : String(err)}（命中 ${subset.length} 条）`);
-        return null;
-      }
-    };
-
-    let parsed: unknown = null;
-    const promptHits = hits.slice(0, 20);
-    const first = await attempt(promptHits, 4_096);
-    if (first !== null) parsed = first;
-    else {
-      const half = promptHits.slice(0, Math.max(3, Math.ceil(promptHits.length / 2)));
-      log(`[intel] ${stage} 首次回填失败 → 半量重试（${half.length} 条命中 / token 上限 8192）`);
-      parsed = await attempt(half, 8_192);
-      if (parsed === null) {
-        log(`[intel] ${stage} 半量重试仍失败 → 缺站`);
-        return null;
-      }
+    // ② 完整证据只提交一次。超时取消在途请求并记录结果未知。
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let response: LLMReasonResult;
+    try {
+      response = await Promise.race([
+        options.llm.reason(buildPrompt(stage, plan, hits), {
+          forceJson: true, temperature: 0.2, timeoutMs: llmTimeoutMs, signal: controller.signal,
+        }),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => {
+            controller.abort();
+            reject(new Error("intel-llm-timeout"));
+          }, llmTimeoutMs);
+        }),
+      ]);
+    } catch (error) {
+      const reason = controller.signal.aborted ? "模型回填超时，结果未知"
+        : `模型回填异常：${error instanceof Error ? error.message : String(error)}`;
+      log(`[intel] ${stage} ${reason} → 缺站`);
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+    if (controller.signal.aborted || response?.unknown) {
+      log(`[intel] ${stage} 模型回填结果未知 → 缺站`);
+      return null;
+    }
+    if (!response?.success) {
+      const reason = response?.content ? "回填 JSON 无效" : `模型回填失败：${response?.error ?? "空回包"}`;
+      log(`[intel] ${stage} ${reason} → 缺站`);
+      return null;
+    }
+    let parsed: unknown;
+    try { parsed = response.data ?? JSON.parse(response.content ?? ""); }
+    catch {
+      log(`[intel] ${stage} 回填 JSON 无效 → 缺站`);
+      return null;
     }
 
     // ③ URL 白名单清洗（防幻觉链接）+ 形状校验

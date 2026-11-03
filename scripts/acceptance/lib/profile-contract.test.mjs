@@ -14,6 +14,17 @@ test('G14: raw, industry-bound profile and all declared outcome scenarios are st
   const result = validateProfileContract(profile, options);
   assert.deepEqual(result.errors, []); assert.equal(result.businessVerified, false); assert.equal(result.suiteCount, 1); assert.equal(result.taskCount, 3);
 });
+test('G14: total text tokens are a separate optional job allowance, while other hard caps still apply', () => {
+  const withBudgets = budgets => changed('live', { ...profile.live, budgets });
+  for (const maxLlmTokens of [0, 300_000, 1_048_576]) {
+    assert.equal(errorsOf(withBudgets({ maxLlmTokens })), '');
+  }
+  for (const maxLlmTokens of [-1, 1.5, "1048576", Infinity, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.match(errorsOf(withBudgets({ maxLlmTokens })), /maxLlmTokens/);
+  }
+  assert.match(errorsOf(withBudgets({ maxLlmTokens: 1_048_576, maxLlmCalls: 41 })), /maxLlmCalls/);
+  assert.match(errorsOf(withBudgets({ maxLlmTokens: 1_048_576, maxCostCny: 121 })), /maxCostCny/);
+});
 test('G14: defaults cannot conceal absent schema, surfaces, journeys or explicit environment', () => {
   for (const key of ['schemaVersion', 'surfaces', 'journeys', 'environment', 'ux', 'outcome']) { const missing = { ...profile }; delete missing[key]; assert.ok(errorsOf(missing).length, key); }
 });

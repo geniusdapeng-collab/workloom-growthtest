@@ -763,6 +763,22 @@ describe("默认导演委托与立项事务", () => {
     const { entry } = await runToTerminal(); expect(entry.status).toBe("failed");
     expect(doubles.runPreproduction).not.toHaveBeenCalled(); expect(doubles.finalize).not.toHaveBeenCalled();
   });
+  it.each([
+    ["unverified", "fallback", true, "派发后超时，结果未知", 1, "producer-unavailable"],
+    ["failed", "deterministic", false, "确定性证据缺失", 1, "producer-unavailable"],
+    ["failed", "llm", false, "完整评审拒绝主张", 2, "producer-rejected"],
+  ])("显式允许重跑时，G1 %s/%s 保留真实裁决并只重跑已知的评审打回", async (status, via, degraded, reason, attempts, expected) => {
+    vi.stubEnv("VM_PRODUCER_RETRY", "1");
+    doubles.review.mockResolvedValue({ status, approved: false, via, degraded, reason, score: 0,
+      model: "test-judge", issues: [], suggestions: [], evidence: [] });
+    const { entry } = await runToTerminal();
+    expect(entry).toMatchObject({ status: "failed", resultSummary: { producerAttempts: attempts } });
+    expect(entry.error).toContain(`${expected}(G1_DOSSIER`);
+    expect(entry.error).toContain(reason);
+    expect(doubles.prepare).toHaveBeenCalledTimes(attempts);
+    expect(doubles.review).toHaveBeenCalledTimes(attempts);
+    expect(doubles.runPreproduction).not.toHaveBeenCalled();
+  });
   it("最终事实审核失败时不写done、不投影商品，保留失败原因", async () => {
     doubles.runPreproduction.mockResolvedValue(success()); doubles.finalize.mockRejectedValue(new Error("MARKETING_PROMPT_FACTS_REJECTED"));
     const { entry } = await runToTerminal(); expect(entry.status).toBe("failed"); expect(entry.error).toContain("MARKETING_PROMPT_FACTS_REJECTED");

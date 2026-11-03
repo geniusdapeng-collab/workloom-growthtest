@@ -1,11 +1,13 @@
 /** Actual CLI + loopback HTTP; all provider keys/data are synthetic and no external calls occur. */
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { fixture, fixtureNodePath, llm, model, report, run } from "./cli-fixtures.mjs";
 import { PNG_BYTES, MP4_BYTES } from "./test-fixtures.mjs";
 import { createBudget } from "./budget.mjs";
@@ -75,6 +77,165 @@ test("live CLI LLM admission: untrusted expectedTokens cannot authorize external
     assert.equal(actual.tasks[0].audit, undefined); assert.equal(s.calls.some((call) => /chat\/completions|auth\.loginAs|fence\.activeRules/u.test(call.url)), false);
   }
 });
+
+const officialGateway = { ...model, adapter: "model-gateway", model: "deepseek-flash" };
+const gatewayFixtureTask = { ...llm, id: "LLM-GATEWAY-ONE", responseFormat: "json_object" };
+
+function officialGatewayFixture(t, url, tasks, budgets) {
+  const f = fixture(t, { environment: { kind: "deployed", target: { apiUrl: url, pcUrl: url }, timeouts: { healthMs: 500 } },
+    live: { enabled: true, models: [officialGateway], budgets, tasks } });
+  for (const directory of ["node_modules", "packages/base"]) {
+    symlinkSync(fileURLToPath(new URL(`../../../../${directory}`, import.meta.url)), join(f.repo, directory), "dir");
+  }
+  appendFileSync(join(f.repo, ".git/info/exclude"), "\n/node_modules\n/packages/base\n");
+  // Exercise the real provider's official URL and request bytes but forbid
+  // actual egress. Only the expected official POST is redirected in memory.
+  const guard = join(f.repo, ".git", "fetch-guard.mjs");
+  writeFileSync(guard, `
+    const original = globalThis.fetch;
+    const loopback = ${JSON.stringify(url)};
+    globalThis.fetch = (input, init) => {
+      const address = new URL(String(input));
+      if (address.origin === loopback) return original(input, init);
+      if (address.href === "https://api.deepseek.com/chat/completions" && init?.method === "POST" && init?.redirect === "error") {
+        return original(loopback + address.pathname, init);
+      }
+      throw new Error("unexpected external egress");
+    };
+  `);
+  return { f, env: { SYNTHETIC_API_KEY: ["fixture", "isolated", "gateway"].join("-"),
+    SYNTHETIC_BASE_URL: "https://api.deepseek.com", NODE_OPTIONS: `--import=${pathToFileURL(guard).href}` } };
+}
+
+test("live CLI official gateway: admits full-window calls, settles actual or holds unknown, and keeps complete answers", async (t) => {
+  const answer = JSON.stringify({ proof: "A".repeat(900) + " COMPLETE" });
+  const s = await server(t, input => ({
+    id: "fixture-gateway-request", model: input.model,
+    choices: [{ message: { content: answer }, finish_reason: input.messages[0].content === "truncated fixture" ? "length" : "stop" }],
+    ...(input.messages[0].content === "missing usage fixture" ? {} : { usage: { prompt_tokens: 7, completion_tokens: 3, total_tokens: 10 } }),
+  }));
+  const { f, env } = officialGatewayFixture(t, s.url, [
+    { ...gatewayFixtureTask, expectedTokens: 1, expect: ["COMPLETE"] },
+    { ...gatewayFixtureTask, id: "LLM-GATEWAY-TWO", prompt: "truncated fixture" },
+    { ...gatewayFixtureTask, id: "LLM-GATEWAY-THREE", prompt: "missing usage fixture" },
+    { ...gatewayFixtureTask, id: "LLM-GATEWAY-FOUR", prompt: "blocked fixture" },
+  ], { maxLlmTokens: 1_048_596, maxCostCny: 9, pricing: { llmCnyPer1kTokens: 0 } });
+  const result = await child(f, [], env);
+  assert.equal(result.status, 1, result.stderr);
+  const actual = report(f);
+  const posts = s.calls.filter(call => call.url === "/chat/completions");
+  assert.equal(posts.length, 3);
+  for (const [i, post] of posts.entries()) {
+    const request = JSON.parse(post.body);
+    assert.equal(request.model, "deepseek-flash");
+    assert.equal(request.max_tokens, 393_216);
+    assert.deepEqual(request.response_format, { type: "json_object" });
+    assert.equal(actual.tasks[i].receipt.requestHash, createHash("sha256").update(post.body).digest("hex"));
+    assert.equal(actual.tasks[i].receipt.contextTokens, 1_048_576);
+  }
+  assert.equal(actual.tasks[0].status, "ok");
+  assert.equal(actual.tasks[0].answer, answer);
+  assert.equal(actual.tasks[0].receipt.finishReason, "stop");
+  assert.equal(actual.tasks[1].status, "failed");
+  assert.equal(actual.tasks[1].receipt.finishReason, "length");
+  assert.equal(actual.tasks[1].receipt.usageComplete, true);
+  assert.equal(actual.tasks[2].status, "blocked");
+  assert.equal(actual.tasks[2].receipt.usageComplete, false);
+  assert.equal(actual.tasks[3].status, "blocked");
+  assert.equal(actual.tasks[3].called, false);
+  assert.equal(actual.budget.pricing.llmCnyPer1kTokens, 0.008);
+  assert.equal(actual.budget.actual.llmTokens, 20);
+  assert.equal(actual.budget.unmeasured.llmTokens, 1_048_576);
+  assert.equal(actual.budget.used.llmTokens, 1_048_596);
+  assert.equal(actual.budget.measurementComplete, false);
+  assert.equal(JSON.stringify(actual).includes(env.SYNTHETIC_API_KEY), false);
+});
+
+test("live CLI official gateway: aggregate shortage never reduces the legal output request or posts", async (t) => {
+  const s = await server(t, () => { throw new Error("no provider call authorized"); });
+  const { f, env } = officialGatewayFixture(t, s.url, [{ ...gatewayFixtureTask, expectedTokens: 999 }],
+    { maxLlmTokens: 500_000, maxCostCny: 9 });
+  const result = await child(f, [], env);
+  assert.equal(result.status, 2, result.stderr);
+  const actual = report(f);
+  assert.equal(actual.tasks[0].called, false);
+  assert.equal(actual.tasks[0].status, "blocked");
+  assert.match(actual.tasks[0].reason, /1048576.*500000/);
+  assert.equal(actual.tasks[0].evidence.requestPlan.outputCeiling, 393_216);
+  assert.equal(actual.budget.reservations.length, 0);
+  assert.equal(s.calls.filter(call => call.method === "POST").length, 0);
+});
+
+test("live CLI official gateway: same-task replay never sends another POST or mutates the first usage record", async (t) => {
+  const s = await server(t, input => ({
+    id: "fixture-gateway-replay", model: input.model,
+    choices: [{ message: { content: '{"proof":"ok"}' }, finish_reason: "stop" }],
+    usage: { prompt_tokens: 7, completion_tokens: 3, total_tokens: 10 },
+  }));
+  const { f, env } = officialGatewayFixture(t, s.url, [{ ...gatewayFixtureTask, expect: ["proof"] }],
+    { maxLlmTokens: 1_048_576, maxCostCny: 9 });
+  const checklist = "docs/acceptance/checklist.v3.json";
+  mkdirSync(join(f.repo, dirname(checklist)), { recursive: true });
+  copyFileSync(new URL(`../../../../${checklist}`, import.meta.url), join(f.repo, checklist));
+  const git = (args) => spawnSync("git", args, { cwd: f.repo, encoding: "utf8" });
+  const add = git(["add", "--", checklist]); assert.equal(add.status, 0, add.stderr);
+  const commit = git(["-c", "user.name=Synthetic Test", "-c", "user.email=synthetic@example.invalid", "commit", "-qm", "Add canonical checklist fixture"]);
+  assert.equal(commit.status, 0, commit.stderr);
+  const first = await child(f, [], env);
+  assert.equal(first.status, 0, first.stderr);
+  const original = report(f);
+  assert.equal(original.checks.find(check => check.id === "P3-01").status, "pass");
+  assert.equal(original.tasks[0].receipt.inputTokens, 7);
+  assert.equal(original.tasks[0].receipt.outputTokens, 3);
+  assert.equal(original.budget.used.llmTokens, 10);
+  assert.equal(original.tasks[0].model, officialGateway.id);
+  assert.equal(original.tasks[0].modelResolved, officialGateway.model);
+  assert.notEqual(original.tasks[0].model, original.tasks[0].modelResolved);
+  const reportCli = fileURLToPath(new URL("../../report-v3.mjs", import.meta.url));
+  const reportRun = spawnSync(process.execPath, [reportCli, "--root", dirname(f.out)], { cwd: f.repo, encoding: "utf8" });
+  assert.equal(reportRun.status, 2, reportRun.stderr);
+  const summary = JSON.parse(readFileSync(join(dirname(f.out), "report-summary.json"), "utf8"));
+  assert.equal(summary.reportGenerated, true);
+  assert.equal(summary.validationErrors.some(error => error.includes("任务模型不属于已就绪模型清单")), false);
+  const receiptPath = join(f.out, "receipts", `${gatewayFixtureTask.id}.json`);
+  const originalBytes = readFileSync(receiptPath, "utf8");
+
+  const replay = await child(f, [], env);
+  assert.equal(replay.status, 2, replay.stderr);
+  const actual = report(f);
+  assert.equal(actual.tasks[0].called, false);
+  assert.match(actual.tasks[0].reason, /已结算.*禁止重复提交/);
+  assert.equal(readFileSync(receiptPath, "utf8"), originalBytes);
+  assert.deepEqual(actual.budget.reservations, original.budget.reservations);
+  assert.equal(s.calls.filter(call => call.url === "/chat/completions").length, 1);
+});
+
+for (const missingId of [true, false]) {
+  test(`live CLI official gateway: ${missingId ? "missing response identity keeps the reserve" : "observed output overrun is counted and freezes further dispatch"}`, async (t) => {
+    const completion = missingId ? 3 : 393_217;
+    const s = await server(t, input => ({
+      ...(missingId ? {} : { id: "fixture-gateway-overrun" }),
+      model: input.model,
+      choices: [{ message: { content: '{"proof":"ok"}' }, finish_reason: "stop" }],
+      usage: { prompt_tokens: 7, completion_tokens: completion, total_tokens: 7 + completion },
+    }));
+    const { f, env } = officialGatewayFixture(t, s.url, [
+      { ...gatewayFixtureTask, expect: ["proof"] },
+      { ...gatewayFixtureTask, id: "LLM-GATEWAY-NEXT", expect: ["proof"] },
+    ], { maxLlmTokens: 3_000_000, maxCostCny: 30 });
+    const result = await child(f, [], env);
+    assert.equal(result.status, missingId ? 2 : 1, result.stderr);
+    const actual = report(f);
+    assert.equal(actual.tasks[0].status, missingId ? "blocked" : "failed");
+    assert.equal(actual.tasks[0].receipt.usageComplete, !missingId);
+    assert.equal(actual.tasks[1].called, false);
+    assert.equal(actual.tasks[1].status, "blocked");
+    assert.equal(actual.budget.actual.llmTokens, missingId ? 0 : 7 + completion);
+    assert.equal(actual.budget.unmeasured.llmTokens, missingId ? 1_048_576 : 0);
+    assert.equal(actual.budget.frozenBy.length, 1);
+    assert.equal(s.calls.filter(call => call.url === "/chat/completions").length, 1);
+  });
+}
 
 test("live CLI: invalid timeout and duplicate valued flags reject before output or admission", (t) => {
   for (const value of ["NaN", "Infinity", "-1", "2147484", "1e309"]) {
