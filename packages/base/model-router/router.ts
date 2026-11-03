@@ -22,6 +22,7 @@ import {
 import {
   mockCredits,
   ModelProviderError,
+  type ChatFailureReceipt,
   type ChatGenerationOptions,
   type ChatMessage,
   type ChatResult,
@@ -200,6 +201,8 @@ export interface RouteFailure {
   reason: string;
   retryable: boolean;
   attempted: string[];
+  receipt?: ChatFailureReceipt;
+  unknown?: boolean;
 }
 
 export interface RouteResult {
@@ -343,13 +346,15 @@ export async function route(
     };
     await sink.recordDegradation({ ...degradation, action: task.action });
     return {
-      kind: task.queueable ? "queued" : "unavailable",
+      kind: task.queueable && !failure.unknown ? "queued" : "unavailable",
       degraded: [degradation],
       failure: {
         kind: failure.kind === "unknown" ? "unknown" : failure.kind,
         reason: failure.message,
         retryable: failure.retryable,
         attempted: [DEEPSEEK_FLASH_MODEL_ID],
+        ...(failure.options.receipt ? { receipt: failure.options.receipt } : {}),
+        ...(failure.unknown ? { unknown: true } : {}),
       },
     };
   }
@@ -542,6 +547,7 @@ export async function routeSmart(
       timeoutMs,
       responseFormat: { type: scenePolicy.responseFormat },
       thinking: { ...scenePolicy.thinking },
+      productOutputCap: task.generation?.productOutputCap,
       ...(scenePolicy.thinking.type === "enabled"
         ? {
             reasoningEffort: scenePolicy.thinking.effort as ThinkingEffort,
@@ -551,7 +557,7 @@ export async function routeSmart(
             temperature: task.generation?.temperature ?? scenePolicy.temperature,
             topP: task.generation?.topP,
           }),
-      retries: task.generation?.maxTokens === undefined ? 0 : 0,
+      retries: 0,
     });
     sceneCircuits.delete(scene);
     const credits = computeCredits({
@@ -597,20 +603,22 @@ export async function routeSmart(
       providerResult: result,
     };
   } catch (error) {
-    if (task.signal?.aborted) return cancelResult(task, scene, tier, passthrough);
     const failure = providerFailure(error);
+    if (task.signal?.aborted && !failure.unknown) return cancelResult(task, scene, tier, passthrough);
     await sink.recordDegradation({
       from: DEEPSEEK_FLASH_MODEL_ID,
       to: null,
       reason: failure.message,
       action: task.action,
     });
-    const state = sceneCircuits.get(scene) ?? { failures: 0, openUntil: 0 };
-    state.failures += 1;
-    if (state.failures >= CIRCUIT_FAILURE_THRESHOLD) {
-      state.openUntil = Date.now() + CIRCUIT_COOLDOWN_MS;
+    if (!task.signal?.aborted) {
+      const state = sceneCircuits.get(scene) ?? { failures: 0, openUntil: 0 };
+      state.failures += 1;
+      if (state.failures >= CIRCUIT_FAILURE_THRESHOLD) {
+        state.openUntil = Date.now() + CIRCUIT_COOLDOWN_MS;
+      }
+      sceneCircuits.set(scene, state);
     }
-    sceneCircuits.set(scene, state);
     return {
       kind: "unavailable",
       degraded: [{ from: DEEPSEEK_FLASH_MODEL_ID, to: null, reason: failure.message }],
@@ -622,6 +630,8 @@ export async function routeSmart(
         reason: failure.message,
         retryable: failure.retryable,
         attempted: [DEEPSEEK_FLASH_MODEL_ID],
+        ...(failure.options.receipt ? { receipt: failure.options.receipt } : {}),
+        ...(failure.unknown ? { unknown: true } : {}),
       },
     };
   }

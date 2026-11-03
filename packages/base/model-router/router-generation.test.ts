@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   circuitSnapshot,
   resetCircuit,
+  route,
   routeSmart,
   type EventSink,
   type SmartTask,
@@ -123,6 +124,14 @@ describe("routeSmart canonical text dispatch", () => {
     expect(f.breaks).toEqual([{ action: "options-test", creditsUsed: 500, limit: 500 }]);
   });
 
+  it("forwards only an explicit product output constraint and leaves the legacy maximum ignored", async () => {
+    const f = fixture();
+    f.task.generation = { maxTokens: 8192, productOutputCap: 12_345 };
+    await routeSmart(f.task, f.providers, f.sink, {}, now);
+    expect(f.calls[0]?.options).toMatchObject({ productOutputCap: 12_345 });
+    expect(f.calls[0]?.options?.maxTokens).toBeUndefined();
+  });
+
   it("retains already paid output and measured credits when this call crosses budget", async () => {
     const f = fixture();
     f.task.creditsUsedSoFar = 499;
@@ -204,6 +213,25 @@ describe("routeSmart canonical text dispatch", () => {
     expect(f.calls).toHaveLength(0);
     expect(f.traces).toHaveLength(0);
     expect(f.breaks).toHaveLength(0);
+  });
+
+  it("retains the identity of an in-flight cancellation with unknown provider use", async () => {
+    const f = fixture();
+    const controller = new AbortController();
+    f.task.signal = controller.signal;
+    const requestHash = "c".repeat(64);
+    const model = f.providers.get("deepseek-flash")!;
+    model.chat = async () => {
+      controller.abort();
+      throw new ModelProviderError("已发出，结果未知", "cancelled", { unknown: true, receipt: { requestHash } });
+    };
+    expect(await routeSmart(f.task, f.providers, f.sink)).toMatchObject({
+      kind: "unavailable", failure: { unknown: true, retryable: false, receipt: { requestHash } },
+    });
+    expect(circuitSnapshot("quest-plan")).toBeUndefined();
+    expect(await route({ ...f.task, queueable: true }, f.providers, f.sink)).toMatchObject({
+      kind: "unavailable", failure: { unknown: true, retryable: false, receipt: { requestHash } },
+    });
   });
 
   it("fails closed when a caller supplies a non-canonical model pin", async () => {
