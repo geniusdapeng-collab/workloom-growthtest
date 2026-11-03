@@ -7430,6 +7430,21 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
     }
     const originalExecute = prototype.execute;
     const originalProduce = enginePrototype.produce as (blueprint: FusionRecord, ...args: unknown[]) => Promise<FusionRecord>;
+    const originalUpdateAgentConfig = enginePrototype.updateAgentConfig as
+      (this: FusionRecord, config?: FusionRecord) => unknown;
+    if (typeof originalUpdateAgentConfig !== "function") {
+      throw new CinematicSkillError("PHASE3_BRIDGE_UNAVAILABLE", "ProductionEngine 运行时配置扩展点不可用", "unverified");
+    }
+    enginePrototype.updateAgentConfig = function updateCurrentPhaseAgents(this: FusionRecord, config?: FusionRecord) {
+      const result = originalUpdateAgentConfig.call(this, config);
+      // vendor 更新配置会替换 agents；各 Phase 必须消费同一批新实例，才能收到本次模型与 deadline。
+      // 仅重接依赖，保留 Phase 的 checkpoint、健康监控及已装配的宿主桥。
+      for (const key of ["phase1", "phase2", "phase3", "phase35"]) {
+        const phase = this[key];
+        if (phase && typeof phase === "object") (phase as FusionRecord).agents = this.agents;
+      }
+      return result;
+    };
 
     prototype.execute = async function executeHostPhase3(this: FusionPhase, state: FusionRecord): Promise<FusionRecord> {
       const start = Date.now();
@@ -7857,11 +7872,13 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
     catch (error) {
       prototype.execute = originalExecute;
       enginePrototype.produce = originalProduce;
+      enginePrototype.updateAgentConfig = originalUpdateAgentConfig;
       throw error;
     }
     return () => {
       prototype.execute = originalExecute;
       enginePrototype.produce = originalProduce;
+      enginePrototype.updateAgentConfig = originalUpdateAgentConfig;
     };
   });
 }
