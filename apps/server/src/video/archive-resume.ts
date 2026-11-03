@@ -17,7 +17,7 @@ import path from "node:path";
 import { newId } from "@workloom/shared";
 import { getAppPool, getOwnerPool } from "@workloom/db";
 import { ArchiveStore, readContextBundle, type ContextBundle } from "@hyperreality/video-studio";
-import { scopedRows, archiveWorkDir, projectRunLockKey } from "./archive-host.js";
+import { scopedRows, archiveWorkDir, projectRunLockKey, readProjectMeta } from "./archive-host.js";
 
 interface Scope {
   tenantId: string;
@@ -274,6 +274,8 @@ export interface ArchiveSummary {
 
 /** 档案只读视图（任务详情页「制片档案」标签数据源）：文件本体 + PG 索引合并返回 */
 export async function readArchiveSummary(scope: Scope, projectId: string): Promise<ArchiveSummary> {
+  // 文件档案不受数据库RLS保护；必须先用当前租户/工作区核验项目归属。
+  if (!await readProjectMeta(scope, projectId)) throw new Error("ARCHIVE_PROJECT_NOT_FOUND");
   const store = new ArchiveStore(archiveWorkDir(), scope.workspaceId, projectId);
   const manifest = await store.readManifest();
   const contextBundle = await readContextBundle(store);

@@ -21,6 +21,11 @@ afterEach(async () => {
 });
 
 describe("ArchiveStore", () => {
+  it.each(["..", ".", "../ws-victim", "VID/other", "VID\\other", ""])("拒绝目录组件 %j，不能逃出工作区", (id) => {
+    expect(() => new ArchiveStore(workDir, "ws-test", id)).toThrow("ARCHIVE_SCOPE_INVALID");
+    expect(() => new ArchiveStore(workDir, id, "VID-safe")).toThrow("ARCHIVE_SCOPE_INVALID");
+  });
+
   it("ensure() 建档案夹并按管线类型写 manifest", async () => {
     await store.ensure();
     const manifest = await store.readManifest();
