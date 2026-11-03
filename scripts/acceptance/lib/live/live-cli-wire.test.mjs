@@ -1,7 +1,7 @@
 /** Actual CLI + loopback HTTP; all provider keys/data are synthetic and no external calls occur. */
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,11 +10,12 @@ import { fixture, fixtureNodePath, llm, model, report, run } from "./cli-fixture
 import { PNG_BYTES, MP4_BYTES } from "./test-fixtures.mjs";
 import { createBudget } from "./budget.mjs";
 
-async function server(t, reply) {
+async function server(t, reply, { healthStatus = 200, healthy = true } = {}) {
   const calls = []; const instance = http.createServer(async (req, res) => {
     let body = ""; for await (const chunk of req) body += chunk; calls.push({ method: req.method, url: req.url, body });
     res.setHeader("content-type", "application/json");
-    res.end(JSON.stringify(req.url === "/chat/completions" ? reply(JSON.parse(body)) : { ok: true }));
+    if (req.url === "/health") res.statusCode = healthStatus;
+    res.end(JSON.stringify(req.url === "/chat/completions" ? reply(JSON.parse(body)) : { ok: healthy }));
   });
   await new Promise((resolve) => instance.listen(0, "127.0.0.1", resolve));
   t.after(() => new Promise((resolve) => { instance.close(resolve); instance.closeAllConnections(); }));
@@ -115,6 +116,64 @@ const imageTask = { id: "IMG-01", kind: "image", model: imageModel.id, title: "s
 const videoTask = { id: "VID-01", kind: "video", model: videoModel.id, title: "synthetic video", prompt: "synthetic", durationSeconds: 12 };
 const mediaProfile = (url, tasks) => ({ environment: { kind: "local-preview", target: { apiUrl: url, pcUrl: url, bMobileUrl: url, cMobileUrl: url }, timeouts: { healthMs: 500 } },
   live: { enabled: true, models: [model, imageModel, videoModel], tasks } });
+
+function runtimeIdentity(t, status) {
+  const supportDir = mkdtempSync(join(tmpdir(), "workloom-live-runtime-"));
+  t.after(() => rmSync(supportDir, { recursive: true, force: true }));
+  if (status) {
+    mkdirSync(join(supportDir, "runtime"));
+    writeFileSync(join(supportDir, "runtime", "VERSION"), "synthetic-version\n");
+    writeFileSync(join(supportDir, "install-state.json"), JSON.stringify({
+      status, phase: status === "complete" ? "ready" : "services",
+    }));
+  }
+  return supportDir;
+}
+
+for (const { title, kind, healthStatus, healthy, installStatus, task } of [
+  { title: "deployment HTTP 503", kind: "deployed", healthStatus: 503, task: imageTask },
+  { title: "deployment HTTP 200 with unhealthy JSON", kind: "deployed", healthy: false, task: videoTask },
+  { title: "healthy client without installed runtime identity", kind: "client-runtime", task: imageTask },
+  { title: "healthy client with incomplete installation", kind: "client-runtime", installStatus: "running", task: videoTask },
+]) {
+  test(`live CLI media admission: ${title} blocks before reservation or provider HTTP`, async (t) => {
+    const target = await server(t, () => { throw new Error("no target provider is authorized"); }, { healthStatus, healthy });
+    const provider = await mediaServer(t, task.kind === "image" ? "image-http" : "video-submit-http");
+    const f = fixture(t, {
+      ...mediaProfile(target.url, [task]),
+      environment: {
+        kind, target: { apiUrl: target.url, pcUrl: target.url },
+        ...(kind === "client-runtime" ? { supportDir: runtimeIdentity(t, installStatus) } : {}),
+      },
+    });
+    const result = await child(f, [], { SYNTHETIC_API_KEY: "synthetic-only-media-key", SYNTHETIC_BASE_URL: provider.url });
+    assert.equal(result.status, 2, result.stderr);
+    assert.ok(target.calls.some(call => call.method === "GET" && call.url === "/health"));
+    assert.deepEqual(provider.calls, []);
+    const actual = report(f);
+    assert.equal(actual.tasks[0].status, "blocked");
+    assert.equal(actual.tasks[0].called, false);
+    assert.match(actual.tasks[0].reason, kind === "client-runtime" ? /客户端.*身份/ : /目标.*健康/);
+    assert.deepEqual(actual.budget.reservations, []);
+    assert.equal(actual.budget.used.costCny, 0);
+  });
+}
+
+test("live CLI media admission: healthy verified client reaches the provider through the existing budget gate", async (t) => {
+  const target = await server(t, () => { throw new Error("no target provider is authorized"); });
+  const provider = await mediaServer(t, "image-http");
+  const f = fixture(t, {
+    ...mediaProfile(target.url, [imageTask]),
+    environment: { kind: "client-runtime", target: { apiUrl: target.url, pcUrl: target.url }, supportDir: runtimeIdentity(t, "complete") },
+  });
+  const result = await child(f, [], { SYNTHETIC_API_KEY: "synthetic-only-media-key", SYNTHETIC_BASE_URL: provider.url });
+  assert.equal(result.status, 2, result.stderr);
+  assert.deepEqual(provider.calls.map(({ method, url }) => [method, url]), [["POST", "/images/generations"]]);
+  const actual = report(f);
+  assert.equal(actual.tasks[0].called, true);
+  assert.equal(actual.budget.reservations.length, 1);
+  assert.equal(actual.budget.used.images, 1);
+});
 
 for (const mode of ["image-http", "image-network", "image-partial", "image-missing-usage", "video-submit-http", "video-poll-http", "video-no-url", "video-download-http"]) {
   test(`live CLI media budget: ${mode} retains unmeasured reservations and stops every later modality before HTTP`, async (t) => {

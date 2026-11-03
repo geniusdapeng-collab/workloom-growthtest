@@ -311,6 +311,20 @@ const gitInfo = (() => {
 const fingerprint = fingerprintEnvironment({ repoRoot: REPO_ROOT, env: environment, profile, git: gitInfo });
 fingerprint.targetProbe = probeResult;
 
+// A production probe must admit paid media before reservation or provider I/O.
+let productionMediaBlock = null;
+if (!SELFTEST && environment.isProduction) {
+  const health = probeResult.checks.find((check) => check.name === "server.health");
+  if (!profile.environment?.target?.apiUrl) {
+    productionMediaBlock = "生产媒体任务需要显式声明目标 API 地址，尚未调用供应商";
+  } else if (!probeResult.ok || health?.json?.ok !== true) {
+    productionMediaBlock = "生产目标健康探测未通过，尚未调用供应商";
+  } else if (environment.kind === "client-runtime" &&
+    (!fingerprint.clientRuntimeVersion || fingerprint.clientInstallState?.status !== "complete" || fingerprint.clientInstallState.phase !== "ready")) {
+    productionMediaBlock = "客户端运行时身份未验证：缺少 VERSION 或已完成的安装状态，尚未调用供应商";
+  }
+}
+
 /* ---------------------------- 执行 ---------------------------- */
 const modelById = new Map(resolvedModels.map((m) => [m.id, m]));
 const results = [];
@@ -320,6 +334,9 @@ async function runTask(task) {
   const base = { id: task.id, title: task.title, kind: task.kind, chain: task.chain ?? null, criticality: task.criticality ?? "P1", model: task.model ?? null, selftest: SELFTEST };
   if (task._blocked) return { ...base, status: "blocked", reason: task._blocked, ms: 0 };
   if (task._skip) return { ...base, status: "skipped", reason: task._skip, ms: 0 };
+  if (productionMediaBlock && (task.kind === "image" || task.kind === "video")) {
+    return { ...base, status: "blocked", called: false, reason: productionMediaBlock, ms: 0 };
+  }
   const resolved = task.model ? modelById.get(task.model) : resolvedModels.find((m) => m.kind === (task.kind === "product" ? "llm" : task.kind));
   const chain = task.chain ?? resolved?.adapter ?? "model-gateway";
   let reserved = null;
