@@ -60,4 +60,41 @@ describe.runIf(RUN_DB)("render poller persisted recovery and isolation", () => {
     expect((await job()).status).toBe("submitted"); expect(await actions()).toEqual([]);
   });
 
+  it("a nonmock accepted task cannot become mock:// success after provider credentials disappear", async () => {
+    for (const key of ["VOLCENGINE_ARK_API_KEY", "HF_API_KEY_ID", "HF_API_KEY_SECRET", "MUAPI_API_KEY", "KLING_API_KEY", "JIMENG_API_KEY"]) vi.stubEnv(key, "");
+    vi.stubEnv("WHITEBOARD_ENABLED", "0"); vi.stubEnv("TALKCRAFT_ENABLED", "0");
+    const fetch = vi.fn(async () => { throw new Error("no outbound request expected"); }); vi.stubGlobal("fetch", fetch);
+    const report = await pollRenderJobs(app, gateway, scope, { ingest: false, archive: null });
+    expect(report.done).toBe(0); expect((await job()).result_url).toBeNull();
+    expect(await actions()).toEqual([]); expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("a real task ID beginning mock- still uses the real provider and a truthful receipt", async () => {
+    await owner.query("UPDATE render_jobs SET task_id='mock-prefix-real-task' WHERE id=$1", [jobId]);
+    const poll = vi.fn(async () => ({ status: "succeeded" as const, uri, actualUnits: 5 }));
+    await pollRenderJobs(app, gateway, scope, options(poll, { ingest: false }));
+    expect(poll).toHaveBeenCalledWith("mock-prefix-real-task");
+    expect((await job()).result_url).toBe(uri);
+    const event = (await owner.query(`SELECT payload FROM biz_events WHERE workspace_id=$1
+      AND payload->'decision'->>'action'='render.complete'`, [scope.workspaceId])).rows[0].payload;
+    expect(event.decision.after.mock).toBe(false); expect(event.receipt.synced).toBe(true);
+  });
+
+  it("a simulated row uses its persisted mock flag even when its task ID has no prefix", async () => {
+    await owner.query("UPDATE render_jobs SET mock=true WHERE id=$1", [jobId]);
+    const poll = vi.fn(async () => { throw new Error("real provider must not run for a mock row"); });
+    const report = await pollRenderJobs(app, gateway, scope, options(poll, { ingest: false }));
+    expect(poll).not.toHaveBeenCalled(); expect(report.done).toBe(1);
+    const event = (await owner.query(`SELECT payload FROM biz_events WHERE workspace_id=$1
+      AND payload->'decision'->>'action'='render.complete'`, [scope.workspaceId])).rows[0].payload;
+    expect(event.decision.after.mock).toBe(true); expect(event.receipt).toMatchObject({ synced: false, mode: "simulated" });
+  });
+
+  it("a real provider cannot turn a simulated URI or missing URI into an external success receipt", async () => {
+    for (const invalidUri of ["mock://gen/forged.mp4", undefined, " "]) {
+      const report = await pollRenderJobs(app, gateway, scope, options(async () => ({ status: "succeeded", uri: invalidUri }), { ingest: false }));
+      expect(report.done).toBe(0); expect((await job()).result_url).toBeNull();
+      expect(await actions()).toEqual([]);
+    }
+  });
 });

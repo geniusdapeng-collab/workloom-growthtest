@@ -5,13 +5,13 @@
  *   succeeded → status='done' + result_url + render.complete 事件（actual_seconds 台账回填）
  *   failed    → status='failed' + render.failed 事件（原因留痕，不静默）
  *   running   → status 推进 'rendering'
- * mock 任务（task_id 前缀 mock-）走 MockGenProvider（离线全流程可跑）。
+ * mock 任务只认持久化的 mock 标记，走 MockGenProvider（离线全流程可跑）。
  * 纪律：状态推进与事件同一事务同一 COMMIT（D16 同构）；provider 取自提交事件留痕。
  */
 import type pg from "pg";
 import { gatewayAppendOnClient } from "@workloom/base/workdata";
 import {
-  MockGenProvider, genPoolFromEnv, type GenProvider,
+  MockGenProvider, type GenProvider,
 } from "@workloom/base/model-router";
 import { newId } from "@workloom/shared";
 import { videoGenPool } from "./gen/providers.js";
@@ -30,6 +30,8 @@ interface OpenJob {
   script_id: string;
   project_id: string;
   provider_model: string | null;
+  provider: string | null;
+  mock: boolean;
   est_cny: string | null;
   est_usd: string | null;
   created_at: string;
@@ -63,14 +65,14 @@ export interface PollReport {
   }>;
 }
 
-/** 生成供应商解析：提交事件留痕优先；mock 前缀回退；缺省 seedance（首选） */
+/** 供应商凭据缺失不能把真实任务降成模拟结果；mock 身份只认持久化标记。 */
 function resolveProvider(
   pool: Map<string, GenProvider>,
   job: OpenJob,
   mockPool: Map<string, GenProvider>,
 ): GenProvider | null {
-  const provider = job.submit_payload?.decision?.after?.provider ?? null;
-  if (job.task_id.startsWith("mock-")) {
+  const provider = job.submit_payload?.decision?.after?.provider ?? job.provider ?? null;
+  if (job.mock) {
     return mockPool.get(provider ?? "seedance") ?? mockPool.get("seedance") ?? null;
   }
   return pool.get(provider ?? "seedance") ?? null;
@@ -108,9 +110,8 @@ export async function pollRenderJobs(
     archive?: { store: ArchiveStore; ledger: StageLedgerWriter } | null;
   } = {},
 ): Promise<PollReport> {
-  // 生成池：基座 provider（Kling/即梦等）与视频接缝 provider（Ark 带参数 / Higgsfield / MuAPI）合并，
-  // 后者优先（同 providerId 时以视频接缝实现为准：带参数与报价口径）。
-  const realPool = opts.pool ?? new Map<string, GenProvider>([...genPoolFromEnv(), ...videoGenPool()]);
+  // 视频接缝池已包含配置过的 Kling/即梦；无密钥时缺位，绝不混入基座的演示 fallback。
+  const realPool = opts.pool ?? videoGenPool();
   const mockPool = new Map<string, GenProvider>([
     ["seedance", new MockGenProvider("seedance")],
     ["kling", new MockGenProvider("kling")],
@@ -135,7 +136,7 @@ export async function pollRenderJobs(
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]);
     // 开放任务 + 提交事件留痕的供应商（event 回放取 provider，无留痕回退推断）
     const rows = await client.query<OpenJob>(
-      `SELECT j.id, j.task_id, j.script_id, j.project_id, j.provider_model, j.est_cny, j.est_usd, j.created_at,
+      `SELECT j.id, j.task_id, j.script_id, j.project_id, j.provider_model, j.provider, j.mock, j.est_cny, j.est_usd, j.created_at,
               (SELECT e.payload
                  FROM biz_events e
                 WHERE e.workspace_id=j.workspace_id
@@ -196,7 +197,7 @@ export async function pollRenderJobs(
         report.details.push({
           jobId: job.id,
           status: "skip",
-          error: `供应商 ${job.submit_payload?.decision?.after?.provider ?? "seedance"} 未配置`,
+          error: `供应商 ${job.submit_payload?.decision?.after?.provider ?? job.provider ?? "seedance"} 未配置`,
         });
       }
       continue;
@@ -206,6 +207,10 @@ export async function pollRenderJobs(
       result = await provider.poll(job.task_id);
     } catch (err) {
       result = { status: "running", error: err instanceof Error ? err.message : String(err) };
+    }
+    if (result.status === "succeeded" && (typeof result.uri !== "string" || !result.uri.trim()
+      || (!job.mock && /^mock:/i.test(result.uri)))) {
+      result = { status: "running", error: "供应商完成响应缺少可核实的真实产物地址" };
     }
     // C-04：超龄任务无论 poll 返回什么都判 failed——poll 持续异常/供应商挂起不再永远悬停
     if (result.status === "running" && renderJobTimedOut(job)) {
@@ -302,7 +307,7 @@ export async function pollRenderJobs(
             after: {
               task_id: job.task_id, provider: provider.providerId,
               /** C-01 修复：mock 产物必须可辨识——此前只能靠 task_id 前缀推断，事件面与真实成片同形 */
-              mock: job.task_id.startsWith("mock-"),
+              mock: job.mock,
               result_url: result.uri ?? null, error: result.error ?? null,
               actual_seconds: actualUnits,
               est_cny: job.est_cny === null ? null : Number(job.est_cny),
@@ -320,10 +325,10 @@ export async function pollRenderJobs(
           /**
            * 2026-09-20 真机测试修复：渲染完成必须带**外部回执**（无回执不算完成）。
            * 成功=Seedance 返回的成片 URL（synced:true，可回溯到供应商对象）；失败=无回执并标原因。
-           * C-01 修复：mock 任务（task_id 前缀 mock-）的"成功"是本地模拟，不得携带 synced:true 假回执——
+           * C-01 修复：mock 任务的"成功"是本地模拟，不得携带 synced:true 假回执——
            * 此前 mock 完成事件写 synced:true+verified_at，账本层面与真实外部回执无法区分（假交付）。
            */
-          ...(done && result.uri && !job.task_id.startsWith("mock-")
+          ...(done && result.uri && !job.mock
             ? { receipt: { synced: true, snapshot_uri: result.uri, verified_at: new Date().toISOString() } }
             : done && result.uri
               ? { receipt: { synced: false, mode: "simulated", snapshot_uri: result.uri } }
@@ -347,7 +352,7 @@ export async function pollRenderJobs(
             provider: provider.providerId,
             providerModel: job.provider_model ?? "",
             seconds: actualUnits,
-            mock: job.task_id.startsWith("mock-"),
+            mock: job.mock,
             by: "render-poller",
           });
         } catch (err) {
