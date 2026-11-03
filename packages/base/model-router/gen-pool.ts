@@ -61,6 +61,29 @@ function httpSubmissionError(provider: string, status: number): GenSubmissionErr
   return new GenSubmissionError(`${provider} 提交失败：HTTP ${status}`, rejected ? "not-accepted" : "unknown", canFallback);
 }
 
+function unverifiedTaskLookup(provider: string, reason: string): never {
+  throw new GenSubmissionError(`${provider} 任务查询未核实：${reason}`, "unknown", false);
+}
+
+/** Transport/protocol errors are lookup failures, never proof that an accepted task failed. */
+async function taskLookupJson(provider: string, url: string, init: RequestInit): Promise<Record<string, unknown>> {
+  let response: Response;
+  let body: unknown;
+  try {
+    response = await fetch(url, { ...init, signal: AbortSignal.timeout(60_000) });
+  } catch { return unverifiedTaskLookup(provider, "网络查询失败"); }
+  if (!response.ok) return unverifiedTaskLookup(provider, `HTTP ${response.status}`);
+  try { body = await response.json() as unknown; }
+  catch { return unverifiedTaskLookup(provider, "响应解析失败"); }
+  if (!body || typeof body !== "object" || Array.isArray(body)) return unverifiedTaskLookup(provider, "响应不是任务对象");
+  return body as Record<string, unknown>;
+}
+
+function completedTaskUri(provider: string, uri: unknown): string {
+  if (typeof uri !== "string" || !uri.trim()) return unverifiedTaskLookup(provider, "完成响应缺少产物地址");
+  return uri;
+}
+
 /* ================= Mock 生成 Provider（D4 离线可跑 + 故障注入） ================= */
 
 export class MockGenProvider implements GenProvider {
@@ -116,18 +139,21 @@ export class SeedanceProvider implements GenProvider {
     return { taskId: data.id };
   }
   async poll(taskId: string): Promise<{ status: GenTaskStatus; uri?: string; error?: string }> {
-    const res = await fetch(`${this.base()}/contents/generations/tasks/${taskId}`, {
+    const data = await taskLookupJson("Seedance", `${this.base()}/contents/generations/tasks/${encodeURIComponent(taskId)}`, {
+      method: "GET",
       headers: { authorization: `Bearer ${this.cfg.apiKey}` },
-    });
-    if (!res.ok) return { status: "failed", error: `Seedance 查询失败：HTTP ${res.status}` };
-    const data = (await res.json()) as {
+    }) as {
       status?: string;
       content?: { video_url?: string };
       error?: { message?: string };
     };
-    if (data.status === "succeeded") return { status: "succeeded", uri: data.content?.video_url };
-    if (data.status === "failed") return { status: "failed", error: data.error?.message ?? "生成失败" };
-    return { status: "running" };
+    if (data.status === "succeeded") return { status: "succeeded", uri: completedTaskUri("Seedance", data.content?.video_url) };
+    if (["failed", "expired", "cancelled", "canceled"].includes(data.status ?? "")) {
+      return { status: "failed", error: typeof data.error?.message === "string" ? data.error.message : `生成失败（${data.status}）` };
+    }
+    if (data.status === "queued" || data.status === "submitted") return { status: "submitted" };
+    if (data.status === "running" || data.status === "processing") return { status: "running" };
+    return unverifiedTaskLookup("Seedance", "未知任务状态");
   }
 }
 
@@ -170,17 +196,20 @@ export class KlingProvider implements GenProvider {
     return { taskId };
   }
   async poll(taskId: string): Promise<{ status: GenTaskStatus; uri?: string; error?: string }> {
-    const res = await fetch(`${this.base()}/v1/videos/text2video/${taskId}`, {
+    const data = await taskLookupJson("Kling", `${this.base()}/v1/videos/text2video/${encodeURIComponent(taskId)}`, {
+      method: "GET",
       headers: { authorization: `Bearer ${this.cfg.apiKey}` },
-    });
-    if (!res.ok) return { status: "failed", error: `Kling 查询失败：HTTP ${res.status}` };
-    const data = (await res.json()) as {
+    }) as {
+      code?: number;
       data?: { task_status?: string; task_result?: { videos?: Array<{ url?: string }> }; task_status_msg?: string };
     };
+    if (data.code !== 0) return unverifiedTaskLookup("Kling", "查询未返回成功业务码");
     const st = data.data?.task_status;
-    if (st === "succeed") return { status: "succeeded", uri: data.data?.task_result?.videos?.[0]?.url };
-    if (st === "failed") return { status: "failed", error: data.data?.task_status_msg ?? "生成失败" };
-    return { status: "running" };
+    if (st === "succeed") return { status: "succeeded", uri: completedTaskUri("Kling", data.data?.task_result?.videos?.[0]?.url) };
+    if (st === "failed") return { status: "failed", error: typeof data.data?.task_status_msg === "string" ? data.data.task_status_msg : "生成失败" };
+    if (st === "submitted") return { status: "submitted" };
+    if (st === "processing") return { status: "running" };
+    return unverifiedTaskLookup("Kling", "未知任务状态");
   }
 }
 
@@ -222,23 +251,29 @@ export class JimengProvider implements GenProvider {
     return { taskId };
   }
   async poll(taskId: string): Promise<{ status: GenTaskStatus; uri?: string; error?: string }> {
-    const res = await fetch(`${this.base()}?Action=CVSync2AsyncGetResult&Version=2022-08-31`, {
+    const data = await taskLookupJson("Jimeng", `${this.base()}?Action=CVSync2AsyncGetResult&Version=2022-08-31`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${this.cfg.apiKey}` },
       body: JSON.stringify({ req_key: this.cfg.model ?? "jimeng-video-3.0", task_id: taskId }),
-    });
-    if (!res.ok) return { status: "failed", error: `Jimeng 查询失败：HTTP ${res.status}` };
-    const data = (await res.json()) as {
+    }) as {
+      code?: number;
       data?: { status?: string; video_url?: string; resp_data?: string; message?: string };
     };
+    if (data.code !== 10000) return unverifiedTaskLookup("Jimeng", "查询未返回成功业务码");
     const st = data.data?.status;
     if (st === "done" || st === "SUCCESS") {
-      const uri = data.data?.video_url
-        ?? (data.data?.resp_data ? (JSON.parse(data.data.resp_data) as { video_url?: string }).video_url : undefined);
-      return { status: "succeeded", uri };
+      let uri: unknown = data.data?.video_url;
+      if (!uri && data.data?.resp_data) {
+        try { uri = (JSON.parse(data.data.resp_data) as { video_url?: unknown } | null)?.video_url; }
+        catch { return unverifiedTaskLookup("Jimeng", "完成响应的产物字段无法解析"); }
+      }
+      return { status: "succeeded", uri: completedTaskUri("Jimeng", uri) };
     }
-    if (st === "failed" || st === "FAIL") return { status: "failed", error: data.data?.message ?? "生成失败" };
-    return { status: "running" };
+    if (st === "failed" || st === "FAIL") return { status: "failed", error: typeof data.data?.message === "string" ? data.data.message : "生成失败" };
+    if (st === "in_queue") return { status: "submitted" };
+    if (st === "generating") return { status: "running" };
+    // not_found/expired can mean the result lookup has expired, so retain the accepted task for reconciliation.
+    return unverifiedTaskLookup("Jimeng", "任务不存在、查询已过期或状态未知");
   }
 }
 
