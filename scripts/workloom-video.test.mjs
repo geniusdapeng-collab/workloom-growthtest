@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { copyFile, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
@@ -14,7 +14,7 @@ const expected = {
   origin: "http://127.0.0.1:9123", instance: "growthtest-isolated", tenantId: "tenant-a",
   workspaceId: "ws-a", memberNo: "MEM-G01", memberId: "member-a",
 };
-const token = "synthetic.fixture.member";
+const token = randomUUID();
 const exec = promisify(execFile);
 const environment = {
   WORKLOOM_BASE_URL: expected.origin, WORKLOOM_DESKTOP_INSTANCE_ID: expected.instance,
