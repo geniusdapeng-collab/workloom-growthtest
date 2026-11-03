@@ -1,7 +1,7 @@
 # Growthtest 视频调用指南：AI 工作台先读，再制作
 
-> guideVersion: 2026-10-15.2
-> 适用仓库：`geniusdapeng-collab/workloom-growthtest`（隔离副本）；本次引导改动前生产基线：`c28f11cd3d200770ee15d21c4ed98176d2e6bbb9`。
+> guideVersion: 2026-11-03.1
+> 适用仓库：`geniusdapeng-collab/workloom-growthtest`（隔离副本）。
 > 读者：Codex、DeepSeek Harness 桌面端及其它可调用本仓 CLI / stdio MCP 的 AI 工作台。
 
 目标是把用户原话变成符合约束的作品：人、商品、平台、时长、账号调性、声音和特殊要求始终有依据。工作台负责组织调用与解释回执；剧本、提示词、渲染和后期使用本仓正式执行器。已交付作品的经验应进入本指南和生产机制，不能依赖某次对话记忆。
@@ -10,10 +10,11 @@
 
 ## 1. 每次接手视频任务，先读本指南全文
 
-在当前仓库根执行：
+第一次使用先按 [GitHub 克隆、安装和服务接入](AGENT-CLIENTS.md) 设置工作区。已经配置过的项目也要核对本次检出、服务地址与成员身份。只读发现无需服务。在当前仓库根执行：
 
 ```bash
 node scripts/workloom-agent.mjs list
+node scripts/workloom-agent.mjs invoke growth.repo.readiness
 node scripts/workloom-agent.mjs describe growth.video.workbench.guide
 node scripts/workloom-agent.mjs invoke growth.video.workbench.guide
 ```
@@ -29,24 +30,7 @@ node tools/codex-gateway/bin/cli.mjs video guide --json
 
 插件 MCP 调用 `workloom_video_guide({})`，或读取资源 `workloom://guides/video`。握手 `instructions`、SessionStart `context` 和仓内技能均指向本指南。插件网关的目录/模拟工作台仍只读；增加指南不会让它具备启动、批准或发布视频的权限。
 
-接入通用 stdio MCP 时，使用客户端要求的格式，把命令指向本机可执行的 Node、参数指向本仓 `scripts/workloom-agent-mcp.mjs` 的绝对路径。只有产品根需要覆盖时，才设置 `WORKLOOM_PRODUCT_ROOT`；源码服务实际在 8787 时显式设置 `WORKLOOM_BASE_URL=http://127.0.0.1:8787`，不能套用打包产品的偏移端口。成员令牌只放运行环境 `WORKLOOM_ACCESS_TOKEN`。DeepSeek Harness 的具体桌面配置键以该客户端当前版本为准，先用标准 stdio 握手与实际工具返回验证接通。
-
-DSH 当前官方 MCP 客户端的配置条目如下（对照 [官方说明](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/mcp/mcp-client/README.md)，2026-10-07）；放入当前 profile 支持的配置位置，替换本机 Node 和仓库路径：
-
-```yaml
-- id: workloom-growthtest-mcp
-  name: '@deepseek-ai/dsh-mcp-client'
-  config:
-    serverName: workloom_growthtest
-    transport: stdio
-    command: node
-    args: ['/abs/path/to/workloom-growthtest/scripts/workloom-agent-mcp.mjs']
-    cwd: /abs/path/to/workloom-growthtest
-    env:
-      WORKLOOM_PRODUCT_ROOT: /abs/path/to/workloom-growthtest
-```
-
-DSH 会清理继承环境中的秘密变量，需要服务访问时按当前配置机制显式注入成员令牌和服务地址；不把令牌字面量保存到仓库。客户端显示的工具名会增加 `mcp__workloom_growthtest__` 前缀，原始 `tools/list` 名称仍是 `workloom_growth_video_workbench_guide`。Codex STDIO 配置字段见 [OpenAI 官方 MCP 说明](https://learn.chatgpt.com/docs/extend/mcp)。本次协议回读不等于 DSH/Codex 原生桌面 GUI 已逐机实测。
+客户端能运行本机终端就可直接走 CLI。希望通过工具菜单读状态时，按 [Codex / DSH 的 stdio MCP 配置](AGENT-CLIENTS.md#3-codex-接入) 接入。两种方式使用同一仓库和指南。源服务的端口从实际启动配置取得，成员令牌只由运行环境提供；运行服务的供应商凭据不传给只读客户端。
 
 读取失败先保留错误，停止依赖该指南的生产动作；不借用 Growth/Matrix 的路径、静态参数或另一份指南。核对返回的 `repository`，三个同源仓是不同产品实例。源码会话先按根 `AGENTS.md` 读取 `AGENTS.repo.md`；Codex 并不自动读取任意名称的 Markdown。相关说明：[Agent 能力协议](../scripts/AGENT-CAPABILITIES.md)、[插件接入](../plugins/workloom-workbench/README.md)。
 
@@ -58,7 +42,7 @@ DSH 会清理继承环境中的秘密变量，需要服务访问时按当前配�
 
 | 约束 | 制作前必须有的事实 | 缺失或冲突的处理 |
 |---|---|---|
-| 指定模特/真人 | 角色 ID、平台素材 ID、人物属性、授权范围与有效期、哪些镜头出镜 | 不猜性别，不把系统默认陈卓覆盖指定人物；缺授权停在付费前 |
+| 指定模特/真人 | 角色 ID、当前定妆照版本或适用的平台素材 ID、人物属性、授权范围与有效期、哪些镜头出镜 | 有指定角色时按档案绑定。缺授权或供应商不接收所需素材类型时停在付费前 |
 | 指定商品 | 商品档案、真实图片、名称/参数/价格/卖点的来源和禁止改写项 | 营销片缺商品锚点停止，不编造品牌、规格或优惠 |
 | 平台与画幅 | 目标平台、比例、分辨率、字幕呈现、封面画布 | 用户明确项优先，不把默认抖音或封面比例套给其它平台 |
 | 时长 | 总秒数、误差边界、各镜时长之和、帧率 | 不以文件名证明时长，不用变速/补静音凑长度；当前普通生成每镜整数 4–12 秒 |
@@ -81,11 +65,11 @@ flowchart LR
   F --> G[核验与本地交付]
 ```
 
-1. **能力与环境。**读取 `growth.repo.readiness`、`growth.video.gen.catalog`（后者需服务），再按需要运行 `pnpm video:doctor`。未配置模型/媒体工位、权限或额度时保留失败事实。检查就绪不触发生产。
+1. **能力与环境。**读取 `growth.repo.readiness`，回读实际服务的 `/health` 和有权限的 `growth.video.gen.catalog`，再运行 `pnpm video:doctor`。本地只读、服务探活、运行时模型可用、账户权限/余额和本次付费资格分别记录。按本次需要核对可用的图生图、文生图或参考图/视频生成模式，以及实际后期二进制、字体和授权音乐。已有可用原片的标准后期不需要生成供应商。
 2. **分流。**视频工位的 `video.studio.start` 进入系统营销/叙事/解释片分流。专业 CLI 使用 `route-video.mts` 保存分流记录；营销片必须有商品锚点。`clarify` 或类型不符时停，解释片走其专用入口，不硬塞进逐镜片管线。
 3. **由系统生成前期。**默认一句话导演使用 `scripts/workloom-director.mjs plan`；它会调用真实文字模型，强制 `mode=plan`，不提交图像/视频。`growth.video.director.preview` 是免费的确定性预览，不能当作真实文字方案。`plan` 返回导演方案，不等于已具备正式完整渲染提示词或完成媒体。
 4. **正式提示词与资格。**专业 Studio 前期通过 `startVideoProjectRun`、`VideoStudio.runPreproduction` 和实际制作引擎生成并归档前期素材。读取 `growth.video.production.shots` 和项目实际前期记录，对照冻结约束逐镜核验。归档草案镜头卡、纯文字导演方案、`ready:true` 本地计划都不能冒充正式渲染放行包。缺正式前期或资格时停止，不写临时镜头卡绕过系统；用户明确提供的镜头稿仍须走正式规范检查。
-5. **计划后执行。**`growth.video.production.plan` 只读已有镜头卡、分流、fps、原声合同和本地配置，返回 `checklist` 与 `execution.command/args/cwd`。`ready` 只覆盖这些已读检查，不能证明余额、身份或全部生产资格。使用实际计划的参数数组启动官方 `full-chain-film.mts`，不要拼接用户原话。任一失败项都有 `argv=[]`，不能继续执行。
+5. **计划后执行。**`growth.video.production.plan` 只读已有镜头卡、分流、fps、原声合同和本地配置，返回 `checklist` 与 `execution.command/args/cwd`。`readyScope=authored-input-and-local-configuration`。逐项核对后以实际参数数组启动官方 `full-chain-film.mts`，将用户文本作为数据传入。失败时 `argv=[]`、`execution=null`，回到出错工位。服务项目逐镜提交使用同一服务的 `video.production.qualifyShot` 与渲染 API；[服务项目 CLI](../scripts/tools/render-project.mts) 可按真实项目 ID、模型 ID、批准范围和估算上限调用。
 6. **付费渲染。**正常生成先冻结原稿，逐镜核对 ID、请求参数、原生音轨选择及授权，保留实际供应商任务、下载与签发事实。保持已有项目/输入/目录，优先接续已受理任务；不清缓存、不自动重发付费 POST。真人档案在提交前核对；成功后不再跑 canary 或身份比对。普通导演保留原片音轨，只有用户明确授权 `audioMode=dubbing` 才进入真实配音处理。
 7. **官方后期与交付。**成功原片默认直接进入 compose/color/subtitle/BGM/cover/mux/master 单母版链，或用下一节完整原片标准后期；显式请求多风格时再加入 deliver。执行单次声明的调色和混音配方，实际编解码、字幕、封面、导出和摘要失败留痕；不做品质打分、候选择优、自动降音量重试或无声替代配乐。核对实际请求版本与文件清单后交付；平台外发另需授权与真实回执。
 
@@ -113,6 +97,8 @@ node scripts/workloom-director.mjs versions --input-file project.json
 
 需要按导演合同继续同一项目时，在已授权的身份和制作预算内调用 `node scripts/workloom-director.mjs render --input-file render.json`。输入必须来自当前返回值：`projectId`、64 位 `expectedPlanHash`、正整数 `revision`，再加本次新的 `idempotencyKey` 和已授权的 `maxBudgetCny`；实际要求的身份素材/来源也须满足。再次 `start` 会新建项目，不能用于续接。`render` 可能触发真实媒体和预算流程，不能为了读指南或检查接通而调用。
 
+将 `render` 返回的真实任务 ID 写入新的 `job.json`，继续用 `job` 轮询、用 `versions` 查看当前版本。遇到预算或身份阶段，按任务回执和 [导演授权流程](director-studio-v2.md#固定-api-契约) 在原工作区完成，不新增第二个项目。回执中的可播放地址如有有效期，交付前从同一版本刷新并实际打开。
+
 通用 MCP 当前登记的是导演 `preview/job/versions/preferences/calibration` 读取能力，尚无导演 `plan/start/render` 执行工具；这些写动作使用现有服务 CLI/API，不发明 MCP 工具名。免费 `preview` 的选项字段是 `options`，真实 `plan/start` 是 `deliveryOptions`；CLI 只接受 `--input-file`，没有 `--intent/--mode/--plan-only` 等参数。专业 Studio 路径另走其正式前期与 `production.shots/qualifyShot` 来源资格，不能把导演方案转换成工作台手写卡冒充它的产物。
 
 ## 4. 已有原片：完整原片标准后期
@@ -134,7 +120,15 @@ pnpm exec tsx scripts/tools/full-chain-film.mts \
 
 ## 5. 调用、恢复与失败
 
-先 `describe` 核对当前 schema。专业计划示例文件只承载当前支持字段，完整作业合同另存生产资料：
+专业 CLI 先保存实际作业的分流结果。示例只做本地分流，不生成素材。把目录和文案换成当前作业值，源 brief 如已存在可通过 `--brief` 读取。
+
+```bash
+mkdir -p work/film
+pnpm exec tsx scripts/tools/route-video.mts \
+  --title "雨后山间民宿，只拍空景" --explicit narrative --platform 抖音 --out work/film/route.json
+```
+
+上例的 `--explicit narrative` 用于已明确选定叙事片的作业。未明确片型时省略，按真实 `decision.route` 继续。营销片需由正式前期绑定真实商品档案。说明图仅可用在已授权的参考或生成用途。先 `describe` 核对当前 schema。专业计划示例只承载支持字段，`shotlistPath` 使用当前正式前期产物，完整作业合同另存生产资料。
 
 ```json
 {
@@ -142,7 +136,7 @@ pnpm exec tsx scripts/tools/full-chain-film.mts \
   "projectId": "VID-CUSTOMER-01",
   "platform": "抖音",
   "shotlistPath": "work/film/shotlist.json",
-  "routePath": "work/route.json",
+  "routePath": "work/film/route.json",
   "workDir": "work/production",
   "outDir": "work/out-VID-CUSTOMER-01",
   "unifiedNarration": false
@@ -153,21 +147,25 @@ pnpm exec tsx scripts/tools/full-chain-film.mts \
 node scripts/workloom-agent.mjs invoke growth.video.production.plan --input-file work/plan-input.json
 node scripts/workloom-agent.mjs invoke growth.video.production.status --input-file work/status-input.json
 node scripts/workloom-agent.mjs invoke growth.video.delivery.inspect --input-file work/delivery-input.json
+node scripts/workloom-agent.mjs invoke growth.video.post.quality --input-file work/delivery-input.json
 ```
 
-状态输入示例为 `{"projectId":"VID-CUSTOMER-01","workDir":"work/production"}`；清单输入为 `{"projectId":"VID-CUSTOMER-01","outDir":"work/out-VID-CUSTOMER-01"}`。使用实际项目和目录，避免读错示例默认值。仓外产物由运行者设置 `WORKLOOM_VIDEO_ARTIFACT_ROOT`，请求仍只接相对路径；文档指南读取始终固定代码根，不随产物根漂移。
+状态输入示例为 `{"projectId":"VID-CUSTOMER-01","workDir":"work/production"}`。清单和技术核验输入可用 `{"projectId":"VID-CUSTOMER-01","outDir":"work/out-VID-CUSTOMER-01"}`。使用实际项目和目录。仓外产物由运行者设置 `WORKLOOM_VIDEO_ARTIFACT_ROOT`，请求仍只接相对路径；文档指南读取始终固定代码根。
 
 | 失败/状态 | 必须做什么 | 禁止的补救 |
 |---|---|---|
 | 无身份/权限，非本工作区项目 | 获取正确身份/项目，再读真实结果 | 借另一工作区或直接写 DB |
 | 前期缺项、时长/人物/商品冲突 | 保留失败项，回到正式前期解决 | 手写可跑卡或删除固定要求 |
 | 欠费/配额错误、账户权限 | 解决真实账户状态后续取原任务 | 重复点生成或换另一账户规避 |
+| 本地参考图类型不支持或平台拒绝人像 | 按正式档案核对原图字节和用途；对平台隐私拒绝走该供应商的已授权人像入口 | 改扩展名、重编码、换链接来规避素材限制 |
 | 已有 taskId，轮询/下载失败 | 查同一任务、保留原输入和接受记录，按恢复入口接续 | 把 GET 失败当成需要再付费 POST |
 | 标准后期忙、目录已存在 | 查询正在运行的任务，换明确的新输出目录 | 强删锁、覆盖旧成片 |
 | 原稿/原片/代码/字体哈希变更 | 原目录保留失败回执，查出实际变更 | 改哈希或把不存在的旧素材当成功恢复 |
 | 成片不合意 | 按反馈归因到字幕/封面/音乐等层复用原片；新镜须新增范围与预算 | 未授权变速、替声、改剧情、重渲 |
 
 `integrity=sha256-verified` 仅证明列出文件的实际字节与清单一致；`unverified/incomplete` 保持原结论。哈希、声学相关性、`ready` 和 `mediaReady` 分别有自己的范围，不证明真人身份、台词准确、口型、主观听感或音乐商业许可。
+
+使用 `full-chain-film.mts` 的作业，保留原项目、输入和工作目录，以现有任务日志恢复。已核实的外部已受理任务可以通过 `--resume-tasks <文件>` 提供镜头 ID 到供应商 task ID 的 JSON 对象。只有任务 ID、请求输入、已签发事实和原片字节可以相互核对时，才记录可正式采用。请求结果未知时先查供应商，勿将未收到响应判成未受理。
 
 - 已成功但旧品质失败的原片保留原记录，真实来源/当前字节通过后直接正式后期；新生成只限缺失或用户明确授权改变的点名镜。
 - 镜头级清晰度/去雾在共享归一化层执行：默认 `--clarity auto`，只有黑位与细节共同支持“发灰/发糊”时才进入 `light/medium/strong`；2026-10-18 起强档半径收到 7×7、CAS 0.25，变体最终 look 不再叠加旧的固定 `conservative` 锐化。逐镜计划写入交付清单，显式 `--clarity off|light|medium|strong` 可覆盖自动判定。
@@ -179,15 +177,25 @@ node scripts/workloom-agent.mjs invoke growth.video.delivery.inspect --input-fil
 - Color 的 best/match 和封面按明确方案一次本地执行；调色批次完整回传每项，有失败时 CLI 非零退出。没有默认残差、像素差、身份或整图模型品质裁决。
 - 后期包与 HTTP 技术凭据只核对真实加工、来源/权限、版本和请求导出。历史签章保持可验证兼容，不要求重新补画面/声音质量证据。
 
-## 6. 三个典型作业
+## 6. 典型作业与交付回执
 
 | 用户场景 | 正确步骤 | 不遵循会发生什么 |
 |---|---|---|
 | 指定 CEO、商品、抖音、30 秒和账号语气 | 冻结完整约束→正式营销前期→逐镜核对人物/商品/台词/秒数→原声生成→完整后期→清单核验 | 错人、漏商品、声线变化或付费后才发现时长不符 |
+| 使用随仓注册的内置角色展示一件真实商品 | 按当前角色库选中指定角色和在用定妆照，记录角度、字节摘要、使用权与引用用途；独立核对商品事实、图片权利及供应商模式 | 参考图已存在也可能不适用于本次供应商或商用场景 |
 | 已有全部成功原片，只做五版本 | 读原片任务与实际字节→默认采用→标准后期→核对声明配方、消费音乐和真实导出清单 | 旧品质门引起重复付费，或文件清单与实际结果不符 |
 | 中断后继续，用户仅要求字幕更大 | 先查已受理任务与产物→复用画面/音轨→正式局部后期→新目录/新清单 | 重复花钱，旧绿回执误绑定本次改动或原片被覆盖 |
 
-交付回复逐项回答：用户固定项是否满足；作品、字幕、封面、清单位置；真实生成/复用次数；阶段失败与恢复；实际耗时和未验证项。仅有文件或文字方案时标明候选/计划，不能说成完成。
+交付回复按实际完成的层级报告。
+
+| 状态 | 最少要给用户的证据 |
+|---|---|
+| 已接入或已有方案 | 仓库提交、实际服务目标、项目/任务 ID；如已生成文字方案，附冻结版本、`planHash`、`mediaReady` 和可继续的缺口 |
+| 已提交或已取得原片 | 实际受理与成功镜头数、任务 ID、来源或输入摘要、下载/签发与当前原片字节的绑定，另列复用次数和仍在运行的任务 |
+| 成片已交付 | 可播放作品、封面、字幕和当前清单位置；实际时长/画幅和请求版本；最新 `delivery.inspect`、`post.quality` 及播放检查 |
+| 受阻 | 实际阶段、缺失或错误项、供应商是否已受理、保留的回执及续跑入口；没有可播放文件时明确写明 |
+
+同时注明哪些用户固定项有证据、实际耗时、失败与恢复，以及身份、口型、审美或素材许可等独立结论。按 [角色库](character-registry.md) 和 [认证真人档案](real-person-asset.md) 区分在册定妆照与平台授权人像。识别 PNG、JPEG、WebP 的本地参考图时读取实际文件签名，保留原字节。上传许可、供应商对人像的准入与授权素材引用需另行核对。
 
 ## 7. 正常耗时与提速
 
