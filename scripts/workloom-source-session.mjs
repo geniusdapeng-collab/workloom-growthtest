@@ -11,6 +11,8 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 const entries = Object.freeze({
   agent: ["scripts/workloom-agent.mjs"],
   director: ["scripts/workloom-director.mjs"],
+  video: ["scripts/workloom-video.mjs"],
+  "video-deliver": ["node_modules/tsx/dist/cli.mjs", "scripts/tools/deliver-studio-video.mts"],
   render: ["node_modules/tsx/dist/cli.mjs", "scripts/tools/render-project.mts"],
 });
 const agentOverrides = ["--root", "--base-url", "--bundle"];
@@ -24,7 +26,7 @@ const studioReads = Object.freeze({
   shots: ["video.production.shots", "projectId"],
 });
 const studioStartSchema = "workloom.growthtest-studio-start/v1";
-const usage = "node scripts/workloom-source-session.mjs <agent|director|render> -- <CLI args>\n"
+const usage = "node scripts/workloom-source-session.mjs <agent|director|video|video-deliver|render> -- <CLI args>\n"
   + "node scripts/workloom-source-session.mjs studio -- start --work-root <作业目录> --input-file <JSON或->\n"
   + "node scripts/workloom-source-session.mjs studio -- <status RUN-ID|archive PROJECT-ID|shots PROJECT-ID>";
 const isObject = value => value !== null && typeof value === "object" && !Array.isArray(value);
@@ -301,6 +303,12 @@ export async function runSourceSession(argv, { env = process.env, fetcher = fetc
     WORKLOOM_DEV_AUTO_LOGIN: "0",
     [name === "render" ? "WORKLOOM_TOKEN" : "WORKLOOM_ACCESS_TOKEN"]: token,
   });
+  if (name === "video" || name === "video-deliver") Object.assign(childEnv, {
+    WORKLOOM_DESKTOP_INSTANCE_ID: instanceId,
+    WORKLOOM_SOURCE_TENANT_ID: tenantId,
+    WORKLOOM_SOURCE_WORKSPACE_ID: workspaceId,
+    WORKLOOM_DESKTOP_MEMBER: memberNo,
+  });
   return new Promise((resolve, reject) => {
     const child = spawnImpl(process.execPath, [...argvPrefix, ...args], { cwd: repo, env: childEnv, stdio: "inherit" });
     child.once("error", () => reject(new SourceSessionError("CLI_START_FAILED", "当前检出的正式 CLI 无法启动", 7)));
@@ -308,7 +316,7 @@ export async function runSourceSession(argv, { env = process.env, fetcher = fetc
   });
 }
 
-if (resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && await realpath(process.argv[1]).catch(() => null) === fileURLToPath(import.meta.url)) {
   const argv = process.argv.slice(2);
   if (argv.length === 1 && argv[0] === "--help") console.log(usage);
   else {

@@ -137,3 +137,38 @@ describe("公共产品参考图路径边界", () => {
       expect.objectContaining({ customerMetadata: metadata, by: { id: identity.memberNo, type: "human" } }));
   });
 });
+
+describe("正式一句话生产入口", () => {
+  it.each([["叙事短片", "narrative"], ["宣传测试商品", "marketing"]] as const)("由系统分流 %s 至 %s，原话与时长随同一正式项目入档", async (intent, route) => {
+    const raw = `制作 20 秒${intent}，用于抖音`;
+    d.route.mockResolvedValue({ route, signals: [], via: "rules" });
+    const result = await caller().studio.start({ officialIntent: true, intent: raw,
+      ...(route === "marketing" ? { product: { name: "测试商品" } } : {}) });
+    expect(result).toMatchObject({ kind: "routed", runId: "RUN-test", projectId: "VID-test", pipeline: route, durationSec: 20 });
+    expect(d.route).toHaveBeenCalledWith(expect.objectContaining({ text: raw, explicit: undefined }), expect.any(Object));
+    expect(d.start).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: identity.workspaceId }), expect.objectContaining({
+      rawIntent: raw, intent: expect.stringContaining("时长：20秒"), isMarketing: route === "marketing", creativeMode: "manual",
+    }));
+  });
+
+  it.each([{ projectId: "VID-sibling" }, { metadata: {} }, { route: "marketing" }, { durationSec: 301 },
+    { product: { name: "测试商品", referenceManifest: {} } }])("拒绝额外生产输入 %j", async extra => {
+    await expect(caller().studio.start({ officialIntent: true, intent: "做视频", ...extra })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(d.route).not.toHaveBeenCalled(); expect(d.start).not.toHaveBeenCalled();
+  });
+
+  it("运行时启用直发渲染时先拒绝正式工作单", async () => {
+    vi.stubEnv("HR_DEFER_RENDER", "0");
+    await expect(caller().studio.start({ officialIntent: true, intent: "做视频" }))
+      .rejects.toMatchObject({ code: "PRECONDITION_FAILED", message: expect.stringContaining("OFFICIAL_RENDER_DEFER_REQUIRED") });
+    expect(d.route).not.toHaveBeenCalled(); expect(d.start).not.toHaveBeenCalled();
+  });
+
+  it("解释片分流和缺少产品时均不立项", async () => {
+    d.route.mockResolvedValueOnce({ route: "explainer", signals: [], via: "rules" })
+      .mockResolvedValueOnce({ route: "clarify", clarify: { question: "商品是什么", missing: ["product"] }, signals: [], via: "rules" });
+    await expect(caller().studio.start({ officialIntent: true, intent: "做解说片" })).resolves.toMatchObject({ kind: "unsupported", pipeline: "explainer" });
+    await expect(caller().studio.start({ officialIntent: true, intent: "推广这个商品" })).resolves.toMatchObject({ kind: "clarify", missing: ["product"] });
+    expect(d.start).not.toHaveBeenCalled();
+  });
+});

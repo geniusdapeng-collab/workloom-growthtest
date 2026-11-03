@@ -97,6 +97,7 @@ export class ProductionClient {
 export async function renderServiceProject(input: {
   client: ProductionClient; projectId: string; modelId: string; only?: string[]; params?: Record<string, unknown>;
   maxEstimatedCny?: number; pollRounds?: number; pollIntervalMs?: number;
+  expectedSource?: Pick<ServiceShotList, "sourceStageRunId" | "sourceAttempt" | "promptsSha256">;
   onProgress?: (result: ProductionProjectResult) => void | Promise<void>; wait?: (ms: number) => Promise<void>;
 }): Promise<ProductionProjectResult> {
   if (!input.projectId.trim() || !input.modelId.trim()) throw new ProductionClientError("REQUEST_INVALID", "Project and model are required");
@@ -105,6 +106,10 @@ export async function renderServiceProject(input: {
     || (input.maxEstimatedCny !== undefined && (!Number.isFinite(input.maxEstimatedCny) || input.maxEstimatedCny < 0))) throw new ProductionClientError("LIMIT_INVALID", "Polling and budget limits are invalid");
   if (input.params?.durationSec !== undefined) throw new ProductionClientError("DURATION_SOURCE_REQUIRED", "Duration is loaded from the service archive");
   const source = await input.client.shots(input.projectId);
+  if (input.expectedSource && (source.sourceStageRunId !== input.expectedSource.sourceStageRunId
+    || source.sourceAttempt !== input.expectedSource.sourceAttempt || source.promptsSha256 !== input.expectedSource.promptsSha256)) {
+    throw new ProductionClientError("SOURCE_CHANGED", "The current archive differs from the selected Studio run");
+  }
   const only = input.only ?? [];
   if (new Set(only).size !== only.length || only.some(id => !source.shots.some(shot => shot.shotId === id))) throw new ProductionClientError("SHOT_SCOPE_INVALID", "Selected shots are missing or repeated");
   const shots = only.length ? source.shots.filter(shot => only.includes(shot.shotId)) : source.shots;
@@ -145,7 +150,7 @@ export async function renderServiceProject(input: {
   for (let round = 0; round < rounds && result.shots.some(row => ["submitted", "rendering"].includes(row.status)); round++) {
     await wait(interval);
     try {
-      await input.client.request("video.render.poll", { limit: 100 });
+      await input.client.request("video.render.poll", { limit: 100, projectId: input.projectId });
       const jobs = await input.client.request<Array<Record<string, unknown>>>("video.gen.jobs", { projectId: input.projectId, limit: 100 }, "GET");
       if (!Array.isArray(jobs)) throw new ProductionClientError("JOB_RESPONSE_INVALID", "Service jobs response is not an array");
       for (const row of result.shots) {

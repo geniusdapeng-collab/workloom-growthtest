@@ -3,7 +3,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { getAppPool } from "@workloom/db";
 import { protectedProcedure, router, scopeOf, writeProcedure } from "../trpc/context.js";
-import { listProductionShots, qualifyProductionShot } from "./production-authority.js";
+import { listProductionOriginals, listProductionShots, qualifyProductionShot } from "./production-authority.js";
 import { SubmissionError } from "./gen/submission-ledger.js";
 
 const params = z.object({
@@ -23,6 +23,15 @@ const params = z.object({
 export const productionRouter = router({
   shots: protectedProcedure.input(z.object({ projectId: z.string().min(1).max(200) }).strict()).query(async ({ ctx, input }) => {
     try { return await listProductionShots({ app: getAppPool(), scope: scopeOf(ctx.identity), projectId: input.projectId }); }
+    catch (error) {
+      if (error instanceof SubmissionError) throw new TRPCError({ code: "PRECONDITION_FAILED", message: error.message, cause: error });
+      throw error;
+    }
+  }),
+  originals: protectedProcedure.input(z.object({
+    projectId: z.string().min(1).max(200), modelId: z.string().min(1).max(200),
+  }).strict()).query(async ({ ctx, input }) => {
+    try { return await listProductionOriginals({ app: getAppPool(), scope: scopeOf(ctx.identity), ...input }); }
     catch (error) {
       if (error instanceof SubmissionError) throw new TRPCError({ code: "PRECONDITION_FAILED", message: error.message, cause: error });
       throw error;

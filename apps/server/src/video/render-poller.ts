@@ -46,7 +46,7 @@ interface OpenJob {
 }
 
 /** Missing local assets or cost rows remain durable retry work after generation succeeds. */
-async function readPollJobs(client: pg.PoolClient, scope: Scope, input: { limit: number; ingest: boolean; jobId?: string }): Promise<OpenJob[]> {
+async function readPollJobs(client: pg.PoolClient, scope: Scope, input: { limit: number; ingest: boolean; jobId?: string; projectId?: string }): Promise<OpenJob[]> {
   try {
     await client.query("BEGIN");
     await client.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
@@ -63,12 +63,13 @@ async function readPollJobs(client: pg.PoolClient, scope: Scope, input: { limit:
          FROM render_jobs j
         WHERE j.workspace_id=$1 AND j.task_id IS NOT NULL
           AND ($4::text IS NULL OR j.id=$4)
+          AND ($5::text IS NULL OR j.project_id=$5)
           AND (j.status IN ('submitted','rendering') OR (j.status='done' AND (
             ($3::boolean AND NOT j.mock AND j.asset_id IS NULL AND j.result_url IS NOT NULL)
             OR NOT EXISTS (SELECT 1 FROM budget_ledger b WHERE b.workspace_id=j.workspace_id
                             AND b.idempotency_key='render:' || j.id))))
         ORDER BY (j.status='done') ASC, j.created_at ASC LIMIT $2`,
-      [scope.workspaceId, input.limit, input.ingest, input.jobId ?? null],
+      [scope.workspaceId, input.limit, input.ingest, input.jobId ?? null, input.projectId ?? null],
     );
     await client.query("COMMIT");
     return rows.rows;
@@ -136,6 +137,7 @@ export async function pollRenderJobs(
   scope: Scope,
   opts: {
     limit?: number;
+    projectId?: string;
     pool?: Map<string, GenProvider>;
     /** 成片入库开关（默认 true；测试可关） */
     ingest?: boolean;
@@ -169,7 +171,7 @@ export async function pollRenderJobs(
   const client = await app.connect();
   let jobs: OpenJob[];
   try {
-    jobs = await readPollJobs(client, scope, { limit: opts.limit ?? 20, ingest: opts.ingest !== false });
+    jobs = await readPollJobs(client, scope, { limit: opts.limit ?? 20, ingest: opts.ingest !== false, projectId: opts.projectId });
   } finally {
     client.release();
   }

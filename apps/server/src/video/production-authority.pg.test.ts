@@ -6,10 +6,11 @@ import { mkdtemp, mkdir, writeFile, realpath, rm, readFile } from "node:fs/promi
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { gatewayAppend } from "@workloom/base/workdata";
-import { authorizeRenderSubmission, loadQualifiedRenderInput, qualifyProductionShot } from "./production-authority.js";
+import { authorizeRenderSubmission, listProductionOriginals, loadQualifiedRenderInput, qualifyProductionShot } from "./production-authority.js";
 import { prepareMarketingFacts, finalizeMarketingFacts } from "./marketing-authority.js";
 import { renderSha256 } from "./gen/compiled-request.js";
 import { submitGenJob } from "./gen/submit.js";
+import { pollRenderJobs } from "./render-poller.js";
 import { projectRunLockKey } from "./archive-host.js";
 import { projectComputeUsed } from "./project-compute-budget.js";
 
@@ -92,7 +93,7 @@ describe.runIf(RUN_DB)("正式生成资格活库契约", () => {
         reason: "原始需求未命中已安装片型", evidence: [] } }, rule_impact: [],
     });
   });
-  afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+  afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
   // 不删除 append-only 资格/五元事件；专属测试作用域留作真实回归证据。
   afterAll(async () => { await Promise.all([owner.end(), app.end(), gateway.end()]); await rm(dir, { recursive: true, force: true }); });
 
@@ -131,6 +132,34 @@ describe.runIf(RUN_DB)("正式生成资格活库契约", () => {
       modelId: "doubao-seedance-2-5", params: { aspectRatio: "16:9" }, mode: "manual", env });
     return { first, second };
   }
+
+  it("只签发当前执行中真实生成且已完成入库的片段；跨项目恢复和篡改资产摘要都被拦截", async () => {
+    vi.stubEnv("WORKLOOM_MEDIA_DIR", path.join(dir, "media"));
+    vi.stubEnv("MEDIA_SIGNING_SECRET", "pg-service-originals-test-secret");
+    const modelId = "doubao-seedance-2-5";
+    const read = () => listProductionOriginals({ app, scope, projectId, modelId, env });
+    await expect(read()).resolves.toMatchObject({ projectId, runId: `RUN-${seq}`, pipeline: "narrative", originals: [null] });
+    const qualified = await qualifyProductionShot({ app, scope, actor: "MEM-ORIGINAL", projectId, shotId: "S1",
+      modelId, params: { aspectRatio: "16:9" }, mode: "auto", env });
+    const accepted = await submitGenJob(await input(qualified.qualificationToken));
+    await expect(read()).resolves.toMatchObject({ originals: [null] });
+    const bytes = Buffer.from("provider original video fixture bytes");
+    const poll = vi.fn(async () => ({ status: "succeeded" as const, uri: "https://test.invalid/fixture.mp4", actualUnits: 5 }));
+    const opts = { pool: new Map([["seedance", { providerId: "seedance" as const, kind: "video" as const,
+      healthy: async () => true, submit: async () => { throw new Error("poll must never submit"); }, poll }]]),
+      archive: null, fetchImpl: async () => new Response(bytes, { headers: { "content-type": "video/mp4" } }) };
+    await expect(pollRenderJobs(app, gateway, scope, { ...opts, projectId: "VID-other" })).resolves.toMatchObject({ checked: 0 });
+    expect(poll).not.toHaveBeenCalled();
+    await expect(pollRenderJobs(app, gateway, scope, { ...opts, projectId })).resolves.toMatchObject({ done: 1, ingested: 1 });
+    expect(providerCalls).toBe(1);
+    const result = await read();
+    expect(result.originals[0]).toMatchObject({ shotId: "S1", durationSec: 5, qualificationId: qualified.qualificationId,
+      requestHash: qualified.requestHash, jobId: accepted.jobId, taskId: accepted.taskId, sha256: renderSha256(bytes), bytes: bytes.length });
+    expect(result.originals[0]?.url).toMatch(/^\/media\/video\/.+\.mp4\?token=/u);
+    await expect(listProductionOriginals({ app, scope: other, projectId, modelId, env })).rejects.toThrow("PREPRODUCTION_REQUIRED");
+    await owner.query("UPDATE video_assets SET sha256=$2 WHERE id=$1", [result.originals[0]?.assetId, "a".repeat(64)]);
+    await expect(read()).rejects.toThrow("ORIGINAL_UNVERIFIED");
+  });
 
   it("项目算力预算在真实并发POST前互斥；后一镜不能花掉已被前镜占用的余额", async () => {
     const { first, second } = await secondShot(); env.WORKLOOM_PROJECT_COMPUTE_CAP = "5";
