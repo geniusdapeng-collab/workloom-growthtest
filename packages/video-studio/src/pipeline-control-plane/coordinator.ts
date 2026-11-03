@@ -233,6 +233,7 @@ export class PipelineCoordinator {
     if (!idempotencyKey.trim()) throw new PipelineCommandError("IDEMPOTENCY_KEY_REQUIRED", "命令必须提供幂等键");
     const requestHash = newStableRequestHash(request);
     return this.repository.transaction(scope, async (tx) => {
+      await tx.lockCommand(scope, idempotencyKey);
       const prior = await tx.getCommandReceipt<T>(scope, idempotencyKey);
       if (prior) {
         if (prior.requestHash !== requestHash) {
@@ -241,14 +242,14 @@ export class PipelineCoordinator {
         return prior.result;
       }
       const result = await fn(tx);
-      await tx.insertCommandReceipt<T>({
+      const saved = await tx.insertCommandReceipt<T>({
         scope,
         idempotencyKey,
         requestHash,
         result,
         createdAt: this.now(),
       });
-      return result;
+      return saved.result;
     });
   }
 

@@ -19,6 +19,7 @@ export class PipelineRepositoryError extends Error {
  * 事务内部的窄仓储接口。Coordinator 只能调用这些方法，不接触 SQL、连接池或任意表。
  */
 export interface PipelineTransaction {
+  lockCommand(scope: PipelineScope, idempotencyKey: string): Promise<void>;
   lockProject(scope: PipelineScope, projectId: string): Promise<void>;
   getRun(scope: PipelineScope, id: string): Promise<PipelineRun | null>;
   getRunBySource(scope: PipelineScope, sourceSystem: string, sourceRunId: string): Promise<PipelineRun | null>;
