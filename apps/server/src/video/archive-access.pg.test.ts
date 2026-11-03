@@ -26,7 +26,7 @@ describe.runIf(process.env.RUN_DB_TESTS === "1")("档案文件读取遵守真实
     for (const id of [workspaceId, foreignWorkspace]) {
       await owner.query("INSERT INTO workspaces (id,tenant_id,name,slug,industry) VALUES ($1,$2,$1,$1,'general')", [id, tenantId]);
     }
-    for (const [id, ws] of [[projectId, workspaceId], [foreignProject, foreignWorkspace]]) {
+    for (const [id, ws] of [[projectId, workspaceId], [foreignProject, foreignWorkspace]] as const) {
       await owner.query("INSERT INTO video_projects (id,workspace_id,title,kind,created_by) VALUES ($1,$2,'private video','narrative','test')", [id, ws]);
       const store = new ArchiveStore(workDir, ws, id);
       await store.ensure();
