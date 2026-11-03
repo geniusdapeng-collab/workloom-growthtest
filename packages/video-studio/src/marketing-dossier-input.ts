@@ -20,5 +20,12 @@ export function verifiedMarketingDossierInput(rawByAgent: RecordValue): RecordVa
     }
     input[key] = value;
   }
+  const competitors = record(rawByAgent.A3).competitors;
+  if (Array.isArray(competitors) && competitors.length === 0
+    && Array.isArray(identity.official_selling_points) && identity.official_selling_points.length > 0) {
+    // Vendor默认把己方卖点与竞品卖点求差集；空竞品语料不能证明“竞品没讲”。
+    // 空数组在既有装订合同里显式关闭该推导，己方有证据卖点仍留在A1事实区。
+    input.sellingPointCandidates = [];
+  }
   return input;
 }

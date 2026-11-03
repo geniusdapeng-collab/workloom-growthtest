@@ -58,5 +58,10 @@ try {
     expect(result.consumption.theme).not.toContain("检索服务");
     expect(result.consumption.input).toMatchObject({ name: "已核实 F3" });
     for (const field of ["brand", "category", "model"] as const) expect(result.consumption.input[field] ?? "").toBe(expected[field]);
+    expect(result.dataMining.data.dossier.differentiation).toEqual({ our_opening: [], crowded_points: [], weakness_openings: [] });
+    expect(result.dataMining.data.cards.theme_card.differentiation_space).toEqual([]);
+    expect(result.consumption.theme).not.toContain("差异化空位");
+    expect(result.consumption.description).not.toContain("差异化空位");
+    expect(result.dataMining.data.dossier.identity.official_selling_points).toHaveLength(1);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 }, 65_000);
