@@ -7460,6 +7460,15 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
         const phase = this[key];
         if (phase && typeof phase === "object") (phase as FusionRecord).agents = this.agents;
       }
+      // Phase 3.5 构造独立检查器；健康监控重建 Phase 时也从引擎读取模型。
+      const agents = this.agents as { sceneDesign?: { llmModel?: unknown } } | undefined;
+      const llmModel = agents?.sceneDesign?.llmModel;
+      if (typeof llmModel === "string" && llmModel) {
+        this.llmModel = llmModel;
+        if (this.phase35 && typeof this.phase35 === "object") {
+          (this.phase35 as FusionRecord).llmModel = llmModel;
+        }
+      }
       return result;
     };
 
