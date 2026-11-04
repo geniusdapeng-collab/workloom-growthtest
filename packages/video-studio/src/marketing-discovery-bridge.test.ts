@@ -73,6 +73,13 @@ it("preserves native follow motion and exact post text in the G6 report for a so
     noTitles: true, durationSeconds: 8, aspectRatio: "9:16", resolution: "1080x1920", characterNames: ["骑手"],
     characterPortraits: [], projectProps: ["自行车"], projectActions: actions, marketingPrompt: prd._workloomMarketingPrompt };
   const rows = actions.map((action, index) => ({ shotId: `S${index + 1}`, duration: 4, action,
+    scene: index === 0 ? "封闭训练场的连续门架" : "训练场安全停车区",
+    costume: "专业骑行服与护具，安全帽扣带保持固定", makeup: "自然肤色，不新增妆造",
+    props: "自行车、门架、安全帽", timeline: `T00:00-T00:04 ${action}，末段保持本镜结束姿态。`,
+    composition: "全景，骑手与自行车完整入画", lighting: "训练场自然侧光", color_palette: "中性自然色彩",
+    transition: "动作落定后硬切至下一镜", mood: "视线跟随训练门架，结束后放松呼吸",
+    pacing: "前段完成主要动作，末段稳定收束", depth_of_field: "中等景深，骑手与训练门架清楚可辨",
+    character: "骑手按本镜动作保持平衡，视线沿训练方向移动",
     camera_movement: index === 0 ? "低机位高速平行跟拍，随骑手通过训练门架" : "固定机位",
     prompt: `01.【动作】${action}`, _workloomPromptReviewPolicy: policy }));
   const studio = Object.create(HyperrealitySystem.prototype);

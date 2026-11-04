@@ -5846,6 +5846,18 @@ function recoverPhase3RowFromSource(shot: FusionRecord): FusionRecord {
   };
 }
 
+/** Commercial assembly may format native direction, but must not replace it with a global action position. */
+function marketingNativeShotField(shot: FusionRecord, key: string, ...aliases: string[]): string {
+  const fields = recordValue(shot.fields);
+  for (const name of [key, ...aliases]) {
+    for (const value of [fields[name], shot[name]]) {
+      const text = promptFieldText(value).replace(/\s+/gu, " ").trim();
+      if (text) return text;
+    }
+  }
+  throw new Error(`MARKETING_NATIVE_SHOT_FIELD_MISSING: ${String(shot.shotId ?? shot.shot_id ?? "未编号镜头")} 缺少原生字段 ${key}`);
+}
+
 export function applyNarrativeFinalPromptContract(
   shot: FusionRecord,
   options: {
@@ -5864,6 +5876,7 @@ export function applyNarrativeFinalPromptContract(
     characterNames?: string[];
     noTitles?: boolean;
     canonicalize?: boolean;
+    requireOpeningFields?: boolean;
     characterPortraits?: Array<{
       name: string;
       path: string;
@@ -5952,7 +5965,9 @@ export function applyNarrativeFinalPromptContract(
     [promptFieldText(next.negative ?? (next.fields as FusionRecord).negative ?? next.negative_prompt), fieldValue("负面约束")]
       .join("；").match(/(?:无|禁止|不出现)(?:船只|建筑|现代设备)/gu) ?? [],
   )];
-  const shotCharacterEvidence = promptFieldText(next.character ?? (next.fields as FusionRecord).character);
+  const shotCharacterEvidence = promptFieldText(options.marketingPrompt
+    ? (next.fields as FusionRecord).character ?? next.character
+    : next.character ?? (next.fields as FusionRecord).character);
   const shotCharacterRef = promptFieldText(next.characterRef);
   const explicitNoPersonInShot = /^(?:无|none|n\/a)$/iu.test(shotCharacterRef)
     || /(?:空镜无角色|无角色出场|不出现[^。；\n]{0,8}(?:人物|人手|身影|面部|陈卓)|画面主体仅[^。；\n]{0,12}(?:陈设|物件)|无人物出场)/u.test(shotCharacterEvidence);
@@ -5978,7 +5993,9 @@ export function applyNarrativeFinalPromptContract(
     || fieldValue("动作")
     || "只执行画面中可见的连续动作，动作主体、先后顺序和结束姿态与场景字段一致。";
   replaceField("动作", actionSource);
-  const makeupSource = promptFieldText(next.makeup ?? (next.fields as FusionRecord).makeup);
+  const makeupSource = promptFieldText(options.marketingPrompt
+    ? (next.fields as FusionRecord).makeup ?? next.makeup
+    : next.makeup ?? (next.fields as FusionRecord).makeup);
   replaceField("化妆", shotNoPerson ? "不适用：本镜无人物。" : makeupSource || "自然写实妆，保持同一角色肤色与面部细节，不新增无关妆造。");
   if (duration > 0) {
     replaceField("时间轴", `T00:00-T00:${duration.toFixed(1)} 起幅建立本镜空间，中段只执行动作字段中的连续变化，落幅保持同一光位并接到下一镜。`);
@@ -6096,6 +6113,22 @@ export function applyNarrativeFinalPromptContract(
     }
   }
   if (options.canonicalize) {
+    const nativeMarketing = options.marketingPrompt ? {
+      action: marketingNativeShotField(next, "action"),
+      scene: marketingNativeShotField(next, "scene", "sceneDescription"),
+      costume: marketingNativeShotField(next, "costume"),
+      makeup: marketingNativeShotField(next, "makeup"),
+      props: marketingNativeShotField(next, "props"),
+      timeline: marketingNativeShotField(next, "timeline"),
+      composition: marketingNativeShotField(next, "composition"),
+      lighting: marketingNativeShotField(next, "lighting", "lightingString"),
+      color: marketingNativeShotField(next, "color_palette", "colorPalette"),
+      transition: marketingNativeShotField(next, "transition"),
+      emotion: marketingNativeShotField(next, "mood", "emotion"),
+      camera: marketingNativeShotField(next, "camera_movement", "cameraMovement", "cameraString"),
+      pacing: marketingNativeShotField(next, "pacing"),
+      depth: marketingNativeShotField(next, "depth_of_field", "depthOfField"),
+    } : null;
     const cleanText = (value: string): string => value
       .replace(/(?:^|\n)\s*(?:id|name|portraitRef|authorization)=[^\n]*/gu, " ")
       .replace(/\[需求口径\]/gu, " ")
@@ -6115,7 +6148,7 @@ export function applyNarrativeFinalPromptContract(
     const profileAppearance = profiles.map((item) => item.appearance).filter(Boolean).join("；")
       .replace(/\bfemale\b/giu, "女性")
       .replace(/\bmale\b/giu, "男性");
-    const canonicalNoPerson = Boolean(options.noCharacters);
+    const canonicalNoPerson = Boolean(options.noCharacters) || Boolean(nativeMarketing && explicitNoPersonInShot);
     const canonicalAnimalNames = characterNames.filter((name) => isNarrativeAnimal(name));
     const canonicalAnimalOnly = canonicalNoPerson
       && canonicalAnimalNames.length > 0
@@ -6134,7 +6167,7 @@ export function applyNarrativeFinalPromptContract(
     const profileCostume = profiles.map((item) => item.costume).filter(Boolean).join("；");
     const shoeIndex = (options.projectActions ?? []).findIndex((action) => /(?:换鞋|脱.*鞋|穿.*拖鞋)/u.test(action));
     const projectedAction = cleanText(options.projectActions?.[Math.min(options.shotIndex ?? 0, Math.max(0, (options.projectActions ?? []).length - 1))] ?? "");
-    const costume = canonicalNoPerson
+    const costume = nativeMarketing ? nativeMarketing.costume : canonicalNoPerson
       ? "不适用：本镜无人物。"
       : costumeTextForFootwear(
         profileCostume || source("服装", "costume").replace(/(?:无角色出场|不适用)/gu, "") || "按已审核角色档案服装执行",
@@ -6142,7 +6175,7 @@ export function applyNarrativeFinalPromptContract(
         options.shotIndex ?? 0,
         shoeIndex,
       );
-    const makeup = canonicalNoPerson
+    const makeup = nativeMarketing ? nativeMarketing.makeup : canonicalNoPerson
       ? "不适用：本镜无人物。"
       : makeupSource || makeupTextForAction(projectedAction);
     const portraitText = canonicalAnimalOnly
@@ -6171,7 +6204,7 @@ export function applyNarrativeFinalPromptContract(
     const subjectlessFallback = canonicalAnimalOnly
       ? `${canonicalAnimalNames.join("、")}在${cleanText(options.projectScene ?? "") || "已确认空间"}完成本镜可见动作`
       : "按本镜源合同执行主体与场景的连续变化，无人物动作";
-    const assignedAction = canonicalAnimalOnly
+    const assignedAction = nativeMarketing ? nativeMarketing.action : canonicalAnimalOnly
       ? (projectedAction || visibleAction || subjectlessFallback)
       : canonicalNoPerson
         ? (
@@ -6184,24 +6217,24 @@ export function applyNarrativeFinalPromptContract(
       : actions.length > 0
         ? actions[Math.min(options.shotIndex ?? 0, actions.length - 1)]!
         : visibleAction;
-    const actionText = canonicalNoActors || (canonicalAnimalOnly && canonicalAnimalNames.some((name) => assignedAction.includes(name)))
+    const actionText = nativeMarketing ? nativeMarketing.action : canonicalNoActors || (canonicalAnimalOnly && canonicalAnimalNames.some((name) => assignedAction.includes(name)))
       ? assignedAction
       : canonicalAnimalOnly
         ? `${canonicalAnimalNames.join("、")}作为唯一动物主体：${assignedAction}`
         : characterNames.length === 0 || characterNames.some((name) => assignedAction.includes(name))
           ? assignedAction
           : `${characterNames.join("、")}在本镜保持同一外观，${assignedAction}`;
-    const shotSizeRaw = promptFieldText(next.shotSize ?? (next.fields as FusionRecord).shotSize)
+    const shotSizeRaw = nativeMarketing ? nativeMarketing.composition.split(/[，。；,;]/u)[0]! : promptFieldText(next.shotSize ?? (next.fields as FusionRecord).shotSize)
       || promptFieldText(next.cameraHint ?? (next.fields as FusionRecord).cameraHint)
       || "中景";
     const shotSize = shotSizeRaw.replace(/景别$/u, "");
-    const compositionText = canonicalAnimalOnly
+    const compositionText = nativeMarketing ? nativeMarketing.composition : canonicalAnimalOnly
       ? `${shotSize}景别，${aspect}构图；${canonicalAnimalNames.join("、")}作为唯一动物主体清晰可辨，画面边缘保留安全区，不增加人物。`
       : canonicalNoPerson
         ? `${shotSize}景别，${aspect}构图；源合同主体清晰，画面边缘保留安全区，不增加人物${options.noAnimals ? "或动物" : ""}。`
       : `${shotSize}景别，${aspect}构图；${characterNames.join("、") || "已登记角色"}位于可执行表演区并保持可辨轮廓，为其动作和视线保留空间。`;
     const cameraSource = promptFieldText(next.camera_movement ?? (next.fields as FusionRecord).camera_movement) || "固定机位";
-    const cameraText = options.marketingPrompt ? cameraSource : /(?:固定|锁死|locked|static|零位移)/iu.test(cameraSource)
+    const cameraText = nativeMarketing ? nativeMarketing.camera : /(?:固定|锁死|locked|static|零位移)/iu.test(cameraSource)
       ? "固定机位，三脚架锁死，全镜零推拉零横移零变焦"
       : /后拉/u.test(cameraSource)
         ? "固定轴线极缓后拉，速度连续，末段减速停稳，不改变场景与背景"
@@ -6210,7 +6243,7 @@ export function applyNarrativeFinalPromptContract(
           : /横移|平移/u.test(cameraSource)
             ? "固定高度极缓横移，速度连续并停稳，不改变场景与背景"
             : "固定机位，不做推拉摇移或变焦";
-    const emotionText = canonicalAnimalOnly
+    const emotionText = nativeMarketing ? nativeMarketing.emotion : canonicalAnimalOnly
       ? emotionTextForAnimalAction(assignedAction, canonicalAnimalNames)
       : canonicalNoPerson
         ? "情绪只通过源动作、光线与空间关系表达，不要求人物表情。"
@@ -6225,25 +6258,25 @@ export function applyNarrativeFinalPromptContract(
       "无生成特效", "无镜头光晕伪影", "无模糊", "无过曝", "无未声明角色",
     ];
     const portraitLine = portraitText.startsWith("不适用") ? portraitText : `使用 ${portraitText}；跨镜不得替换。`;
-    const rawSceneText = sceneTextForAction(
+    const rawSceneText = nativeMarketing?.scene ?? sceneTextForAction(
       assignedAction,
       cleanText(options.projectScene ?? "") || source("场景", "scene", "sceneDescription"),
     );
-    const sceneText = options.postRainOnly ? normalizePostRainWording(rawSceneText) : rawSceneText;
-    const rawLightingText = cleanText(options.projectLighting ?? "") || source("灯光设计", "lighting");
-    const lightingText = options.postRainOnly ? normalizePostRainWording(rawLightingText) : rawLightingText;
-    const colorText = cleanText(options.projectColor ?? "") || source("色彩/色调", "color_palette");
-    const normalizedProps = normalizeFootwearProps(
+    const sceneText = !nativeMarketing && options.postRainOnly ? normalizePostRainWording(rawSceneText) : rawSceneText;
+    const rawLightingText = nativeMarketing?.lighting || cleanText(options.projectLighting ?? "") || source("灯光设计", "lighting");
+    const lightingText = !nativeMarketing && options.postRainOnly ? normalizePostRainWording(rawLightingText) : rawLightingText;
+    const colorText = nativeMarketing?.color || cleanText(options.projectColor ?? "") || source("色彩/色调", "color_palette");
+    const normalizedProps = nativeMarketing ? [nativeMarketing.props] : normalizeFootwearProps(
       options.projectProps ?? [source("道具", "props").replace(/本镜为空镜|无角色使用道具/gu, "")],
       assignedAction,
       options.shotIndex ?? 0,
       shoeIndex,
     ).map((item) => options.postRainOnly ? normalizePostRainWording(item) : item);
     const propsText = normalizedProps.join("、");
-    const actionTimelineText = duration > 0
+    const actionTimelineText = nativeMarketing ? nativeMarketing.timeline : duration > 0
       ? timelineTextForAction(assignedAction, duration)
       : fieldValue("时间轴") || "按本镜合同执行完整起幅、动作与落幅。";
-    const timelineText = options.sourceFirstFrame
+    const timelineText = !nativeMarketing && options.sourceFirstFrame
       ? `首帧约束：${options.sourceFirstFrame.replace(/^第一帧[:：]?/u, "")}；${actionTimelineText}`
       : actionTimelineText;
     const verificationText = [
@@ -6267,7 +6300,7 @@ export function applyNarrativeFinalPromptContract(
       : canonicalNoPerson
         ? "按源合同观察场景与物件；以主体变化、空间关系和已确认光线推进，不增加无关叙事、特效或人物表演。"
         : "克制写实的自然长镜或稳定短镜；以人物动作、空间关系和真实光线推进，不增加无关叙事、特效或模板表演。";
-    const pacing = options.marketingPrompt && fieldValue("节奏") || pacingTextForAction(assignedAction, duration);
+    const pacing = nativeMarketing?.pacing || options.marketingPrompt && fieldValue("节奏") || pacingTextForAction(assignedAction, duration);
     prompt = [
       "01.【语言约束】全部字段使用中文；画幅、分辨率、帧率、编码、时间码与资产路径可作为受控制作标记。",
       `02.【导演意图】${directorIntent}`,
@@ -6278,7 +6311,7 @@ export function applyNarrativeFinalPromptContract(
       `07.【明亮约束】${brightnessText}`,
       `08.【构图】${compositionText}`,
       `09.【色彩/色调】${colorText}`,
-      `10.【景深】${depthTextForShotSize(shotSize, canonicalNoPerson, canonicalAnimalOnly)}`,
+      `10.【景深】${nativeMarketing?.depth || depthTextForShotSize(shotSize, canonicalNoPerson, canonicalAnimalOnly)}`,
       `11.【运镜】${cameraText}`,
       `12.【角色】${roles}`,
       `13.【服装】${costume}`,
@@ -6290,7 +6323,7 @@ export function applyNarrativeFinalPromptContract(
       `19.【时间轴】${timelineText}`,
       `20.【情绪】${emotionText}`,
       `21.【节奏】${pacing}`,
-      `22.【转场】${transitionTextForAction(assignedAction, Boolean(options.isLastShot))}`,
+      `22.【转场】${nativeMarketing?.transition || transitionTextForAction(assignedAction, Boolean(options.isLastShot))}`,
       `23.【音频】${audioText}`,
       `24.【负面约束】${[...new Set([...forbidden, "无暗黑风调色", "无塑料或金属感高光"])].join("、")}。`,
       `25.【角色约束】${canonicalNoPerson ? "画面禁止人物、人影、人体局部和拟人化表演模板。" : `本镜仅允许 ${characterNames.join("、") || "已登记角色"} 入画；不得增加未声明人物。`}`,
@@ -6305,6 +6338,29 @@ export function applyNarrativeFinalPromptContract(
         `复核${audioText}，画面内外均不新增未声明人物、文字、品牌或配乐`,
       ].join("；");
       prompt = `${prompt}\n28.【交付复核】${expansion}`;
+    }
+    // T-2026-1105-9003: G6 must retain the native opening values in its actual prompt.
+    const isOpening = next.sceneType === "opening"
+      || ["SC00", "S00"].includes(String(next.shotId ?? next.shot_id ?? ""));
+    if (isOpening && !options.noTitles) {
+      const openingFields = [
+        ["title_content", "主标题内容"], ["subtitle_content", "副标题内容"],
+        ["title_animation", "标题动画设计"], ["title_font_design", "标题字体设计"],
+        ["opening_audio_design", "开场音频设计"],
+      ] as const;
+      const supplied = openingFields.map(([key, label]) => {
+        const value = next[key] ?? (next.fields as FusionRecord)[key];
+        return { key, label, value: typeof value === "string" ? value.trim() : "" };
+      });
+      const missing = supplied.filter(({ value }) => !value).map(({ key }) => key);
+      if (options.requireOpeningFields && missing.length > 0) {
+        throw new Error(`FINAL_PROMPT_OPENING_FIELDS_MISSING: ${String(next.shotId ?? next.shot_id ?? "未编号镜头")} 缺少原生片头字段 ${missing.join("、")}`);
+      }
+      let sequence = (prompt.match(/^\s*\d+\.【[^】]+】/gmu) ?? []).length;
+      for (const { label, value } of supplied.filter(({ value }) => Boolean(value))) {
+        sequence += 1;
+        prompt += `\n${String(sequence).padStart(2, "0")}.【${label}】${value}`;
+      }
     }
     next._workloomShotContract = {
       schema: "workloom.prompt-shot-contract/v1",
@@ -6675,17 +6731,24 @@ export function normalizeNarrativePromptsForReview(
       ? shot._workloomPromptReviewPolicy as NarrativePromptReviewPolicy
       : policy;
     const rowActions = Array.isArray(rowPolicy.projectActions) ? rowPolicy.projectActions : [];
-    const action = String(
+    const nativeMarketing = rowPolicy.marketingPrompt ? {
+      action: marketingNativeShotField(shot, "action"),
+      scene: marketingNativeShotField(shot, "scene", "sceneDescription"),
+      lighting: marketingNativeShotField(shot, "lighting", "lightingString"),
+      color: marketingNativeShotField(shot, "color_palette", "colorPalette"),
+      props: [marketingNativeShotField(shot, "props")],
+    } : null;
+    const action = nativeMarketing?.action ?? String(
       rowActions[Math.min(shotIndex, Math.max(0, rowActions.length - 1))]
         ?? shot.action
         ?? "",
     ).trim();
     const direction = deriveNarrativeShotDirection({
       action,
-      fallbackScene: rowPolicy.projectScene,
-      fallbackLighting: rowPolicy.projectLighting,
-      fallbackColor: rowPolicy.projectColor,
-      fallbackProps: mergeNarrativeProps(
+      fallbackScene: nativeMarketing?.scene ?? rowPolicy.projectScene,
+      fallbackLighting: nativeMarketing?.lighting ?? rowPolicy.projectLighting,
+      fallbackColor: nativeMarketing?.color ?? rowPolicy.projectColor,
+      fallbackProps: nativeMarketing?.props ?? mergeNarrativeProps(
         rowPolicy.projectProps,
         Array.isArray(policy.projectProps) ? policy.projectProps : [],
       ),
@@ -6694,24 +6757,24 @@ export function normalizeNarrativePromptsForReview(
       ...rowPolicy,
       postRainOnly: rowPolicy.postRainOnly ?? policy.postRainOnly,
       sourceFirstFrame: rowPolicy.sourceFirstFrame ?? policy.sourceFirstFrame,
-      projectScene: sceneMatchesAction(action, rowPolicy.projectScene)
+      projectScene: nativeMarketing?.scene ?? (sceneMatchesAction(action, rowPolicy.projectScene)
         ? rowPolicy.projectScene
-        : (direction.scene || rowPolicy.projectScene),
+        : (direction.scene || rowPolicy.projectScene)),
       projectLighting: direction.lighting || rowPolicy.projectLighting,
       projectColor: direction.color || rowPolicy.projectColor,
-      projectProps: mergeNarrativeProps(
+      projectProps: nativeMarketing?.props ?? mergeNarrativeProps(
         direction.props,
         Array.isArray(rowPolicy.projectProps) ? rowPolicy.projectProps : [],
       ),
       projectActions: rowActions,
     };
-    const enforcedShotSize = promptFieldText(shot.shotSize ?? recordValue(shot.fields).shotSize)
+    const enforcedShotSize = nativeMarketing || promptFieldText(shot.shotSize ?? recordValue(shot.fields).shotSize)
       ? null
       : shotSizeForAction(action);
     const shotForReview = enforcedShotSize
       ? { ...shot, shotSize: enforcedShotSize, cameraHint: enforcedShotSize }
       : shot;
-    const sourceFirstFrame = normalizedPolicy.sourceFirstFrame
+    const sourceFirstFrame = !nativeMarketing && normalizedPolicy.sourceFirstFrame
       && !["contact", "withdraw", "retreat", "curl"].includes(animalActionKind(action))
       ? normalizedPolicy.sourceFirstFrame
       : undefined;
@@ -6730,6 +6793,7 @@ export function normalizeNarrativePromptsForReview(
       characterNames: normalizedPolicy.characterNames,
       noTitles: normalizedPolicy.noTitles,
       canonicalize: true,
+      requireOpeningFields: true,
       marketingPrompt: normalizedPolicy.marketingPrompt,
       characterPortraits: normalizedPolicy.characterPortraits,
       postRainOnly: normalizedPolicy.postRainOnly,
@@ -7916,7 +7980,7 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
         const promptActionsBase = marketingPrompt?.actions.length ? marketingPrompt.actions : extractedPromptActions.length > 0
           ? extractedPromptActions
           : updated.map((shot) => promptFieldText(shot.action)).filter(Boolean);
-        const promptActions = projectNarrativeActionSequence(promptActionsBase, updated.length);
+        const promptActions = marketingPrompt ? promptActionsBase : projectNarrativeActionSequence(promptActionsBase, updated.length);
         const promptContractShots = Array.isArray(policyPrd.shotContract)
           ? policyPrd.shotContract.map(recordValue)
           : [];
@@ -7956,7 +8020,7 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
           marketingPrompt,
         };
         updated = updated.map((shot, shotIndex, allShots) => {
-          const contractShot = promptContractShots.length > 0
+          const contractShot = !marketingPrompt && promptContractShots.length > 0
             ? promptContractShots[Math.min(
               promptContractShots.length - 1,
               Math.floor(shotIndex * promptContractShots.length / Math.max(1, allShots.length)),
@@ -7987,7 +8051,7 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
                 promptActions.length - 1,
                 Math.floor((shotIndex + 0.5) * promptActions.length / Math.max(1, allShots.length)),
               )]);
-          const orderedAction = String(
+          const orderedAction = marketingPrompt ? marketingNativeShotField(shot, "action") : String(
             allShots.length <= promptActions.length
               ? promptActions[shotIndex]
               : promptActions[Math.min(
@@ -7997,26 +8061,25 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
             || contractAction
             || "",
           );
-          const sourceFirstFrame = sourceFirstFrameMatch
+          const sourceFirstFrame = !marketingPrompt && sourceFirstFrameMatch
             && !["contact", "withdraw", "retreat", "curl"].includes(animalActionKind(orderedAction))
             ? `第一帧${sourceFirstFrameMatch[1]!.trim()}`
             : undefined;
           const direction = deriveNarrativeShotDirection({
             action: orderedAction,
-            fallbackScene: contractScene || promptReviewPolicy.projectScene,
-            fallbackLighting: contractLighting || promptReviewPolicy.projectLighting,
-            fallbackColor: contractColor || promptReviewPolicy.projectColor,
-            fallbackProps: contractProps.length > 0 ? contractProps : promptReviewPolicy.projectProps,
+            fallbackScene: marketingPrompt ? marketingNativeShotField(shot, "scene", "sceneDescription") : contractScene || promptReviewPolicy.projectScene,
+            fallbackLighting: marketingPrompt ? marketingNativeShotField(shot, "lighting", "lightingString") : contractLighting || promptReviewPolicy.projectLighting,
+            fallbackColor: marketingPrompt ? marketingNativeShotField(shot, "color_palette", "colorPalette") : contractColor || promptReviewPolicy.projectColor,
+            fallbackProps: marketingPrompt ? [marketingNativeShotField(shot, "props")] : contractProps.length > 0 ? contractProps : promptReviewPolicy.projectProps,
           });
-          const contractShotSize = promptFieldText(contractShot.shotSize) || shotSizeForAction(orderedAction);
-          const contractCameraMovement = marketingPrompt && promptFieldText(shot.camera_movement ?? shot.cameraMovement)
-            ? promptFieldText(shot.camera_movement ?? shot.cameraMovement) : promptFieldText(contractShot.cameraMovement);
+          const contractShotSize = marketingPrompt ? null : promptFieldText(contractShot.shotSize) || shotSizeForAction(orderedAction);
+          const contractCameraMovement = marketingPrompt ? "" : promptFieldText(contractShot.cameraMovement);
           const rowPolicy: NarrativePromptReviewPolicy = {
             ...promptReviewPolicy,
             projectScene: direction.scene || promptReviewPolicy.projectScene,
             projectLighting: direction.lighting || promptReviewPolicy.projectLighting,
             projectColor: direction.color || promptReviewPolicy.projectColor,
-            projectProps: mergeNarrativeProps(direction.props, promptReviewPolicy.projectProps),
+            projectProps: marketingPrompt ? direction.props : mergeNarrativeProps(direction.props, promptReviewPolicy.projectProps),
             projectActions: promptActions,
             sourceFirstFrame,
           };

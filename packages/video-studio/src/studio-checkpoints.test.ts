@@ -90,6 +90,19 @@ it("rejects altered output or mismatched identity before executing a new native 
     .rejects.toThrow("STUDIO_CHECKPOINT_INVALID");
 });
 
+it("invalidates the previous production assembly policy while keeping the same frozen request", async () => {
+  const { adapter } = memoryStore();
+  const input = [{ scenes: ["N1"] }, { model: "same-model" }];
+  const output = { result: { success: true, shots: [{ shotId: "N1", prompt: "old assembly" }] } };
+  await adapter.save({ schemaVersion: "workloom.studio-engine-checkpoint/v1", stage: "PRODUCTION",
+    inputSha256: studioCheckpointHash({ policyVersion: "native-production-final-camera-authority/v4", input }),
+    dependencySha256: studioCheckpointHash("same frozen seed"), output, outputSha256: studioCheckpointHash(output) });
+  const author = vi.fn(async () => ({ result: { success: true, shots: [{ shotId: "N1", prompt: "native direction retained" }] } }));
+  const result = await createStudioCheckpointRunner(adapter, "same frozen seed").run("PRODUCTION", input, author);
+  expect(author).toHaveBeenCalledOnce();
+  expect(result.result.shots[0]!.prompt).toBe("native direction retained");
+});
+
 it("surfaces an unresolved checkpoint write after completed work and preserves the original failure", async () => {
   const load = vi.fn(async () => null);
   const save = vi.fn(async () => { throw new Error("archive offline"); });
