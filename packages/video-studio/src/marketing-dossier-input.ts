@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
+import { AsyncLocalStorage } from "node:async_hooks";
 import path from "node:path";
 import { videoRuntimeRoot } from "./runtime-root.js";
 import { installSharedBridge } from "./vendor-compat.js";
@@ -17,10 +18,12 @@ export interface MarketingCreativeRequirements {
 }
 
 const intentDigest = (intent: string): string => createHash("sha256").update(intent).digest("hex");
+const explicitCreativeClaims = new AsyncLocalStorage<true>();
 export const MARKETING_CREATIVE_RESTRICTIONS = [
   "creativeRequirements.intent 是本次创作和交付要求。角色、表演、虚构情节及竞赛结果不得作为真实战绩、人物背书、商品性能或认证的证据。",
   "按 creativeRequirements.intent 的完整原文保留明确要求的披露、屏幕文字、字幕和尾帧；在对应镜头或后期职责中落实。其文字、角色和创作设定不计入商品事实主张。",
   "媒体转述保留来源与报道限定，不能升级为厂家独立确认、当前报价、实测表现或素材使用权。规格与涂装等单项描述不能外推到战绩或性能保证。",
+  "型号与商品识别信息可以用于本片。价格、规格数字及量化性能只有在客户原文明示要求展示或讲述该项、且已核实来源允许其表达时才进入画面文字、台词或营销钩子；其余保持情报底账用途。",
 ] as const;
 
 export function freezeMarketingCreativeRequirements(intent: string): MarketingCreativeRequirements {
@@ -31,6 +34,11 @@ export function verifyMarketingCreativeRequirements(value: unknown): value is Ma
   const input = record(value);
   return input.role === "creative-and-delivery" && typeof input.intent === "string" && Boolean(input.intent.trim())
     && input.intentSha256 === intentDigest(input.intent);
+}
+
+/** The creative handoff must not promote optional evidence into price/specification hooks. */
+export function withExplicitMarketingCreativeClaims<T>(callback: () => T): T {
+  return explicitCreativeClaims.run(true, callback);
 }
 
 /** Apply the same evidence wording before both host and Studio A5 assembly emit their cards. */
@@ -54,6 +62,15 @@ export function installVendorMarketingReferenceBridge(): () => void {
       const brief = record(cards.brief_card);
       if (reported > 0) {
         brief.evidence_note = `${String(brief.evidence_note ?? "")}。另有 ${reported} 条来源转述（reported），保留在身份事实底账，不能算作厂商独立确认或自动进入片中卖点。`;
+      }
+      if (explicitCreativeClaims.getStore()) {
+        const position = record(record(cards.insight_card).market_position);
+        delete position.price_band;
+        delete position.price_confidence;
+        record(record(cards.prd_card).hook_candidates).data_points = [];
+        const routerMaterial = record(cards.router_material);
+        record(routerMaterial.hook_material).data_points = [];
+        record(routerMaterial.style_hints).has_strong_data = false;
       }
       return cards;
     };

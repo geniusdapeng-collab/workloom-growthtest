@@ -4137,6 +4137,44 @@ export function renderPrdContractMarkdown(prd: Record<string, unknown>): string 
   ].join("\n");
 }
 
+export interface SourceBoundMarketingDiscovery {
+  intent: string;
+  product: string;
+  restrictions: readonly string[];
+}
+
+function marketingDiscoveryContract(discovery: Record<string, unknown>, source: SourceBoundMarketingDiscovery) {
+  const scene = recordValue(discovery.sceneStructure);
+  const risk = recordValue(discovery.riskAssessment);
+  const literals = (value: unknown): string[] | null => {
+    if (!Array.isArray(value) || value.length > 30 || !value.every(item => typeof item === "string"
+      && item.length >= 2 && item.length <= 120 && !item.includes("\n") && source.intent.includes(item))) return null;
+    return [...new Set(value)];
+  };
+  const actions = literals(scene.requiredActions);
+  const props = literals(scene.requiredProps);
+  if (!actions || !props || !Array.isArray(risk.technicalRisks) || !risk.technicalRisks.length
+    || !Array.isArray(risk.mitigationSuggestions) || risk.technicalRisks.length !== risk.mitigationSuggestions.length
+    || !risk.mitigationSuggestions.every(item => typeof item === "string" && item.trim())) {
+    throw new Error("MARKETING_DISCOVERY_UNVERIFIED：场景动作和道具须绑定需求原文，技术风险须逐条对应缓解措施");
+  }
+  return { actions, props: [...new Set([source.product, ...props])] };
+}
+
+function marketingDiscoveryPrompt(agent: string | undefined, source: SourceBoundMarketingDiscovery): string {
+  return [
+    "【当前已核对的营销创作合同，优先于上述示例、惯例与自动补全】",
+    JSON.stringify(source),
+    "根据该合同完成当前工位。只使用本项目的角色、场景、动作和可拍道具。受众分析、场景目的、风险和参考方案不得自行添加未明确要求的商品规格、报价、音轨或发布文案。客户明确要求的商品主张仍须依赖本轮已核对的来源与限定。不得把虚构情节写成真实成绩或实测性能。保留原文要求的画幅、声音、披露和尾帧。示例人物、道具和情节不得带进答案。",
+    ...(agent === "SceneArchitect" ? [
+      "在 JSON 根级同时输出 requiredActions 和 requiredProps 两个字符串数组。逐项从 intent 中逐字摘出所有明确必需的可拍动作（保持剧情先后）和可见道具（包括服装、护具和其他明确实物），禁止改写、杜撰或略去必需项。无此类要求时用 []。每个场景 keyElements 只写该场实际出现的实物，purpose 写完整句子，覆盖明确要求的结尾。",
+    ] : []),
+    ...(agent === "RiskAssessor" ? [
+      "列 1 至 4 条本片风险，mitigationSuggestions 必须与 technicalRisks 数量相等且按同一索引一一对应。每项缓解措施写明该风险对象、可执行处理和检查点。",
+    ] : []),
+  ].join("\n");
+}
+
 /**
  * 叙事片运行时兼容桥：
  * 1. 阻断 vendor 仅凭 brief.platform/goal 把叙事片改写成营销广告；
@@ -4145,6 +4183,7 @@ export function renderPrdContractMarkdown(prd: Record<string, unknown>): string 
  */
 export function installVendorDiscoveryNarrativeBridge(options: {
   log?: (line: string) => void;
+  marketingDiscovery?: () => SourceBoundMarketingDiscovery | undefined;
   /** The caller's current host run requires G4; unscoped vendor previews retain their fallback. */
   requireVerifiedPrd?: () => boolean;
 } = {}): () => void {
@@ -4201,6 +4240,8 @@ export function installVendorDiscoveryNarrativeBridge(options: {
         discovery: Record<string, unknown>,
         upstream: Record<string, unknown>,
       ) {
+        const marketing = options.marketingDiscovery?.();
+        const marketingContract = marketing ? marketingDiscoveryContract(discovery, marketing) : null;
         const result = await original.call(this, discovery, upstream);
         const platform = canonicalPlatformId(upstream?.platform_id ?? upstream?.platform);
         const canonical = canonicalCharacterFromEvidence(upstream);
@@ -4236,6 +4277,9 @@ export function installVendorDiscoveryNarrativeBridge(options: {
         const withEvidence = {
           ...result,
           ...(platform ? { platform } : {}),
+          ...(marketing && marketingContract ? { ...marketingContract,
+            ...(typeof upstream?.aspect_ratio === "string" ? { aspectRatio: upstream.aspect_ratio } : {}),
+            keyPoints: [...(Array.isArray(result.keyPoints) ? result.keyPoints : []), marketing.intent] } : {}),
           characters: inferred,
           _discoveryEvidence: {
             sceneStructure: discovery?.sceneStructure ?? null,
@@ -4264,6 +4308,28 @@ export function installVendorDiscoveryNarrativeBridge(options: {
         requirementList: Record<string, unknown> = {},
         discovery: Record<string, unknown> = {},
       ) {
+        if (options.marketingDiscovery?.()) {
+          const rendered = original.call(this, intent, metadata, requirementList, discovery);
+          const renderList = (label: string, values: unknown): string => {
+            const items = Array.isArray(values) ? values : [];
+            return `- **${label}**（${items.length}）：${items.length ? items.join("、") : "客户未指定"}`;
+          };
+          const scene = recordValue(discovery.sceneStructure);
+          const sceneNodes = [scene.opening, ...(Array.isArray(scene.scenes) ? scene.scenes : []), scene.ending].map(recordValue);
+          const scenes = sceneNodes.map((node, index) => {
+            const label = index === 0 ? "开场" : index === sceneNodes.length - 1 ? "结尾" : `主体场景 ${index}`;
+            const elements = Array.isArray(node.keyElements) ? node.keyElements.join("、") : "未提取";
+            return `${label}（${node.duration}s）：${String(node.purpose ?? "").replace(/\s+/gu, " ")}（实物：${elements}）`;
+          });
+          const risk = recordValue(discovery.riskAssessment);
+          const risks = Array.isArray(risk.technicalRisks) ? risk.technicalRisks.map(recordValue) : [];
+          const mitigation = Array.isArray(risk.mitigationSuggestions) ? risk.mitigationSuggestions : [];
+          const riskSummary = risks.map((item, index) => `风险${index + 1}（${item.level}）：${item.risk}；缓解：${mitigation[index]}`);
+          return rendered.replace(/^- \*\*场景\*\*[^\n]*$/mu, () => renderList("场景", scenes))
+            .replace(/^- \*\*道具\*\*[^\n]*$/mu, () => renderList("道具", requirementList.props))
+            .replace(/^- \*\*动作\*\*[^\n]*$/mu, () => renderList("动作", requirementList.actions))
+            .replace(/^- \*\*风险结论\*\*[^\n]*$/mu, () => `- **风险结论**：${riskSummary.join("；")}`);
+        }
         const duration = Number(
           requirementList.targetDuration
           ?? (metadata?.brief as Record<string, unknown> | undefined)?.duration
@@ -4302,6 +4368,7 @@ export function installVendorDiscoveryNarrativeBridge(options: {
         markdown: string,
         requirementList: Record<string, unknown>,
       ) {
+        if (options.marketingDiscovery?.()) return original.call(this, markdown, requirementList);
         const duration = Number(requirementList?.targetDuration ?? 0);
         const discovery = requirementList?._discoveryEvidence && typeof requirementList._discoveryEvidence === "object"
           ? requirementList._discoveryEvidence as Record<string, unknown>
@@ -4365,6 +4432,7 @@ export function installVendorDiscoveryNarrativeBridge(options: {
         this: unknown,
         discovery: Record<string, unknown>,
       ) {
+        if (options.marketingDiscovery?.()) return original.call(this, discovery);
         const upstream = recordValue(discovery?.upstreamFields);
         const duration = Number(upstream.duration_sec ?? 0);
         normalizeNarrativeDiscovery(discovery, duration, upstream);
@@ -4399,17 +4467,18 @@ export function installVendorDiscoveryNarrativeBridge(options: {
         const llm = this.llmEngine;
         if (!llm) throw new Error("LLM 引擎未初始化");
         if (!this._buildPrompt) return original.call(this, input, schema);
-        const prompt = this._buildPrompt(input);
-        const options = {
+        const marketing = options.marketingDiscovery?.();
+        const prompt = this._buildPrompt(input) + (marketing ? `\n\n${marketingDiscoveryPrompt(this.name, marketing)}` : "");
+        const requestOptions = {
           maxTokens: this.name === "SceneArchitect" ? 16_384 : 8_192,
           temperature: this.name === "SceneArchitect" ? 0.4 : 0.8,
           timeoutMs: this.timeoutMs,
           forceJson: true,
         };
         const response = typeof llm.reasonStructured === "function"
-          ? await llm.reasonStructured(prompt, this.name === "SceneArchitect" ? null : schema, options)
+          ? await llm.reasonStructured(prompt, this.name === "SceneArchitect" ? null : schema, requestOptions)
           : typeof llm.reason === "function"
-            ? await llm.reason(prompt, options)
+            ? await llm.reason(prompt, requestOptions)
             : null;
         if (!response?.success) throw new Error(String(response?.error ?? "LLM 调用失败"));
         if (response.data && typeof response.data === "object") return response.data;

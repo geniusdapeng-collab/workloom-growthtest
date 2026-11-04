@@ -1301,7 +1301,8 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
             const studio = new VideoStudio({ ...studioConfig, ...(marketing ? { dataMining: {
               mode: "api", storeRoot: marketing.storeRoot, refresh: true,
               verifiedRaw: { projectId: input.projectId, rawJson: canonicalRenderJson(marketing.raw), sha256: marketing.bundle.rawSha256, productQuery: marketing.bundle.productQuery,
-                specSourceUrls: marketing.specSourceUrls, creativeRequirements: marketing.bundle.creativeRequirements, restrictions: marketing.bundle.restrictions },
+                specSourceUrls: marketing.specSourceUrls, creativeRequirements: marketing.bundle.creativeRequirements, restrictions: marketing.bundle.restrictions,
+                ...(promptReview ? { explicitCreativeClaimsOnly: true as const } : {}) },
             } } : {}) });
             /**
              * 传入 runInput（而不是 input）：它带上了本轮的片型选型结论与注入指引，

@@ -41,19 +41,21 @@ import {
   installSharedBridge,
   narrativeSpeechPolicy,
   runWithDurationProjectionPolicy,
-  type DurationProjectionEvent
+  type DurationProjectionEvent,
+  type SourceBoundMarketingDiscovery,
 } from "./vendor-compat.js";
 import { AUDIO_DISCIPLINE_CLAUSE, AUDIO_NEGATIVE_TERMS } from "./shot-spec.js";
 import { loadDurationRules } from "./duration-rules.js";
 import { installVendorMarketingPriceBridge } from "./marketing-price-contract.js";
 import { installVendorMarketingReferenceBridge, sourceBoundMarketingAssemblyRaw, verifiedMarketingDossierInput,
-  verifyMarketingCreativeRequirements, type MarketingCreativeRequirements } from "./marketing-dossier-input.js";
+  verifyMarketingCreativeRequirements, withExplicitMarketingCreativeClaims, type MarketingCreativeRequirements } from "./marketing-dossier-input.js";
 
 /** 全局桥只安装一次；可变的日志和事件出口属于调用它的异步运行。 */
 interface StudioBridgeScope {
   log: (line: string) => void;
   onDurationEvent: (event: DurationProjectionEvent) => void;
   onPromptReview?: (prompts: readonly Record<string, unknown>[]) => void;
+  marketingDiscovery?: SourceBoundMarketingDiscovery;
 }
 const studioBridgeScopes = new AsyncLocalStorage<StudioBridgeScope>();
 const logFromBridge = (line: string): void => { studioBridgeScopes.getStore()?.log(line); };
@@ -164,7 +166,8 @@ export interface StudioConfig {
     staleAfterDays?: number;
     /** 仅服务宿主在完整来源/G1通过后装配；浏览器metadata中的同名字段没有权限。 */
     verifiedRaw?: { projectId: string; rawJson: string; sha256: string; productQuery: Record<string, unknown>;
-      specSourceUrls?: Record<string, string>; creativeRequirements?: MarketingCreativeRequirements; restrictions?: string[] };
+      specSourceUrls?: Record<string, string>; creativeRequirements?: MarketingCreativeRequirements; restrictions?: string[];
+      explicitCreativeClaimsOnly?: true };
   };
 }
 
@@ -379,6 +382,7 @@ export class VideoStudio {
     delete metadata._dataDossier;
     const verified = cfg.dataMining?.verifiedRaw;
     let verifiedRaw: Record<string, unknown> | undefined;
+    let marketingDiscovery: SourceBoundMarketingDiscovery | undefined;
     if (input.isMarketing) {
       if (!verified || verified.projectId !== input.projectId || createHash("sha256").update(verified.rawJson).digest("hex") !== verified.sha256) {
         throw new Error("MARKETING_G1_REQUIRED：营销创意只能消费本次宿主G1通过的事实回填");
@@ -398,6 +402,13 @@ export class VideoStudio {
           || (input.rawIntent ?? input.intent) !== verified.creativeRequirements.intent
           || !Array.isArray(verified.restrictions) || !verified.restrictions.every(value => typeof value === "string" && value.trim())) {
           throw new Error("MARKETING_CREATIVE_REQUIREMENTS_UNBOUND：营销创作输入与 G1 核对的创作合同不同");
+        }
+        marketingDiscovery = { intent: verified.creativeRequirements.intent, product: verified.productQuery.name,
+          restrictions: verified.restrictions };
+        const selection = metadata.platformSelection as { aspectRatio?: unknown } | undefined;
+        const brief = metadata.brief as Record<string, unknown> | undefined;
+        if (typeof selection?.aspectRatio === "string" && !brief?.aspectRatio && !brief?.aspect_ratio) {
+          metadata.brief = { ...brief, aspectRatio: selection.aspectRatio };
         }
         effectiveIntent += `\n\n【已核对的创作与交付约束】\n按本次客户创作要求（creativeRequirements.intent）落实以下限制。\n${verified.restrictions.join("\n")}`;
       }
@@ -455,6 +466,7 @@ export class VideoStudio {
     const bridgeScope: StudioBridgeScope = {
       log,
       onPromptReview: cfg.onPromptReview,
+      marketingDiscovery,
       onDurationEvent: (event) => {
         if (typeof event.targetSeconds === "number" && event.targetSeconds > 0) {
           lastProjectedTarget = event.targetSeconds;
@@ -528,6 +540,7 @@ export class VideoStudio {
         keep(installSharedBridge("vendor-discovery-narrative", () => installVendorDiscoveryNarrativeBridge({
           log: logFromBridge,
           requireVerifiedPrd: () => Boolean(studioBridgeScopes.getStore()),
+          marketingDiscovery: () => studioBridgeScopes.getStore()?.marketingDiscovery,
         })));
         /** Phase 3 后融合链路深栈诊断（vendor 内部 catch 会吞掉栈帧） */
         keep(installSharedBridge("vendor-phase-internals-diagnostics", () => installVendorPhaseInternalsDiagnostics({ log: logFromBridge })));
@@ -682,9 +695,10 @@ export class VideoStudio {
           const modelName = portraitCfg && portraitCfg.enabled !== false ? portraitCfg.model : "未指定模型";
           log(`[studio] 定妆照真实出图已启用（${modelName}，产物根 ${charactersDir}）`);
         }
+        const create = () => system.create(effectiveIntent, metadata, createOptions);
         const result = await runWithDurationProjectionPolicy(
           { noDialogue: inputSpeechPolicy.allSpeechForbidden, minShotSeconds: minSingleShot, maxShotSeconds: maxSingleShot },
-          () => system.create(effectiveIntent, metadata, createOptions),
+          verifiedRaw && verified?.explicitCreativeClaimsOnly ? () => withExplicitMarketingCreativeClaims(create) : create,
         );
         // Vendor consumes the explicit rejection; the caller still receives
         // the original infrastructure failure after vendor has stopped safely.
