@@ -31,6 +31,8 @@ export * from "./duration-rules.js";
 export * from "./vendor-compat.js";
 export * from "./confirmation.js";
 export * from "./studio.js";
+export * from "./studio-checkpoints.js";
+export * from "./unicode-text.mjs";
 export * from "./render-scripts.js";
 export * from "./stage-registry.js";
 export * from "./micromotion.js";

@@ -7,6 +7,7 @@ import { link, open, readFile, realpath, rename, rm } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { COVER_PLATFORM_IDS } from "../packages/video-studio/src/cover-platforms.ts";
+import { FINAL_PROMPT_MAX_CHARACTERS, VIDEO_INTENT_MAX_CHARACTERS, unicodeLength } from "../packages/video-studio/src/unicode-text.mjs";
 import { CapabilityError, sanitizeErrorMessage } from "./agent-capabilities.mjs";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
@@ -15,6 +16,8 @@ const JOB_SCHEMA = "workloom.official-video-job/v1";
 const RESULT_SCHEMA = "workloom.official-video-cli/v1";
 const PROMPT_REVIEW = "prompt-review";
 const MAX_FILE_BYTES = 64 * 1024;
+// 12000 supplementary characters can occupy 144000 bytes when JSON uses surrogate escapes.
+const MAX_INPUT_BYTES = 256 * 1024;
 const PIPELINES = new Set(["marketing", "narrative"]);
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/u;
 const SHA256 = /^[a-f0-9]{64}$/u;
@@ -29,8 +32,8 @@ const fail = (code, message, exitCode = 2) => { throw new CapabilityError(code, 
 
 export function validateVideoIntent(input) {
   if (!record(input) || Object.keys(input).some(key => !["intent", "durationSec", "platform", "product", "purpose"].includes(key))
-    || typeof input.intent !== "string" || !input.intent.trim() || input.intent.length > 2000) {
-    fail("INVALID_INPUT", "start 需要非空 intent（最多 2000 字符），只接受额外的 durationSec、platform、product、purpose");
+    || typeof input.intent !== "string" || !input.intent.trim() || unicodeLength(input.intent) > VIDEO_INTENT_MAX_CHARACTERS) {
+    fail("INVALID_INPUT", "start 需要非空 intent（最多 12000 个 Unicode 字符），只接受额外的 durationSec、platform、product、purpose");
   }
   if (input.purpose !== undefined && input.purpose !== PROMPT_REVIEW) fail("INVALID_INPUT", "purpose 仅支持 prompt-review");
   if (input.durationSec !== undefined && !validDuration(input.durationSec)) {
@@ -270,7 +273,8 @@ export function validateFormalVideoSource(source, job) {
   }
   const shots = source.shots.map(shot => {
     if (!ID.test(shot?.shotId ?? "") || ids.has(shot.shotId) || !Number.isSafeInteger(shot.durationSec) || shot.durationSec < 1
-      || typeof shot.prompt !== "string" || !shot.prompt.trim() || !record(shot.fields) || hash(shot.prompt) !== shot.promptSha256) {
+      || typeof shot.prompt !== "string" || !shot.prompt.trim() || unicodeLength(shot.prompt) > FINAL_PROMPT_MAX_CHARACTERS
+      || !record(shot.fields) || hash(shot.prompt) !== shot.promptSha256) {
       fail("SOURCE_UNVERIFIED", "正式分镜缺少唯一镜号、完整内容或一致摘要", 7);
     }
     ids.add(shot.shotId);
@@ -290,7 +294,8 @@ async function readPromptReview(session, job) {
     || typeof source.reviewReport !== "string" || !source.reviewReport.trim() || hash(source.reviewReport) !== source.reviewReportSha256
     || !Array.isArray(source.shots) || source.shots.length < 1 || source.shots.length > 100
     || !source.shots.every(shot => ID.test(shot?.shotId ?? "") && validDuration(shot.durationSec)
-      && typeof shot.prompt === "string" && shot.prompt.trim() && hash(shot.prompt) === shot.promptSha256)
+      && typeof shot.prompt === "string" && shot.prompt.trim() && unicodeLength(shot.prompt) <= FINAL_PROMPT_MAX_CHARACTERS
+      && hash(shot.prompt) === shot.promptSha256)
     || new Set(source.shots.map(shot => shot.shotId)).size !== source.shots.length
     || source.plannedSeconds !== source.shots.reduce((total, shot) => total + shot.durationSec, 0)) {
     fail("PROMPT_REVIEW_UNVERIFIED", "提示词评审回执的作用域、作业或正文摘要不符", 7);
@@ -420,14 +425,14 @@ async function readInputFile(path) {
       let valid = false;
       try {
         const info = await file.stat();
-        valid = info.isFile() && info.size <= MAX_FILE_BYTES;
+        valid = info.isFile() && info.size <= MAX_INPUT_BYTES;
       } finally { if (!valid) await file.close(); }
-      if (!valid) fail("INVALID_INPUT", "输入须为不超过 64 KiB 的普通文件");
+      if (!valid) fail("INVALID_INPUT", "输入须为不超过 256 KiB 的普通文件");
     }
     const stream = file ? file.createReadStream() : process.stdin;
     for await (const chunk of stream) {
       length += chunk.length;
-      if (length > MAX_FILE_BYTES) fail("INVALID_INPUT", "输入超过 64 KiB");
+      if (length > MAX_INPUT_BYTES) fail("INVALID_INPUT", "输入超过 256 KiB");
       chunks.push(chunk);
     }
     return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks)));

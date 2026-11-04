@@ -2,7 +2,8 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { newId } from "@workloom/shared";
-import { DIRECTOR_POLICY_VERSION, resolveDeliveryTargets, attributeCreativeFeedback } from "@hyperreality/video-studio";
+import { DIRECTOR_POLICY_VERSION, resolveDeliveryTargets, attributeCreativeFeedback,
+  unicodeLength, VIDEO_INTENT_MAX_CHARACTERS } from "@hyperreality/video-studio";
 import { actionProcedure, navigationPermissionProcedure, navigationPermissionWriteProcedure, router, scopeOf } from "../trpc/context.js";
 import { directorTx, readExplicitDirectorPreferences, saveExplicitDirectorPreference } from "./director-store.js";
 import { assertDirectorProductionRoute, directorEvent, latestDirectorPlan, queueDirectorJob, readDirectorJob, recoverInterruptedDirectorJob, DirectorJobError, type DirectorJob } from "./director-jobs.js";
@@ -49,9 +50,11 @@ export function publicDirectorJob(job:DirectorJob) {
 }
 
 export const directorRouter=router({
-  resolveTargets:read.input(z.object({intent:z.string().min(1).max(10000),options:options.optional()}).strict())
+  resolveTargets:read.input(z.object({intent:z.string().min(1).refine(value=>unicodeLength(value)<=VIDEO_INTENT_MAX_CHARACTERS,
+    "intent 最多 12000 个 Unicode 字符"),options:options.optional()}).strict())
     .query(({input})=>api(async()=>resolveDeliveryTargets(input.intent,input.options))),
-  start:write.input(z.object({intent:z.string().trim().min(2).max(10000),mode:z.enum(["produce","plan"]).default("produce"),
+  start:write.input(z.object({intent:z.string().refine(value=>unicodeLength(value.trim())>=2,"请写一句想拍的内容或感觉")
+    .refine(value=>unicodeLength(value)<=VIDEO_INTENT_MAX_CHARACTERS,"intent 最多 12000 个 Unicode 字符"),mode:z.enum(["produce","plan"]).default("produce"),
     deliveryOptions:options.optional(),identityAssetRefs:z.array(id).max(4).optional(),audioMode:z.enum(["source","dubbing"]).default("source"),
     maxBudgetCny:z.number().nonnegative().max(100000).optional(),idempotencyKey:z.string().min(8).max(200)}).strict())
     .mutation(({ctx,input})=>api(async()=>{

@@ -3,7 +3,6 @@
  * 
  * 职责：
  * - 串行执行 PromptFusion Agent（每镜头独立 LLM 调用）
- * - 动态预算计算（根据镜头数）
  * - 合并 25 字段到 shots
  * - 保存 checkpoint
  */
@@ -18,58 +17,13 @@ class Phase3PromptFusion extends PhaseExecutor {
   }
 
   async execute(state) {
-    const { shots, result, adaptedBlueprint } = state;
+    const { result, adaptedBlueprint } = state;
+    let { shots } = state;
     const startTime = Date.now();
     const shotCount = shots.length;
 
-    // 动态预算计算
-    // 【v2.1.8-fix】从 agentConfig 读取实际 llmTimeout，而非硬编码
-    // 【修复 P1-7】默认值与 PromptFusionAgent 一致（300s），避免预算估算严重偏低
-    const actualLLMTimeout = this.agentConfig?.llmTimeout || 300000;
-    const actualRetries = this.agentConfig?.llmMaxRetries || 1;
-    // 单镜头预算 = LLM超时 × (1 + 重试次数) + 解析/校验开销
-    const PHASE3_PER_SHOT_MS = actualLLMTimeout * (1 + actualRetries) + 30000;   // 正常模式
-    const PHASE3_FAST_PER_SHOT_MS = actualLLMTimeout + 20000;                  // fastMode 不重试
-    const PHASE3_BUFFER_MS = 60000;     // 1分钟缓冲（原为2分钟）
-    
-    // 判断是否需要启用 fastMode
-    const standardNeedMs = shotCount * PHASE3_PER_SHOT_MS + PHASE3_BUFFER_MS;
-    const budgetRemaining = this.budgetRemaining ? this.budgetRemaining() : Infinity;
-    const useFastMode = budgetRemaining < standardNeedMs && budgetRemaining > shotCount * PHASE3_FAST_PER_SHOT_MS;
-    
-    const perShotMs = useFastMode ? PHASE3_FAST_PER_SHOT_MS : PHASE3_PER_SHOT_MS;
-    const needMs = shotCount * perShotMs + PHASE3_BUFFER_MS;
-
-    this.log('PHASE-3', `📊 动态预算: ${shotCount}镜头 × ${perShotMs/1000}s${useFastMode ? '(fastMode)' : ''} + ${PHASE3_BUFFER_MS/1000}s缓冲 = 需${Math.round(needMs/1000)}s`);
-    if (useFastMode) {
-      this.log('PHASE-3', '⚡ fastMode 已启用：预算不足，缩短单镜头超时、禁用重试');
-    }
-
-    // 预算检查
-    // 【v2.1.6-fix】Phase 3 是核心环节，预算不足时告警但继续执行，不可跳过
-    const canAfford = this.checkBudget(needMs, 'Phase 3');
-    if (!canAfford) {
-      this.log('PHASE-3', '⚠️ 预算不足，但 Phase 3 是核心环节，继续执行（可能超时）');
-    }
-
     try {
-      // 【v2.1.8-fix】强制下限：从环境变量读取，默认 60 分钟
-      const totalRemainingMs = this.budgetRemaining ? this.budgetRemaining() : parseInt(process.env.STORMAXE_TOTAL_DEADLINE_MS || '3600000');
-      const minLongTaskTimeoutMs = Number(process.env.STORMAXE_MIN_LONG_TASK_TIMEOUT_MS || process.env.STORMAXE_TOTAL_DEADLINE_MS || '3600000');
-      const phase3Timeout = Math.max(totalRemainingMs, minLongTaskTimeoutMs);
-      if (this.healthMonitor) {
-        this.healthMonitor.setLongTaskMode('ProductionEngine', true, phase3Timeout);
-      } else {
-        console.log('[Phase3PromptFusion] ⚠️ healthMonitor 未设置，长时间任务模式未启用');
-      }
-
-      this.log('PROMPT-FUSION-AGENT', `开始(串行模式,${shotCount}镜头,${useFastMode ? 'fastMode,' : ''}预计${Math.round(needMs/1000)}s)...`);
-      
-      // 【v2.1.8-fix】fastMode 下保留重试（应对429），不缩短超时（避免镜头预算不足）
-      if (useFastMode && this.agents.promptFusion) {
-        this.agents.promptFusion.llmMaxRetries = 1; // fastMode 保留1次重试
-        this.log('PHASE-3', '⚡ fastMode 配置已下发：retries=1（timeout不变）');
-      }
+      this.log('PROMPT-FUSION-AGENT', `开始(串行模式,${shotCount}镜头)...`);
       
       // 【架构-L3】技能预匹配：在 PromptFusion 逐镜头生成前完成【fix-3A1】
       const { routeAndEnhanceV3, assignFilmDirector, getSkillQCBlocks, checkSkillCompliance } = require('../../../skills/hollywood-cinematography/cinematography-skill-router');
@@ -199,21 +153,6 @@ class Phase3PromptFusion extends PhaseExecutor {
     } catch (e) {
       this.log('PROMPT-FUSION-FAIL', `❌ ${e.message},部分镜头降级到规则 Prompt`);
       return { success: false, shots, result, timing: Date.now() - startTime, error: e.message };
-    } finally {
-      // 【v2.1.8-fix3-专家方案】延迟关闭，避免刚完成checkpoint合并时被心跳检查误判
-      // 【修复 P3-2】存储 timer handle + unref，防止进程被悬空 timer 吊住 60s
-      if (this.healthMonitor) {
-        const delayMs = Number(process.env.STORMAXE_LONG_TASK_CLOSE_DELAY_MS || 60000);
-        this._longTaskCloseTimer = setTimeout(() => {
-          try {
-            this.healthMonitor.setLongTaskMode('ProductionEngine', false);
-          } catch (_) {}
-          this._longTaskCloseTimer = null;
-        }, delayMs);
-        if (typeof this._longTaskCloseTimer.unref === 'function') {
-          this._longTaskCloseTimer.unref();
-        }
-      }
     }
   }
   /**

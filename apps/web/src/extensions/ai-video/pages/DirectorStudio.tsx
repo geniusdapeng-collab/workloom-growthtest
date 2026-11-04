@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import type { DirectorFilmPlan } from "../../../../../../packages/video-studio/src/director-planner";
+import { unicodeLength, VIDEO_INTENT_MAX_CHARACTERS } from "../../../../../../packages/video-studio/src/unicode-text.mjs";
 import { ensureDemoLogin, trpc } from "../../../lib/trpc";
 import { useNavigationAccess } from "../../../shell/NavigationAccess";
 import { PageExitLink } from "../../../shell/PageExitLink";
@@ -34,6 +35,8 @@ export default function DirectorStudio(){
   const [identityIds,setIdentityIds]=useState<string[]>([]);
   const mounted=useRef(true),serial=useRef(0),requestKey=useRef(key());
   const write=canAction("workspace.write");
+  const intentCharacters=unicodeLength(intent);
+  const intentTooLong=intentCharacters>VIDEO_INTENT_MAX_CHARACTERS;
   const film=job?.filmPlan && typeof job.filmPlan==="object" && "schemaVersion" in job.filmPlan
     ? job.filmPlan as DirectorFilmPlan : null;
   const variants=(job?.variants??[]) as unknown as Variant[];
@@ -67,10 +70,11 @@ export default function DirectorStudio(){
     try{await ensureDemoLogin();await run();}catch(e){setError(message(e));}finally{if(mounted.current)setBusy(null);}
   };
   const start=(mode:"produce"|"plan")=>operation("start",async()=>{
-    if(intent.trim().length<2)throw new Error("请写一句想拍的内容或感觉。");
+    if(unicodeLength(intent.trim())<2)throw new Error("请写一句想拍的内容或感觉。");
+    if(intentTooLong)throw new Error("创作需求最多 12000 个字，请保留重点后再提交。");
     const amount=budget.trim()?Number(budget):undefined;
     if(amount!==undefined && (!Number.isFinite(amount)||amount<0||amount>100000))throw new Error("预算上限应是 0–100000 元之间的数值。");
-    const next=await trpc.video.creative.start.mutate({intent:intent.trim(),mode,idempotencyKey:requestKey.current,
+    const next=await trpc.video.creative.start.mutate({intent,mode,idempotencyKey:requestKey.current,
       maxBudgetCny:amount,identityAssetRefs:identityIds});adopt(next);setIntent("");
   });
   const resume=()=>operation("resume",async()=>{
@@ -119,11 +123,14 @@ export default function DirectorStudio(){
     <section className="director-composer" aria-label="电影创作需求">
       <label htmlFor="director-intent">你想拍什么？</label>
       <textarea id="director-intent" value={intent} onChange={e=>{setIntent(e.target.value);requestKey.current=key();}}
-        placeholder={placeholder} maxLength={10000} rows={3} disabled={!write||Boolean(busy)||active(job)} />
+        placeholder={placeholder} rows={3} disabled={!write||Boolean(busy)||active(job)}
+        aria-invalid={intentTooLong} aria-describedby="director-intent-length" />
+      <p id="director-intent-length" role={intentTooLong?"alert":undefined} className={intentTooLong?"director-error":"director-muted"}>
+        {intentCharacters} / {VIDEO_INTENT_MAX_CHARACTERS} 字{intentTooLong?"，请保留重点后再提交。":"（汉字和标点各计一字）"}</p>
       <div className="director-composer-footer"><p>默认交付抖音、小红书、视频号三版，再加一支导演惊喜版。你在原话中指定的平台、数量和否定要求优先。</p>
-        <div className="director-actions"><button className="director-secondary" disabled={!write||Boolean(busy)||active(job)||intent.trim().length<2}
+        <div className="director-actions"><button className="director-secondary" disabled={!write||Boolean(busy)||active(job)||unicodeLength(intent.trim())<2||intentTooLong}
           onClick={()=>void start("plan")}>{busy==="start"?"正在提交…":"只做文字方案"}</button>
-          <button className="director-primary" disabled={!write||Boolean(busy)||active(job)||intent.trim().length<2}
+          <button className="director-primary" disabled={!write||Boolean(busy)||active(job)||unicodeLength(intent.trim())<2||intentTooLong}
             onClick={()=>void start("produce")}>{busy==="start"?"正在提交…":"交给导演 →"}</button></div></div>
       <details className="director-budget"><summary>制作预算</summary><label htmlFor="director-budget">本项目可用上限（元）</label>
         <input id="director-budget" type="number" min="0" max="100000" inputMode="decimal" placeholder="沿用客户端设置" value={budget} onChange={e=>setBudget(e.target.value)} disabled={Boolean(busy)||!write}/>

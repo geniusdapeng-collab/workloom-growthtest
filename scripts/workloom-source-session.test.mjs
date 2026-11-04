@@ -83,6 +83,22 @@ test("studio start preserves original intent and target through a single verifie
   });
 });
 
+test("source Studio admits 12000 Unicode characters and rejects overflow before networking", async () => {
+  for (const character of ["汉", "𠮷"]) {
+    const raw = character.repeat(12000);
+    const f = fixtures({ studio: studioReceipt });
+    const request = { intent: raw, durationSec: 18 };
+    await runSourceSession(studioStart(), { ...f, env: config,
+      input: Readable.from([Buffer.from(JSON.stringify(request))]), output: () => {} });
+    assert.equal(JSON.parse(f.calls[3].init.body).intent, raw);
+    const blocked = fixtures({ studio: studioReceipt });
+    await assert.rejects(runSourceSession(studioStart(), { ...blocked, env: config,
+      input: Readable.from([Buffer.from(JSON.stringify({ ...request, intent: raw + character }))]), output: () => {} }),
+    { code: "STUDIO_INPUT_INVALID" });
+    assert.equal(blocked.calls.length, 0);
+  }
+});
+
 test("studio start never retries an unknown or incompatible response", async () => {
   for (const studio of [undefined, { kind: "routed", pipeline: "narrative", projectId: "VID-T", runId: null }]) {
     const f = fixtures({ studio });

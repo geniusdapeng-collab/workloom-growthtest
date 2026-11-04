@@ -89,6 +89,21 @@ it('rejects source actions exceeding the final prompt capacity instead of emitti
   })).toThrow(/FINAL_PROMPT_SOURCE_CAPACITY_EXCEEDED.*S-long.*3000/u);
 });
 
+it('counts supplementary-plane characters at the actual final source-preserving boundary', () => {
+  const build = (count: number) => applyNarrativeFinalPromptContract({
+    shotId: 'A', duration: 6, scene: '𠮷'.repeat(count), action: '𠮷禾举起杯子',
+  }, {
+    noDialogue: true, maxLength: 3000, canonicalize: true, characterNames: ['𠮷禾'],
+    projectScene: '𠮷'.repeat(count), projectActions: ['𠮷禾举起杯子'],
+  });
+  const exact = String(build(1779).prompt);
+  expect(Array.from(exact)).toHaveLength(3000);
+  expect(exact.length).toBeGreaterThan(3000);
+  expect(exact).toContain('𠮷'.repeat(1779));
+  expect(exact).toContain('𠮷禾举起杯子');
+  expect(() => build(1780)).toThrow(/FINAL_PROMPT_SOURCE_CAPACITY_EXCEEDED.*3001.*3000/u);
+});
+
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

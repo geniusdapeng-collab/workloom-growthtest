@@ -734,7 +734,6 @@ class ReferenceCurator extends BaseDiscoveryAgent {
 class RequirementDiscoveryEngine {
   constructor(options = {}) {
     this.llmEngine = options.llmEngine || null;
-    this.timeoutMs = options.timeoutMs || 720000; // 【v2.1.8-fix】12 分钟总预算
     this.agentTimeoutMs = options.agentTimeoutMs || 180000; // 【v2.1.8-fix】180 秒/Agent
     
     // 初始化 4 个 Agent
@@ -769,13 +768,6 @@ class RequirementDiscoveryEngine {
     console.log('\n🔍 [RequirementDiscoveryEngine] 开始需求洞察...');
     this.startTime = Date.now();
 
-    // 检查总预算
-    const budgetCheck = this._checkBudget(0, '启动');
-    if (!budgetCheck.ok) {
-      console.warn(`   ⚠️ 预算不足，使用极速模式（规则推断）`);
-      return this._fastMode(upstreamFields);
-    }
-
     const results = {
       upstreamFields: this._sanitizeUpstreamFields(upstreamFields),
       audienceProfile: null,
@@ -789,50 +781,34 @@ class RequirementDiscoveryEngine {
     };
 
     // Agent 1: AudienceProfiler
-    if (this._checkBudget(this.agentTimeoutMs, 'AudienceProfiler')) {
-      try {
-        results.audienceProfile = await this.agents.audience.run(upstreamFields, AudienceProfileSchema);
-      } catch (e) {
-        console.warn(`   [AudienceProfiler] 失败: ${e.message}`);
-        results.audienceProfile = this.agents.audience._fallback(upstreamFields);
-      }
-    } else {
+    try {
+      results.audienceProfile = await this.agents.audience.run(upstreamFields, AudienceProfileSchema);
+    } catch (e) {
+      console.warn(`   [AudienceProfiler] 失败: ${e.message}`);
       results.audienceProfile = this.agents.audience._fallback(upstreamFields);
     }
 
     // Agent 2: SceneArchitect
-    if (this._checkBudget(this.agentTimeoutMs, 'SceneArchitect')) {
-      try {
-        results.sceneStructure = await this.agents.scene.run(upstreamFields, SceneStructureSchema);
-      } catch (e) {
-        console.warn(`   [SceneArchitect] 失败: ${e.message}`);
-        results.sceneStructure = this.agents.scene._fallback(upstreamFields);
-      }
-    } else {
+    try {
+      results.sceneStructure = await this.agents.scene.run(upstreamFields, SceneStructureSchema);
+    } catch (e) {
+      console.warn(`   [SceneArchitect] 失败: ${e.message}`);
       results.sceneStructure = this.agents.scene._fallback(upstreamFields);
     }
 
     // Agent 3: RiskAssessor
-    if (this._checkBudget(this.agentTimeoutMs, 'RiskAssessor')) {
-      try {
-        results.riskAssessment = await this.agents.risk.run(upstreamFields, RiskAssessmentSchema);
-      } catch (e) {
-        console.warn(`   [RiskAssessor] 失败: ${e.message}`);
-        results.riskAssessment = this.agents.risk._fallback(upstreamFields);
-      }
-    } else {
+    try {
+      results.riskAssessment = await this.agents.risk.run(upstreamFields, RiskAssessmentSchema);
+    } catch (e) {
+      console.warn(`   [RiskAssessor] 失败: ${e.message}`);
       results.riskAssessment = this.agents.risk._fallback(upstreamFields);
     }
 
     // Agent 4: ReferenceCurator
-    if (this._checkBudget(this.agentTimeoutMs, 'ReferenceCurator')) {
-      try {
-        results.referenceCases = await this.agents.reference.run(upstreamFields, ReferenceCasesSchema);
-      } catch (e) {
-        console.warn(`   [ReferenceCurator] 失败: ${e.message}`);
-        results.referenceCases = this.agents.reference._fallback(upstreamFields);
-      }
-    } else {
+    try {
+      results.referenceCases = await this.agents.reference.run(upstreamFields, ReferenceCasesSchema);
+    } catch (e) {
+      console.warn(`   [ReferenceCurator] 失败: ${e.message}`);
       results.referenceCases = this.agents.reference._fallback(upstreamFields);
     }
 
@@ -859,21 +835,6 @@ class RequirementDiscoveryEngine {
         timestamp: new Date().toISOString()
       }
     };
-  }
-
-  /**
-   * 检查预算
-   */
-  _checkBudget(needMs, label) {
-    if (!this.startTime) return { ok: true };
-    const elapsed = Date.now() - this.startTime;
-    const remaining = this.timeoutMs - elapsed;
-    
-    if (remaining < needMs) {
-      console.log(`   [Budget] ⚠️ 预算不足(剩${remaining}ms)，跳过 ${label}`);
-      return { ok: false, remaining };
-    }
-    return { ok: true, remaining };
   }
 
   /**

@@ -1,5 +1,6 @@
 /** Authenticated CLI adapter. Only the service can compile, qualify and submit a production request. */
 import { createHash } from "node:crypto";
+import { FINAL_PROMPT_MAX_CHARACTERS, unicodeLength } from "./unicode-text.mjs";
 export interface ServiceShot { shotId: string; durationSec: number; prompt: string; fields: Record<string, unknown>; promptSha256: string }
 export interface ServiceShotList { projectId: string; sourceStageRunId: string; sourceAttempt: number; promptsSha256: string; shots: ServiceShot[] }
 export interface QualifiedShot {
@@ -74,7 +75,8 @@ export class ProductionClient {
     const seen = new Set<string>();
     for (const shot of value.shots) {
       if (!obj(shot) || typeof shot.shotId !== "string" || !shot.shotId || seen.has(shot.shotId) || !Number.isInteger(shot.durationSec) || shot.durationSec <= 0
-        || typeof shot.prompt !== "string" || !shot.prompt.trim() || !obj(shot.fields) || sha(shot.prompt) !== shot.promptSha256) throw new ProductionClientError("SOURCE_INVALID", "Shot identity, planned duration or original bytes are invalid");
+        || typeof shot.prompt !== "string" || !shot.prompt.trim() || unicodeLength(shot.prompt) > FINAL_PROMPT_MAX_CHARACTERS
+        || !obj(shot.fields) || sha(shot.prompt) !== shot.promptSha256) throw new ProductionClientError("SOURCE_INVALID", "Shot identity, planned duration, Unicode prompt length or original bytes are invalid");
       seen.add(shot.shotId);
     }
     return value;

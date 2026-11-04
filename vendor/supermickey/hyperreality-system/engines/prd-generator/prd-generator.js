@@ -23,10 +23,6 @@ class PRDGenerator {
     this.agent4 = new ConstraintSynthesisAgent(options);
     this.agent5 = new DeliveryStandardAgent(options);
     
-    // 超时配置
-    this.timeoutMs = options.timeoutMs || 600000; // 10 分钟总预算
-    this.agent2TimeoutMs = options.agent2TimeoutMs || 120000; // 2 分钟
-    this.agent3TimeoutMs = options.agent3TimeoutMs || 300000; // 5 分钟
   }
 
   /**
@@ -47,11 +43,7 @@ class PRDGenerator {
       console.log(`[PRDGenerator] Step 2/5: 创意方向（LLM）...`);
       let creativeResult;
       try {
-        creativeResult = await this._runWithTimeout(
-          () => this.agent2.process(discoveryResult),
-          this.agent2TimeoutMs,
-          'Agent 2'
-        );
+        creativeResult = await this.agent2.process(discoveryResult);
       } catch (error) {
         console.warn(`[PRDGenerator] Agent 2 超时/失败: ${error.message}，使用 fallback`);
         creativeResult = this.agent2.fallback(discoveryResult);
@@ -61,11 +53,7 @@ class PRDGenerator {
       console.log(`[PRDGenerator] Step 3/5: 制作规格（LLM）...`);
       let productionResult;
       try {
-        productionResult = await this._runWithTimeout(
-          () => this.agent3.process(discoveryResult, creativeResult),
-          this.agent3TimeoutMs,
-          'Agent 3'
-        );
+        productionResult = await this.agent3.process(discoveryResult, creativeResult);
       } catch (error) {
         console.warn(`[PRDGenerator] Agent 3 超时/失败: ${error.message}，使用 fallback`);
         productionResult = this.agent3.fallback(discoveryResult, creativeResult);
@@ -123,18 +111,6 @@ class PRDGenerator {
       console.error(`[PRDGenerator] ❌ 生成失败: ${error.message}`);
       throw error;
     }
-  }
-
-  /**
-   * 带超时的 Agent 执行
-   */
-  async _runWithTimeout(fn, timeoutMs, agentName) {
-    return Promise.race([
-      fn(),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error(`${agentName} 超时 (${timeoutMs}ms)`)), timeoutMs)
-      )
-    ]);
   }
 
   /**

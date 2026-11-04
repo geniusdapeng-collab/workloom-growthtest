@@ -74,6 +74,17 @@ describe("service production client", () => {
     if (mode === "scope") f.source.projectId = "OTHER";
     await expect(run(f)).rejects.toThrow("SOURCE_INVALID"); expect(f.calls).toHaveLength(1);
   });
+  it("uses the final 3000 Unicode-character ceiling without rejecting supplementary Han", async () => {
+    const accepted = fixture();
+    const prompt = "𠮷".repeat(3000);
+    Object.assign(accepted.source.shots[0]!, { prompt, promptSha256: digest(prompt) });
+    expect((await accepted.client.shots("P")).shots[0]!.prompt).toBe(prompt);
+    const blocked = fixture();
+    const overflow = prompt + "𠮷";
+    Object.assign(blocked.source.shots[0]!, { prompt: overflow, promptSha256: digest(overflow) });
+    await expect(run(blocked)).rejects.toThrow("SOURCE_INVALID");
+    expect(blocked.calls).toHaveLength(1);
+  });
   it("does not turn an unknown or repeated --only into full-project generation", async () => {
     for (const only of [["GHOST"], ["S1", "S1"]]) {
       const f = fixture(); await expect(run(f, { only })).rejects.toThrow("SHOT_SCOPE_INVALID"); expect(f.calls).toHaveLength(1);

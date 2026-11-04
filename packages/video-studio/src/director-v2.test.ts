@@ -15,6 +15,10 @@ const sources = {
 };
 
 describe("一句话导演与四版本合同", () => {
+  it.each(["汉", "𠮷"])("直接策略入口同样接受 12000 个 %s 字符并拒绝超限", character => {
+    expect(resolveDeliveryTargets(character.repeat(12000)).expectedOutputs).toBe(4);
+    expect(() => resolveDeliveryTargets(character.repeat(12001))).toThrow("需求超过 12000");
+  });
   it("无平台默认三平台和独立惊喜版", () => {
     const plan = resolveDeliveryTargets("生日短片，让我漂亮一点");
     expect(plan.regular.map(x => x.platform)).toEqual(["douyin", "xiaohongshu", "wechat-channels"]);

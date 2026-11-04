@@ -4,7 +4,8 @@ import { mkdtemp, realpath, rm, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { prepareMarketingFacts, finalizeMarketingFacts, verifyMarketingFacts, type PreparedMarketingFacts } from "./marketing-authority.js";
+import { checkpointMarketingFacts, prepareMarketingFacts, restoreMarketingFacts, finalizeMarketingFacts, verifyMarketingFacts,
+  type PreparedMarketingFacts, type MarketingShotFactReview } from "./marketing-authority.js";
 import { primeSearchCache } from "./data-mining-executor.js";
 import { fetchMarketingSource, requestSource } from "./marketing-source-fetcher.js";
 import { canonicalRenderJson, renderSha256 } from "./gen/compiled-request.js";
@@ -120,6 +121,66 @@ async function prepare(options: {
 }
 const shots = [{ shotId: "S1", prompt: "窗边展示星野 F3 风扇，字幕说明风量 9 档。", fields: { 场景: "窗边", 产品: "星野 F3", 规格: "9 档" } }];
 describe("营销事实宿主完整执行", () => {
+  it("第二镜事实审核失败后只重审该镜，保留第一镜已完成的真实审核", async () => {
+    const original = await checkpointMarketingFacts(await prepare());
+    const records = new Map<string, MarketingShotFactReview>();
+    let rejectSecond = true;
+    const cache = { load: async (key: string) => records.get(key) ?? null,
+      save: async (key: string, review: MarketingShotFactReview) => {
+        records.set(key, structuredClone(review));
+        if (rejectSecond && review.shotId === "S1") rejectJudge = true;
+      } };
+    const twoShots = [...shots, { ...shots[0]!, shotId: "S2", prompt: "镜头二继续展示已核实的风量 9 档。" }];
+    const sourceCalls = modelCalls.length;
+    await expect(finalizeMarketingFacts(original, twoShots, env, cache)).rejects.toThrow("MARKETING_PROMPT_FACTS_REJECTED");
+    expect(modelCalls.length - sourceCalls).toBe(2);
+    expect(records.size).toBe(1);
+    rejectSecond = false;
+    rejectJudge = false;
+    const nextScope = { ...scope, runId: "RUN-next", attempt: 2 };
+    const resumed = await restoreMarketingFacts(original, { root, scope: nextScope, intent: "做一条风扇介绍", stageId: "preproduction" });
+    const before = modelCalls.length;
+    const saved = await finalizeMarketingFacts(resumed, twoShots, env, cache);
+    expect(modelCalls.length - before).toBe(1);
+    const verified = await verifyMarketingFacts({ root, ...saved, scope: nextScope, shots: twoShots });
+    expect(verified.outputReviews.map(review => review.scope?.runId)).toEqual([scope.runId, nextScope.runId]);
+  });
+
+  it.each([false, true])("来源审核保留原身份和原始字节，最终镜头绑定新attempt，同run=%s", async sameRun => {
+    const intent = "做一条风扇介绍";
+    const original = await checkpointMarketingFacts(await prepare({ intent }));
+    const nextScope = { ...scope, runId: sameRun ? scope.runId : "RUN-resumed", attempt: 2 };
+    const before = extractionCalls.length;
+    const resumed = await restoreMarketingFacts(original, { root, scope: nextScope, intent, stageId: "preproduction" });
+    expect(extractionCalls).toHaveLength(before);
+    expect(resumed.g1Content).toBe(original.g1Content);
+    expect(resumed.bundle).toMatchObject({ scope: nextScope, sourceScope: scope });
+    expect(resumed.storeRoot).toBe(path.join(root, "stages/preproduction/attempt-2.marketing-dossier"));
+    const saved = await finalizeMarketingFacts(resumed, shots, env);
+    const checked = await verifyMarketingFacts({ root, ...saved, scope: nextScope, shots });
+    expect(checked.sources[0]!.textRef).toContain("attempt-1.");
+    expect(checked.outputReviews[0]!.ref).toContain("attempt-2.");
+    const sourceReview = JSON.parse(await readFile(path.join(root, checked.stages[0]!.review!.ref), "utf8"));
+    const shotReview = JSON.parse(await readFile(path.join(root, checked.outputReviews[0]!.ref), "utf8"));
+    expect(sourceReview.scope.runId).toBe(scope.runId);
+    expect(shotReview.scope.runId).toBe(nextScope.runId);
+  });
+
+  it.each(["different-intent", "different-project", "tampered-source", "expired"])("来源接续拒绝 %s", async kind => {
+    const original = await checkpointMarketingFacts(await prepare());
+    if (kind === "tampered-source") await writeFile(path.join(root, original.bundle.sources[0]!.textRef), "改过的来源");
+    if (kind === "expired") {
+      const expired = { ...original.bundle, collectedAt: new Date(Date.now() - 25 * 3600_000).toISOString() };
+      const text = canonicalRenderJson(expired);
+      await writeFile(path.join(root, original.sourceCheckpoint!.ref), text);
+      original.sourceCheckpoint!.sha256 = renderSha256(text);
+      original.bundle = expired;
+    }
+    await expect(restoreMarketingFacts(original, { root,
+      scope: { ...scope, projectId: kind === "different-project" ? "OTHER" : scope.projectId, runId: "RUN-next", attempt: 2 },
+      intent: kind === "different-intent" ? "新的意图" : "做一条风扇介绍", stageId: "preproduction" })).rejects.toThrow();
+  });
+
   it("同项目同执行号的提示词审核和正式前期使用独立来源与事实目录", async () => {
     const full = await finalizeMarketingFacts(await prepare(), shots, env);
     const prompt = await finalizeMarketingFacts(await prepare({ stageId: "prompt_review" }), shots, env);

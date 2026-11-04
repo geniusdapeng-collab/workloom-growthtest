@@ -15,6 +15,7 @@ import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
+import { unicodeLength, VIDEO_INTENT_MAX_CHARACTERS } from "@hyperreality/video-studio";
 import { getAppPool, getGatewayPool } from "@workloom/db";
 import { judge, type RuntimeRule } from "@workloom/base/fence-engine";
 import { checkRenderBudget, planTierToPlanId } from "@workloom/base/model-router";
@@ -101,7 +102,8 @@ export const explainerRouter = router({
   /** 立项：建 kind='explainer' 项目 + shotbook v1（draft） */
   create: writeProcedure
     .input(z.object({
-      intent: z.string().min(1).max(2000),
+      intent: z.string().min(1).refine(value => unicodeLength(value) <= VIDEO_INTENT_MAX_CHARACTERS,
+        "intent 最多 12000 个 Unicode 字符"),
       scriptText: z.string().min(1).max(20000),
       aspect: z.enum(["9:16", "16:9"]).default("9:16"),
       brand: brandSchema.optional(),

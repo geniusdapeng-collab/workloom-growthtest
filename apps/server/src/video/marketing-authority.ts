@@ -22,17 +22,27 @@ interface StageFactsReport {
   discovery: { queries: unknown[]; candidates: number; fetched: number; omittedCandidates: number; failures: Array<{ url: string; reason: string }> };
   review?: { ref: string; sha256: string; verdict: ProducerVerdict };
 }
-interface OutputReview { shotId: string; promptSha256: string; fieldsSha256: string; ref: string; sha256: string; verdict: ProducerVerdict }
+export interface MarketingShotFactReview {
+  shotId: string; promptSha256: string; fieldsSha256: string; ref: string; sha256: string; verdict: ProducerVerdict;
+  scope?: MarketingScope;
+}
+export interface MarketingFactReviewCache {
+  load(key: string): Promise<MarketingShotFactReview | null>;
+  save(key: string, review: MarketingShotFactReview): Promise<void>;
+}
 export interface MarketingFactsBundle {
   schemaVersion: "workloom.marketing-facts/v1"; issuer: "workloom.marketing-authority"; scope: MarketingScope;
+  /** Reused source reviews keep their original run and immutable archive paths. */
+  sourceScope?: MarketingScope;
   collectedAt: string; policyVersion: "source-claims/v1"; productQuery: RecordValue;
   sources: ArchivedSource[]; stages: StageFactsReport[]; rawByAgent: Record<IntelStage, RecordValue>;
   rawSha256: string; dossier: RecordValue; cards: RecordValue; dossierSha256: string;
-  restrictions: string[]; creativeRequirements?: MarketingCreativeRequirements; g1ContentSha256: string; outputReviews: OutputReview[];
+  restrictions: string[]; creativeRequirements?: MarketingCreativeRequirements; g1ContentSha256: string; outputReviews: MarketingShotFactReview[];
 }
 export interface PreparedMarketingFacts {
   bundle: MarketingFactsBundle; g1Content: string; raw: Record<IntelStage, RecordValue>; storeRoot: string;
   root: string; prefix: string; stageId: MarketingStageId; specSourceUrls: Record<string, string>;
+  sourceCheckpoint?: { ref: string; sha256: string };
 }
 interface DossierEngine {
   plan(input: RecordValue): { trace_id: string; plans: Record<IntelStage, DataMiningStagePlan> };
@@ -188,6 +198,7 @@ export async function prepareMarketingFacts(input: {
           "prices.observedAt 是系统记录的抓取时间，不是模型事实主张；币种等系统归一值可按 claims.quote 的同一有限来源窗口与原文金额/货币符号共同核验，但窗口不得跨来源拼接，规范化枚举不能反过来被当作原文逐字事实"],
         context: { purpose: "marketing-source-support", stage, scope },
       });
+      if (verdict.unknownOutcome) fail("VIDEO_MODEL_OUTCOME_UNKNOWN", "来源评审的供应商回执待核实，保留原请求");
       if (!accepted(verdict, evidence.path, evidence.sha256)) fail("MARKETING_SUPPORT_REJECTED", `原文支持关系未通过：${verdict.reason}`);
       await readBound(root, evidence.ref, evidence.sha256);
       reports.push({ stage, facts, sourceIds: pages.map(page => page.sourceId), discovery, review: { ref: evidence.ref, sha256: evidence.sha256, verdict } });
@@ -241,18 +252,57 @@ export async function prepareMarketingFacts(input: {
   return { bundle, g1Content, raw: structuredClone(raw), storeRoot, root, prefix, stageId, specSourceUrls };
 }
 
-function shotFactReviewEvidence(bundle: MarketingFactsBundle, shot: { shotId: string; prompt: string; fields: unknown }): RecordValue {
-  return { scope: bundle.scope, sourceClaims: bundle.stages.map(stage => stage.facts), restrictions: bundle.restrictions,
+function shotFactReviewEvidence(bundle: MarketingFactsBundle, shot: { shotId: string; prompt: string; fields: unknown }, scope = bundle.scope): RecordValue {
+  return { scope, sourceClaims: bundle.stages.map(stage => stage.facts), restrictions: bundle.restrictions,
     ...(bundle.creativeRequirements ? { creativeRequirements: bundle.creativeRequirements } : {}), shot };
 }
 
-export async function finalizeMarketingFacts(prepared: PreparedMarketingFacts, shots: Array<{ shotId: string; prompt: string; fields: unknown }>, env: NodeJS.ProcessEnv = process.env): Promise<{ ref: string; sha256: string }> {
+export async function checkpointMarketingFacts(prepared: PreparedMarketingFacts): Promise<PreparedMarketingFacts> {
+  const saved = await writeBound(prepared.root, `${prepared.prefix}-prepared-source.json`, canonicalRenderJson(prepared.bundle));
+  return { ...prepared, sourceCheckpoint: { ref: saved.ref, sha256: saved.sha256 } };
+}
+
+/** Preserve the exact reviewed sources while binding subsequent shot reviews to the new run. */
+export async function restoreMarketingFacts(prepared: PreparedMarketingFacts, input: {
+  root: string; scope: MarketingScope; intent: string; stageId: MarketingStageId;
+}): Promise<PreparedMarketingFacts> {
+  const sourceScope = prepared.bundle.sourceScope ?? prepared.bundle.scope;
+  if (prepared.root !== input.root || prepared.stageId !== input.stageId || !prepared.sourceCheckpoint
+    || sourceScope.tenantId !== input.scope.tenantId || sourceScope.workspaceId !== input.scope.workspaceId
+    || sourceScope.projectId !== input.scope.projectId || sourceScope.attempt >= input.scope.attempt
+    || prepared.bundle.creativeRequirements?.intentSha256 !== renderSha256(input.intent)
+    || renderSha256(prepared.g1Content) !== prepared.bundle.g1ContentSha256) {
+    fail("MARKETING_CHECKPOINT_UNBOUND", "来源断点与同一项目原需求及原审核正文不一致");
+  }
+  const source = await verifyMarketingFacts({ root: input.root, ...prepared.sourceCheckpoint, scope: sourceScope,
+    stageId: input.stageId, intentSha256: renderSha256(input.intent), shots: [], sourcesOnly: true });
+  const sourceFields = (bundle: MarketingFactsBundle) => ({ ...bundle, scope: sourceScope, sourceScope: undefined, outputReviews: [] });
+  if (canonicalRenderJson(sourceFields(source)) !== canonicalRenderJson(sourceFields(prepared.bundle))) {
+    fail("MARKETING_CHECKPOINT_CHANGED", "来源断点与原始来源事实文件不一致");
+  }
+  const prefix = marketingPrefix(input.stageId, input.scope.attempt);
+  return { ...structuredClone(prepared), prefix, storeRoot: path.join(input.root, `${prefix}-dossier`),
+    bundle: { ...structuredClone(source), scope: input.scope, sourceScope, outputReviews: [] } };
+}
+
+export async function finalizeMarketingFacts(prepared: PreparedMarketingFacts, shots: Array<{ shotId: string; prompt: string; fields: unknown }>, env: NodeJS.ProcessEnv = process.env,
+  cache?: MarketingFactReviewCache): Promise<{ ref: string; sha256: string }> {
   if (!shots.length || new Set(shots.map(shot => shot.shotId)).size !== shots.length) fail("MARKETING_PROMPTS_INVALID", "营销镜头为空或镜头标识重复");
   for (const [index, item] of shots.entries()) {
     const shot = { shotId: item.shotId, prompt: item.prompt, fields: item.fields };
     if (!shot.prompt.trim()) fail("MARKETING_PROMPTS_INVALID", "营销镜头正文为空");
+    const evidenceBody = shotFactReviewEvidence(prepared.bundle, shot);
+    const { scope: _currentScope, ...reviewInput } = evidenceBody;
+    const cacheKey = `FACT_${renderSha256(canonicalRenderJson({ policy: "marketing-shot-facts/v1", ...reviewInput }))}`;
+    const cached = await cache?.load(cacheKey);
+    if (cached) {
+      await verifyShotFactReview(prepared, shot, cached);
+      await cache!.save(cacheKey, cached);
+      prepared.bundle.outputReviews.push(cached);
+      continue;
+    }
     const evidence = await writeBound(prepared.root, `${prepared.prefix}-shot-${index + 1}.review.json`, canonicalRenderJson(
-      shotFactReviewEvidence(prepared.bundle, shot)));
+      evidenceBody));
     const verdict = await reviewStage({ stage: "prompt", projectId: prepared.bundle.scope.projectId, env,
       artifacts: [{ path: evidence.path, kind: "json", note: "完整最终镜头与逐主张事实证据；禁止无证据营销声明" }],
       deterministic: [{ id: "marketing-current-facts", pass: true, hard: true, detail: "本次G1事实包与完整最终镜头同scope/run/attempt" }],
@@ -263,9 +313,12 @@ export async function finalizeMarketingFacts(prepared: PreparedMarketingFacts, s
         "creativeRequirements 是本片原始创作与交付合同。核对当前镜头承担的角色、画面文字、披露或尾帧要求；全片、其他镜头或后期才承担的内容不要求在每个镜头重复"],
       context: { purpose: "marketing-final-fact-review", shotId: shot.shotId, scope: prepared.bundle.scope },
     });
+    if (verdict.unknownOutcome) fail("VIDEO_MODEL_OUTCOME_UNKNOWN", "镜头事实评审的供应商回执待核实，保留原请求");
     if (!accepted(verdict, evidence.path, evidence.sha256)) fail("MARKETING_PROMPT_FACTS_REJECTED", `营销镜头事实未通过：${verdict.reason}`);
-    prepared.bundle.outputReviews.push({ shotId: shot.shotId, promptSha256: renderSha256(shot.prompt), fieldsSha256: renderSha256(canonicalRenderJson(shot.fields)),
-      ref: evidence.ref, sha256: evidence.sha256, verdict });
+    const reviewed: MarketingShotFactReview = { shotId: shot.shotId, promptSha256: renderSha256(shot.prompt), fieldsSha256: renderSha256(canonicalRenderJson(shot.fields)),
+      ref: evidence.ref, sha256: evidence.sha256, verdict, scope: prepared.bundle.scope };
+    await cache?.save(cacheKey, reviewed);
+    prepared.bundle.outputReviews.push(reviewed);
   }
   const saved = await writeBound(prepared.root, `${prepared.prefix}-facts.json`, canonicalRenderJson(prepared.bundle));
   await verifyMarketingFacts({ root: prepared.root, ref: saved.ref, sha256: saved.sha256, scope: prepared.bundle.scope,
@@ -273,13 +326,33 @@ export async function finalizeMarketingFacts(prepared: PreparedMarketingFacts, s
   return { ref: saved.ref, sha256: saved.sha256 };
 }
 
+async function verifyShotFactReview(prepared: Pick<PreparedMarketingFacts, "bundle" | "root" | "stageId">,
+  shot: { shotId: string; prompt: string; fields: unknown }, review: MarketingShotFactReview): Promise<void> {
+  const scope = review.scope ?? prepared.bundle.scope;
+  const current = prepared.bundle.scope;
+  if (scope.tenantId !== current.tenantId || scope.workspaceId !== current.workspaceId || scope.projectId !== current.projectId
+    || !Number.isSafeInteger(scope.attempt) || scope.attempt < 1 || scope.attempt > current.attempt
+    || scope.attempt === current.attempt && scope.runId !== current.runId
+    || review.shotId !== shot.shotId || review.promptSha256 !== renderSha256(shot.prompt)
+    || review.fieldsSha256 !== renderSha256(canonicalRenderJson(shot.fields))
+    || !review.ref.startsWith(`${marketingPrefix(prepared.stageId, scope.attempt)}-shot-`)
+    || !accepted(review.verdict, path.join(prepared.root, review.ref), review.sha256)) {
+    fail("MARKETING_PROMPTS_UNVERIFIED", "营销镜头不是同一项目已核实的完整最终内容");
+  }
+  const bytes = await readBound(prepared.root, review.ref, review.sha256);
+  if (bytes.toString("utf8") !== canonicalRenderJson(shotFactReviewEvidence(prepared.bundle, shot, scope))) {
+    fail("MARKETING_PROMPTS_UNBOUND", "最终镜头审核未绑定当前完整镜头和事实用途限制");
+  }
+}
+
 export async function verifyMarketingFacts(input: {
   root: string; ref: string; sha256: string; scope: MarketingScope;
   stageId?: MarketingStageId; intentSha256?: string;
+  sourcesOnly?: boolean;
   shots: Array<{ shotId: string; prompt: string; fields: unknown }>;
 }): Promise<MarketingFactsBundle> {
   const expectedPrefix = marketingPrefix(input.stageId ?? "preproduction", input.scope.attempt);
-  if (input.ref !== `${expectedPrefix}-facts.json`) fail("MARKETING_PATH_INVALID", "营销事实包不是当前执行产物");
+  if (input.ref !== `${expectedPrefix}-${input.sourcesOnly ? "prepared-source" : "facts"}.json`) fail("MARKETING_PATH_INVALID", "营销事实包不是当前执行产物");
   const bundle = JSON.parse((await readBound(input.root, input.ref, input.sha256)).toString("utf8")) as MarketingFactsBundle;
   if (bundle.schemaVersion !== "workloom.marketing-facts/v1" || bundle.issuer !== "workloom.marketing-authority" || bundle.policyVersion !== "source-claims/v1"
     || canonicalRenderJson(bundle.scope) !== canonicalRenderJson(input.scope) || !Array.isArray(bundle.sources) || !Array.isArray(bundle.stages)
@@ -290,10 +363,16 @@ export async function verifyMarketingFacts(input: {
     fail("MARKETING_CREATIVE_REQUIREMENTS_UNBOUND", "创作与交付原文不属于当前营销工作单");
   }
   assertMarketingFactsFresh(bundle.collectedAt);
+  const sourceScope = bundle.sourceScope ?? input.scope;
+  if (sourceScope.tenantId !== input.scope.tenantId || sourceScope.workspaceId !== input.scope.workspaceId
+    || sourceScope.projectId !== input.scope.projectId || !Number.isSafeInteger(sourceScope.attempt)
+    || sourceScope.attempt < 1 || sourceScope.attempt > input.scope.attempt
+    || (bundle.sourceScope && sourceScope.attempt >= input.scope.attempt)) fail("MARKETING_SCOPE_INVALID", "来源复用必须保留同一项目更早执行的原身份");
+  const sourcePrefix = marketingPrefix(input.stageId ?? "preproduction", sourceScope.attempt);
   const pages: SourceSnapshot[] = [];
   if (new Set(bundle.sources.map(source => source.sourceId)).size !== bundle.sources.length) fail("MARKETING_SOURCE_INVALID", "营销来源ID重复");
   for (const source of bundle.sources) {
-    if (!source.rawRef.startsWith(`${expectedPrefix}-sources/`) || !source.textRef.startsWith(`${expectedPrefix}-sources/`)) fail("MARKETING_PATH_INVALID", "营销来源不是当前执行目录");
+    if (!source.rawRef.startsWith(`${sourcePrefix}-sources/`) || !source.textRef.startsWith(`${sourcePrefix}-sources/`)) fail("MARKETING_PATH_INVALID", "营销来源不是已绑定的原来源目录");
     await readBound(input.root, source.rawRef, source.rawSha256);
     const text = (await readBound(input.root, source.textRef, source.textSha256)).toString("utf8");
     const { rawRef: _rawRef, textRef: _textRef, ...snapshot } = source;
@@ -306,9 +385,9 @@ export async function verifyMarketingFacts(input: {
     if (used.length !== record.sourceIds.length || new Set(record.sourceIds).size !== record.sourceIds.length) fail("MARKETING_SOURCE_INVALID", "营销来源记录缺失或重复");
     revalidateStageFacts(record.facts, used);
     if (record.facts.claims.length > 0 || record.review) {
-      if (!record.review || !record.review.ref.startsWith(expectedPrefix) || !accepted(record.review.verdict, path.join(input.root, record.review.ref), record.review.sha256)) fail("MARKETING_SUPPORT_UNVERIFIED", "缺少真实原文支持关系审核");
+      if (!record.review || !record.review.ref.startsWith(sourcePrefix) || !accepted(record.review.verdict, path.join(input.root, record.review.ref), record.review.sha256)) fail("MARKETING_SUPPORT_UNVERIFIED", "缺少真实原文支持关系审核");
       const reviewBytes = await readBound(input.root, record.review.ref, record.review.sha256);
-      const expectedReview = canonicalRenderJson({ scope: input.scope, productQuery: bundle.productQuery, facts: record.facts, sources: used });
+      const expectedReview = canonicalRenderJson({ scope: sourceScope, productQuery: bundle.productQuery, facts: record.facts, sources: used });
       if (reviewBytes.toString("utf8") !== expectedReview) fail("MARKETING_SUPPORT_UNBOUND", "支持关系审核未绑定当前完整主张与来源正文");
     }
     if (canonicalRenderJson(record.facts.payload) !== canonicalRenderJson(bundle.rawByAgent[stage])) fail("MARKETING_FACTS_CHANGED", "下游回填与已审核事实不一致");
@@ -318,12 +397,8 @@ export async function verifyMarketingFacts(input: {
   for (const item of input.shots) {
     const shot = { shotId: item.shotId, prompt: item.prompt, fields: item.fields };
     const records = bundle.outputReviews.filter(record => record.shotId === shot.shotId), review = records[0];
-    if (records.length !== 1 || !review || review.promptSha256 !== renderSha256(shot.prompt) || review.fieldsSha256 !== renderSha256(canonicalRenderJson(shot.fields))
-      || !review.ref.startsWith(expectedPrefix) || !accepted(review.verdict, path.join(input.root, review.ref), review.sha256)) fail("MARKETING_PROMPTS_UNVERIFIED", "营销镜头不是已核实的完整最终内容");
-    const reviewBytes = await readBound(input.root, review.ref, review.sha256);
-    if (reviewBytes.toString("utf8") !== canonicalRenderJson(shotFactReviewEvidence(bundle, shot))) {
-      fail("MARKETING_PROMPTS_UNBOUND", "最终镜头审核未绑定当前完整镜头和事实用途限制");
-    }
+    if (records.length !== 1 || !review) fail("MARKETING_PROMPTS_UNVERIFIED", "营销镜头缺少唯一的事实审核");
+    await verifyShotFactReview({ bundle, root: input.root, stageId: input.stageId ?? "preproduction" }, shot, review);
   }
   return bundle;
 }

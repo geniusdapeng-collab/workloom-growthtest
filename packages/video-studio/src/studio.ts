@@ -21,6 +21,7 @@ import { runWithConfirmationHandler, type ConfirmationHandler } from "./confirma
 import { resolveGate, type GateVerdict } from "./gates.js";
 import { WorkloomLLMEngine } from "./llm-adapter.js";
 import { createPortraitRuntime, type PortraitRuntimeOptions } from "./portrait-runtime.js";
+import { bindStudioEngineCheckpoints, type StudioCheckpointAdapter } from "./studio-checkpoints.js";
 import {
   applyDurationPolicyToManager,
   installVendorAudioDisciplineBridge,
@@ -41,6 +42,7 @@ import {
   installSharedBridge,
   narrativeSpeechPolicy,
   runWithDurationProjectionPolicy,
+  restoreMarketingDiscoveryCheckpoint,
   type DurationProjectionEvent,
   type SourceBoundMarketingDiscovery,
 } from "./vendor-compat.js";
@@ -56,6 +58,7 @@ interface StudioBridgeScope {
   onDurationEvent: (event: DurationProjectionEvent) => void;
   onPromptReview?: (prompts: readonly Record<string, unknown>[]) => void;
   marketingDiscovery?: SourceBoundMarketingDiscovery;
+  assertCheckpointActive?: () => void;
 }
 const studioBridgeScopes = new AsyncLocalStorage<StudioBridgeScope>();
 const logFromBridge = (line: string): void => { studioBridgeScopes.getStore()?.log(line); };
@@ -123,7 +126,9 @@ export interface StudioConfig {
   onEvent?: EventSink;
   /** Capture the current native rows after normalization, immediately before G6 sees them. */
   onPromptReview?: (prompts: readonly Record<string, unknown>[]) => void;
-  /** 总截止（毫秒），默认 1 小时，与 vendor 默认一致 */
+  /** The host verifies durable checkpoint identity, approval, dependencies and source freshness. */
+  checkpoints?: StudioCheckpointAdapter;
+  /** @deprecated 仅保留调用兼容性，已忽略；超时由各次模型请求的传输层负责。 */
   totalDeadlineMs?: number;
   llmTimeoutMs?: number;
   /**
@@ -422,6 +427,11 @@ export class VideoStudio {
     const emit: EventSink = (e) => (cfg.onEvent ? cfg.onEvent(e) : undefined);
     let runId: string | null = null;
     let approvalFailure: { error: unknown } | undefined;
+    let checkpointFailure: { error: unknown } | undefined;
+    const assertCheckpointActive = (): void => {
+      if (checkpointFailure) throw checkpointFailure.error;
+      if (cfg.llm.hasUnknownOutcome()) throw new Error("STUDIO_CHECKPOINT_OUTCOME_UNKNOWN：原运行存在未核实的模型结果");
+    };
 
     const handler: ConfirmationHandler = async (req) => {
       const gate = resolveGate(req.type);
@@ -434,6 +444,7 @@ export class VideoStudio {
       });
       let verdict: GateVerdict;
       try {
+        if (cfg.checkpoints) assertCheckpointActive();
         verdict = await cfg.onApproval({
           gate,
           vendorType: req.type,
@@ -467,6 +478,7 @@ export class VideoStudio {
       log,
       onPromptReview: cfg.onPromptReview,
       marketingDiscovery,
+      ...(cfg.checkpoints ? { assertCheckpointActive } : {}),
       onDurationEvent: (event) => {
         if (typeof event.targetSeconds === "number" && event.targetSeconds > 0) {
           lastProjectedTarget = event.targetSeconds;
@@ -541,6 +553,7 @@ export class VideoStudio {
           log: logFromBridge,
           requireVerifiedPrd: () => Boolean(studioBridgeScopes.getStore()),
           marketingDiscovery: () => studioBridgeScopes.getStore()?.marketingDiscovery,
+          assertActive: () => studioBridgeScopes.getStore()?.assertCheckpointActive?.(),
         })));
         /** Phase 3 后融合链路深栈诊断（vendor 内部 catch 会吞掉栈帧） */
         keep(installSharedBridge("vendor-phase-internals-diagnostics", () => installVendorPhaseInternalsDiagnostics({ log: logFromBridge })));
@@ -599,10 +612,6 @@ export class VideoStudio {
           );
         }
 
-        // 与 vendor CLI（app/commands/preproduction.js）保持同一装配口径
-        process.env.STORMAXE_TOTAL_DEADLINE_MS =
-          process.env.STORMAXE_TOTAL_DEADLINE_MS ?? String(cfg.totalDeadlineMs ?? 3_600_000);
-
         /**
          * 项目产物目录：checkpoints / characters / 渲染输出一律收在同一 workDir 下。
          * vendor 的三个引擎各自读 `options.<engine>.charactersDir`（顶层 charactersDir 不生效），
@@ -638,7 +647,6 @@ export class VideoStudio {
               llmMaxRetries: 2,
               llmModel: cfg.llm.model,
               fastModel: cfg.llm.fastModel,
-              totalDeadlineMs: cfg.totalDeadlineMs ?? 3_600_000,
               promptFusionConcurrency: 1,
               checkpointDir: path.join(cfg.workDir, "checkpoints", input.projectId),
               enableResume: true
@@ -649,6 +657,20 @@ export class VideoStudio {
           charactersDir,
           durationConstraint: { maxSingleShot, minSingleShot }
         });
+        if (cfg.checkpoints) {
+          bindStudioEngineCheckpoints(system as unknown as Record<string, unknown>, cfg.checkpoints, {
+            projectId: input.projectId, rawIntent: input.rawIntent ?? input.intent, intent: input.intent,
+            metadata: input.metadata ?? {}, isMarketing: input.isMarketing === true,
+            marketing: verified ? { rawSha256: verified.sha256, productQuery: verified.productQuery,
+              creativeRequirements: verified.creativeRequirements, restrictions: verified.restrictions } : null,
+          }, {
+            assertActive: assertCheckpointActive,
+            onFailure: (error) => { checkpointFailure ??= { error }; },
+            ...(marketingDiscovery ? {
+              restoreDiscovery: (output) => restoreMarketingDiscoveryCheckpoint(output, marketingDiscovery!),
+            } : {}),
+          });
+        }
         /** 实例级放宽 rhythmProfiles（standard 12 / slow 15 → 模型上限），否则 30s 单镜会被重新夹紧 */
         applyDurationPolicyToManager(
           (system as unknown as { durationConstraintManager?: unknown }).durationConstraintManager,
@@ -703,6 +725,7 @@ export class VideoStudio {
         // Vendor consumes the explicit rejection; the caller still receives
         // the original infrastructure failure after vendor has stopped safely.
         if (approvalFailure) throw approvalFailure.error;
+        if (checkpointFailure) throw checkpointFailure.error;
         if (portraitRuntime) {
           const index = portraitRuntime.snapshot();
           const characters = Object.keys(index.characters).length;

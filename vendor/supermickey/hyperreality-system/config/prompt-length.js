@@ -4,7 +4,8 @@
  * Prompt 长度统一配置模块
  * 超级小香宝适配版 v1.0
  *
- * 系统使用 3000 字符作为 Prompt 硬上限（超级小香宝扩容），理想区间为 2470-3000。
+ * 系统使用 3000 个 Unicode 字符（码点）作为 Prompt 硬上限，理想区间为 2470-3000。
+ * 扩展区汉字计为一个字符；不使用 JavaScript UTF-16 代码单元数作为长度。
  */
 
 const PromptLengthConfig = {
@@ -28,6 +29,14 @@ const PromptLengthConfig = {
    * REFINED_MIN 定为 1200：低于此值说明有效细节被过度压缩，视为质量事故。
    */
   REFINED_MIN: 1200,
+
+  countCharacters(text) {
+    return typeof text === 'string' ? Array.from(text).length : 0;
+  },
+
+  sliceCharacters(text, start, end) {
+    return typeof text === 'string' ? Array.from(text).slice(start, end).join('') : '';
+  },
 
   getCreativeTarget(systemTemplateLen) {
     if (typeof systemTemplateLen !== 'number' || systemTemplateLen < 0) {
@@ -58,9 +67,10 @@ const PromptLengthConfig = {
 
   truncate(text, maxLen = this.HARD_MAX) {
     if (typeof text !== 'string') return { text: '', truncated: false, originalLen: 0 };
-    const originalLen = text.length;
-    if (originalLen <= maxLen) return { text, truncated: false, originalLen };
-    return { text: text.substring(0, maxLen), truncated: true, originalLen };
+    const originalLen = this.countCharacters(text);
+    const limit = Math.max(0, Math.trunc(Number(maxLen) || 0));
+    if (originalLen <= limit) return { text, truncated: false, originalLen };
+    return { text: this.sliceCharacters(text, 0, limit), truncated: true, originalLen };
   },
 
   getReport(length) {
@@ -103,6 +113,21 @@ if (require.main === module) {
     const r = PromptLengthConfig.truncate('A'.repeat(3100));
     assert.strictEqual(r.truncated, true);
     assert.strictEqual(r.text.length, 3000);
+  });
+  test('supplementary Han counts as one character', () => {
+    assert.strictEqual(PromptLengthConfig.countCharacters('汉𠮷A，\n'), 5);
+    const value = '𠮷'.repeat(3000);
+    assert.deepStrictEqual(PromptLengthConfig.truncate(value), { text: value, truncated: false, originalLen: 3000 });
+  });
+  test('truncate preserves complete supplementary Han characters', () => {
+    const result = PromptLengthConfig.truncate('𠮷'.repeat(3001));
+    assert.strictEqual(result.text, '𠮷'.repeat(3000));
+    assert.strictEqual(result.originalLen, 3001);
+    assert.strictEqual(result.truncated, true);
+  });
+  test('truncate retains the zero and negative bound behavior', () => {
+    for (const bound of [0, -1, NaN]) assert.deepStrictEqual(PromptLengthConfig.truncate('𠮷汉', bound),
+      { text: '', truncated: true, originalLen: 2 });
   });
   console.log(`\n 结果: ${passed} 通过, ${failed} 失败\n`);
   process.exit(failed > 0 ? 1 : 0);

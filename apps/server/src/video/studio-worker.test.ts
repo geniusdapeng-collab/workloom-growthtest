@@ -2,7 +2,7 @@
  * T-2026-0927-0013：真实 startRun + StageRunner + ArchiveStore 回归。
  * vendor、PG、媒体登记用边界替身；档案写盘与重试/终态/商品摘要走实际代码。
  */
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { createHash, randomBytes } from "node:crypto";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -25,6 +25,7 @@ const doubles = vi.hoisted(() => ({
   detach: vi.fn(),
   review: vi.fn(),
   prepare: vi.fn(),
+  restoreMarketing: vi.fn(),
   finalize: vi.fn(),
   verifyMarketingFacts: vi.fn(),
   studioConfigs: [] as Array<Record<string, any>>,
@@ -32,6 +33,7 @@ const doubles = vi.hoisted(() => ({
   connect: vi.fn(),
   query: vi.fn(),
   releaseDb: vi.fn(),
+  checkpointEvents: [] as Array<Record<string, any>>,
 }));
 
 vi.mock("@workloom/db", () => ({ getAppPool: () => ({ connect: doubles.connect }), getGatewayPool: () => ({}) }));
@@ -62,8 +64,11 @@ vi.mock("@workloom/base/workdata", async () => {
   };
 });
 vi.mock("../service/llm.js", () => ({ modelPolicyFor: () => undefined }));
-vi.mock("./marketing-authority.js", () => ({ prepareMarketingFacts: doubles.prepare, finalizeMarketingFacts: doubles.finalize,
-  verifyMarketingFacts: doubles.verifyMarketingFacts }));
+vi.mock("./marketing-authority.js", async importOriginal => ({
+  ...await importOriginal<typeof import("./marketing-authority.js")>(),
+  prepareMarketingFacts: doubles.prepare, restoreMarketingFacts: doubles.restoreMarketing,
+  finalizeMarketingFacts: doubles.finalize, verifyMarketingFacts: doubles.verifyMarketingFacts,
+}));
 vi.mock("./data-mining-executor.js", () => ({ createDataMiningExecutor: vi.fn() }));
 vi.mock("./media/library.js", () => ({ ingestPortraitsFromIndex: doubles.ingest }));
 vi.mock("./media/products.js", () => ({ upsertProductProfileFromDossier: doubles.project }));
@@ -71,6 +76,14 @@ vi.mock("./archive-host.js", () => ({
   archiveWorkDir: () => doubles.workDir,
   acquireProjectLease: doubles.lease,
   readProjectMeta: doubles.meta,
+  scopedRows: async (_scope: unknown, sql: string, params: unknown[] = []) => {
+    if (sql.includes("video.studio.checkpoint.saved")) {
+      const [workspaceId, tenantId, projectId, kind, runId] = params;
+      return doubles.checkpointEvents.filter(event => event.workspaceId === workspaceId && event.tenantId === tenantId
+        && event.projectId === projectId && event.kind === kind && event.runId === runId).slice().reverse();
+    }
+    return (await doubles.query(sql, params)).rows;
+  },
   makeLedgerWriter: () => ({
     claimRun: async (row: { inputRefTemplate: string }) => {
       const attempt = ++doubles.nextAttempt;
@@ -94,7 +107,8 @@ vi.mock("@hyperreality/video-studio", async (importOriginal) => ({
     }
   },
   reviewStage: doubles.review,
-  WorkloomLLMEngine: { fromEnv: () => ({ attachRouter: vi.fn(), attachConfiguredRouter: vi.fn() }) },
+  WorkloomLLMEngine: { fromEnv: () => ({ model: "test-author", hasUnknownOutcome: () => false,
+    attachRouter: vi.fn(), attachConfiguredRouter: vi.fn() }) },
   withVendorEngineBridge: (_engine: unknown, run: () => Promise<unknown>) => run(),
   withVendorPortraitBindingBridge: async (_options: unknown, run: () => Promise<unknown>) => {
     try { return await run(); } finally { doubles.uninstall(); }
@@ -107,7 +121,7 @@ const scope = { tenantId: "tenant-test", workspaceId: "ws-test" };
 let projectSequence = 0;
 
 beforeAll(async () => {
-  doubles.workDir = await mkdtemp(path.join(tmpdir(), "studio-result-"));
+  doubles.workDir = await realpath(await mkdtemp(path.join(tmpdir(), "studio-result-")));
   worker = await import("./studio-worker.js");
 });
 
@@ -117,15 +131,29 @@ afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 beforeEach(() => {
   vi.clearAllMocks();
   const eventReceipt = { eventId: "EVT-studio-test", seq: 1n, hash: "a".repeat(64), deduped: false, piiHits: 0 };
-  vi.mocked(gatewayAppend).mockReset().mockResolvedValue(eventReceipt);
+  doubles.checkpointEvents.length = 0;
+  vi.mocked(gatewayAppend).mockReset().mockImplementation(async (_pool, identity, event) => {
+    if (event.decision.action === "video.studio.checkpoint.saved") {
+      const after = event.decision.after;
+      if (!after || typeof after !== "object" || Array.isArray(after)) throw new Error("断点事件夹具要求对象型after");
+      doubles.checkpointEvents.push({ ...after, tenantId: identity.tenantId,
+        workspaceId: identity.workspaceId, projectId: event.object.id });
+    }
+    return eventReceipt;
+  });
   vi.mocked(gatewayAppendOnClient).mockReset().mockResolvedValue(eventReceipt);
   doubles.nextAttempt = 0;
   doubles.studioConfigs.length = 0;
-  doubles.prepare.mockReset().mockImplementation(async ({ scope, root }) => ({
-    bundle: { rawSha256: "a".repeat(64), productQuery: { name: "本次商品" } }, raw: { A1: {}, A2: {}, A3: {} },
-    prefix: `stages/preproduction/attempt-${scope.attempt}.marketing`,
-    storeRoot: path.join(root, `stages/preproduction/attempt-${scope.attempt}.marketing-dossier`),
+  doubles.prepare.mockReset().mockImplementation(async ({ scope, root, stageId = "preproduction" }) => ({
+    root, stageId, bundle: { scope, rawSha256: "a".repeat(64), productQuery: { name: "本次商品" } }, raw: { A1: {}, A2: {}, A3: {} },
+    prefix: `stages/${stageId}/attempt-${scope.attempt}.marketing`,
+    storeRoot: path.join(root, `stages/${stageId}/attempt-${scope.attempt}.marketing-dossier`),
     g1Content: JSON.stringify({ facts: { schemaVersion: "workloom.marketing-facts/v1", stages: [1, 2, 3], sources: [1], optionalValue: null }, scope }),
+  }));
+  doubles.restoreMarketing.mockReset().mockImplementation(async (prepared, { scope, stageId }) => ({
+    ...structuredClone(prepared), prefix: `stages/${stageId}/attempt-${scope.attempt}.marketing`,
+    storeRoot: path.join(prepared.root, `stages/${stageId}/attempt-${scope.attempt}.marketing-dossier`),
+    bundle: { ...structuredClone(prepared.bundle), scope, sourceScope: prepared.bundle.sourceScope ?? prepared.bundle.scope, outputReviews: [] },
   }));
   doubles.finalize.mockReset().mockResolvedValue({ ref: "stages/preproduction/attempt-1.marketing-facts.json", sha256: "b".repeat(64) });
   doubles.verifyMarketingFacts.mockReset().mockResolvedValue(undefined);
@@ -461,6 +489,85 @@ describe("预生产原始结果与诚实终态", () => {
     expect(doubles.uninstall).toHaveBeenCalledTimes(1);
   });
 
+  it("旧项目直接补跑不能绕过未知模型结果，拒绝发生在新attempt和供应商之前", async () => {
+    useNarrativeProject();
+    const projectId = `VID-unknown-direct-${++projectSequence}`;
+    doubles.runPreproduction.mockRejectedValueOnce(new Error("VIDEO_MODEL_OUTCOME_UNKNOWN: 原请求最终回执丢失"));
+    const firstRunId = worker.startRun(scope, { projectId, intent: "同一冻结需求" });
+    await vi.waitFor(() => expect(worker.getRun(firstRunId, scope.workspaceId)?.finishedAt).not.toBeNull());
+    const outcome = doubles.checkpointEvents.filter(event => event.kind === "OUTCOME").at(-1)!;
+    const saved = JSON.parse(await readFile(path.join(doubles.workDir, "archive", scope.workspaceId, projectId, outcome.ref), "utf8"));
+    expect(saved.payload.state).toBe("unknown");
+    doubles.query.mockImplementation(async (sql: string) => ({ rows: sql.includes("SELECT attempt, input_ref")
+      ? [{ run_id: firstRunId, attempt: 1, status: "failed", error_class: "MODEL_UNKNOWN",
+        input_ref: "stages/preproduction/attempt-1.input.json" }] : [], rowCount: 1 }));
+    doubles.runPreproduction.mockResolvedValue(success());
+    const secondRunId = worker.startRun(scope, { projectId, intent: "同一冻结需求" });
+    await vi.waitFor(() => expect(worker.getRun(secondRunId, scope.workspaceId)?.finishedAt).not.toBeNull());
+    expect(worker.getRun(secondRunId, scope.workspaceId)).toMatchObject({ status: "failed",
+      error: expect.stringContaining("STUDIO_RESUME_REQUIRED") });
+    expect(doubles.nextAttempt).toBe(1);
+    expect(doubles.runPreproduction).toHaveBeenCalledTimes(1);
+  });
+
+  it("已核实的失败只能携带同项目原run与attempt接续，正常续跑仍完成", async () => {
+    useNarrativeProject();
+    const projectId = `VID-known-resume-${++projectSequence}`;
+    doubles.runPreproduction.mockResolvedValueOnce(rejected()).mockResolvedValueOnce(success());
+    const firstRunId = worker.startRun(scope, { projectId, intent: "同一冻结需求" });
+    await vi.waitFor(() => expect(worker.getRun(firstRunId, scope.workspaceId)?.finishedAt).not.toBeNull());
+    const outcome = doubles.checkpointEvents.filter(event => event.kind === "OUTCOME").at(-1)!;
+    const saved = JSON.parse(await readFile(path.join(doubles.workDir, "archive", scope.workspaceId, projectId, outcome.ref), "utf8"));
+    expect(saved.payload.state).toBe("known");
+    doubles.query.mockImplementation(async (sql: string) => ({ rows: sql.includes("SELECT attempt, input_ref")
+      ? [{ run_id: firstRunId, attempt: 1, status: "failed", error_class: "GATE_REJECTED",
+        input_ref: "stages/preproduction/attempt-1.input.json" }] : [], rowCount: 1 }));
+    const nextRunId = worker.startRun(scope, { projectId, intent: "同一冻结需求",
+      resumePrior: { runId: firstRunId, attempt: 1, stageId: "preproduction" } });
+    await vi.waitFor(() => expect(worker.getRun(nextRunId, scope.workspaceId)?.finishedAt).not.toBeNull());
+    expect(worker.getRun(nextRunId, scope.workspaceId)).toMatchObject({ status: "finished", error: null });
+    expect(doubles.nextAttempt).toBe(2);
+    expect(doubles.runPreproduction).toHaveBeenCalledTimes(2);
+  });
+
+  it("作者完成但断点事件未落账时，proper prior恢复也必须先对账而不能再次执行作者", async () => {
+    useNarrativeProject();
+    const projectId = `VID-checkpoint-unverified-${++projectSequence}`;
+    const { createStudioCheckpointRunner } = await import("@hyperreality/video-studio");
+    const append = vi.mocked(gatewayAppend).getMockImplementation()!;
+    let eventFailure = true, authorCalls = 0;
+    vi.mocked(gatewayAppend).mockImplementation(async (pool, identity, event) => {
+      if (event.decision.action === "video.studio.checkpoint.saved"
+        && (event.decision.after as { kind?: string }).kind === "ENGINE_SCRIPT" && eventFailure) {
+        eventFailure = false;
+        throw new Error("作者已完成后的断点事件写入短暂失败");
+      }
+      return append(pool, identity, event);
+    });
+    doubles.runPreproduction.mockImplementation(async () => {
+      const config = doubles.studioConfigs.at(-1)!;
+      const runner = createStudioCheckpointRunner(config.checkpoints, "同一冻结工位种子");
+      return runner.run("SCRIPT", "同一完整输入", async () => { authorCalls++; return success(); });
+    });
+    const firstRunId = worker.startRun(scope, { projectId, intent: "同一冻结需求" });
+    await vi.waitFor(() => expect(worker.getRun(firstRunId, scope.workspaceId)?.finishedAt).not.toBeNull());
+    expect(worker.getRun(firstRunId, scope.workspaceId)?.error).toContain("STUDIO_CHECKPOINT_WRITE_UNVERIFIED");
+    const outcome = doubles.checkpointEvents.filter(event => event.kind === "OUTCOME").at(-1)!;
+    const saved = JSON.parse(await readFile(path.join(doubles.workDir, "archive", scope.workspaceId, projectId, outcome.ref), "utf8"));
+    expect(saved.payload.state).toBe("receipt_unverified");
+    doubles.query.mockImplementation(async (sql: string) => ({ rows: sql.includes("SELECT attempt, input_ref")
+      ? [{ run_id: firstRunId, attempt: 1, status: "failed", error_class: "BUG",
+        input_ref: "stages/preproduction/attempt-1.input.json" }] : [], rowCount: 1 }));
+    const nextRunId = worker.startRun(scope, { projectId, intent: "同一冻结需求",
+      resumePrior: { runId: firstRunId, attempt: 1, stageId: "preproduction" } });
+    await vi.waitFor(() => expect(worker.getRun(nextRunId, scope.workspaceId)?.finishedAt).not.toBeNull());
+    expect(worker.getRun(nextRunId, scope.workspaceId)).toMatchObject({ status: "failed",
+      error: expect.stringContaining("PROMPT_REVIEW_PRIOR_CHANGED") });
+    expect(authorCalls).toBe(1);
+    expect(doubles.runPreproduction).toHaveBeenCalledTimes(1);
+    expect(doubles.nextAttempt).toBe(1);
+  });
+
   it("归档输出写入失败时，不因已取得 rawResult 而伪称成功", async () => {
     const { ArchiveStore } = await import("@hyperreality/video-studio");
     const original = ArchiveStore.prototype.writeJsonAtomic;
@@ -684,7 +791,8 @@ describe("正式 G6 提示词工作单", () => {
     expect(receipt.reviewReportSha256).toBe(createHash("sha256").update(report).digest("hex"));
     if (kind === "marketing") {
       expect(doubles.prepare).toHaveBeenCalledWith(expect.objectContaining({ stageId: "prompt_review" }));
-      expect(doubles.finalize).toHaveBeenCalledWith(expect.anything(), receipt.shots);
+      expect(doubles.finalize).toHaveBeenCalledWith(expect.anything(), receipt.shots, process.env,
+        expect.objectContaining({ load: expect.any(Function), save: expect.any(Function) }));
       expect(doubles.verifyMarketingFacts).toHaveBeenCalledWith(expect.objectContaining({ stageId: "prompt_review",
         intentSha256: receipt.intentSha256, shots: receipt.shots }));
     }
@@ -695,6 +803,7 @@ describe("正式 G6 提示词工作单", () => {
   });
 
   it("取得项目租约后再次发现原提示词执行已变化时不认领新尝试", async () => {
+    useNarrativeProject();
     vi.stubEnv("WORKLOOM_RENDER_SIGNING_SECRET", randomBytes(32).toString("hex"));
     doubles.query.mockImplementation(async (sql: string) => ({ rows: sql.includes("SELECT attempt, input_ref")
       ? [{ run_id: "RUN-successor", attempt: 2, status: "done", error_class: null }] : [], rowCount: 1 }));
@@ -856,7 +965,8 @@ describe("默认导演委托与立项事务", () => {
     });
     const { entry, projectId } = await runToTerminal(); expect(entry.status).toBe("finished");
     expect(doubles.prepare).toHaveBeenCalledWith(expect.objectContaining({ scope: expect.objectContaining({ ...scope, projectId, attempt: 1 }) }));
-    expect(doubles.finalize).toHaveBeenCalledWith(expect.anything(), [{ shotId: "SC-1", prompt: "01.【场景】窗边桌面", fields: { scene: "窗边桌面" } }]);
+    expect(doubles.finalize).toHaveBeenCalledWith(expect.anything(), [{ shotId: "SC-1", prompt: "01.【场景】窗边桌面", fields: { scene: "窗边桌面" } }], process.env,
+      expect.objectContaining({ load: expect.any(Function), save: expect.any(Function) }));
     expect(await archiveOutput(projectId, 1)).toMatchObject({ marketingFactsRef: "stages/preproduction/attempt-1.marketing-facts.json", marketingFactsSha256: "b".repeat(64) });
     expect(doubles.studioConfigs[0]?.dataMining.verifiedRaw.projectId).toBe(projectId);
   });

@@ -53,17 +53,10 @@ class ContinuityReviewAgent extends BaseAgent {
     }
   }
 
-  // 【P0-1 修复】总体超时包装
-  _totalTimeout(promise, ms, label) {
-    const { SafePromise } = require('../../../utils/safe-promise');
-    return SafePromise.withTimeout(promise, ms, label);
-  }
-
   async process(shots, blueprint, options = {}) {
     console.log(`[ContinuityReviewAgent] 开始审查 ${shots.length} 个镜头...`);
-    const TOTAL_MS = Math.min(240000, this._remainingMs()); // 总体最多4分钟
     try {
-      return await this._totalTimeout(this._processCore(shots, blueprint, options), TOTAL_MS, 'ContinuityReview');
+      return await this._processCore(shots, blueprint, options);
     } catch (err) {
       console.warn(`[ContinuityReviewAgent] 总体兜底触发: ${err.message}，返回规则降级`);
       return { review: this._fallback(shots).review, degraded: true, degradeReason: err.message, boundaryReport: null };

@@ -281,6 +281,46 @@ describe("商品情报执行器", () => {
 });
 
  describe("正式来源collector接缝", () => {
+  it.each(["A1", "A3"] as const)("%s 默认执行完整任务书，保留旧查询上限之后的来源", async stage => {
+    const queries = Array.from({ length: 10 }, (_, index) => ({ q: `商品调研 ${index + 1}` }));
+    const search = vi.fn(async (query: string, _limit: number) => [{
+      title: query, url: `https://source.example.com/${encodeURIComponent(query)}`, snippet: "候选正文入口",
+    }]);
+    const evidenceCollector = vi.fn(async () => ({ verified: true }));
+    const reason = vi.fn();
+    const executor = createDataMiningExecutor({ search, llm: { reason }, evidenceCollector });
+
+    expect(await executor(stage, { queries })).toEqual({ verified: true });
+    expect(search).toHaveBeenCalledTimes(10);
+    expect(search).toHaveBeenCalledWith("商品调研 9", 5);
+    expect(search).toHaveBeenCalledWith("商品调研 10", 5);
+    expect(evidenceCollector).toHaveBeenCalledWith(stage, { queries }, expect.arrayContaining([
+      expect.objectContaining({ title: "商品调研 9" }), expect.objectContaining({ title: "商品调研 10" }),
+    ]));
+    expect(reason).not.toHaveBeenCalled();
+  });
+
+  it("旧回填路径也执行完整的A3 discovery_queries任务书", async () => {
+    const queries = Array.from({ length: 9 }, (_, index) => ({ q: `竞品 ${index}` }));
+    const search = vi.fn(async (query: string) => [{ title: query, url: `https://source.example.com/${encodeURIComponent(query)}`, snippet: "真实候选" }]);
+    const reason = vi.fn(async (_prompt: string) => ({ success: true, data: { competitors: [] } }));
+    const executor = createDataMiningExecutor({ search, llm: { reason } });
+    expect(await executor("A3", { discovery_queries: queries })).toEqual({ competitors: [] });
+    expect(search).toHaveBeenCalledTimes(9);
+    expect(reason).toHaveBeenCalledTimes(1);
+    expect(reason.mock.calls[0]?.[0]).toContain("竞品 8");
+  });
+
+  it.each([0, 2])("显式声明的查询上限%s仍约束本次执行", async cap => {
+    const queries = Array.from({ length: 10 }, (_, index) => ({ q: `商品 ${index}` }));
+    const search = vi.fn(async () => []);
+    const evidenceCollector = vi.fn(async () => ({ verified: true }));
+    const executor = createDataMiningExecutor({ search, llm: { reason: vi.fn() }, evidenceCollector, perStageQueryCap: { A1: cap } });
+    expect(await executor("A1", { queries })).toEqual({ verified: true });
+    expect(search).toHaveBeenCalledTimes(cap);
+    expect(evidenceCollector).toHaveBeenCalledWith("A1", { queries }, []);
+  });
+
   it("真实候选完整交给collector，不把snippet交给旧模型回填", async () => {
     const reason = vi.fn(), evidenceCollector = vi.fn(async () => ({ identity: { name: "已核实" } }));
     const executor = createDataMiningExecutor({ search: async () => [{ title: "x", url: "https://source.example.com/", snippet: "待核实" }], llm: { reason }, evidenceCollector });

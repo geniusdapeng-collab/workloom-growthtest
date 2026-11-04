@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import test from "node:test";
-import { runVideoCli, startVideo, statusVideo, validateVideoIntent } from "./workloom-video.mjs";
+import { runVideoCli, startVideo, statusVideo, validateFormalVideoSource, validateVideoIntent } from "./workloom-video.mjs";
 
 const checkout = { repository: "geniusdapeng-collab/workloom-growthtest", commit: "1".repeat(40), productId: "workloom-ai-growth" };
 const expected = {
@@ -79,11 +79,39 @@ const routePaths = f => f.seen.map(call => call.path);
 test("strict input leaves original UTF-8 intent untouched and accepts only explicit facts", () => {
   assert.deepEqual(validateVideoIntent(intent), { ...intent, platform: "抖音", product: { name: "虚构头盔", model: "XT-30" }, officialIntent: true });
   assert.deepEqual(validateVideoIntent({ intent: "拍短片" }), { intent: "拍短片", officialIntent: true });
-  for (const input of [[], { intent: " " }, { ...intent, intent: "字".repeat(2001) },
+  for (const input of [[], { intent: " " }, { ...intent, intent: "字".repeat(12001) },
     ...["route", "metadata", "projectId", "shots", "prompt", "timeline", "stage", "officialIntent"].map(key => ({ ...intent, [key]: [] })),
     { ...intent, durationSec: 301 }, { ...intent, durationSec: 1.5 }, { ...intent, platform: "字".repeat(41) },
     { ...intent, product: { name: "../../secret" } }, { ...intent, product: { name: "头盔", source: "/private" } },
   ]) assert.throws(() => validateVideoIntent(input), { code: "INVALID_INPUT" });
+});
+
+test("intent accepts exactly 12000 Unicode characters and rejects 12001 without changing original text", () => {
+  for (const character of ["汉", "𠮷"]) {
+    const raw = character.repeat(12000);
+    assert.equal(validateVideoIntent({ intent: raw }).intent, raw);
+    assert.throws(() => validateVideoIntent({ intent: raw + character }), { code: "INVALID_INPUT" });
+  }
+});
+
+test("CLI reads a 12000-character intent from surrogate-escaped JSON without changing decoded text", async t => {
+  const root = await directory(t);
+  const raw = "𠮷".repeat(12000);
+  const inputFile = join(root, "intent.json");
+  await writeFile(inputFile, '{"intent":"' + "\\ud842\\udfb7".repeat(12000) + '"}');
+  const f = fixture();
+  assert.equal((await runVideoCli(["start", "--input-file", inputFile, "--job-file", join(root, "job.json")], f.deps)).phase,
+    "preproduction_submitted");
+  assert.equal(JSON.parse(f.seen[2].init.body).intent, raw);
+});
+
+test("formal source keeps 3000 supplementary Han characters and rejects an oversized prompt", () => {
+  const raw = "𠮷".repeat(3000);
+  const shot = { ...formalSource.shots[0], prompt: raw, promptSha256: sha(raw) };
+  assert.equal(validateFormalVideoSource({ ...formalSource, shots: [shot] }, started).shots[0].promptSha256, sha(raw));
+  const overflow = raw + "𠮷";
+  assert.throws(() => validateFormalVideoSource({ ...formalSource,
+    shots: [{ ...shot, prompt: overflow, promptSha256: sha(overflow) }] }, started), { code: "SOURCE_UNVERIFIED" });
 });
 
 test("writes owner-only scope and hash before the single official POST; retains IDs without intent or bearer", async t => {
@@ -303,6 +331,18 @@ test("explicit prompt review job never reads render-eligible shots and exports o
   assert.equal((await startVideo(promptIntent, join(root, "old-service.json"), wrongPurpose.deps)).phase, "start_unknown");
 });
 
+test("prompt-review export uses a 3000 Unicode-character ceiling including supplementary Han", async t => {
+  const jobFile = join(await directory(t), "job.json");
+  await startVideo({ ...intent, purpose: "prompt-review" }, jobFile,
+    fixture({ post: async () => trpc({ ...started, purpose: "prompt-review" }) }).deps);
+  for (const [length, phase] of [[3000, "prompt_review_ready"], [3001, "status_unavailable"]]) {
+    const raw = "𠮷".repeat(length);
+    const shots = [{ ...reviewedShots[0], prompt: raw, promptSha256: sha(raw) }];
+    const reviewed = { ...promptReview, shots, promptsSha256: sha(JSON.stringify(shots)) };
+    assert.equal((await statusVideo(jobFile, fixture({ status: null, reviewed }).deps)).phase, phase);
+  }
+});
+
 test("a failed prompt review continues in a new bound work order without another project start", async t => {
   const root = await directory(t);
   const original = join(root, "original.json");
@@ -364,6 +404,7 @@ test("actual CLI and source-session process start and recover the same job throu
     await copyFile(new URL(file, import.meta.url), join(repo, "scripts", file));
   }
   await copyFile(new URL("../packages/video-studio/src/cover-platforms.ts", import.meta.url), join(repo, "packages/video-studio/src/cover-platforms.ts"));
+  await copyFile(new URL("../packages/video-studio/src/unicode-text.mjs", import.meta.url), join(repo, "packages/video-studio/src/unicode-text.mjs"));
   await writeFile(join(repo, "product.manifest.json"), JSON.stringify(checkout));
   const git = (...args) => exec("git", ["-C", repo, ...args]);
   await git("init", "-q");

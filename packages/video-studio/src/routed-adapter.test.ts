@@ -4,7 +4,7 @@
  */
 import { createRequire } from "node:module";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MockProvider, type ChatMessage, type ChatOptions, type ModelProvider } from "@workloom/base/model-router";
+import { MockProvider, ModelProviderError, type ChatMessage, type ChatOptions, type ModelProvider } from "@workloom/base/model-router";
 import { WorkloomLLMEngine, withVendorEngineBridge } from "./llm-adapter.js";
 
 afterEach(() => vi.restoreAllMocks());
@@ -83,6 +83,26 @@ describe("vendor 引擎收口 routeSmart（preproduction 场景）", () => {
     const r = await engine(sink).reasonStructured("x", {});
     expect(r.success).toBe(false);
     expect(r.retryable).toBe(false);
+  });
+
+  it("供应商结果未知且降级事件写入失败时仍标记待对账，同一引擎禁止第二次派发", async () => {
+    const chat = vi.fn(async () => {
+      throw new ModelProviderError("已受理请求的最终回执丢失", "unknown", { retryable: false });
+    });
+    const provider: ModelProvider = { modelId: "deepseek-flash", healthy: async () => true, chat };
+    const { sink } = memSink();
+    sink.recordDegradation = vi.fn(async () => { throw new Error("临时事件库故障"); });
+    const adapter = new WorkloomLLMEngine({
+      baseUrl: "https://offline.invalid/v1", apiKey: "test-only", model: "deepseek-flash",
+      router: { providers: new Map([[provider.modelId, provider]]), sink, scene: "video.preproduction.plan" },
+    });
+    const first = await adapter.reason("同一冻结需求");
+    expect(first).toMatchObject({ success: false, unknown: true, retryable: false, error: "临时事件库故障" });
+    expect(adapter.hasUnknownOutcome()).toBe(true);
+    expect(await adapter.reason("同一冻结需求")).toMatchObject({ success: false, unknown: true, retryable: false,
+      error: expect.stringContaining("VIDEO_MODEL_OUTCOME_UNKNOWN") });
+    expect(chat).toHaveBeenCalledTimes(1);
+    expect(sink.recordDegradation).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -20,6 +20,7 @@ import { ArchiveStore, readContextBundle, type ContextBundle } from "@hyperreali
 import { scopedRows, archiveWorkDir, projectRunLockKey, readProjectMeta } from "./archive-host.js";
 import { restoreStudioResumeInput } from "./studio-resume-input.js";
 import { isStudioPromptReviewProject } from "./prompt-review-authority.js";
+import { readStudioAttemptOutcome } from "./studio-checkpoint-store.js";
 import { scopedQuery } from "./gen/db.js";
 import type { resolveScenePolicyForIntent } from "./scene-policy-routing.js";
 import type { resolvePlatformForIntent } from "./platform-routing.js";
@@ -58,6 +59,7 @@ export interface ResumeOptions {
     purpose?: "prompt-review";
     durationSec?: number;
     promptReviewPrior?: { runId: string; attempt: number };
+    resumePrior?: { runId: string; attempt: number; stageId: "preproduction" | "prompt_review" };
     selectedScenePolicy?: ReturnType<typeof resolveScenePolicyForIntent>;
     selectedPlatform?: ReturnType<typeof resolvePlatformForIntent>;
   }) => string | Promise<string>;
@@ -82,6 +84,20 @@ export async function readLatestStudioResumeStage(scope: Scope, projectId: strin
 
 export function isPromptReviewRejection(stage: ResumeStage | undefined, expectedRunId: string): boolean {
   return Boolean(expectedRunId && stage?.run_id === expectedRunId && stage.status === "failed" && stage.error_class === "GATE_REJECTED");
+}
+
+export async function isKnownStudioResume(input: {
+  scope: Scope; project: { projectId: string; createdAt: string | null }; stageId: "preproduction" | "prompt_review";
+  latest: ResumeStage | undefined; expectedRunId: string; archive: ArchiveStore;
+}): Promise<boolean> {
+  const { latest } = input;
+  if (!latest || latest.run_id !== input.expectedRunId || !["failed", "interrupted"].includes(latest.status)
+    || latest.error_class === "RECEIPT_UNVERIFIED") return false;
+  const outcome = await readStudioAttemptOutcome({ scope: input.scope, projectId: input.project.projectId,
+    projectCreatedAt: input.project.createdAt, stageId: input.stageId, runId: input.expectedRunId,
+    attempt: latest.attempt, archive: input.archive });
+  // Existing gate-rejected work orders retain their original explicit-retry contract.
+  return outcome === "known" || outcome === null && isPromptReviewRejection(latest, input.expectedRunId);
 }
 
 /** 最新 attempt 的断点（每个 stage 只看最新一次；假断点会被 stage2 的成功重跑覆盖） */
@@ -205,9 +221,6 @@ export async function resumeProject(
     return { kind: "noaction", stage: "prompt_review", message: "提示词审核项目只能恢复原提示词阶段。" };
   }
   const stuckStage = promptReview ? "prompt_review" : opts.fromStage ?? breakpoints[0]?.stageId ?? "preproduction";
-  if (!promptReview && opts.expectedRunId) {
-    return { kind: "noaction", stage: stuckStage, message: "指定的运行只能用于续跑原提示词审核项目。" };
-  }
   const archive = new ArchiveStore(archiveWorkDir(), scope.workspaceId, opts.projectId);
   for (const stage of breakpoints) {
     // PG 完成写与失败补写可能同时不可用；本地 meta/output 仍是待对账证据。
@@ -242,17 +255,22 @@ export async function resumeProject(
   }
 
   if (stuckStage === "preproduction" || (promptReview && stuckStage === "prompt_review")) {
+    const resumeStageId: "preproduction" | "prompt_review" = promptReview ? "prompt_review" : "preproduction";
     const project = await readProjectMeta(scope, opts.projectId);
     if (!project) {
       return { kind: "noaction", stage: stuckStage, message: `项目 ${opts.projectId} 不存在或不属于当前工作区` };
     }
     const latest = await readLatestStudioResumeStage(scope, opts.projectId, stuckStage);
     const attempt = latest && Number.isSafeInteger(latest.attempt) && latest.attempt > 0 ? latest.attempt : null;
-    const priorRunId = opts.expectedRunId;
-    const prior = promptReview && opts.fromStage && attempt !== null && priorRunId && isPromptReviewRejection(latest, priorRunId)
-      ? { runId: priorRunId, attempt } : null;
+    const priorRunId = opts.expectedRunId ?? (!promptReview ? latest?.run_id : undefined);
+    const prior = attempt !== null && priorRunId && (!promptReview || opts.fromStage)
+      && await isKnownStudioResume({ scope, project, stageId: resumeStageId, latest, expectedRunId: priorRunId, archive })
+      ? { runId: priorRunId, attempt, stageId: resumeStageId } : null;
     if (promptReview && !prior) {
-      return { kind: "noaction", stage: stuckStage, message: "只允许显式续跑最新且已确认被门禁打回的原提示词工作单。" };
+      return { kind: "noaction", stage: stuckStage, message: "只允许接续最新且外部结果已核实的原提示词工作单；未决模型请求须先对账。" };
+    }
+    if (latest && !prior && !(opts.fromStage && latest.status === "done" && !promptReview)) {
+      return { kind: "noaction", stage: stuckStage, message: "已有运行的模型结果或完成回执待核实；保留原工作单先对账。" };
     }
     const inputRef = attempt === null ? null : `stages/${stuckStage}/attempt-${attempt}.input.json`;
     const saved = inputRef !== null && latest?.input_ref === inputRef
@@ -262,12 +280,12 @@ export async function resumeProject(
     if ((restored.input.purpose === "prompt-review") !== promptReview) {
       return { kind: "noaction", stage: stuckStage, message: "恢复输入用途与当前项目不一致。" };
     }
-    if (prior) {
-      const runId = await opts.startRun({ ...restored.input, promptReviewPrior: prior });
+    if (prior && promptReview) {
+      const runId = await opts.startRun({ ...restored.input, promptReviewPrior: { runId: prior.runId, attempt: prior.attempt }, resumePrior: prior });
       return { kind: "resumed", stage: "prompt_review", projectId: opts.projectId, priorRunId: prior.runId, runId, attempt: prior.attempt,
         message: `原提示词工作单 ${prior.runId} 已提交续跑（原 attempt=${prior.attempt}），保留需求原文和目标时长。` };
     }
-    const runId = await opts.startRun(restored.input);
+    const runId = await opts.startRun({ ...restored.input, ...(prior ? { resumePrior: prior } : {}) });
     return {
       kind: "resumed",
       stage: "preproduction",
@@ -275,8 +293,7 @@ export async function resumeProject(
       attempt,
       message:
         `预生产断点（attempt=${attempt ?? "-"}，状态=${latest?.status ?? "无记录"}）→ 走既有补跑入口续跑。`
-        + `注意：vendor Phase checkpoint 仅在 blueprint 指纹一致时命中（真实模型下常不一致 → 全量重跑，重复计费风险）；`
-        + `本轮开跑前已把 checkpoint 快照进档案（checkpoints/attempt-<n>-before/），跑完看输出里的 resumed 标记。`
+        + `已通过的工位按冻结输入、原始审核与依赖摘要复用，失败及依赖变化的部分重新执行。`
         + (interruptedRows > 0 ? `已把 ${interruptedRows} 条 running 台账归位为 interrupted。` : ""),
     };
   }
