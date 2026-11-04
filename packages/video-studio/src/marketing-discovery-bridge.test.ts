@@ -2,7 +2,7 @@ import { createRequire } from "node:module";
 import { join } from "node:path";
 import { expect, it, vi } from "vitest";
 import { videoRuntimeRoot } from "./runtime-root.js";
-import { installVendorDiscoveryFixBridge, installVendorDiscoveryNarrativeBridge } from "./vendor-compat.js";
+import { installVendorDiscoveryFixBridge, installVendorDiscoveryNarrativeBridge, normalizeNarrativePrdContract } from "./vendor-compat.js";
 
 it("projects the current marketing contract through native G3 and keeps its real scene props and paired risks", async () => {
   const root = videoRuntimeRoot(import.meta.url);
@@ -56,4 +56,27 @@ it("projects the current marketing contract through native G3 and keeps its real
     restoreBridge();
     restoreDefaults();
   }
+});
+
+it("keeps the portrait identity while projecting explicit project wardrobe and approved actions into G4", () => {
+  const identity = { id: "chen-zhuo", name: "陈卓", role: "protagonist",
+    portraitRef: "bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png" };
+  const actions = ["抬手检查扣带", "通过训练门架", "解扣后举盔"];
+  const source = "陈卓穿专业防护服与护具，抬手检查扣带，通过训练门架，解扣后举盔。";
+  const discovery = { _canonicalCharacters: [identity], upstreamFields: { duration_sec: 12, aspect_ratio: "9:16",
+    platform: "douyin", _originalStoryText: source }, sceneStructure: {
+    opening: { duration: 4, purpose: "室内训练区准备", keyElements: ["护具"] },
+    scenes: [{ duration: 4, purpose: "通过室内训练装置", keyElements: ["训练门架"] }],
+    ending: { duration: 4, purpose: "安全停下后结束训练", keyElements: ["头盔"] },
+  } };
+  const original = { characterSystem: { characters: [{ name: "陈卓", costume: "专业防护服与护具" }] }, scenePlan: {},
+    projectDefinition: { sourceIntent: source }, creativeCore: { creativeHook: "扣带先出声" } };
+  const result = normalizeNarrativePrdContract(original, discovery, { actions, props: ["专业防护服", "护具"] });
+  expect(result.characterSystem).toMatchObject({ characters: [expect.objectContaining({ characterId: identity.id,
+    costume: "专业防护服与护具", portraitPath: identity.portraitRef, authorization: "real-authorized" })] });
+  expect(result.creativeCore).toMatchObject({ creativeHook: "扣带先出声" });
+  const shots = result.shotContract as Array<{ purpose: string; keyProps: string[] }>;
+  expect(shots).toHaveLength(3);
+  actions.forEach((action, index) => expect(shots[index]?.purpose).toContain(action));
+  expect(shots.map(shot => shot.keyProps)).toEqual([["护具"], ["训练门架"], ["头盔"]]);
 });

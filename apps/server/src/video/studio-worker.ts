@@ -599,7 +599,8 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
   const runInput: RunInput = {
     projectId: input.projectId,
     rawIntent: input.rawIntent ?? input.intent,
-    intent: appendPlatformGuidance(appendScenePolicyGuidance(input.intent, selectedScenePolicy.policy), selectedPlatform.decision)
+    intent: appendPlatformGuidance(appendScenePolicyGuidance(input.intent, selectedScenePolicy.policy),
+      selectedPlatform.decision, input.rawIntent ?? input.intent)
       +(directorProfile?directorGuidance(directorProfile):""),
     metadata: resolvedMetadata,
     isMarketing: input.isMarketing,
@@ -790,6 +791,7 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
       return { approved: false, reason: promptReviewStopped ? PROMPT_REVIEW_STOP : "PROMPT_REVIEW_G6_REQUIRED", suggestions: [] };
     }
     const scopedPromptGate = promptReview && gate === "G6_PROMPT";
+    const evidencePhase = gate === "G2_THEME" ? "theme" : gate === "G3_INSIGHT" ? "requirements" : undefined;
     if (scopedPromptGate) assertStudioPromptReviewText(req.contentMd ?? "", promptReviewShots);
     const gateObj = gateObjectOf(gate, req.vendorType);
     const objectId = gate === "G7_FINAL" ? input.projectId : `${input.projectId}:${gate.toLowerCase()}`;
@@ -816,9 +818,11 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
           stage: producerStage,
           projectId: input.projectId,
           artifacts: [{ path: artifact.path, kind: "text", note: req.title }],
+          ...(evidencePhase ? { evidencePhase } : {}),
           deterministic: gateDeterministicChecks(gate, req.contentMd ?? ""),
           rubric: [
             ...((GATE_RUBRIC[gate] ?? []) as string[]),
+            ...(gate === "G2_THEME" ? ["核对当前创意主题、用户明确的题材、动作顺序、声音、比例和目标时长。用户未指定的受众可以采用明确标注的可执行画像。分镜阶段才产生的逐镜秒数、逐镜构图和最终资产证据不属于主题审批内容。"] : []),
             ...(gate === "G1_DOSSIER" ? [
               "creativeRequirements.intent 中的原文是本片创作与交付合同。人物、情节、披露和尾帧不属于商品事实，应核对两者分区及 restrictions 约束，具体镜头是否落实由后续门判定。",
             ] : []),
@@ -827,8 +831,8 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
             `门内容全长 ${artifact.chars} 字，已随附件送审；摘录（供定位，不是全文）：${(req.contentMd ?? "").slice(0, 600)}`
           ],
           context: { gate, vendorType: req.vendorType, runId: entry.runId, contentChars: (req.contentMd ?? "").length,
-            ...(scopedPromptGate ? { request: input.rawIntent ?? input.intent, targetSeconds: input.durationSec,
-              platform: selectedPlatform.decision.id, purpose: "prompt-review" } : {}) },
+            ...(scopedPromptGate || evidencePhase ? { request: input.rawIntent ?? input.intent, targetSeconds: input.durationSec,
+              platform: selectedPlatform.decision.id, ...(promptReview ? { purpose: "prompt-review" } : {}) } : {}) },
           // 内部准备门默认 fail-closed：评审模型不可用即打回，不静默放行
           allowFallbackApprove: (process.env.HR_PRODUCER_FALLBACK_APPROVE ?? "0") === "1",
           log: (line) => console.log(line)

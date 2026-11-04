@@ -141,6 +141,27 @@ describe("AI producer evidence gate", () => {
     expect(verdict.reason).toContain("HTTP 500");
   });
 
+  it("scopes pre-storyboard evidence without overriding the judge's content rejection", async () => {
+    const bodies: string[] = [];
+    const rejected = { ...good, approved: false, score: 55, reason: "客户指定的结束画面缺失" };
+    for (const evidencePhase of ["theme", "requirements", undefined] as const) {
+      const verdict = await reviewStage(textOptions({
+        stage: "script",
+        evidencePhase,
+        fetchImpl: judge(rejected, bodies),
+      }));
+      expect(verdict).toMatchObject({ approved: false, status: "failed", score: 55 });
+    }
+    const requests = bodies.map(body => JSON.parse(body).messages[0].content[0].text as string);
+    expect(requests).toHaveLength(3);
+    for (const early of requests.slice(0, 2)) {
+      expect(early).toContain("按本环节实际应交付的内容核对原始需求和约束");
+      expect(early).toContain("不能以缺少后续产物作为本环节的缺项");
+    }
+    expect(requests[2]).toContain("未提供结构化镜头合同");
+    expect(requests[2]).not.toContain("不能以缺少后续产物作为本环节的缺项");
+  });
+
   it("does not retry an unknown HTTP failure that mentions empty content", async () => {
     const bodies: string[] = [];
     const verdict = await reviewStage(textOptions({

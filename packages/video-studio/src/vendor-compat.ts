@@ -3144,6 +3144,7 @@ function reconcileNarrativeScenePlan(
   discovery: Record<string, unknown>,
   upstream: Record<string, unknown>,
   duration: number,
+  sourceBoundMarketing = false,
 ): boolean {
   const sourceScene = recordValue(discovery.sceneStructure);
   const nodes = [
@@ -3216,21 +3217,22 @@ function reconcileNarrativeScenePlan(
       ? nodeDuration
       : Number((duration / nodes.length).toFixed(3));
     const previous = previousScenes[index] ?? previousScenes[0] ?? {};
-    const keyProps = [...new Set([
+    const sceneProps = Array.isArray(node.keyElements) ? node.keyElements.map(String) : [];
+    const keyProps = sourceBoundMarketing ? sceneProps : [...new Set([
       ...inferNarrativeProps({
         intent: purpose,
         discovery: { sceneStructure: { opening: { purpose } } },
         upstream,
       }),
       ...inferNarrativeProps({ intent: originalStory, discovery: {}, upstream }),
-      ...(Array.isArray(node.keyElements) ? node.keyElements.map(String) : []),
+      ...sceneProps,
     ].map((item) => item.trim()).filter((item) =>
       item
       && !isNarrativeAnimal(item)
       && !/(?:探头|伸爪|缩回|盘成|蜷缩|压住|光影|蒸汽|釉面)$/u.test(item)
       && (item !== "积水" || groundEvidence)))]
       .slice(0, 8);
-    const setting = sanitizeSetting(String(previous.setting ?? purpose));
+    const setting = sourceBoundMarketing ? String(previous.setting ?? purpose) : sanitizeSetting(String(previous.setting ?? purpose));
     const visualRequirements = [
       purpose,
       ...(Array.isArray(previous.visualRequirements)
@@ -3361,6 +3363,7 @@ function buildShotContract(
   prd: Record<string, unknown>,
   canonicalCharacters: Array<Record<string, unknown>>,
   safeAreaInsets: { topPercent: number; bottomPercent: number; rightRailPercent: number },
+  marketingActions?: string[],
 ): Array<Record<string, unknown>> {
   const scenePlan = recordValue(prd.scenePlan);
   const scenes = Array.isArray(scenePlan.scenes)
@@ -3370,14 +3373,14 @@ function buildShotContract(
     ? scenePlan.shotMapping.map(recordValue)
     : [];
   const sourceIntent = String(recordValue(prd.projectDefinition).sourceIntent ?? "");
-  const globalActionsBase = extractNarrativeActions({}, {
+  const globalActionsBase = marketingActions ?? extractNarrativeActions({}, {
     _originalStoryText: [
       sourceIntent,
       ...scenes.map((scene) => String(scene.purpose ?? "")),
     ].join("；"),
   });
   const totalRows = mappings.reduce((sum, mapping) => sum + Math.max(1, Math.round(Number(mapping.estimatedShots ?? 1))), 0);
-  const globalActions = projectNarrativeActionSequence(globalActionsBase, totalRows);
+  const globalActions = marketingActions?.length === 0 ? [] : projectNarrativeActionSequence(globalActionsBase, totalRows);
   const visual = recordValue(prd.visualSpecification);
   const globalLighting = String(visual.lightingDirection ?? "按已确认视觉方案执行");
   const globalColorText = [
@@ -3672,6 +3675,7 @@ export function normalizeHomecomingPrdContinuity(prd: Record<string, unknown>, m
 export function normalizeNarrativePrdContract(
   input: Record<string, unknown>,
   discovery: Record<string, unknown>,
+  marketingContract?: { actions: string[]; props: string[] },
 ): Record<string, unknown> {
   const prd = input;
   const upstream = recordValue(discovery.upstreamFields);
@@ -3698,7 +3702,7 @@ export function normalizeNarrativePrdContract(
   const scenePlan = recordValue(prd.scenePlan);
   rebalanceSceneDurations(scenePlan, duration);
   prd.scenePlan = scenePlan;
-  reconcileNarrativeScenePlan(prd, discovery, upstream, duration);
+  reconcileNarrativeScenePlan(prd, discovery, upstream, duration, Boolean(marketingContract));
   const dialoguePolicy = [
     upstream.dialogue_requirement,
     upstream.special_notes,
@@ -3712,10 +3716,15 @@ export function normalizeNarrativePrdContract(
     upstream.audio_design,
     upstream.dialogue_requirement,
   ].map(String).join(" ");
-  const sourceActions = extractNarrativeActions({}, {
+  const sourceActions = marketingContract?.actions ?? extractNarrativeActions({}, {
     _originalStoryText: String(upstream._originalStoryText ?? upstream.description ?? ""),
   });
-  if (sourceActions.length > 0) {
+  if (marketingContract && sourceActions.length > 0) {
+    const creative = recordValue(prd.creativeCore);
+    creative.keyMessages = [...(Array.isArray(creative.keyMessages) ? creative.keyMessages : []),
+      `当前创作合同的必需动作（按顺序执行）：${sourceActions.join("；")}`];
+    prd.creativeCore = creative;
+  } else if (sourceActions.length > 0) {
     const plannedShotCount = (Array.isArray(recordValue(prd.scenePlan).shotMapping)
       ? recordValue(prd.scenePlan).shotMapping as unknown[]
       : []).map(recordValue).reduce((sum, mapping) =>
@@ -3772,6 +3781,8 @@ export function normalizeNarrativePrdContract(
     }).map((item, index) => ({ ...item, id: `char_${index + 1}`, characterId: `char_${index + 1}` }));
   }
   const noCharacters = canonicalCharacters.length === 0;
+  const explicitWardrobe = canonicalCharacters.length === 1 ? marketingContract?.props.filter(item =>
+    /(?:服|衣|裤|鞋|裙|护具|防护装备|头盔|手套)(?:$|和|与|及)/u.test(item)) ?? [] : [];
   if (canonicalCharacters.length > 0) {
     characterSystem.characters = canonicalCharacters.map((item, index) => {
       const id = String(item.id ?? item.characterId ?? `char_${index + 1}`);
@@ -3799,6 +3810,10 @@ export function normalizeNarrativePrdContract(
         ?? wardrobeEntries.find((entry) => entry.scene)
         ?? wardrobeEntries[0]
         ?? {};
+      const plannedCostume = String(generated[index]?.costume ?? "").trim();
+      const projectCostume = explicitWardrobe.length
+        ? explicitWardrobe.every(item => plannedCostume.includes(item)) ? plannedCostume : explicitWardrobe.join("、")
+        : null;
       const name = String(authoritative?.name ?? item.name ?? generated[index]?.name ?? `角色${index + 1}`);
       const animal = isNarrativeAnimal(name);
       if (animal) {
@@ -3827,9 +3842,8 @@ export function normalizeNarrativePrdContract(
         ageRange: authoritative?.age ?? generated[index]?.ageRange ?? null,
         appearance: `${authoritativeAppearance || baseAppearance}；模特ID=${id}；定妆照=${portrait || "未指定"}；授权=${authorization}`,
         costume: String(
-          [wardrobe.name, wardrobe.detail].map(String).filter(Boolean).join("，")
-          || generated[index]?.costume
-          || "按已登记角色档案",
+          projectCostume ?? ([wardrobe.name, wardrobe.detail].filter(Boolean).map(String).join("，")
+            || plannedCostume || "按已登记角色档案"),
         ),
         portraitPath: portrait,
         portraitEvidence: portraitEvidence(portrait),
@@ -3984,7 +3998,7 @@ export function normalizeNarrativePrdContract(
     prd.visualSpecification = visual;
   }
   normalizeHomecomingPrdContinuity(prd, musicForbidden);
-  prd.shotContract = buildShotContract(prd, canonicalCharacters, safeAreaInsets);
+  prd.shotContract = buildShotContract(prd, canonicalCharacters, safeAreaInsets, marketingContract?.actions);
   const normalizedCharacters = Array.isArray(recordValue(prd.characterSystem).characters)
     ? (recordValue(prd.characterSystem).characters as unknown[]).map(recordValue)
     : [];
@@ -4077,7 +4091,7 @@ export function normalizeNarrativePrdContract(
   };
   if (animalOnly || noCharacters || musicForbidden || canonicalK) normalizePrdStrings(prd);
   if (normalizeHomecomingPrdContinuity(prd, musicForbidden)) {
-    prd.shotContract = buildShotContract(prd, canonicalCharacters, safeAreaInsets);
+    prd.shotContract = buildShotContract(prd, canonicalCharacters, safeAreaInsets, marketingContract?.actions);
   }
   reconcileShotContractExecutionCoherence(prd);
   return sanitizePrdText(prd, duration || 30, speechForbidden) as Record<string, unknown>;
@@ -4216,6 +4230,19 @@ export function installVendorDiscoveryNarrativeBridge(options: {
         intent: string,
         metadata: Record<string, unknown> = {},
       ) {
+        if (options.marketingDiscovery?.()) {
+          const input = original.call(this, intent, metadata);
+          return [
+            input,
+            "",
+            "【营销主题字段合同】以下字段要求优先于通用提炼心法、类型默认值和示例。",
+            "tone 必须逐字选用温暖治愈、轻快明朗、冷酷精密、诗意哀伤中的一项。把用户的速度、动作张力和节奏要求写入 description 或 special_notes，按原文保留强度，不拼接到 tone。",
+            "target_audience 必填。已指定受众时保留原意；否则基于本片商品、内容与平台，提出具体的观看兴趣及观看动机，并明示是本片创作假设。不要用“目标消费者/品牌受众”等泛称，也不要编造用户调查、市场规模、年龄或性别。",
+            "visual_style 用本片可执行的景别、运动、用光及色调描述美学。仅在客户原文明确提供第三方作品时才可提名，并注明仅借鉴拍摄手法、不得使用或复刻可识别素材。",
+            "dialogue_requirement 严格按客户的声音合同填报。禁止人声时保留原文允许的声音，台词字数与配音语速不适用。明确要求旁白或对白时保留相应内容。",
+            "description 和 special_notes 保留客户明确给出的动作、声音、披露与尾帧。画面里尚未创作的物理细节、场地和道具是创作建议，不是客户已指定的事实。",
+          ].join("\n");
+        }
         const route = metadata?.pipelineRoute && typeof metadata.pipelineRoute === "object"
           ? metadata.pipelineRoute as Record<string, unknown>
           : {};
@@ -4400,7 +4427,8 @@ export function installVendorDiscoveryNarrativeBridge(options: {
         discovery: Record<string, unknown>,
       ) {
         const result = await original.call(this, discovery) as Record<string, unknown>;
-        return normalizeNarrativePrdContract(result, discovery);
+        const marketing = options.marketingDiscovery?.();
+        return normalizeNarrativePrdContract(result, discovery, marketing ? marketingDiscoveryContract(discovery, marketing) : undefined);
       };
       restores.push(() => { prototype.generate = original; });
     }
