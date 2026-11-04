@@ -383,10 +383,9 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
     }
     console.log(`[PromptFusionAgent] 完成 ✓ | 降级: ${failed}/${shots.length}`);
 
-    // 【v2.1.10-fix 提示词融合断点】全部镜头完成后显式清理子 checkpoint，避免残留文件累积
-    if (checkpointMgr && blueprintHash) {
-      try { this._clearSubCheckpoint(checkpointMgr, blueprintHash); } catch (_) {}
-    }
+    // WorkLoom modification [T-2026-1105-9004]: raw fusion completion precedes
+    // host Phase3 validation. Retain these rows if that later boundary fails;
+    // ProductionEngine._clearCheckpoints owns cleanup after production succeeds.
 
     return {
       shots: results,
@@ -483,7 +482,7 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
 
   /**
    * 【v2.1.10-fix 提示词融合断点】加载子 checkpoint（加载后不删除，防止进程崩溃丢失进度）
-   * 清理时机：全部镜头完成后由 process() 末尾统一调用 _clearSubCheckpoint。
+   * 清理时机：原生生产与宿主校验成功后，由 ProductionEngine._clearCheckpoints 统一清理。
    */
   _loadSubCheckpoint(checkpointMgr, blueprintHash) {
     const fs = require('fs');
@@ -506,7 +505,7 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
   }
 
   /**
-   * 【v2.1.10-fix 提示词融合断点】清理子 checkpoint（全部镜头完成后调用）
+   * 显式清理工具；process() 完成不代表宿主校验已通过，不在此提前清理。
    */
   _clearSubCheckpoint(checkpointMgr, blueprintHash) {
     const fs = require('fs');

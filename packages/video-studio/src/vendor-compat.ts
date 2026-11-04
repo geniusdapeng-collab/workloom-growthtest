@@ -1348,11 +1348,17 @@ export function narrativeSpeechPolicy(value: unknown): {
   const voiceoverMentioned = /(?:旁白|画外音|画外)/u.test(text);
   const voiceoverDenied = text.split(/[。；;\n]/u).some((clause) => {
     const compact = clause.replace(/\s+/gu, "");
-    return /(?:禁止|不得|不要|不加|不添加|不允许|避免)(?:任何|额外)?(?:使用|添加|加入|保留|有|出现|存在)?(?:字幕|文字)?(?:和|及|与|、|,|，|\/)?(?:旁白|画外音|画外)/u.test(compact)
-      || /(?:无|没有|零)(?:任何|额外)?(?:字幕|文字)?(?:和|及|与|、|,|，|\/)?(?:旁白|画外音|画外)/u.test(compact)
+    return /(?:禁止|不得|不要|无需|不需要|不加|不添加|不允许|不使用|不采用|避免)(?:任何|额外)?(?:使用|添加|加入|保留|有|出现|存在)?(?:任何|额外)?(?:字幕|文字)?(?:和|及|与|、|,|，|\/)?(?:人声)?(?:旁白|画外音|画外)/u.test(compact)
+      || /(?:无|没有|零)(?:任何|额外)?(?:字幕|文字)?(?:和|及|与|、|,|，|\/)?(?:人声)?(?:旁白|画外音|画外)/u.test(compact)
       || /(?:字幕|文字)(?:和|及|与|、|,|，|\/)?(?:旁白|画外音|画外)(?:都|均|也)?(?:不要|禁止|禁用|去掉|删除)/u.test(compact);
   });
-  const voiceoverAllowed = voiceoverMentioned && !voiceoverDenied;
+  const voiceoverAllowed = !voiceoverDenied && text.split(/[。；;\n]/u).some((clause) => {
+    const compact = clause.replace(/\s+/gu, "");
+    // A conditional instruction describes how to obey a later request; it is not that request.
+    if (/(?:若|如果|如需|仅当)[^。；;\n]{0,32}(?:旁白|画外音)|(?:当|明确要求)[^。；;\n]{0,32}(?:时|则|才)/u.test(compact)) return false;
+    return /(?:允许|需要|保留|加入|添加|使用|可(?:以)?(?:加|加入|用|使用|保留))[^。；;\n]{0,12}(?:旁白|画外音)/u.test(compact)
+      || /(?:旁白|画外音)[:：][“"「]/u.test(compact);
+  });
   return {
     noLipSyncDialogue,
     voiceoverMentioned,
@@ -5858,6 +5864,61 @@ function marketingNativeShotField(shot: FusionRecord, key: string, ...aliases: s
   throw new Error(`MARKETING_NATIVE_SHOT_FIELD_MISSING: ${String(shot.shotId ?? shot.shot_id ?? "未编号镜头")} 缺少原生字段 ${key}`);
 }
 
+/** Keep native sound events; remove only forbidden speech and postproduction music instructions. */
+function marketingAudioForContract(
+  value: string,
+  options: { noDialogue: boolean; noMusic: boolean; shotId: string; field: string },
+): string {
+  const source = value.trim();
+  // The appended discipline is policy text, not an authored sound event.
+  const native = source.split("【音频纪律】")[0]!.trim();
+  const music = /背景音乐|配乐|音乐风格|音乐节拍|旋律|歌曲|音乐|弦乐|钢琴|器乐|合成器|电子鼓|贝斯|鼓点|\bBPM|\bBGM|soundtrack|background\s*music|\bmusic\b|\bscore\b/iu;
+  const postproductionMusic = /背景音乐|配乐|音乐风格|音乐节拍|\bBGM\b|soundtrack|background\s*music/iu;
+  const musicDenial = /(?:无|没有|不含|不加|不出现|不加入|禁止|避免|无需|不要|严禁)[^，。；;、,\n]{0,8}(?:背景音乐|配乐|音乐|BGM|旋律|歌曲|soundtrack)/giu;
+  const speechDenial = /(?:无|没有|不添加|不加入|禁止|不得|不允许)(?:任何|额外|可辨)?(?:人声)?(?:台词|对白|对话|旁白|口播|voiceover)(?:人声)?/giu;
+  const nonsemanticVoice = /欢呼|呼吸|喘息|笑声|呐喊|叹息|抽泣|哭声|咳嗽|含混|不可辨|不构成可辨语句|无可辨语义/u;
+  const inSceneMusic = /画面内|画内|实况|街边音响|街头演奏|店内音响|现场(?:演奏|乐器|乐队)/u;
+  const kept: string[] = [];
+  let changed = native !== source;
+  let musicContext = false;
+  let inSceneContext = false;
+  for (const match of native.matchAll(/([^。；;，,\n]+)([。；;，,\n]*)/gu)) {
+    const body = match[1]!.trim();
+    const punctuation = match[2]!;
+    const resumesNative = /^(?:环境音|环境声|原生声|现场声|动作音效?|(?:只|仅)保留环境)/u.test(body)
+      || /(?:保留|只剩|让)[^。；;\n]{0,12}(?:欢呼|呼吸|喘息|笑声|掌声|环境声)/u.test(body);
+    if (resumesNative) musicContext = false;
+    const explicitlyInScene = !options.noMusic && inSceneMusic.test(body);
+    if (explicitlyInScene) inSceneContext = true;
+    const musicBody = body.replace(musicDenial, "");
+    const positiveMusic = music.test(musicBody);
+    const forbiddenMusic = positiveMusic && (options.noMusic || !inSceneContext
+      || postproductionMusic.test(musicBody) && !explicitlyInScene);
+    if (forbiddenMusic) {
+      musicContext = true;
+      inSceneContext = false;
+    }
+    const speech = body.replace(speechDenial, "");
+    const forbiddenSpeech = options.noDialogue && (
+      /台词|对白|对话|旁白|口播|voiceover|说话|播报|解说/iu.test(speech)
+      || /人声|人物声/u.test(speech) && !nonsemanticVoice.test(speech)
+    );
+    if (forbiddenMusic || musicContext && !inSceneContext || forbiddenSpeech) changed = true;
+    else kept.push(match[0]);
+    if (/[。；;\n]/u.test(punctuation)) {
+      musicContext = false;
+      inSceneContext = false;
+    }
+  }
+  const result = changed
+    ? kept.join("").replace(/[，,；;]+\s*(?=[。；;]|$)/gu, "").trim()
+    : source;
+  if (!result) {
+    throw new Error(`MARKETING_AUDIO_CONTRACT_EMPTY: ${options.shotId} 的 ${options.field} 没有符合声音合同的原生声音事件`);
+  }
+  return result;
+}
+
 export function applyNarrativeFinalPromptContract(
   shot: FusionRecord,
   options: {
@@ -6028,7 +6089,18 @@ export function applyNarrativeFinalPromptContract(
       : "本镜落幅后硬切至下一镜；不使用叠化、黑场或其他转场特效。");
     if (duration > 0) replaceField("时间轴", timelineTextForAction(action || actionSource, duration));
   }
-  if (options.noMusic || options.noDialogue) {
+  let marketingAudio: string | undefined;
+  if (options.marketingPrompt) {
+    const nativeAudio = marketingNativeShotField(next, "audio");
+    const sound = marketingAudioForContract(nativeAudio, {
+      noDialogue: options.noDialogue, noMusic: Boolean(options.noMusic),
+      shotId: String(next.shotId ?? next.shot_id ?? "未编号镜头"), field: "audio",
+    }).replace(/[。；;]+$/u, "");
+    next.audio = sound;
+    (next.fields as FusionRecord).audio = sound;
+    marketingAudio = `${sound}；${options.noDialogue ? "无可辨台词、对白、旁白或口播；" : ""}${options.noMusic ? "无音乐、无配乐、无音乐节拍" : "无镜头外配乐"}。`;
+    replaceField("音频", marketingAudio);
+  } else if (options.noMusic || options.noDialogue) {
     const rawAudio = promptFieldText((next.fields as FusionRecord).audio ?? next.audio);
     const musicTerms = "音乐|配乐|旋律|弦乐|钢琴|氛围音|铺底|BPM|BGM|soundtrack|music|score";
     const speechTerms = "台词|人声|对话|旁白|口播|voiceover";
@@ -6190,7 +6262,7 @@ export function applyNarrativeFinalPromptContract(
     const dialogueText = options.noDialogue
       ? "不适用：本片无台词、无旁白、无口播。"
       : promptFieldText(next.dialogue ?? (next.fields as FusionRecord).dialogue) || "按已确认台词合同执行。";
-    const audioText = fieldValue("音频") || "环境声、主体动作声与合同允许的人声同步；无未声明配乐。";
+    const audioText = marketingAudio ?? (fieldValue("音频") || "环境声、主体动作声与合同允许的人声同步；无未声明配乐。");
     const rawAction = cleanText(actionSource)
       .replace(/[^；。\n]*(?:画面内无人物|没有实体肢体入画|无角色出场|空镜无角色)[^；。\n]*[；。]?/gu, "")
       .trim();
@@ -6349,8 +6421,15 @@ export function applyNarrativeFinalPromptContract(
         ["opening_audio_design", "开场音频设计"],
       ] as const;
       const supplied = openingFields.map(([key, label]) => {
-        const value = next[key] ?? (next.fields as FusionRecord)[key];
-        return { key, label, value: typeof value === "string" ? value.trim() : "" };
+        const original = next[key] ?? (next.fields as FusionRecord)[key];
+        let value = typeof original === "string" ? original.trim() : "";
+        if (key === "opening_audio_design" && value && options.marketingPrompt) {
+          value = marketingAudioForContract(value, { noDialogue: options.noDialogue,
+            noMusic: Boolean(options.noMusic), shotId: String(next.shotId ?? next.shot_id ?? "未编号镜头"), field: key });
+          next[key] = value;
+          if (Object.hasOwn(next.fields as FusionRecord, key)) (next.fields as FusionRecord)[key] = value;
+        }
+        return { key, label, value };
       });
       const missing = supplied.filter(({ value }) => !value).map(({ key }) => key);
       if (options.requireOpeningFields && missing.length > 0) {
@@ -6361,6 +6440,21 @@ export function applyNarrativeFinalPromptContract(
         sequence += 1;
         prompt += `\n${String(sequence).padStart(2, "0")}.【${label}】${value}`;
       }
+    }
+    let detailedQa: { verification: string; deliveryReview?: string } | undefined;
+    if (nativeMarketing && unicodeLength(prompt) > options.maxLength) {
+      const deliveryReview = /^\d+\.【交付复核】([^\n]*)$/mu.exec(prompt)?.[1];
+      const compactVerification = [
+        "按本镜原生合同核对动作、声画与跨镜连续性",
+        ...options.marketingPrompt!.overlay.map(text => `后期成片叠加原文“${text}”，底画面无需模型生成文字`),
+        ...(options.isLastShot ? options.marketingPrompt!.endCard.map(text => `本镜结束在后期尾帧原文“${text}”`) : []),
+      ].join("；");
+      // Only repeated host QA moves to the existing report contract. Native
+      // creative fields, original client text and opening values stay intact.
+      prompt = prompt.replace(/^(\d+\.【本镜验收】)[^\n]*$/mu, (_line, prefix: string) => `${prefix}${compactVerification}`);
+      if (deliveryReview) prompt = prompt.replace(/^(\d+\.【交付复核】)[^\n]*$/mu,
+        (_line, prefix: string) => `${prefix}详细复核见结构化镜头合同，按本镜原生字段逐项验收。`);
+      detailedQa = { verification: verificationText, ...(deliveryReview ? { deliveryReview } : {}) };
     }
     next._workloomShotContract = {
       schema: "workloom.prompt-shot-contract/v1",
@@ -6382,6 +6476,7 @@ export function applyNarrativeFinalPromptContract(
       audio: audioText,
       timeline: timelineText,
       emotion: emotionText,
+      ...detailedQa,
       ...(options.sourceFirstFrame ? { sourceFirstFrame: options.sourceFirstFrame } : {}),
       portraitAssets: profiles
         .filter((item) => String(item.path ?? "").trim())
