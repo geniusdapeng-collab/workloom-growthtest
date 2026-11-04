@@ -692,6 +692,10 @@ class HyperrealitySystem {
       // 从上游 CreativeThemeGenerator 获取 12 字段
       const upstreamFields = {
         ...metadata._creativeTheme,
+        // Keep the customer's own wording separate from generated theme and
+        // dossier text so discovery can verify audience/reference provenance.
+        _workloomCustomerIntent: typeof options._workloomCustomerIntent === 'string'
+          ? options._workloomCustomerIntent : String(intent || ''),
         // 【方案A-fix】原始故事文本透传到需求洞察
         _originalStoryText: metadata._originalStoryText || metadata._creativeTheme?._originalStoryText || ''
       };
@@ -2725,6 +2729,14 @@ class HyperrealitySystem {
    */
   async _convertDiscoveryToRequirementList(discoveryResult, upstreamFields) {
     const { audienceProfile, sceneStructure, riskAssessment, referenceCases } = discoveryResult;
+    // Discovery sanitizes its generated theme fields. Retain the separately
+    // supplied customer wording and confirmed parameters for G4 revalidation;
+    // the profile checkpoint persists this context change on a later resume.
+    discoveryResult.upstreamFields = {
+      ...(discoveryResult.upstreamFields || {}),
+      ...Object.fromEntries(['_workloomCustomerIntent', 'duration_sec', 'aspect_ratio', 'platform', 'platform_id']
+        .filter(key => Object.hasOwn(upstreamFields, key)).map(key => [key, upstreamFields[key]]))
+    };
 
     // 生成生产画像（三级兜底，永不失败）
     if (!this._profileResolver) {
@@ -2738,14 +2750,28 @@ class HyperrealitySystem {
     const resolved = await this._profileResolver.resolve({
       theme: upstreamFields.theme,
       description: upstreamFields.description,
-      type: upstreamFields.type // 用户声明的题材（含自定义类型），原样保留
+      type: upstreamFields.type, // 用户声明的题材（含自定义类型），原样保留
+      duration_sec: upstreamFields.duration_sec,
+      aspect_ratio: upstreamFields.aspect_ratio
     });
+    const audienceInterests = audienceProfile?.primaryAudience?.interestTags || audienceProfile?.primaryAudience?.interests || [];
+    const audienceBasis = audienceProfile?.audienceBasis === 'customer-provided' && audienceProfile.audienceEvidenceQuote
+      ? `客户指定受众：${audienceProfile.audienceEvidenceQuote}`
+      : `创作假设（非客户事实）：${audienceInterests.join('、') || upstreamFields.target_audience || '待补充具体观看兴趣'}`;
+    const productionProfile = {
+      ...resolved.profile,
+      audience: audienceBasis,
+      // Newly inferred type defaults cannot create a hard prohibition. The
+      // actual customer contract and risk constraints remain in their own fields.
+      special_constraints: Array.isArray(upstreamFields.special_constraints)
+        ? upstreamFields.special_constraints.filter(value => typeof value === 'string' && value.trim()) : []
+    };
 
     return {
       // 【新】双轨字段
       genre: resolved.genre, // 开放题材（'宠物殡葬纪实'原样保留）
       genreConfidence: resolved.genreConfidence,
-      productionProfile: resolved.profile, // 生产画像（下游决策唯一依据）
+      productionProfile, // 生产画像（下游决策唯一依据）
 
       // 【旧字段保留，但语义降级】仅用于展示/旧链路兼容，不再做决策
       videoType: resolved.presetRef, // 最接近的预设标签（展示用）
@@ -2801,7 +2827,7 @@ class HyperrealitySystem {
       targetAudience: upstreamFields.target_audience || null,
       dialogueRequirement: upstreamFields.dialogue_requirement || null,
       contentConstraints: riskAssessment?.businessConstraints || [],
-      specialConstraints: resolved.profile.special_constraints,
+      specialConstraints: productionProfile.special_constraints,
       uncertainties: [],
       _analysis: {
         confidence: 0.8,
@@ -3176,9 +3202,12 @@ class HyperrealitySystem {
     // 确认门要核对的"受众结论/风险结论"（此前只散落在第二节正文里，门容易判"缺失"）
     const profile = discoveryResult?.audienceProfile || {};
     const primary = profile.primaryAudience || {};
+    const genderLabel = { female: '女性为主', male: '男性为主', all: '不限性别' }[primary.gender] || '性别：客户未指定';
+    const audienceBasis = profile.audienceBasis === 'customer-provided' ? '客户原文指定' : '创作假设（非客户事实）';
     const audienceText = [
-      primary.ageRange, primary.gender === 'female' ? '女性为主' : primary.gender === 'male' ? '男性为主' : '不限性别',
-      ...(primary.interestTags || []).slice(0, 4),
+      audienceBasis,
+      primary.ageRange || '年龄：客户未指定', genderLabel,
+      ...(primary.interests || primary.interestTags || []).slice(0, 4),
     ].filter(Boolean).join(' · ');
     const risk = discoveryResult?.riskAssessment || {};
     const risks = Array.isArray(risk.technicalRisks) ? risk.technicalRisks : [];
@@ -3398,9 +3427,9 @@ ${line('动作', actions, '（动作以镜头卡 action 字段为准）')}
       productPositioning: {
         productType: '剧情短片',
         genre: type,
-        targetPlatform: '通用',
+        targetPlatform: upstreamFields?.platform || '通用',
         targetDuration: duration,
-        aspectRatio: '16:9',
+        aspectRatio: upstreamFields?.aspect_ratio || '16:9',
         resolution: '1080p',
         frameRate: 24
       },
@@ -3441,13 +3470,16 @@ ${line('动作', actions, '（动作以镜头卡 action 字段为准）')}
           consistencyStrategy: 'textual-description'
         }
       },
-      audienceProfile: {
-        primaryAudience: { ageRange: '25-30', gender: 'all', interests: ['通用'], consumptionLevel: 'medium' },
+      audienceProfile: discoveryResult.audienceProfile || {
+        primaryAudience: { ageRange: null, gender: null, interests: [], consumptionLevel: null },
+        audienceBasis: 'creative-hypothesis',
+        audienceEvidenceQuote: null,
+        demographicEvidence: { ageRange: null, gender: null, consumptionLevel: null },
         emotionTriggers: ['好奇心'],
         contentExpectations: ['高质量内容']
       },
-      referenceCases: {
-        filmReferences: [theme],
+      referenceCases: discoveryResult.referenceCases || {
+        filmReferences: [],
         adReferences: [],
         styleReferences: ['通用风格']
       },

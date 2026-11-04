@@ -283,18 +283,40 @@ const PRDSchema = {
     // ========== 9. 受众定位（3 字段）==========
     audienceProfile: {
       type: "object",
-      required: ["primaryAudience", "emotionTriggers", "contentExpectations"],
+      required: ["primaryAudience", "emotionTriggers", "contentExpectations", "audienceBasis", "audienceEvidenceQuote", "demographicEvidence"],
       properties: {
         primaryAudience: {
           type: "object",
-          required: ["ageRange", "gender", "interests", "consumptionLevel"],
+          required: ["ageRange", "gender", "occupation", "interests", "consumptionLevel"],
           properties: {
-            ageRange: { type: "string", enum: ["18-24", "25-30", "31-35", "36-40", "40+"] },
-            gender: { type: "string", enum: ["male", "female", "all"] },
+            ageRange: { type: ["string", "null"] },
+            gender: { type: ["string", "null"], enum: [null, "male", "female", "all"] },
+            occupation: { type: ["string", "null"] },
             interests: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 5 },
-            consumptionLevel: { type: "string", enum: ["low", "medium", "high", "luxury"] }
+            consumptionLevel: { type: ["string", "null"] }
           },
           additionalProperties: false
+        },
+        audienceBasis: { type: "string", enum: ["creative-hypothesis", "customer-provided"] },
+        audienceEvidenceQuote: { type: ["string", "null"] },
+        demographicEvidence: {
+          type: "object",
+          required: ["ageRange", "gender", "occupation", "consumptionLevel"],
+          properties: Object.fromEntries(["ageRange", "gender", "occupation", "consumptionLevel"]
+            .map(key => [key, { type: ["string", "null"] }])),
+          additionalProperties: false
+        },
+        excludedDemographics: {
+          type: "array",
+          items: {
+            type: "object",
+            required: ["field", "value", "quote", "reason"],
+            properties: {
+              field: { type: "string" }, value: { type: "string" },
+              quote: { type: ["string", "null"] }, reason: { type: "string" }
+            },
+            additionalProperties: false
+          }
         },
         emotionTriggers: {
           type: "array",
@@ -320,7 +342,7 @@ const PRDSchema = {
         filmReferences: {
           type: "array",
           items: { type: "string" },
-          minItems: 1,
+          minItems: 0,
           maxItems: 4
         },
         adReferences: {
@@ -449,9 +471,10 @@ const ENUM_DEFAULTS = {
   emotionalBeat: 'setup',
   maxPromptComplexity: 'moderate',
   consistencyStrategy: 'textual-description',
-  ageRange_audience: '25-30',
-  gender: 'all',
-  consumptionLevel: 'medium',
+  ageRange_audience: null,
+  gender: null,
+  occupation: null,
+  consumptionLevel: null,
   videoCodec: 'H.264',
   audioCodec: 'AAC',
   container: 'MP4',

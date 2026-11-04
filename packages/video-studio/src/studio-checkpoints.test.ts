@@ -38,6 +38,43 @@ it("reuses completed native outputs and invalidates downstream work when an upst
   expect(records.size).toBe(4);
 });
 
+it("retains the approved theme while invalidating discovery, profile and PRD from the old semantic policies", async () => {
+  const { adapter, records } = memoryStore();
+  const seed = { rawIntent: "原文保持不变" };
+  const input = { theme: "已通过主题" };
+  const themeOutput = { tasks: [{ theme: "已通过主题" }] };
+  const themeRequest: StudioCheckpointRequest = {
+    schemaVersion: "workloom.studio-engine-checkpoint/v1", stage: "G2_THEME",
+    inputSha256: studioCheckpointHash({ policyVersion: "theme-input-and-brief/v1", input }),
+    dependencySha256: studioCheckpointHash(seed),
+  };
+  const outputSha256 = studioCheckpointHash(themeOutput);
+  await adapter.save({ ...themeRequest, output: themeOutput, outputSha256 });
+  let dependencySha256 = studioCheckpointHash({ previous: themeRequest.dependencySha256,
+    stage: themeRequest.stage, inputSha256: themeRequest.inputSha256, outputSha256 });
+  for (const [stage, policyVersion] of [
+    ["G3_INSIGHT", "source-bound-discovery/v1"], ["G3_PROFILE", "native-production-profile/v1"],
+    ["G4_PRD", "source-bound-prd/v1"],
+  ] as const) {
+    const output = { stage, old: true };
+    const inputSha256 = studioCheckpointHash({ policyVersion, input });
+    const outputSha256 = studioCheckpointHash(output);
+    await adapter.save({ schemaVersion: "workloom.studio-engine-checkpoint/v1", stage, inputSha256,
+      dependencySha256, output, outputSha256 });
+    dependencySha256 = studioCheckpointHash({ previous: dependencySha256, stage, inputSha256, outputSha256 });
+  }
+  const runner = createStudioCheckpointRunner(adapter, seed);
+  const theme = vi.fn(async () => themeOutput);
+  const author = vi.fn(async () => ({ current: true }));
+  expect(await runner.run("G2_THEME", input, theme)).toEqual(themeOutput);
+  for (const stage of ["G3_INSIGHT", "G3_PROFILE", "G4_PRD"] as const) {
+    expect(await runner.run(stage, input, author)).toEqual({ current: true });
+  }
+  expect(theme).not.toHaveBeenCalled();
+  expect(author).toHaveBeenCalledTimes(3);
+  expect(records.size).toBe(7);
+});
+
 it("rejects altered output or mismatched identity before executing a new native call", async () => {
   const { adapter, records } = memoryStore();
   await createStudioCheckpointRunner(adapter, "seed").run("G2_THEME", "input", async () => ({ value: "kept" }));

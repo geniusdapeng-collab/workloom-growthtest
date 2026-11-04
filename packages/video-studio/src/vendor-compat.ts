@@ -4511,6 +4511,26 @@ export function installVendorDiscoveryNarrativeBridge(options: {
     const probe = discoveryMod?.RequirementDiscoveryEngine
       ? new discoveryMod.RequirementDiscoveryEngine({ llmEngine: null })
       : null;
+    for (const agentName of ["audience", "reference"] as const) {
+      const agent = probe?.agents?.[agentName];
+      const prototype = agent ? Object.getPrototypeOf(agent) as Record<string, unknown> : null;
+      if (!prototype || typeof prototype.run !== "function") continue;
+      const originalRun = prototype.run as (input: unknown, schema: unknown) => Promise<unknown>;
+      const hadOwnRun = Object.hasOwn(prototype, "run");
+      prototype.run = async function runSourceBoundDiscovery(this: unknown, input: unknown, schema: unknown) {
+        const marketing = options.marketingDiscovery?.();
+        if (!marketing) return originalRun.call(this, input, schema);
+        options.assertActive?.();
+        // The native prompt and provenance validation receive the same raw customer
+        // contract. Keep the approved theme and its enriched story evidence untouched.
+        const customerInput = { ...recordValue(input), _workloomCustomerIntent: marketing.intent };
+        return originalRun.call(this, customerInput, schema);
+      };
+      restores.push(() => {
+        if (hadOwnRun) prototype.run = originalRun;
+        else delete prototype.run;
+      });
+    }
     const riskPrototype = probe?.agents?.risk ? Object.getPrototypeOf(probe.agents.risk) as Record<string, unknown> : null;
     if (riskPrototype && typeof riskPrototype.run === "function") {
       const originalRun = riskPrototype.run as (input: unknown, schema: unknown) => Promise<unknown>;

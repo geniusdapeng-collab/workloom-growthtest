@@ -18,18 +18,27 @@
 
 const AudienceProfileSchema = {
   type: "object",
-  required: ["primaryAudience", "emotionTriggers", "contentExpectations"],
+  required: ["primaryAudience", "emotionTriggers", "contentExpectations", "audienceBasis", "audienceEvidenceQuote", "demographicEvidence"],
   properties: {
     primaryAudience: {
       type: "object",
-      required: ["ageRange", "gender", "interestTags", "consumptionLevel"],
+      required: ["ageRange", "gender", "interestTags", "occupation", "consumptionLevel"],
       properties: {
-        ageRange: { type: "string", enum: ["18-24", "25-30", "31-35", "36-40", "40+"] },
-        gender: { type: "string", enum: ["male", "female", "all"] },
+        ageRange: { type: ["string", "null"] },
+        gender: { type: ["string", "null"], enum: ["male", "female", "all", null] },
         interestTags: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 5 },
-        occupation: { type: "string" },
-        consumptionLevel: { type: "string", enum: ["low", "medium", "high", "luxury"] }
-      }
+        occupation: { type: ["string", "null"] },
+        consumptionLevel: { type: ["string", "null"] }
+      },
+      additionalProperties: false
+    },
+    audienceBasis: { type: "string", enum: ["customer-provided", "creative-hypothesis"] },
+    audienceEvidenceQuote: { type: ["string", "null"] },
+    demographicEvidence: {
+      type: "object",
+      properties: Object.fromEntries(["ageRange", "gender", "occupation", "consumptionLevel"]
+        .map(key => [key, { type: ["string", "null"] }])),
+      additionalProperties: false
     },
     secondaryAudience: { type: "array", items: { type: "string" }, maxItems: 3 },
     emotionTriggers: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 5 },
@@ -65,7 +74,7 @@ const SceneStructureSchema = {
           emotionalBeat: { type: "string", enum: ["setup", "rising", "climax", "falling", "resolution", "twist"] }
         }
       },
-      minItems: 2,
+      minItems: 0,
       maxItems: 8
     },
     ending: {
@@ -126,28 +135,30 @@ const ReferenceCasesSchema = {
       type: "array",
       items: {
         type: "object",
-        required: ["title", "relevance", "keyTakeaway"],
+        required: ["title", "relevance", "keyTakeaway", "sourceQuote"],
         properties: {
           title: { type: "string" },
           relevance: { type: "string", enum: ["high", "medium", "low"] },
-          keyTakeaway: { type: "string" }
+          keyTakeaway: { type: "string" },
+          sourceQuote: { type: "string" }
         }
       },
-      minItems: 2,
+      minItems: 0,
       maxItems: 4
     },
     adReferences: {
       type: "array",
       items: {
         type: "object",
-        required: ["brand", "relevance", "keyTakeaway"],
+        required: ["brand", "relevance", "keyTakeaway", "sourceQuote"],
         properties: {
           brand: { type: "string" },
           relevance: { type: "string", enum: ["high", "medium", "low"] },
-          keyTakeaway: { type: "string" }
+          keyTakeaway: { type: "string" },
+          sourceQuote: { type: "string" }
         }
       },
-      minItems: 1,
+      minItems: 0,
       maxItems: 3
     },
     styleReferences: {
@@ -189,6 +200,177 @@ const RequirementAlignmentSchema = {
   additionalProperties: false
 };
 
+// Creative interests and viewing motives are proposals. Demographics and named
+// references need the caller's customer text, never an upstream model's guess.
+function customerIntent(input = {}) {
+  if (Object.hasOwn(input, '_workloomCustomerIntent')) {
+    return typeof input._workloomCustomerIntent === 'string' ? input._workloomCustomerIntent : '';
+  }
+  return String(input._originalStoryText || input.original_story_text || '');
+}
+
+function nonemptyText(value) {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function sourceQuoteContexts(source, quote) {
+  if (!quote || !source.includes(quote)) return [];
+  const needle = quote.trim().replace(/[。！？!?；;\n]+$/u, '').trim();
+  // A provenance quote cannot borrow an audience marker from one sentence and
+  // a character's demographic from the next sentence.
+  if (!needle || /[。！？!?；;\n]/u.test(needle)) return [];
+  const contexts = [];
+  for (const sentence of source.match(/[^。！？!?；;\n]+/gu) || []) {
+    let index = sentence.indexOf(needle);
+    while (index >= 0) {
+      contexts.push({ sentence, index, needle });
+      index = sentence.indexOf(needle, index + 1);
+    }
+  }
+  return contexts;
+}
+
+function negativeAudiencePolarity(text) {
+  const normalized = text.replace(/不限性别|性别不限|不分性别|不低于|不高于|不少于|不大于|不超过|不小于/gu, '');
+  return /不|未|并非|而非|排除|除外|禁止|严禁|避免|勿|别|\b(?:not|never|exclude|excluding)\b/iu.test(normalized);
+}
+
+function customerAudienceClause(source, quote) {
+  const contexts = sourceQuoteContexts(source, quote);
+  if (!contexts.length) return null;
+  const marker = /(?:目标)?(?:受众|观众|人群|观看者)|面向|目标(?:客户|用户)|\b(?:audience|viewers)\b|(?:给|供)(?=[^。！？\n]{0,80}(?:观看|看))/iu.exec(contexts[0].needle);
+  if (!marker) return null;
+  for (const { sentence, index } of contexts) {
+    const markerIndex = index + marker.index;
+    const prefix = sentence.slice(0, markerIndex).split(/[，,]/u).pop();
+    const firstAudienceClause = sentence.slice(markerIndex).split(/[，,]/u)[0];
+    // Check the actual raw occurrence, including a negative prefix the model
+    // may have cut out of sourceQuote. Ambiguous repeated occurrences fail shut.
+    if (negativeAudiencePolarity(prefix) || negativeAudiencePolarity(firstAudienceClause)
+      || /(?:受众|观众|人群)[^，,]{0,8}(?:未知|不明)/u.test(firstAudienceClause)) return null;
+  }
+  return contexts[0].needle.slice(marker.index);
+}
+
+function demographicValueMatchesQuote(key, value, quote) {
+  if (!value || !quote) return false;
+  if (key === 'gender') {
+    const patterns = {
+      male: /男性|男士|男生|男观众|\bmale\b|\bmen\b/iu,
+      female: /女性|女士|女生|女观众|\bfemale\b|\bwomen\b/iu,
+      all: /性别不限|不限性别|不分性别|男女皆可|所有性别|\ball genders\b/iu
+    };
+    return patterns[value]?.test(quote) === true;
+  }
+  if (key === 'consumptionLevel') {
+    const patterns = {
+      low: /低消费|消费(?:能力|水平)?低|低收入|\blow\b/iu,
+      medium: /中等|中消费|消费(?:能力|水平)?中|\bmedium\b/iu,
+      high: /高消费|消费(?:能力|水平)?高|高收入|\bhigh\b/iu,
+      luxury: /奢侈|奢华|\bluxury\b/iu
+    };
+    if (Object.hasOwn(patterns, value)) return patterns[value].test(quote);
+  }
+  const normalize = text => text.replace(/\s|岁/gu, '').replace(/至|到|[~～—–]/gu, '-');
+  return normalize(quote).includes(normalize(value));
+}
+
+function positiveDemographicQuote(clause, quote) {
+  return clause.split(/[，,；;。！？!?\n]/u).some(segment => {
+    if (!segment.includes(quote)) return false;
+    return !negativeAudiencePolarity(segment)
+      && !/(?:主角|配角|演员|出镜角色|人物|模特)(?:是|为|设为)/u.test(segment);
+  });
+}
+
+function sourceBoundAudience(result, input = {}) {
+  const value = result && typeof result === 'object' ? result : {};
+  const primary = value.primaryAudience && typeof value.primaryAudience === 'object' ? value.primaryAudience : {};
+  const source = customerIntent(input);
+  const proposedAudienceQuote = nonemptyText(value.audienceEvidenceQuote);
+  const audienceClause = value.audienceBasis === 'customer-provided'
+    ? customerAudienceClause(source, proposedAudienceQuote) : null;
+  const audienceQuote = audienceClause ? proposedAudienceQuote : null;
+  const evidence = value.demographicEvidence && typeof value.demographicEvidence === 'object' ? value.demographicEvidence : {};
+  const primaryAudience = { interestTags: Array.isArray(primary.interestTags) ? [...primary.interestTags] : [] };
+  const demographicEvidence = {};
+  const excludedDemographics = Array.isArray(value.excludedDemographics) ? [...value.excludedDemographics] : [];
+  for (const key of ['ageRange', 'gender', 'occupation', 'consumptionLevel']) {
+    const candidate = nonemptyText(primary[key]);
+    const quote = nonemptyText(evidence[key]);
+    const supported = candidate && quote && audienceClause && audienceClause.includes(quote)
+      && source.includes(quote) && positiveDemographicQuote(audienceClause, quote)
+      && demographicValueMatchesQuote(key, candidate, quote);
+    primaryAudience[key] = supported ? candidate : null;
+    demographicEvidence[key] = supported ? quote : null;
+    if (candidate && !supported) {
+      const excluded = { field: key, value: candidate, quote, reason: 'customer-demographic-evidence-missing-or-incompatible' };
+      if (!excludedDemographics.some(item => JSON.stringify(item) === JSON.stringify(excluded))) excludedDemographics.push(excluded);
+    }
+  }
+  return {
+    ...value,
+    primaryAudience,
+    audienceBasis: audienceQuote ? 'customer-provided' : 'creative-hypothesis',
+    audienceEvidenceQuote: audienceQuote,
+    demographicEvidence,
+    excludedDemographics
+  };
+}
+
+function measuredSceneStructure(result) {
+  const value = result && typeof result === 'object' ? result : {};
+  const nodes = [value.opening, ...(Array.isArray(value.scenes) ? value.scenes : []), value.ending]
+    .filter(node => node && typeof node === 'object');
+  const durations = nodes.map(node => node.duration);
+  return {
+    ...value,
+    sceneCount: nodes.length,
+    ...(durations.every(duration => typeof duration === 'number' && Number.isFinite(duration) && duration >= 0)
+      ? { totalDuration: durations.reduce((sum, duration) => sum + duration, 0) } : {})
+  };
+}
+
+const referenceUsageRestriction = '仅借鉴拍摄手法，不使用或复刻可识别素材';
+
+function customerReferenceQuote(source, name, quote) {
+  if (!name || !quote || !source.includes(quote) || !quote.includes(name)) return false;
+  const contexts = sourceQuoteContexts(source, quote);
+  if (!contexts.length || !/参考|借鉴|对标|风格|提供|启发|\breference\b/iu.test(quote)) return false;
+  return contexts.every(({ sentence, index, needle }) => {
+    const nameIndex = index + needle.indexOf(name);
+    const start = Math.max(sentence.lastIndexOf('，', nameIndex), sentence.lastIndexOf(',', nameIndex)) + 1;
+    const next = sentence.slice(nameIndex + name.length).search(/[，,]/u);
+    const end = next >= 0 ? nameIndex + name.length + next : sentence.length;
+    return !/不|未|禁止|严禁|避免|勿|别|排除|\b(?:not|never|exclude)\b/iu.test(sentence.slice(start, end));
+  });
+}
+
+function sourceBoundReferences(result, input = {}) {
+  const value = result && typeof result === 'object' ? result : {};
+  const source = customerIntent(input);
+  const excludedReferences = Array.isArray(value.excludedReferences) ? [...value.excludedReferences] : [];
+  const keep = (items, field) => (Array.isArray(items) ? items : []).filter(item => {
+    const name = nonemptyText(item?.[field]);
+    const quote = nonemptyText(item?.sourceQuote);
+    const supported = customerReferenceQuote(source, name, quote);
+    if (!supported) excludedReferences.push({ field, value: item, reason: 'customer-reference-evidence-missing-or-incompatible' });
+    return supported;
+  }).map(item => ({ ...item, usageRestriction: referenceUsageRestriction }));
+  const filmReferences = keep(value.filmReferences, 'title');
+  const adReferences = keep(value.adReferences, 'brand');
+  const allowedNames = new Set([...filmReferences.map(item => item.title), ...adReferences.map(item => item.brand)]);
+  const styleReferences = (Array.isArray(value.styleReferences) ? value.styleReferences : []).filter(item => {
+    if (typeof item !== 'string' || !item.trim()) return false;
+    const titles = [...item.matchAll(/《[^》]+》/gu)].map(match => match[0]);
+    const supported = titles.every(title => allowedNames.has(title));
+    if (!supported) excludedReferences.push({ field: 'styleReferences', value: item, reason: 'unprovided-named-work-in-technique' });
+    return supported;
+  });
+  return { ...value, filmReferences, adReferences,
+    styleReferences, excludedReferences };
+}
+
 // ===== Agent 基类 =====
 
 class BaseDiscoveryAgent {
@@ -205,7 +387,7 @@ class BaseDiscoveryAgent {
     for (let i = 0; i <= this.maxRetries; i++) {
       try {
         const result = await this._callLLM(input, schema);
-        const validated = this._validateAndFill(result, schema);
+        const validated = this._validateAndFill(result, schema, input);
         console.log(`   [${this.name}] ✅ 完成 (${Date.now() - startTime}ms)`);
         return validated;
       } catch (error) {
@@ -370,25 +552,29 @@ class AudienceProfiler extends BaseDiscoveryAgent {
 核心主题: ${theme}
 情绪基调: ${tone || '未指定'}
 主题描述: ${description || '未提供'}
-用户指定受众: ${target_audience || '未指定'}
+上游受众提案（不得自动当作客户人口事实）: ${target_audience || '未指定'}
+客户原文（人口属性与受众来源的唯一依据）: ${customerIntent(input) || '未提供'}
 
 【分析心法】
 1. emotionTriggers 必须写到具体画面级：不是'匠人精神感人'，而是'老匠人颤抖的手与一整车人的安危之间的张力'——每个触发点都要能直接翻译成镜头。
 2. painPoints 写现代生活的缺失感（快节奏/技艺消逝/承诺稀缺），不写生理痛点。
-3. contentExpectations 至少包含一条'无需字幕也能看懂的视觉叙事'类全球化要求，和一条'可复述可转发的钉子台词'类传播要求。
+3. contentExpectations 至少包含一条'无需字幕也能看懂的视觉叙事'类要求，和一条可复述的画面记忆点；声音严格遵循客户合同，无台词时不得为了传播增加台词。
 4. secondaryAudience 写'有具体记忆关联的人'（去过京都的游客/手艺人），不写泛人群。
 
-【原始故事文本是核心依据】所有结论必须能从原文细节里找到出处，禁止套模板。
+【来源合同】观看兴趣、情绪触发、动机、次要受众与内容期望均是本片创作假设，不是用户调查或人口统计结论。只有客户明确指定的受众条款（例如包含“受众”“面向”“给某人群看”的完整原句）可以标为 customer-provided；原文仅有演员、人物或故事角色的属性不能作为受众依据。客户没有明确受众人口属性时，ageRange、gender、occupation、consumptionLevel 必须为 null。不得根据影片类型、演员年龄性别、品牌、平台或兴趣猜人口属性。明确给出的属性逐字保留其含义，不局限于固定年龄段。每个非空人口字段必须在 demographicEvidence 给出客户受众条款中的连续引用，并包含在 audienceEvidenceQuote 的受众部分中。
 
 请输出 JSON 格式的受众分析：
 {
   "primaryAudience": {
-    "ageRange": "18-24|25-30|31-35|36-40|40+",
-    "gender": "male|female|all",
+    "ageRange": null,
+    "gender": null,
     "interestTags": ["标签1", "标签2", "标签3"],
-    "occupation": "主要职业群体",
-    "consumptionLevel": "low|medium|high|luxury"
+    "occupation": null,
+    "consumptionLevel": null
   },
+  "audienceBasis": "creative-hypothesis",
+  "audienceEvidenceQuote": null,
+  "demographicEvidence": {"ageRange": null, "gender": null, "occupation": null, "consumptionLevel": null},
   "secondaryAudience": ["次要受众1", "次要受众2"],
   "emotionTriggers": ["情绪触发点1", "情绪触发点2", "情绪触发点3"],
   "painPoints": ["痛点1", "痛点2"],
@@ -396,48 +582,28 @@ class AudienceProfiler extends BaseDiscoveryAgent {
 }
 
 要求：
-1. ageRange 必须从枚举中选择
-2. gender 必须从枚举中选择
+1. 无客户人口依据的字段必须是 JSON null；不得用 all、medium 或通用人群代替未知
+2. gender 仅在客户明确给出时用 male/female/all；all 必须有客户明确“不限性别”的原文依据
 3. interestTags 2-5个
-4. consumptionLevel 必须从枚举中选择
-5. 所有字段必须存在`;
+4. 客户明确给出受众时 audienceBasis=customer-provided，并在 audienceEvidenceQuote 逐字引用完整受众条款；否则 creative-hypothesis 和 null
+5. 保留具体观看兴趣和动机，不套人口模板，不编造消费能力或职业`;
   }
 
-  _fallback(input) {
-    const typeToAudience = {
-      '硬科幻': { ageRange: '25-30', gender: 'male', interestTags: ['科幻', '科技', '电影'], consumptionLevel: 'medium' },
-      '赛博朋克': { ageRange: '18-24', gender: 'all', interestTags: ['科幻', '潮流', '游戏'], consumptionLevel: 'medium' },
-      '武侠动作': { ageRange: '25-30', gender: 'male', interestTags: ['武侠', '动作', '国风'], consumptionLevel: 'medium' },
-      '恐怖悬疑': { ageRange: '25-30', gender: 'all', interestTags: ['悬疑', '恐怖', '推理'], consumptionLevel: 'medium' },
-      '自然纪录片': { ageRange: '31-35', gender: 'all', interestTags: ['自然', '纪录片', '科普'], consumptionLevel: 'high' },
-      '商业广告': { ageRange: '25-30', gender: 'all', interestTags: ['品牌', '消费', '生活方式'], consumptionLevel: 'high' },
-      '科普教育': { ageRange: '25-30', gender: 'all', interestTags: ['知识', '学习', '科普'], consumptionLevel: 'medium' },
-      '音乐MV': { ageRange: '18-24', gender: 'all', interestTags: ['音乐', '舞蹈', '潮流'], consumptionLevel: 'medium' },
-      '家庭温情': { ageRange: '31-35', gender: 'all', interestTags: ['家庭', '温情', '生活'], consumptionLevel: 'medium' },
-      '浪漫爱情': { ageRange: '18-24', gender: 'female', interestTags: ['爱情', '浪漫', '情感'], consumptionLevel: 'medium' },
-      '喜剧荒诞': { ageRange: '18-24', gender: 'all', interestTags: ['喜剧', '幽默', '娱乐'], consumptionLevel: 'low' },
-      '历史战争': { ageRange: '31-35', gender: 'male', interestTags: ['历史', '战争', '军事'], consumptionLevel: 'medium' },
-      '社会现实': { ageRange: '25-30', gender: 'all', interestTags: ['社会', '现实', '纪实'], consumptionLevel: 'medium' },
-      '艺术实验': { ageRange: '25-30', gender: 'all', interestTags: ['艺术', '实验', '独立'], consumptionLevel: 'medium' },
-      '运动竞技': { ageRange: '18-24', gender: 'male', interestTags: ['运动', '竞技', '热血'], consumptionLevel: 'medium' },
-      '美食文化': { ageRange: '25-30', gender: 'all', interestTags: ['美食', '文化', '生活'], consumptionLevel: 'medium' },
-      '文化遗产': { ageRange: '31-35', gender: 'all', interestTags: ['文化', '遗产', '历史'], consumptionLevel: 'high' },
-      '旅游推广': { ageRange: '25-30', gender: 'all', interestTags: ['旅行', '摄影', '生活方式'], consumptionLevel: 'high' }
-    };
+  _validateAndFill(result, schema, input = {}) {
+    return sourceBoundAudience(super._validateAndFill(result, schema), input);
+  }
 
-    const defaultAudience = { ageRange: '25-30', gender: 'all', interestTags: ['通用'], consumptionLevel: 'medium' };
-    const primary = typeToAudience[input.type] || defaultAudience;
-
-    return {
+  _fallback(input = {}) {
+    return sourceBoundAudience({
       primaryAudience: {
-        ...primary,
-        occupation: 'general'
+        ageRange: null, gender: null, occupation: null, consumptionLevel: null,
+        interestTags: [input.theme || '待补充具体观看兴趣', input.visual_style || '待补充观看动机']
       },
-      secondaryAudience: ['general audience'],
-      emotionTriggers: ['情感共鸣', '视觉享受'],
+      secondaryAudience: [],
+      emotionTriggers: [input.description || '待作者补充具体画面触发点'],
       painPoints: [],
-      contentExpectations: ['高质量内容', '清晰表达']
-    };
+      contentExpectations: [input.target_audience || '待作者基于当前内容补充观看动机']
+    }, input);
   }
 }
 
@@ -449,7 +615,8 @@ class SceneArchitect extends BaseDiscoveryAgent {
   _buildPrompt(input) {
     const { type, theme, duration_sec, tone, description } = input;
     const duration = duration_sec || 45;
-    const sceneCount = Math.min(Math.max(Math.ceil(duration / 15), 2), 8);
+    const sceneCount = Math.min(Math.max(Math.ceil(duration / 15), 3), 8);
+    const example = this._fallback(input);
 
     // 【P0-PE-01】根据类型注入电影语法参考
     const filmGrammar = this._getFilmGrammar(type);
@@ -464,10 +631,10 @@ class SceneArchitect extends BaseDiscoveryAgent {
 
 ${filmGrammar}
 
-请设计 ${sceneCount} 个场景（含开场和结尾），总时长约 ${duration} 秒。
+请设计约 ${sceneCount} 个实际场景节点（含开场和结尾），总时长约 ${duration} 秒。sceneCount 等于 opening、scenes 与 ending 的实际节点数之和；scenes 数组只装主体场景，不重复存开场与结尾。
 
 输出 JSON 格式（严格遵守，只输出合法 JSON，不要 markdown 代码块）：
-{"opening":{"duration":10,"purpose":"开场目的 —— 观众第一眼看到什么？为什么会被吸引？","keyElements":["元素1","元素2"]},"scenes":[{"index":1,"duration":10,"purpose":"场景目的 —— 如果删掉这镜，故事会损失什么？","keyElements":["元素1","元素2"],"emotionalBeat":"setup"}],"ending":{"duration":10,"purpose":"结尾目的 —— 观众离开时会记住什么？","keyElements":["元素1","元素2"]},"totalDuration":${duration},"sceneCount":${sceneCount},"narrativeArc":"linear"}
+${JSON.stringify(example)}
 
 要求：
 1. 所有场景时长之和 ≈ ${duration} 秒
@@ -481,7 +648,7 @@ ${filmGrammar}
 1. opening（前3秒抓眼）：第一帧即悬念——把全片最大的矛盾浓缩成一个画面（巨大vs渺小/颤抖的手vs一整车安危），禁止平铺直叙的建立镜头。
 2. 每个 scenes[i].purpose 必须写'删掉这镜故事会损失什么'——答不上来就说明这镜该删。
 3. 情绪弧线必须有'换气口'：高潮(climax)之后、结尾(ending)之前，安排一个 falling 级的留白场景（3-6秒），让最后的释放有落差。60秒短片没有喘息就是噪音。
-4. ending 必须落到'一个特写+一句台词'的收束结构：观众最后记住的永远是一个细节，不是一个道理。
+4. ending 落到具体细节或动作的收束结构；声音遵循客户已确认要求，无台词时不得补一句台词。
 5. keyElements 只写能被镜头拍到的物理元素，禁止'氛围''感觉'类词。
 
 【时长铁律】所有场景时长之和≈目标时长；climax 场景时长必须≥任一其他场景的1.3倍——重点不突出等于没有重点。`;
@@ -505,40 +672,47 @@ ${filmGrammar}
     return grammar[type] || '【电影语法参考】关注：视觉焦点引导、情绪光影、空间层次、动作张力';
   }
 
-  _fallback(input) {
-    const duration = input.duration_sec || 45;
-    const sceneCount = Math.min(Math.max(Math.ceil(duration / 15), 2), 8);
-    const perScene = Math.floor((duration - 6) / sceneCount); // 开场3s + 结尾3s
+  _validateAndFill(result, schema) {
+    return measuredSceneStructure(super._validateAndFill(result, schema));
+  }
+
+  _fallback(input = {}) {
+    const supplied = Number(input.duration_sec);
+    const duration = Number.isFinite(supplied) && supplied > 0 ? supplied : 45;
+    const sceneCount = Math.min(Math.max(Math.ceil(duration / 15), 3), 8);
+    const bookendDuration = Math.min(3, duration / 3);
+    const bodyCount = sceneCount - 2;
+    const perScene = (duration - bookendDuration * 2) / bodyCount;
 
     const scenes = [];
     const beats = ['setup', 'rising', 'climax', 'falling', 'resolution'];
     
-    for (let i = 0; i < sceneCount; i++) {
+    for (let i = 0; i < bodyCount; i++) {
       scenes.push({
         index: i + 1,
-        duration: perScene,
+        duration: i === bodyCount - 1 ? duration - bookendDuration * 2 - perScene * (bodyCount - 1) : perScene,
         purpose: `场景${i + 1}：推动叙事发展`,
         keyElements: ['核心动作', '情绪表达'],
         emotionalBeat: beats[i % beats.length]
       });
     }
 
-    return {
+    return measuredSceneStructure({
       opening: {
-        duration: 3,
+        duration: bookendDuration,
         purpose: '建立场景氛围，引入主题',
         keyElements: ['环境展示', '主题暗示']
       },
       scenes,
       ending: {
-        duration: 3,
+        duration: bookendDuration,
         purpose: '总结收尾，留下印象',
         keyElements: ['情绪收束', '主题呼应']
       },
       totalDuration: duration,
       sceneCount: sceneCount,
       narrativeArc: 'linear'
-    };
+    });
   }
 }
 
@@ -634,35 +808,24 @@ class ReferenceCurator extends BaseDiscoveryAgent {
 
   _buildPrompt(input) {
     const { type, theme, tone, visual_style } = input;
-    return `你是一位泡在片库里的剪辑指导。推荐对标案例的唯一标准是：这部片子里有哪一个具体手法，可以直接搬进我们这条片子？
+    return `你是一位剪辑指导。为本片提出可执行的构图、运镜、用光与声音策略。具名第三方作品只能来自客户明确提供的参考，不能自行从片库选片或指定品牌广告。
 
 视频类型: ${type}
 核心主题: ${theme}
 情绪基调: ${tone || '未指定'}
 视觉风格: ${visual_style || '未指定'}
+客户原文: ${customerIntent(input) || '未提供'}
 
 【推荐心法】
-1. filmReferences 的 keyTakeaway 必须写'手法'不写'主题'：坏例子'体现了匠人精神'；好例子'用手部特写与日常细节承载情感重量，全程无配乐煽情'。
-2. 至少一部同文化语境的东方克制系参考（是枝裕和/小津/职人纪录片），至少一部不同语境但同情绪结构的参考（让观众知道这种感动是全球通用的）。
-3. adReferences 选 60-90 秒内完成完整情感弧线的标杆（Apple新春短片级），takeaway 写'弧线结构'。
-4. styleReferences 写可执行的视听策略：'冷暖色调区分闪回时空'、'声音先行：号子声承担叙事'。
+1. 客户未明确给出影片时 filmReferences=[]，未给出广告参考时 adReferences=[]。不设具名参考数量下限，不默认任何文化、导演、电影或品牌。
+2. 只在客户原文明确给出参考时保留 title/brand；sourceQuote 必须逐字引用含该名称的客户原文，keyTakeaway 只写可借鉴的拍摄手法。
+3. 每项具名参考均遵守：${referenceUsageRestriction}；不得把提名当作素材授权。
+4. styleReferences 直接写本片可执行、不具名的视听策略，遵守当前声音、时长、动作和视觉合同；不在字符串里夹带未经客户提供的电影、导演或品牌名。
 
 请输出 JSON 格式：
 {
-  "filmReferences": [
-    {
-      "title": "影片名称（带《》）",
-      "relevance": "high|medium|low",
-      "keyTakeaway": "可借鉴要点"
-    }
-  ],
-  "adReferences": [
-    {
-      "brand": "品牌名称",
-      "relevance": "high|medium|low",
-      "keyTakeaway": "可借鉴要点"
-    }
-  ],
+  "filmReferences": [],
+  "adReferences": [],
   "styleReferences": [
     "风格参考1",
     "风格参考2"
@@ -670,62 +833,21 @@ class ReferenceCurator extends BaseDiscoveryAgent {
 }
 
 要求：
-1. filmReferences 2-4 个
-2. adReferences 1-3 个
-3. styleReferences 2-4 个
-4. 影片名称必须带《》
-5. 相关度必须从枚举中选择`;
+1. filmReferences 0-4 个，adReferences 0-3 个；只有客户有明确提名及完整 sourceQuote 才能非空
+2. styleReferences 2-4 个，必须结合本片的具体画面、节奏和声音
+3. 客户具名参考的相关度从 high/medium/low 中选择，禁止新增提名`;
   }
 
-  _fallback(input) {
-    const typeToFilms = {
-      '硬科幻': [
-        { title: '《星际穿越》', relevance: 'high', keyTakeaway: '科学叙事与视觉震撼的结合' },
-        { title: '《2001太空漫游》', relevance: 'high', keyTakeaway: '极简美学与哲学深度' }
-      ],
-      '赛博朋克': [
-        { title: '《银翼杀手2049》', relevance: 'high', keyTakeaway: '霓虹美学与雨夜氛围' },
-        { title: '《攻壳机动队》', relevance: 'high', keyTakeaway: '赛博朋克视觉标杆' }
-      ],
-      '武侠动作': [
-        { title: '《卧虎藏龙》', relevance: 'high', keyTakeaway: '武侠美学的国际表达' },
-        { title: '《一代宗师》', relevance: 'high', keyTakeaway: '功夫与哲学的融合' }
-      ],
-      '恐怖悬疑': [
-        { title: '《遗传厄运》', relevance: 'high', keyTakeaway: '心理恐怖的渐进营造' }
-      ],
-      '自然纪录片': [
-        { title: '《蓝色星球》', relevance: 'high', keyTakeaway: '自然美学的极致呈现' }
-      ],
-      '商业广告': [
-        { title: '《她》', relevance: 'medium', keyTakeaway: '科技美学的情感表达' }
-      ],
-      '音乐MV': [
-        { title: '《爱乐之城》', relevance: 'high', keyTakeaway: '音乐与视觉的完美结合' }
-      ],
-      '家庭温情': [
-        { title: '《海街日记》', relevance: 'high', keyTakeaway: '日常温情的细腻表达' }
-      ],
-      '浪漫爱情': [
-        { title: '《爱》', relevance: 'high', keyTakeaway: '爱情叙事的克制表达' }
-      ],
-      '艺术实验': [
-        { title: '《镜子》', relevance: 'high', keyTakeaway: '诗意影像的语言探索' }
-      ]
-    };
+  _validateAndFill(result, schema, input = {}) {
+    return sourceBoundReferences(super._validateAndFill(result, schema), input);
+  }
 
-    const defaultFilms = [
-      { title: '《星际穿越》', relevance: 'medium', keyTakeaway: '电影级质感参考' },
-      { title: '《布达佩斯大饭店》', relevance: 'medium', keyTakeaway: '视觉风格参考' }
-    ];
-
-    return {
-      filmReferences: typeToFilms[input.type] || defaultFilms,
-      adReferences: [
-        { brand: 'Apple', relevance: 'medium', keyTakeaway: '极简美学与产品展示' }
-      ],
-      styleReferences: ['电影级质感', '专业摄影']
-    };
+  _fallback(input = {}) {
+    return sourceBoundReferences({
+      filmReferences: [],
+      adReferences: [],
+      styleReferences: [input.visual_style || '待作者基于当前画面合同补充具体视听手法']
+    }, input);
   }
 }
 
@@ -862,10 +984,15 @@ class RequirementDiscoveryEngine {
    * 生成 Markdown 供人工确认
    */
   generateMarkdown(discoveryResult) {
-    const { upstreamFields, audienceProfile, sceneStructure, riskAssessment, referenceCases } = discoveryResult;
+    const { upstreamFields, riskAssessment } = discoveryResult;
+    const audienceProfile = sourceBoundAudience(discoveryResult.audienceProfile, upstreamFields);
+    const referenceCases = sourceBoundReferences(discoveryResult.referenceCases, upstreamFields);
+    const sceneStructure = measuredSceneStructure(discoveryResult.sceneStructure);
+    const primary = audienceProfile.primaryAudience;
+    const demographic = (key, labels = {}) => primary[key] == null ? '未指定' : labels[primary[key]] || primary[key];
     
     // 【方案A-fix】原始故事文本加入需求洞察确认单
-    const originalStory = upstreamFields._originalStoryText || upstreamFields.original_story_text || '';
+    const originalStory = customerIntent(upstreamFields);
     const storySection = originalStory ? `
 
 ## 📖 原始故事文本（完整版）
@@ -902,15 +1029,17 @@ ${storySection}
 ### 2.1 目标受众画像
 
 **主要受众**
-- 年龄段: ${audienceProfile.primaryAudience.ageRange}
-- 性别: ${audienceProfile.primaryAudience.gender === 'all' ? '不限' : audienceProfile.primaryAudience.gender === 'male' ? '男性为主' : '女性为主'}
+- 受众依据: ${audienceProfile.audienceBasis === 'customer-provided' ? '客户明确指定；观看兴趣和动机的延展仍是本片创作假设' : '本片创作假设（依据内容提出观看兴趣和动机，不是人口统计或用户调查）'}
+${audienceProfile.audienceEvidenceQuote ? `- 客户受众原文: ${audienceProfile.audienceEvidenceQuote}\n` : ''}- 年龄段: ${demographic('ageRange')}
+- 性别: ${demographic('gender', { all: '不限（客户明确指定）', male: '男性（客户明确指定）', female: '女性（客户明确指定）' })}
 - 兴趣标签: ${audienceProfile.primaryAudience.interestTags.join('、')}
-- 消费水平: ${audienceProfile.primaryAudience.consumptionLevel === 'high' ? '高' : audienceProfile.primaryAudience.consumptionLevel === 'medium' ? '中' : '低'}
+- 职业: ${demographic('occupation')}
+- 消费水平: ${demographic('consumptionLevel', { low: '低', medium: '中', high: '高', luxury: '奢侈消费' })}
 
-**情绪触发点**
+**情绪触发点（本片创作假设）**
 ${audienceProfile.emotionTriggers.map((t, i) => `${i + 1}. ${t}`).join('\n')}
 
-**内容期望**
+**内容期望（本片创作假设）**
 ${audienceProfile.contentExpectations.map((e, i) => `${i + 1}. ${e}`).join('\n')}
 
 ---
@@ -950,7 +1079,10 @@ ${riskAssessment.mitigationSuggestions.map((s, i) => `${i + 1}. ${s}`).join('\n'
 ### 2.4 对标参考
 
 **参考影片**
-${referenceCases.filmReferences.map(f => `- ${f.title} [${f.relevance === 'high' ? '高度相关' : f.relevance === 'medium' ? '中度相关' : '参考'}]: ${f.keyTakeaway}`).join('\n')}
+${referenceCases.filmReferences.length ? referenceCases.filmReferences.map(f => `- ${f.title} [${f.relevance === 'high' ? '高度相关' : f.relevance === 'medium' ? '中度相关' : '参考'}]: ${f.keyTakeaway}；${f.usageRestriction || referenceUsageRestriction}；客户原文：${f.sourceQuote}`).join('\n') : '客户未提供具名影片参考，使用下列不具名视听策略。'}
+
+**广告参考**
+${referenceCases.adReferences.length ? referenceCases.adReferences.map(f => `- ${f.brand}: ${f.keyTakeaway}；${f.usageRestriction || referenceUsageRestriction}；客户原文：${f.sourceQuote}`).join('\n') : '客户未提供具名广告参考。'}
 
 **风格参考**
 ${referenceCases.styleReferences.map((s, i) => `${i + 1}. ${s}`).join('\n')}
@@ -967,4 +1099,4 @@ ${referenceCases.styleReferences.map((s, i) => `${i + 1}. ${s}`).join('\n')}
   }
 }
 
-module.exports = { RequirementDiscoveryEngine };
+module.exports = { RequirementDiscoveryEngine, sourceBoundAudience };

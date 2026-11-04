@@ -689,7 +689,9 @@ export class VideoStudio {
          * deferRender=true 时 Layer 3 不提交（渲染由宿主 render-operator 走 G8 围栏提交），
          * 避免 vendor 与宿主对同一批镜头各提交一次、双份烧额度。
          */
-        const createOptions: Record<string, unknown> = {};
+        const createOptions: Record<string, unknown> = {
+          _workloomCustomerIntent: input.rawIntent ?? input.intent,
+        };
         if (cfg.deferRender === true) createOptions.skipRender = true;
         /**
          * 商品情报档案（Stage -2）开关透传：只有宿主显式装配才生效，

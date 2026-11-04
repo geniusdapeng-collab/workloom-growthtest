@@ -27,6 +27,7 @@ coordinator.releaseLock = () => {};
 const dispose = ${JSON.stringify(withHostBridge)} ? installVendorDiscoveryNarrativeBridge() : () => {};
 let profileCompleted = false;
 let profileCompletedAtG3 = false;
+let customerIntentSeen = null;
 const confirmations = [];
 const system = Object.create(HyperrealitySystem.prototype);
 const llm = { reasonStructured: async () => {
@@ -48,7 +49,10 @@ system.requirementDiscoveryEngine = new RequirementDiscoveryEngine();
 for (const agent of Object.values(system.requirementDiscoveryEngine.agents)) {
  // The model boundary supplies deterministic valid outputs; real agent.run,
  // schema filling, discover and generateMarkdown still execute.
- agent._callLLM = async input => agent._fallback(input);
+ agent._callLLM = async input => {
+  if (agent.name === 'AudienceProfiler') customerIntentSeen = input._workloomCustomerIntent;
+  return agent._fallback(input);
+ };
 }
 system.creativeThemeGenerator = {
  generate: async () => ({ tasks: [{ type: '展台纪实', theme: '灯光亮起', description: '展台灯光依次亮起，最后定格。', duration_sec: 30, visual_style: '写实', dialogue_requirement: '无台词，纯画面', creative_style: 0.4 }] }),
@@ -60,10 +64,10 @@ system._waitForExternalConfirmation = async type => {
  return { approved: true, waitTimeMs: 0 };
 };
 try {
- const result = await system.create('展台灯光依次亮起，最后定格。', { title: '灯光亮起', pipelineRoute: { kind: 'narrative' }, brief: { duration: 30, aspectRatio: '9:16', platform: 'douyin' } }, { skipRender: true, skipPostProduction: true });
+ const result = await system.create('展台灯光依次亮起，最后定格。\\n[系统自动附加的制作指导]', { title: '灯光亮起', pipelineRoute: { kind: 'narrative' }, brief: { duration: 30, aspectRatio: '9:16', platform: 'douyin' } }, { _workloomCustomerIntent: '展台灯光依次亮起，最后定格。', skipRender: true, skipPostProduction: true });
  const requirement = result.confirmations.requirementList?.requirementList;
  const metadata = requirement ? system.requirementListBuilder.toScriptEngineMetadata(requirement) : {};
- console.log('RESULT '+JSON.stringify({ confirmations, profileCompletedAtG3, isPromise: typeof requirement?.then === 'function', title: requirement?.title, genre: requirement?.genre, targetDuration: requirement?.targetDuration, aspectRatio: requirement?.aspectRatio, scriptDuration: metadata.target_duration, rejected: result.stages.requirementReview?.reason, errors: result.errors, released: system._activeRun === null }));
+ console.log('RESULT '+JSON.stringify({ confirmations, profileCompletedAtG3, customerIntentSeen, isPromise: typeof requirement?.then === 'function', title: requirement?.title, genre: requirement?.genre, targetDuration: requirement?.targetDuration, aspectRatio: requirement?.aspectRatio, scriptDuration: metadata.target_duration, rejected: result.stages.requirementReview?.reason, errors: result.errors, released: system._activeRun === null }));
  // Let the intentionally delayed profile call settle on the broken baseline,
  // so the probe also catches unexpected rejected background work.
  await new Promise(resolve => setImmediate(resolve));
@@ -88,6 +92,7 @@ describe("real create waits for discovery conversion before the G3 confirmation"
     expect(result.errors).toEqual([]);
     expect(result.confirmations).toEqual(["creative-theme", "requirement"]);
     expect(result.profileCompletedAtG3).toBe(true);
+    expect(result.customerIntentSeen).toBe("展台灯光依次亮起，最后定格。");
     expect(result.isPromise).toBe(false);
     expect(result.title).toBe("灯光亮起");
     expect(result.genre).toBe("展台纪实");

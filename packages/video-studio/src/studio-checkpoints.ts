@@ -6,9 +6,9 @@ export type StudioEngineCheckpointStage = "G2_THEME" | "G3_INSIGHT" | "G3_PROFIL
 /** Bump only the changed station's semantic contract; dependency hashes invalidate its descendants. */
 const STUDIO_STAGE_POLICY_VERSION: Record<StudioEngineCheckpointStage, string> = {
   G2_THEME: "theme-input-and-brief/v1",
-  G3_INSIGHT: "source-bound-discovery/v1",
-  G3_PROFILE: "native-production-profile/v1",
-  G4_PRD: "source-bound-prd/v1",
+  G3_INSIGHT: "source-bound-discovery-and-assumptions/v2",
+  G3_PROFILE: "native-source-aware-production-profile/v2",
+  G4_PRD: "source-bound-prd-and-assumptions/v2",
   SCRIPT: "native-script-and-metadata/v1",
   PRODUCTION: "native-production-repair-feedback/v3",
   OPENING_TITLE: "native-opening-title-fields/v1",
