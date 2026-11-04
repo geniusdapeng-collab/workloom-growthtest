@@ -1083,7 +1083,7 @@ describe("公共产品参考图路径边界", () => {
  * Source preparation/restoration/final fact verification and their immutable file checks run unchanged.
  */
 describe("正式宿主按最终事实诊断返工，并保留后续基础设施恢复", () => {
-  async function fixture(mode: "semantic" | "infra" | "unknown") {
+  async function fixture(mode: "semantic" | "infra" | "unknown" | "native") {
     const authority = await vi.importActual<typeof import("./marketing-authority.js")>("./marketing-authority.js");
     const mining = await vi.importActual<typeof import("./data-mining-executor.js")>("./data-mining-executor.js");
     const { createStudioCheckpointRunner } = await import("@hyperreality/video-studio");
@@ -1091,6 +1091,10 @@ describe("正式宿主按最终事实诊断返工，并保留后续基础设施�
     const projectId = `VID-independent-fact-continuity-${++projectSequence}`;
     doubles.meta.mockResolvedValue({ projectId, kind: "marketing", title: "事实返工接续", threadId: "T1", createdAt: "2026-09-27T00:00:00Z" });
     const intent = "介绍星野 R 风扇，仅表达有完整来源支持的风量9档。";
+    const nativeFailure = "STUDIO_CHECKPOINT_INVALID: PRODUCTION 未完成有效原生产物；运镜诊断：" + [
+      { rule: "R1_scale_jump", shots: ["SC-1", "SC-2"], message: "原生景别跳变无动机，必须保留冻结动作。".repeat(40), rewrite_hint: "使用真实动机或调整跨度。" },
+      { rule: "R4_transition_mismatch", shots: ["SC-1", "SC-2"], message: "硬切缺有效动机。", rewrite_hint: "完整尾部诊断：区分入场出场，不能只加叠化。" },
+    ].map(issue => JSON.stringify(issue)).join("；");
     const sourceUrl = "https://source.example.com/independent-r";
     const sourceText = "星野 R 风扇，风量9档。未提供其他档位或性能承诺。";
     const source = { sourceId: "SRC-independent-host", requestedUrl: sourceUrl, finalUrl: sourceUrl,
@@ -1160,6 +1164,7 @@ describe("正式宿主按最终事实诊断返工，并保留后续基础设施�
       // in the PRODUCTION request, matching the native wrapper contract tested separately.
       const production = await runner.run("PRODUCTION", { script, feedback: config.productionRepairFeedback ?? null }, async () => {
         const generation = ++authors.PRODUCTION;
+        if (mode === "native" && generation === 1) throw new Error(nativeFailure);
         const first = mode === "semantic" && generation === 1 ? 999 : 9;
         const second = mode === "semantic" && generation <= 2 ? 888 : 9;
         return { shots: [first, second].map((value, index) => ({ shotId: `SC-${index + 1}`,
@@ -1170,6 +1175,7 @@ describe("正式宿主按最终事实诊断返工，并保留后续基础设施�
       promptHashes.push(renderSha256(canonicalRenderJson(final.shots)));
       gateHashes.push(renderSha256(contentMd));
       await approve("G6_PROMPT", contentMd);
+      if (mode === "native" && feedbacks.length === 2) throw new Error("known infrastructure failure after G6 before native return");
       await approve("G7_FINAL", `# 当前整体交付\n${canonicalRenderJson(final.shots)}\n${"完整交付合同。".repeat(30)}`);
       return { ...success(), stages: { ...success().stages, productionEngine: final } };
     });
@@ -1177,8 +1183,13 @@ describe("正式宿主按最终事实诊断返工，并保留后续基础设施�
     async function run() {
       const prior = runs.at(-1);
       const priorAttempt = runs.length;
+      const priorEntry = prior ? worker.getRun(prior, scope.workspaceId) : null;
+      const priorFinish = [...doubles.finish.mock.calls].reverse().find(([row]) => row.attempt === priorAttempt)?.[0];
       doubles.query.mockImplementation(async (sql: string) => ({ rows: prior && sql.includes("SELECT attempt, input_ref")
-        ? [{ run_id: prior, attempt: priorAttempt, status: "failed", error_class: "BUG",
+        ? [{ run_id: prior, attempt: priorAttempt, status: priorFinish?.status ?? "failed", error_class: priorFinish?.errorClass ?? "BUG",
+          error_msg: priorFinish?.errorMsg ?? null,
+          started_at: priorEntry?.startedAt ? new Date(priorEntry.startedAt) : null,
+          finished_at: priorEntry?.finishedAt ? new Date(priorEntry.finishedAt) : null,
           input_ref: `stages/preproduction/attempt-${priorAttempt}.input.json` }] : [], rowCount: 1 }));
       const runId = worker.startRun(scope, { projectId, intent, rawIntent: intent, isMarketing: true,
         metadata: { brief: { product: "星野 R" } },
@@ -1187,11 +1198,11 @@ describe("正式宿主按最终事实诊断返工，并保留后续基础设施�
       await vi.waitFor(() => expect(worker.getRun(runId, scope.workspaceId)?.finishedAt).not.toBeNull(), { timeout: 5_000, interval: 10 });
       return worker.getRun(runId, scope.workspaceId)!;
     }
-    return { run, projectId, authors, feedbacks, promptHashes, gateHashes, completeReasons,
+    return { run, projectId, authors, feedbacks, promptHashes, gateHashes, completeReasons, nativeFailure, intent,
       factCalls: () => factCalls, gateCalls: (gate: string) => doubles.review.mock.calls.filter(([options]) => options.context?.gate === gate).length };
   }
 
-  it("两次最终事实拒绝只返工生产，完整诊断跨四次宿主运行稳定，后续落盘失败不再生成好作者", async () => {
+  it("两次最终事实拒绝只返工生产，真实输出回执未完成后拒绝盲重跑", async () => {
     const scenario = await fixture("semantic");
     const { ArchiveStore } = await import("@hyperreality/video-studio");
     const write = ArchiveStore.prototype.writeJsonAtomic;
@@ -1206,27 +1217,49 @@ describe("正式宿主按最终事实诊断返工，并保留后续基础设施�
     expect(await scenario.run()).toMatchObject({ status: "failed", error: expect.stringContaining("MARKETING_PROMPT_FACTS_REJECTED") });
     expect(await scenario.run()).toMatchObject({ status: "failed", error: expect.stringContaining("MARKETING_PROMPT_FACTS_REJECTED") });
     expect(await scenario.run()).toMatchObject({ status: "failed", error: "independent late output disk failure" });
-    expect(await scenario.run()).toMatchObject({ status: "finished", error: null });
+    expect(await scenario.run()).toMatchObject({ status: "failed", error: expect.stringContaining("PROMPT_REVIEW_PRIOR_CHANGED") });
     expect(scenario.authors).toEqual({ G2_THEME: 1, G3_INSIGHT: 1, G3_PROFILE: 1, G4_PRD: 1,
       SCRIPT: 1, PRODUCTION: 3, OPENING_TITLE: 3 });
     expect(doubles.prepare).toHaveBeenCalledTimes(1);
-    expect(doubles.restoreMarketing).toHaveBeenCalledTimes(3);
+    expect(doubles.restoreMarketing).toHaveBeenCalledTimes(2);
     expect(scenario.feedbacks[0]).toBeNull();
     expect(scenario.feedbacks[1]).toContain(scenario.completeReasons.get("SC-1"));
     expect(scenario.feedbacks[2]).toContain(scenario.completeReasons.get("SC-1"));
     expect(scenario.feedbacks[2]).toContain(scenario.completeReasons.get("SC-2"));
-    expect(scenario.feedbacks[3]).toBe(scenario.feedbacks[2]);
     expect(new Set(scenario.promptHashes.slice(0, 3)).size).toBe(3);
-    expect(scenario.promptHashes[3]).toBe(scenario.promptHashes[2]);
     expect(new Set(scenario.gateHashes.slice(0, 3)).size).toBe(3);
-    expect(scenario.gateHashes[3]).toBe(scenario.gateHashes[2]);
     for (const gate of ["G1_DOSSIER", "G2_THEME", "G3_INSIGHT", "G4_PRD"]) expect(scenario.gateCalls(gate)).toBe(1);
     expect(scenario.gateCalls("G6_PROMPT")).toBe(3);
     expect(scenario.factCalls()).toBe(4);
     expect(injected).toBe(true);
-    expect(doubles.nextAttempt).toBe(4);
-    expect(doubles.checkpointEvents.filter(event => event.kind === "PRODUCTION_REJECTION" && event.attempt === 4)).toHaveLength(2);
-    expect((await archiveOutput(scenario.projectId, 4)).marketingFactsRef).toContain("attempt-4.marketing-facts.json");
+    expect(doubles.nextAttempt).toBe(3);
+    expect(doubles.checkpointEvents.filter(event => event.kind === "PRODUCTION_REJECTION" && event.attempt === 3)).toHaveLength(2);
+    expect(doubles.finish.mock.calls.some(([row]) => row.attempt === 3 && row.errorClass === "RECEIPT_UNVERIFIED")).toBe(true);
+  });
+
+  it("已结算原生失败把完整诊断与冻结需求回灌作者，随后已知基础设施失败继续复用已通过工位", async () => {
+    const scenario = await fixture("native");
+    expect(await scenario.run()).toMatchObject({ status: "failed", error: scenario.nativeFailure });
+    expect(scenario.feedbacks).toEqual([null]);
+    expect(await scenario.run()).toMatchObject({ status: "failed", error: "known infrastructure failure after G6 before native return" });
+    const second = JSON.parse(scenario.feedbacks[1]!);
+    expect(second.frozenUserRequirements).toBe(scenario.intent);
+    expect(second.nativeProductionFailures[0].message).toBe(scenario.nativeFailure);
+    expect(second.nativeProductionFailures[0].issues).toHaveLength(2);
+    expect(second.nativeProductionFailures[0].issues[1].rewrite_hint).toContain("完整尾部诊断");
+    expect(scenario.nativeFailure.length).toBeGreaterThan(500);
+    expect(await scenario.run()).toMatchObject({ status: "finished", error: null });
+    expect(scenario.feedbacks[2]).toBe(scenario.feedbacks[1]);
+    expect(scenario.authors).toEqual({ G2_THEME: 1, G3_INSIGHT: 1, G3_PROFILE: 1, G4_PRD: 1,
+      SCRIPT: 1, PRODUCTION: 2, OPENING_TITLE: 1 });
+    for (const gate of ["G1_DOSSIER", "G2_THEME", "G3_INSIGHT", "G4_PRD", "G6_PROMPT"]) expect(scenario.gateCalls(gate)).toBe(1);
+    expect(doubles.prepare).toHaveBeenCalledTimes(1);
+    expect(doubles.restoreMarketing).toHaveBeenCalledTimes(2);
+    expect(doubles.checkpointEvents.some(event => event.kind === "PRODUCTION_REJECTION")).toBe(false);
+    const evidence = doubles.checkpointEvents.filter(event => event.kind === "NATIVE_PRODUCTION_FEEDBACK");
+    expect(evidence).toHaveLength(2);
+    expect(evidence[0]!.originRunId).toBe(evidence[1]!.originRunId);
+    expect(doubles.nextAttempt).toBe(3);
   });
 
   it("最终审核基础设施未作语义裁决时恢复原生产与G6，只重试事实审核", async () => {

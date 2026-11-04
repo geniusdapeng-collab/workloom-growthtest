@@ -70,7 +70,7 @@ class CoherenceValidator {
     const movementRaw =
       f.camera_movement || shot.cameraString || shot.camera_string ||
       shot.camera?.movement || f.camera?.movement || '';
-    // 转场
+    // Current validation checks this shot's transition at the previous→current boundary.
     const transitionRaw = f.transition || shot.transition || shot.transition_intent || '';
     // 动机（若 LLM 按新规范标注了 transition_motivation，或从 transition 字符串解析 'motivation: id'）
     let motivation = f.transition_motivation || shot.transition_motivation || null;
@@ -133,7 +133,7 @@ class CoherenceValidator {
       if (verdict.verdict === 'illegal') {
         issues.push(this._issue('R1_scale_jump', 'critical', pair,
           verdict.advice,
-          `为 ${curr.shotId} 的 transition 字段补充动机标注（${Object.keys(SHOCK_MOTIVATIONS).join('/')}），或在两镜之间插入 ${this._suggestMiddleScale(verdict.fromScale, verdict.toScale)} 过渡镜`));
+          `核对 ${prev.shotId}→${curr.shotId} 的切入边界；仅在原始合同与镜头真实内容支持时，为 ${curr.shotId} 的 transition 标注 motivation: <白名单id>（${Object.keys(SHOCK_MOTIVATIONS).join('/')}）并说明依据，否则减小景别跨度；不得为通过检查编造动机或新增情节`));
       } else if (verdict.verdict === 'caution') {
         issues.push(this._issue('R1_scale_caution', 'warning', pair, verdict.advice,
           `将 ${curr.shotId} 的 transition 从硬切改为 ${verdict.transitionSuggestion}`));
@@ -158,7 +158,7 @@ class CoherenceValidator {
         if (verdict.diff >= 3 && declaresHardCut && !curr.motivation) {
           issues.push(this._issue('R4_transition_mismatch', 'critical', pair,
             `景别差${verdict.diff}级却声明硬切，且无动机标注`,
-            '补动机标注，或改叠化/匹配剪辑/闪白'));
+            '该边界仍须满足 R1：以原始合同和镜头内容支持真实合法动机，或减小景别跨度；单改叠化、淡入、匹配剪辑或闪白不能消除 R1 的无动机大跨度。请明确上一镜→本镜的切入边界'));
         }
         if (verdict.diff <= 1 && declaresSoft && this.strictness === 'strict') {
           issues.push(this._issue('R4_transition_overkill', 'info', pair,

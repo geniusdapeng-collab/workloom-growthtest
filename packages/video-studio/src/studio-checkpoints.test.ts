@@ -95,7 +95,7 @@ it("invalidates the previous production assembly policy while keeping the same f
   const input = [{ scenes: ["N1"] }, { model: "same-model" }];
   const output = { result: { success: true, shots: [{ shotId: "N1", prompt: "old assembly" }] } };
   await adapter.save({ schemaVersion: "workloom.studio-engine-checkpoint/v1", stage: "PRODUCTION",
-    inputSha256: studioCheckpointHash({ policyVersion: "native-production-native-audio-speech-contract/v6", input }),
+    inputSha256: studioCheckpointHash({ policyVersion: "native-production-host-template-capacity/v7", input }),
     dependencySha256: studioCheckpointHash("same frozen seed"), output, outputSha256: studioCheckpointHash(output) });
   const author = vi.fn(async () => ({ result: { success: true, shots: [{ shotId: "N1", prompt: "native direction retained" }] } }));
   const result = await createStudioCheckpointRunner(adapter, "same frozen seed").run("PRODUCTION", input, author);
