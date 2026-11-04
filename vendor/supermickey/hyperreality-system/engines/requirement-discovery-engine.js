@@ -236,10 +236,14 @@ function negativeAudiencePolarity(text) {
 }
 
 function customerAudienceClause(source, quote) {
+  if (/(?:不|未|没有|无需)(?:再|明确)?(?:指定|设定|限定)(?:任何)?(?:受众|观众)(?:的)?人口(?:属性|特征|信息)?|(?:受众|观众)(?:的)?人口(?:属性|特征|信息)?(?:未|不|无需)(?:指定|设定|限定)/u.test(source)) return null;
   const contexts = sourceQuoteContexts(source, quote);
   if (!contexts.length) return null;
   const marker = /(?:目标)?(?:受众|观众|人群|观看者)|面向|目标(?:客户|用户)|\b(?:audience|viewers)\b|(?:给|供)(?=[^。！？\n]{0,80}(?:观看|看))/iu.exec(contexts[0].needle);
   if (!marker) return null;
+  const relation = contexts[0].needle.slice(marker.index + marker[0].length);
+  if (!/^(?:面向|给|供)$/u.test(marker[0])
+    && !/^\s*(?:[:：=]|(?:主要|明确|应当|应|设定|定位|设置|设)?(?:为|是)|包括|包含|以|is\b|are\b)/iu.test(relation)) return null;
   for (const { sentence, index } of contexts) {
     const markerIndex = index + marker.index;
     const prefix = sentence.slice(0, markerIndex).split(/[，,]/u).pop();
@@ -276,10 +280,14 @@ function demographicValueMatchesQuote(key, value, quote) {
 }
 
 function positiveDemographicQuote(clause, quote) {
-  return clause.split(/[，,；;。！？!?\n]/u).some(segment => {
-    if (!segment.includes(quote)) return false;
+  const segments = clause.split(/[，,；;。！？!?\n]/u).filter(segment => segment.includes(quote));
+  return segments.length > 0 && segments.every(segment => {
+    const viewingObject = segment.replace(/观看者/gu, '受众者')
+      .search(/看|欣赏|拍摄|扮演|表演|\bwatch(?:es|ing)?\b/iu);
+    const quoteEnd = segment.lastIndexOf(quote) + quote.length;
     return !negativeAudiencePolarity(segment)
-      && !/(?:主角|配角|演员|出镜角色|人物|模特)(?:是|为|设为)/u.test(segment);
+      && !/(?:主角|配角|演员|出镜角色|人物|模特)(?:是|为|设为)/u.test(segment)
+      && !(viewingObject >= 0 && viewingObject < quoteEnd);
   });
 }
 

@@ -266,6 +266,41 @@ describe("native G3 customer evidence and scene contract", () => {
     expect(value.primaryAudience).toMatchObject({ ageRange: null, gender: null, occupation: null });
   });
 
+  it.each(["", "，不指定受众人口属性"])(
+    "does not classify the audience's viewing object as the audience population: %s", explicitUnknown => {
+      const engine = new RequirementDiscoveryEngine();
+      const quote = "目标受众观看30岁女性模特的器物操作";
+      const value = engine.agents.audience!._validateAndFill({ ...audience(),
+        audienceBasis: "customer-provided", audienceEvidenceQuote: quote,
+        primaryAudience: { ...audience().primaryAudience, ageRange: "30岁", gender: "female", occupation: "模特" },
+        demographicEvidence: { ageRange: "30岁", gender: "女性", occupation: "模特", consumptionLevel: null },
+      }, {}, { ...input, _workloomCustomerIntent: `${quote}${explicitUnknown}。` });
+      expect(value.primaryAudience).toMatchObject({ ageRange: null, gender: null, occupation: null });
+    });
+
+  it("retains the model profession when the customer defines the audience itself as that population", () => {
+    const engine = new RequirementDiscoveryEngine();
+    const quote = "目标受众为30岁女性模特并喜欢观看器物操作。";
+    const value = engine.agents.audience!._validateAndFill({ ...audience(),
+      audienceBasis: "customer-provided", audienceEvidenceQuote: quote,
+      primaryAudience: { ...audience().primaryAudience, ageRange: "30岁", gender: "female", occupation: "模特" },
+      demographicEvidence: { ageRange: "30岁", gender: "女性", occupation: "模特", consumptionLevel: null },
+    }, {}, { ...input, _workloomCustomerIntent: quote });
+    expect(value.primaryAudience).toMatchObject({ ageRange: "30岁", gender: "female", occupation: "模特" });
+  });
+
+  it("does not remove the raw instruction to leave population unspecified by cropping its quote", () => {
+    const engine = new RequirementDiscoveryEngine();
+    const quote = "目标受众为30岁女性";
+    const value = engine.agents.audience!._validateAndFill({ ...audience(),
+      audienceBasis: "customer-provided", audienceEvidenceQuote: quote,
+      primaryAudience: { ...audience().primaryAudience, ageRange: "30岁", gender: "female" },
+      demographicEvidence: { ageRange: "30岁", gender: "女性", occupation: null, consumptionLevel: null },
+    }, {}, { ...input, _workloomCustomerIntent: `原先${quote}，本片不指定受众人口属性。` });
+    expect(value.primaryAudience.ageRange).toBeNull();
+    expect(value.primaryAudience.gender).toBeNull();
+  });
+
   it("requires an unambiguous affirmative population clause when an extracted quote repeats", () => {
     const engine = new RequirementDiscoveryEngine();
     const quote = "受众为25-30岁女性";
