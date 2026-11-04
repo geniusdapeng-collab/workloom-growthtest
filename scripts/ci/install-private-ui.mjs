@@ -27,7 +27,7 @@ export async function installPrivateUi({ args, environment = process.env, fetchI
   const archivePath = await externalOutput(repo, values['--archive']); const reportPath = await externalOutput(repo, values['--report']);
   requireFact(archivePath !== reportPath, 'UI_OUTPUT_COLLISION');
   const state = JSON.parse(await readFile(resolve(repo, '.workloom-ui.json'), 'utf8'));
-  const download = await downloadPinnedArchive({ releaseReadToken: environment.WORKLOOM_UI_RELEASE_READ_TOKEN, state, fetchImplementation });
+  const download = await downloadPinnedArchive({ releaseReadToken: environment.WORKLOOM_UI_RELEASE_READ_TOKEN, githubToken: environment.GITHUB_TOKEN, state, fetchImplementation });
   // This private original archive stays in runner temporary storage for the
   // following credential-free tests. It is never checked in or uploaded.
   let archiveCreated = false;

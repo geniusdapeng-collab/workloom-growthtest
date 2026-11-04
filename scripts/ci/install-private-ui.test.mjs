@@ -145,6 +145,32 @@ test('wrapper boundary success keeps original bytes and private file modes and l
   assert.equal(JSON.stringify(result).includes('wrapper-fixture-token'), false); assert.equal(JSON.stringify(result).includes('?signature='), false);
   assert.deepEqual(mock.calls[2].options.headers, { Accept: 'application/octet-stream' });
 });
+test('wrapper routes the Actions environment token only to GitHub API and keeps its receipt secret-free', async () => {
+  const f = await boundaryFixture(); const mock = mockFetch();
+  const environment = { GITHUB_TOKEN: 'actions-test-only', WORKLOOM_UI_RELEASE_READ_TOKEN: 'cnb-test-only' };
+  const result = await f.module.installPrivateUi({ args: f.args, environment, ...mock });
+  assert.equal(result.download.authenticatedApi, true); assert.equal(mock.calls.length, 3);
+  for (const call of mock.calls.slice(0, 2)) assert.equal(call.options.headers.Authorization, 'Bearer actions-test-only');
+  assert.deepEqual(mock.calls[2].options.headers, { Accept: 'application/octet-stream' });
+  assert.equal(mock.calls[2].options.credentials, 'omit');
+  assert.doesNotMatch(await readFile(f.report, 'utf8'), /actions-test-only|cnb-test-only|signature=/);
+});
+for (const entrypoint of ['install-private-ui.mjs', 'ui-auth-bootstrap.mjs']) test(entrypoint + ' CLI passes GITHUB_TOKEN to fixed API only and fails safely on denied access', async () => {
+  const f = await fixture(); const preload = join(f.outside, 'mock-fetch.mjs');
+  await writeFile(preload, `import assert from 'node:assert/strict';
+globalThis.fetch = async (url, options) => {
+  assert.equal(url, ${JSON.stringify(PIN.releaseUrl)});
+  assert.equal(options.headers.Authorization, 'Bearer cli-test-only');
+  assert.equal(options.redirect, 'error'); assert.equal(options.credentials, 'omit');
+  return new Response(JSON.stringify({ message: 'cli-test-only' }), { status: 403 });
+};\n`);
+  const args = entrypoint === 'install-private-ui.mjs' ? f.args : ['--repo', f.repo, '--store-dir', f.store, '--staging-root', f.outside, '--report', f.report];
+  const result = spawnSync(process.execPath, ['--import', preload, join(here, entrypoint), ...args], { cwd: source, env: { PATH: process.env.PATH ?? '', HOME: f.outside, GITHUB_TOKEN: 'cli-test-only', WORKLOOM_UI_RELEASE_READ_TOKEN: 'cnb-cli-only' }, encoding: 'utf8', timeout: 10000 });
+  assert.equal(result.error, undefined); assert.equal(result.status, 1); assert.equal(result.stdout, '');
+  assert.deepEqual(JSON.parse(result.stderr), { code: 'UI_RELEASE_HTTP_403', message: 'UI_RELEASE_HTTP_403' });
+  assert.doesNotMatch(result.stderr, /cli-test-only|cnb-cli-only/);
+  await absent(f.archive); await absent(f.report);
+});
 for (const type of ['file', 'symlink', 'hardlink']) test('archive wx rejects an existing ' + type + ' and preserves its target', async () => {
   const f = await boundaryFixture(); const sentinel = join(f.repo, 'protected'); const protectedBytes = Buffer.from('existing source content'); await writeFile(sentinel, protectedBytes);
   if (type === 'file') await writeFile(f.archive, protectedBytes);
@@ -182,10 +208,13 @@ for (const name of ['ci.yml', 'workloom-ui-contract.yml']) test(name + ' limits 
   const text = await readFile(join(source, '.github/workflows', name), 'utf8'); const steps = workflowSteps(text);
   const installs = steps.filter(step => step.includes('install-private-ui.mjs')); assert.equal(installs.length, 1);
   const installer = installs[0]; assert.match(installer, /WORKLOOM_UI_RELEASE_READ_TOKEN: \$\{\{ secrets\.CNB_UI_RELEASE_TOKEN \}\}/);
+  assert.match(installer, /GITHUB_TOKEN: \$\{\{ github\.token \}\}/);
+  assert.match(text, /^permissions:\n  contents: read\n/m);
   assert.doesNotMatch(installer, /continue-on-error|if:|GITHUB_ENV|GITHUB_OUTPUT|upload-artifact/);
   for (const flag of ['--repo', '--store-dir', '--staging-root', '--archive', '--report']) assert.ok(installer.includes(flag));
   assert.equal(text.split('secrets.CNB_UI_RELEASE_TOKEN').length - 1, 1);
-  const others = text.replace(installer, ''); assert.doesNotMatch(others, /WORKLOOM_UI_RELEASE_READ_TOKEN|CNB_UI_RELEASE_TOKEN/);
+  assert.equal(text.split('github.token').length - 1, 1);
+  const others = text.replace(installer, ''); assert.doesNotMatch(others, /WORKLOOM_UI_RELEASE_READ_TOKEN|CNB_UI_RELEASE_TOKEN|GITHUB_TOKEN|github\.token/);
   const next = steps[steps.indexOf(installer) + 1]; assert.match(next, /WORKLOOM_UI_TEST_ARCHIVE_PATH: \$\{\{ runner\.temp \}\}\/workloom-ui-original\.tgz/);
   assert.match(next, /node --test --test-concurrency=1 scripts\/ci\/ui-auth-bootstrap\.test\.mjs scripts\/ci\/install-private-ui\.test\.mjs/);
   assert.doesNotMatch(next, /secrets\.|continue-on-error|if:|--test-skip|\|\| true/);

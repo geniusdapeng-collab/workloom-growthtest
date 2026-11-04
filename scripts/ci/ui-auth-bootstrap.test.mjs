@@ -9,7 +9,7 @@ import {
   PIN, LEGACY_PIN, BootstrapError, digest, verifyArchive, readArchiveManifest, validateState,
   validateAssetRedirect, downloadPinnedArchive, canonicalLockBinding, transportLock,
   childEnvironment, runProcess, expectedIndexPath, validateCanonicalIndex,
-  warmCanonicalStore, installCanonicalFrozen,
+  warmCanonicalStore, installCanonicalFrozen, bootstrapInstall,
 } from './ui-auth-bootstrap.mjs';
 
 const root = dirname(fileURLToPath(import.meta.url));
@@ -192,8 +192,15 @@ test('body stream failures remain safe coded errors', async () => {
   assert.equal(calls, 1);
 });
 test('child processes receive an allowlisted environment and empty npm config, including no AWS key', () => {
-  const output = childEnvironment({ PATH: '/fixture/bin', HOME: '/fixture/home', WORKLOOM_UI_RELEASE_READ_TOKEN: 'fixture', CNB_UI_RELEASE_TOKEN: 'fixture', GITHUB_TOKEN: 'fixture', AWS_ACCESS_KEY_ID: 'fixture', UNRELATED_SECRET: 'fixture', NPM_CONFIG_USERCONFIG: '/unsafe', NODE_OPTIONS: '--inspect', XDG_CACHE_HOME: '/fixture/cache' }, '/safe/empty.npmrc');
+  const output = childEnvironment({ PATH: '/fixture/bin', HOME: '/fixture/home', WORKLOOM_UI_RELEASE_READ_TOKEN: 'fixture', CNB_UI_RELEASE_TOKEN: 'fixture', GITHUB_TOKEN: 'fixture', GH_TOKEN: 'fixture', AWS_ACCESS_KEY_ID: 'fixture', UNRELATED_SECRET: 'fixture', NPM_CONFIG_USERCONFIG: '/unsafe', NODE_OPTIONS: '--inspect', XDG_CACHE_HOME: '/fixture/cache' }, '/safe/empty.npmrc');
   assert.deepEqual(output, { PATH: '/fixture/bin', HOME: '/fixture/home', XDG_CACHE_HOME: '/fixture/cache', NPM_CONFIG_USERCONFIG: '/safe/empty.npmrc', CI: 'true' });
+});
+test('an actual child cannot read either platform token or its common aliases', async () => {
+  const keys = ['GITHUB_TOKEN', 'GH_TOKEN', 'WORKLOOM_UI_RELEASE_READ_TOKEN', 'CNB_UI_RELEASE_TOKEN'];
+  const environment = Object.fromEntries(keys.map(key => [key, 'child-test-only']));
+  const result = await runProcess(process.execPath, ['-e', 'console.log(JSON.stringify(' + JSON.stringify(keys) + '.map(key => process.env[key] ?? null)))'], { env: childEnvironment(environment) });
+  assert.equal(result.exitCode, 0); assert.deepEqual(JSON.parse(result.output), keys.map(() => null));
+  assert.doesNotMatch(result.output, /child-test-only/);
 });
 test('process runner records real exit and controlled timeout and rejects missing executables', async () => {
   const failed = await runProcess(process.execPath, ['-e', 'console.log("fixture-failure");process.exit(7)']); assert.equal(failed.exitCode, 7); assert.match(failed.output, /fixture-failure/);
@@ -286,6 +293,65 @@ test('GitHub public archive accepts official 200 and 302 binary responses withou
 test('GitHub public archive requires no token and binds identical original bytes', async () => {
   const mock = githubFetch(); const result = await downloadPinnedArchive({ state, ...mock });
   assert.equal(result.proof.bytes, PIN.bytes); assert.equal(result.proof.entries, 81);
+});
+test('GitHub token authenticates only the two pinned API reads for both binary response forms', async () => {
+  for (const assetStatus of [200, 302]) {
+    const mock = githubFetch({ assetStatus });
+    const result = await downloadPinnedArchive({ state, githubToken: 'gh-test-only', releaseReadToken: 'cnb-test-only', ...mock });
+    assert.deepEqual(result.bytes, archive); assert.equal(result.proof.authenticatedApi, true);
+    assert.deepEqual(mock.calls.slice(0, 2).map(call => call.url), [PIN.releaseUrl, PIN.apiUrl]);
+    for (const call of mock.calls.slice(0, 2)) {
+      assert.equal(call.options.headers.Authorization, 'Bearer gh-test-only');
+      assert.equal(call.options.credentials, 'omit'); assert.equal(call.options.headers.Cookie, undefined);
+    }
+    assert.equal(mock.calls[0].options.redirect, 'error'); assert.equal(mock.calls[1].options.redirect, 'manual');
+    if (assetStatus === 302) {
+      assert.deepEqual(mock.calls[2].options.headers, { Accept: 'application/octet-stream' });
+      assert.equal(mock.calls[2].options.credentials, 'omit'); assert.equal(mock.calls[2].options.redirect, 'error');
+    }
+    assert.equal(result.proof.credentialsForwardedToCdn, false);
+    assert.doesNotMatch(JSON.stringify(result.proof), /gh-test-only|cnb-test-only|signature=/);
+  }
+});
+test('a GitHub token never replaces or enters the legacy CNB credential branch', async () => {
+  const mock = mockFetch();
+  const result = await downloadPinnedArchive({ state: legacyState, githubToken: 'gh-test-only', releaseReadToken: 'cnb-test-only', ...mock });
+  assert.equal(result.proof.apiOrigin, 'https://api.cnb.cool');
+  for (const call of mock.calls.slice(0, 2)) assert.equal(call.options.headers.Authorization, 'Bearer cnb-test-only');
+  assert.deepEqual(mock.calls[2].options.headers, { Accept: 'application/octet-stream' });
+  const missingLegacy = mockFetch();
+  await assert.rejects(downloadPinnedArchive({ state: legacyState, githubToken: 'gh-test-only', ...missingLegacy }), errorCode('MISSING_UI_RELEASE_TOKEN'));
+  assert.equal(missingLegacy.calls.length, 0);
+});
+for (const [label, githubToken] of [['empty', ''], ['null', null], ['boolean', false], ['number', 123], ['whitespace', 'fixture token'], ['newline', 'fixture\ntoken'], ['oversized', 'x'.repeat(4096)]]) test('GitHub rejects an explicitly invalid ' + label + ' token before network', async () => {
+  const mock = githubFetch();
+  await assert.rejects(downloadPinnedArchive({ state, githubToken, ...mock }), error => errorCode('INVALID_GITHUB_TOKEN')(error) && !error.message.includes('fixture'));
+  assert.equal(mock.calls.length, 0);
+});
+test('denied GitHub tokens stay safe 401/403 failures without falling back to anonymous reads', async () => {
+  for (const releaseStatus of [401, 403]) {
+    const mock = githubFetch({ releaseStatus, releaseValue: { message: 'gh-test-only' } });
+    await assert.rejects(downloadPinnedArchive({ state, githubToken: 'gh-test-only', ...mock }), error => errorCode('UI_RELEASE_HTTP_' + releaseStatus)(error) && !error.message.includes('gh-test-only'));
+    assert.equal(mock.calls.length, 1); assert.equal(mock.calls[0].options.headers.Authorization, 'Bearer gh-test-only');
+  }
+});
+test('authenticated GitHub transport failures cannot disclose token-bearing exceptions', async () => {
+  for (const [failAt, code] of [[1, 'UI_RELEASE_REQUEST'], [2, 'UI_ASSET_REQUEST'], [3, 'UI_ASSET_DOWNLOAD']]) {
+    const mock = githubFetch();
+    const fetchImplementation = (url, options) => {
+      if (mock.calls.length + 1 === failAt) throw Error('gh-test-only https://release-assets.githubusercontent.com/?signature=gh-test-only');
+      return mock.fetchImplementation(url, options);
+    };
+    await assert.rejects(downloadPinnedArchive({ state, githubToken: 'gh-test-only', fetchImplementation }), error => errorCode(code)(error) && !/gh-test-only|signature=/.test(error.message));
+  }
+});
+test('bootstrapInstall passes its explicit GitHub token to the pinned metadata request', async () => {
+  const fixture = await tempFixture(); const mock = githubFetch({ releaseStatus: 403 });
+  try {
+    await assert.rejects(bootstrapInstall({ repoRoot: fixture.repo, githubToken: 'gh-test-only', ...mock }), errorCode('UI_RELEASE_HTTP_403'));
+    assert.equal(mock.calls.length, 1); assert.equal(mock.calls[0].options.headers.Authorization, 'Bearer gh-test-only');
+    assert.deepEqual(await readdir(fixture.stage), []);
+  } finally { await rm(fixture.dir, { recursive: true, force: true }); }
 });
 for (const [label, mutate] of [
   ['missing platform', x => { delete x.artifact.platform; }],
