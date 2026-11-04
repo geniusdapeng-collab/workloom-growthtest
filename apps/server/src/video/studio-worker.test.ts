@@ -3,7 +3,7 @@
  * vendor、PG、媒体登记用边界替身；档案写盘与重试/终态/商品摘要走实际代码。
  */
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -26,6 +26,7 @@ const doubles = vi.hoisted(() => ({
   review: vi.fn(),
   prepare: vi.fn(),
   finalize: vi.fn(),
+  verifyMarketingFacts: vi.fn(),
   studioConfigs: [] as Array<Record<string, any>>,
   emitGates: true,
   connect: vi.fn(),
@@ -61,7 +62,8 @@ vi.mock("@workloom/base/workdata", async () => {
   };
 });
 vi.mock("../service/llm.js", () => ({ modelPolicyFor: () => undefined }));
-vi.mock("./marketing-authority.js", () => ({ prepareMarketingFacts: doubles.prepare, finalizeMarketingFacts: doubles.finalize }));
+vi.mock("./marketing-authority.js", () => ({ prepareMarketingFacts: doubles.prepare, finalizeMarketingFacts: doubles.finalize,
+  verifyMarketingFacts: doubles.verifyMarketingFacts }));
 vi.mock("./data-mining-executor.js", () => ({ createDataMiningExecutor: vi.fn() }));
 vi.mock("./media/library.js", () => ({ ingestPortraitsFromIndex: doubles.ingest }));
 vi.mock("./media/products.js", () => ({ upsertProductProfileFromDossier: doubles.project }));
@@ -126,6 +128,7 @@ beforeEach(() => {
     g1Content: JSON.stringify({ facts: { schemaVersion: "workloom.marketing-facts/v1", stages: [1, 2, 3], sources: [1], optionalValue: null }, scope }),
   }));
   doubles.finalize.mockReset().mockResolvedValue({ ref: "stages/preproduction/attempt-1.marketing-facts.json", sha256: "b".repeat(64) });
+  doubles.verifyMarketingFacts.mockReset().mockResolvedValue(undefined);
   doubles.emitGates = true;
   doubles.query.mockReset().mockResolvedValue({ rows: [], rowCount: 1 });
   doubles.review.mockReset().mockImplementation(async (options) => {
@@ -610,6 +613,93 @@ describe("预生产原始结果与诚实终态", () => {
     });
   });
 
+});
+
+describe("正式 G6 提示词工作单", () => {
+  it.each(["marketing", "narrative"] as const)("%s 只签发 G6 实审字节，恢复绑定且不进入媒体链", async (kind) => {
+    vi.stubEnv("WORKLOOM_RENDER_SIGNING_SECRET", randomBytes(32).toString("hex"));
+    vi.stubEnv("HR_DEFER_RENDER", "0");
+    vi.stubEnv("HR_PORTRAIT_ENABLED", "1");
+    vi.stubEnv("VOLCENGINE_ARK_API_KEY", "synthetic-unit-test-key");
+    vi.stubEnv("ARK_IMAGE_MODEL", "synthetic-unit-test-model");
+    if (kind === "narrative") useNarrativeProject();
+    const { readStudioPromptReview } = await import("./prompt-review-authority.js");
+    const { restoreStudioResumeInput } = await import("./studio-resume-input.js");
+    const { getAppPool } = await import("@workloom/db");
+    const projectId = `VID-prompt-only-${++projectSequence}`;
+    const rawIntent = "制作三十秒短片，保留冲线后摘盔的动作顺序，无对白";
+    const prompt = `01.【场景】${"封闭赛道，安全停稳后摘下头盔。".repeat(20)}`;
+    const report = `# 提示词审核报告\n| SC-1 | 28s | 330 |\n### SC-1(内容·25字段)\n\n\`\`\`markdown\n${prompt}\n\`\`\`\n`;
+    let runId = "";
+    doubles.emitGates = false;
+    doubles.finalize.mockResolvedValue({ ref: "stages/prompt_review/attempt-1.marketing-facts.json", sha256: "b".repeat(64) });
+    doubles.query.mockImplementation(async (sql: string, params: unknown[] = []) => {
+      if (!sql.includes("r.stage_id='prompt_review'") || params[0] !== scope.tenantId || params[1] !== scope.workspaceId || params[2] !== projectId) {
+        return { rows: [], rowCount: 0 };
+      }
+      const finished = doubles.finish.mock.calls.at(-1)?.[0];
+      return { rows: [{ id: "SR-prompt-only", run_id: runId, attempt: 1, kind,
+        status: finished?.status ?? "running", output_ref: finished?.outputRef ?? null,
+        output_sha256: finished?.outputSha256 ?? null }], rowCount: 1 };
+    });
+    doubles.runPreproduction.mockImplementation(async () => {
+      const config = doubles.studioConfigs.at(-1)!;
+      expect(config).toMatchObject({ deferRender: true, portraits: { enabled: false } });
+      const approval = (gate: string, contentMd: string, vendorType = "test-gate") =>
+        config.onApproval({ gate, vendorType, runId: "vendor-run", title: "完整确认单", contentMd });
+      for (const gate of ["G2_THEME", "G3_INSIGHT", "G4_PRD"]) {
+        expect(await approval(gate, "完整原生前期说明。".repeat(20))).toMatchObject({ approved: true });
+      }
+      expect(await approval("G5_PORTRAIT", "已有角色和商品的参考需求", "portrait-generation"))
+        .toMatchObject({ approved: false, reason: "PROMPT_REVIEW_PORTRAIT_DEFERRED" });
+      config.onPromptReview([{ shotId: "SC-1", duration: 28, prompt, fields: { action: "停稳后摘盔" } }]);
+      expect(await approval("G6_PROMPT", report, "prompt")).toMatchObject({ approved: true });
+      const stopped = await approval("G7_FINAL", "本轮不申请整体预生产", "preproduction");
+      expect(stopped).toMatchObject({ approved: false, reason: "PROMPT_REVIEW_SCOPE_REACHED" });
+      return { success: false, stages: { preproductionReview: { status: "rejected", reason: stopped.reason },
+        productionEngine: { shots: [{ shotId: "SC-1", prompt: "不能导出的旧版提示词" }] } } };
+    });
+    runId = worker.startRun(scope, { projectId, rawIntent, intent: rawIntent + "\n系统格式要求", isMarketing: kind === "marketing",
+      purpose: "prompt-review", durationSec: 30 });
+    await vi.waitFor(() => expect(worker.getRun(runId, scope.workspaceId)?.finishedAt).not.toBeNull(), { timeout: 3_000, interval: 10 });
+    expect(worker.getRun(runId, scope.workspaceId)).toMatchObject({ status: "finished", error: null,
+      resultSummary: { purpose: "prompt-review", state: "prompt_review_ready", renderAuthorized: false, plannedSeconds: 28 } });
+    expect(doubles.finish).toHaveBeenCalledWith(expect.objectContaining({ stageId: "prompt_review", status: "done" }));
+    expect(doubles.review.mock.calls.filter(([config]) => config.context.gate === "G6_PROMPT")[0]?.[0].context)
+      .toMatchObject({ request: rawIntent, targetSeconds: 30 });
+    expect(doubles.review.mock.calls.some(([config]) => ["G5_PORTRAIT", "G7_FINAL"].includes(config.context.gate))).toBe(false);
+    expect(doubles.ingest).not.toHaveBeenCalled();
+    expect(doubles.project).not.toHaveBeenCalled();
+    const root = path.join(doubles.workDir, "archive", scope.workspaceId, projectId);
+    await expect(readFile(path.join(root, "stages/preproduction/attempt-1.prompts.json"))).rejects.toMatchObject({ code: "ENOENT" });
+    const stored = JSON.parse(await readFile(path.join(root, "stages/prompt_review/attempt-1.input.json"), "utf8")).input.resumeInput;
+    const project = { projectId, createdAt: "2026-09-27T00:00:00Z", kind };
+    expect(restoreStudioResumeInput(stored, scope, project)).toMatchObject({ ok: true, input: { purpose: "prompt-review", durationSec: 30, rawIntent } });
+    expect(restoreStudioResumeInput(stored, scope, project, "不同的需求")).toMatchObject({ ok: false });
+    const read = { app: getAppPool(), scope, projectId, runId, workDir: doubles.workDir };
+    const receipt = await readStudioPromptReview(read);
+    expect(receipt).toMatchObject({ stageRunId: "SR-prompt-only", pipeline: kind, targetSeconds: 30,
+      plannedSeconds: 28, renderAuthorized: false, deferredGates: ["G5_PORTRAIT", "G7_FINAL"],
+      reviewReport: report, shots: [{ shotId: "SC-1", durationSec: 28, prompt }] });
+    expect(receipt.reviewReportSha256).toBe(createHash("sha256").update(report).digest("hex"));
+    if (kind === "marketing") {
+      expect(doubles.prepare).toHaveBeenCalledWith(expect.objectContaining({ stageId: "prompt_review" }));
+      expect(doubles.finalize).toHaveBeenCalledWith(expect.anything(), receipt.shots);
+      expect(doubles.verifyMarketingFacts).toHaveBeenCalledWith(expect.objectContaining({ stageId: "prompt_review", shots: receipt.shots }));
+    }
+    await expect(readStudioPromptReview({ ...read, runId: "RUN-stale" })).rejects.toMatchObject({ code: "PROMPT_REVIEW_NOT_READY" });
+    await expect(readStudioPromptReview({ ...read, scope: { ...scope, workspaceId: "ws-other" } })).rejects.toMatchObject({ code: "PROMPT_REVIEW_NOT_READY" });
+    await writeFile(path.join(root, "stages/prompt_review/attempt-1.prompt-review.json"), JSON.stringify({ ...receipt, targetSeconds: 31 }));
+    await expect(readStudioPromptReview(read)).rejects.toMatchObject({ code: "PROMPT_REVIEW_UNVERIFIED" });
+  });
+
+  it("没有独立签发密钥时在租约和供应商之前拒绝", () => {
+    vi.stubEnv("WORKLOOM_RENDER_SIGNING_SECRET", "");
+    expect(() => worker.startRun(scope, { projectId: "VID-no-prompt-signing", intent: "电影", purpose: "prompt-review", durationSec: 30 }))
+      .toThrow(/PROMPT_REVIEW_SIGNING_UNAVAILABLE/);
+    expect(doubles.lease).not.toHaveBeenCalled();
+    expect(doubles.runPreproduction).not.toHaveBeenCalled();
+  });
 });
 
 describe("默认导演委托与立项事务", () => {

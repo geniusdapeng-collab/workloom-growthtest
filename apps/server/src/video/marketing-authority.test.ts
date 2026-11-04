@@ -66,6 +66,7 @@ async function prepare(options: {
   modelFailure?: boolean;
   mode?: string;
   attempt?: number;
+  stageId?: "preproduction" | "prompt_review";
   searchCacheFile?: string;
   redirectAliases?: boolean;
   mixedCurrencies?: boolean;
@@ -76,7 +77,7 @@ async function prepare(options: {
   queryHints?: { brand?: string; category?: string; model?: string };
 } = {}): Promise<PreparedMarketingFacts> {
   let searches = 0;
-  return prepareMarketingFacts({ scope: { ...scope, attempt: options.attempt ?? 1 }, root, intent: "做一条风扇介绍", metadata: { brief: { product: "星野 F3", brand: "星野" }, ...(options.queryHints ? { dataMining: { name: "星野 F3", ...options.queryHints } } : {}), ...(options.largeGate ? { notes: longMetadata } : {}) }, env: { ...env, ...(options.mode ? { VM_DATA_MINING_MODE: options.mode } : {}) },
+  return prepareMarketingFacts({ scope: { ...scope, attempt: options.attempt ?? 1 }, stageId: options.stageId, root, intent: "做一条风扇介绍", metadata: { brief: { product: "星野 F3", brand: "星野" }, ...(options.queryHints ? { dataMining: { name: "星野 F3", ...options.queryHints } } : {}), ...(options.largeGate ? { notes: longMetadata } : {}) }, env: { ...env, ...(options.mode ? { VM_DATA_MINING_MODE: options.mode } : {}) },
     llm: { reason: async prompt => {
       extractionCalls.push(prompt); if (options.modelFailure) return { success: false, error: "LLM unavailable" };
       const match = /当前阶段：(A[123])\n(.*)$/s.exec(prompt)!; const source = JSON.parse(match[2]!).sources[0];
@@ -117,6 +118,18 @@ async function prepare(options: {
 }
 const shots = [{ shotId: "S1", prompt: "窗边展示星野 F3 风扇，字幕说明风量 9 档。", fields: { 场景: "窗边", 产品: "星野 F3", 规格: "9 档" } }];
 describe("营销事实宿主完整执行", () => {
+  it("同项目同执行号的提示词审核和正式前期使用独立来源与事实目录", async () => {
+    const full = await finalizeMarketingFacts(await prepare(), shots, env);
+    const prompt = await finalizeMarketingFacts(await prepare({ stageId: "prompt_review" }), shots, env);
+    expect(full.ref).toBe("stages/preproduction/attempt-1.marketing-facts.json");
+    expect(prompt.ref).toBe("stages/prompt_review/attempt-1.marketing-facts.json");
+    const verified = await verifyMarketingFacts({ root, ...prompt, scope, shots, stageId: "prompt_review" });
+    expect(verified.sources[0]!.rawRef).toMatch(/^stages\/prompt_review\//);
+    expect(verified.outputReviews[0]!.ref).toMatch(/^stages\/prompt_review\//);
+    await expect(verifyMarketingFacts({ root, ...prompt, scope, shots })).rejects.toMatchObject({ code: "MARKETING_PATH_INVALID" });
+    await expect(verifyMarketingFacts({ root, ...full, scope, shots, stageId: "prompt_review" })).rejects.toMatchObject({ code: "MARKETING_PATH_INVALID" });
+  });
+
   it("未进入已审A1主张的品牌、类别、型号仍只是检索线索，不能兜底成档案身份", async () => {
     const hints = { brand: "仅供检索品牌", category: "仅供检索服务", model: "仅供检索型号" };
     const prepared = await prepare({ queryHints: hints });

@@ -40,6 +40,15 @@ const formalSource = {
   sourceStageRunId: "stage-run-a", sourceAttempt: 1, promptsSha256: "a".repeat(64),
   shots: [{ shotId: "SC-01", durationSec: 5, prompt, fields: {}, promptSha256: sha(prompt) }],
 };
+const reviewedShots = [{ durationSec: 5, fields: {}, prompt, promptSha256: sha(prompt), shotId: "SC-01" }];
+const promptReview = {
+  schemaVersion: "workloom.studio-prompt-review/v1", state: "prompt_review_ready",
+  issuer: "workloom.studio-worker", purpose: "prompt-review",
+  tenantId: expected.tenantId, workspaceId: expected.workspaceId, projectId: started.projectId, runId: started.runId,
+  stageRunId: "stage-run-prompt", attempt: 1, pipeline: started.pipeline, targetSeconds: 30, renderAuthorized: false,
+  reviewReport: prompt, reviewReportSha256: sha(prompt),
+  shots: reviewedShots, plannedSeconds: 5, promptsSha256: sha(JSON.stringify(reviewedShots)),
+};
 
 async function directory(t) {
   const root = await mkdtemp(join(tmpdir(), "growthtest-video-cli-"));
@@ -48,7 +57,7 @@ async function directory(t) {
 }
 
 function fixture({ healthBody = health, accessBody = access, post = async () => trpc(started),
-  status = run("running"), source = formalSource, repo = checkout, env = environment } = {}) {
+  status = run("running"), source = formalSource, reviewed = promptReview, repo = checkout, env = environment } = {}) {
   const seen = [];
   return {
     seen,
@@ -59,6 +68,7 @@ function fixture({ healthBody = health, accessBody = access, post = async () => 
       if (url.pathname === "/trpc/video.studio.start") return post(url, init);
       if (url.pathname === "/trpc/video.studio.status") return status instanceof Response ? status : trpc(status);
       if (url.pathname === "/trpc/video.production.shots") return trpc(source);
+      if (url.pathname === "/trpc/video.production.promptReview") return trpc(reviewed);
       assert.fail("Unexpected endpoint");
     } },
   };
@@ -252,6 +262,44 @@ test("same run, pipeline and matching per-shot prompt digest required for prepro
     assert.ok(!JSON.stringify(result).includes(prompt));
     assert.deepEqual(f.seen[3].input, { projectId: started.projectId });
   }
+});
+
+test("explicit prompt review job never reads render-eligible shots and exports only the bound review", async t => {
+  const root = await directory(t);
+  const jobFile = join(root, "job.json");
+  const out = join(root, "prompts.json");
+  const promptIntent = { ...intent, purpose: "prompt-review" };
+  assert.throws(() => validateVideoIntent({ ...intent, purpose: "other" }), { code: "INVALID_INPUT" });
+  const f = fixture({ post: async (_url, init) => {
+    assert.equal(JSON.parse(init.body).purpose, "prompt-review");
+    return trpc({ ...started, purpose: "prompt-review" });
+  }, status: null });
+  assert.equal((await startVideo(promptIntent, jobFile, f.deps)).renderAuthorized, false);
+  const status = await statusVideo(jobFile, f.deps);
+  assert.equal(status.phase, "prompt_review_ready");
+  assert.equal(status.mediaReady, false);
+  assert.equal(status.source.reviewReportSha256, promptReview.reviewReportSha256);
+  assert.ok(!JSON.stringify(status).includes(prompt));
+  const argv = ["prompts", "--job-file", jobFile, "--out", out];
+  assert.equal((await runVideoCli(argv, f.deps)).out, out);
+  assert.deepEqual(JSON.parse(await readFile(out, "utf8")), promptReview);
+  assert.equal((await stat(out)).mode & 0o777, 0o600);
+  await assert.rejects(runVideoCli(argv, f.deps), { code: "PROMPT_REVIEW_EXISTS" });
+  assert.ok(!routePaths(f).includes("/trpc/video.production.shots"));
+  assert.ok(f.seen.filter(call => call.path === "/trpc/video.production.promptReview")
+    .every(call => call.input.projectId === started.projectId && call.input.runId === started.runId));
+  for (const reviewed of [{ ...promptReview, runId: "stale" }, { ...promptReview, reviewReport: "被替换" },
+    { ...promptReview, workspaceId: "another" }, { ...promptReview, renderAuthorized: true },
+    { ...promptReview, shots: [{ ...reviewedShots[0], fields: { changed: true } }] },
+  ]) {
+    const blocked = fixture({ status: null, reviewed });
+    assert.equal((await statusVideo(jobFile, blocked.deps)).phase, "status_unavailable");
+    await assert.rejects(runVideoCli(argv, blocked.deps), { code: "PROMPT_REVIEW_UNVERIFIED" });
+  }
+  assert.deepEqual(JSON.parse(await readFile(out, "utf8")), promptReview);
+
+  const wrongPurpose = fixture();
+  assert.equal((await startVideo(promptIntent, join(root, "old-service.json"), wrongPurpose.deps)).phase, "start_unknown");
 });
 
 test("CLI rejects unknown arguments, invalid file encoding and symlinked or shared job records", async t => {

@@ -7307,7 +7307,10 @@ export function installVendorQualityGateBridge(): () => void {
 }
 
 /** Rebuild every prompt from the Phase 3 policy immediately before the G6 report is generated. */
-export function installVendorNarrativePromptReviewBridge(options: { log?: (line: string) => void } = {}): () => void {
+export function installVendorNarrativePromptReviewBridge(options: {
+  log?: (line: string) => void;
+  capture?: (prompts: readonly FusionRecord[]) => void;
+} = {}): () => void {
   const log = options.log ?? (() => undefined);
   const repoRoot = videoRuntimeRoot(import.meta.url);
   const vendorRequire = createRequire(resolvePath(repoRoot, "package.json"));
@@ -7436,6 +7439,7 @@ export function installVendorNarrativePromptReviewBridge(options: { log?: (line:
         log("[vendor-compat] G6 提示词缺少 Phase3 冻结策略；不做未绑定重写，交由后续门禁失败关闭");
       }
     }
+    options.capture?.(prompts);
     return original.call(this, prompts);
   };
   return () => {

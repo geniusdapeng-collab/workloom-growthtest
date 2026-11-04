@@ -52,6 +52,7 @@ import { sourceBoundMarketingAssemblyRaw, verifiedMarketingDossierInput } from "
 interface StudioBridgeScope {
   log: (line: string) => void;
   onDurationEvent: (event: DurationProjectionEvent) => void;
+  onPromptReview?: (prompts: readonly Record<string, unknown>[]) => void;
 }
 const studioBridgeScopes = new AsyncLocalStorage<StudioBridgeScope>();
 const logFromBridge = (line: string): void => { studioBridgeScopes.getStore()?.log(line); };
@@ -117,6 +118,8 @@ export interface StudioConfig {
   workDir: string;
   onApproval: ApprovalCallback;
   onEvent?: EventSink;
+  /** Capture the current native rows after normalization, immediately before G6 sees them. */
+  onPromptReview?: (prompts: readonly Record<string, unknown>[]) => void;
   /** 总截止（毫秒），默认 1 小时，与 vendor 默认一致 */
   totalDeadlineMs?: number;
   llmTimeoutMs?: number;
@@ -180,7 +183,7 @@ export function sanitizeGateContent(gate: string, content: string): string {
   if (gate !== "G2_THEME") return content;
   return content
     .replace(
-      /(?:\[默认模特锚点\]\s*)?id=[^;\n]+;[\s\S]{0,1800}?name=[^;\n]+;[\s\S]{0,1800}?authorization=[^\n]*/gu,
+      /(?:\[默认模特锚点\]\s*)?id=[^;；\n]+[;；][\s\S]{0,1800}?name=[^;；\n]+[;；][\s\S]{0,1800}?authorization=[^\n]*/gu,
       "\n",
     )
     .replace(/^\s*(?:id|name|portraitRef|authorization)=[^\n]*$/gmu, "")
@@ -247,7 +250,15 @@ export function attachDefaultCharacterAnchor(
   const existing = Array.isArray(metadata.characters) ? metadata.characters : [];
   const explicitlyUsesDefault = /(?:使用|采用|启用|使用系统|使用仓库)?\s*(?:内置)?默认模特/u.test(intent)
     && !/(?:不使用|不要|无需|禁止|拒绝)\s*(?:内置)?默认模特/u.test(intent);
-  if (existing.length > 0 || !explicitlyUsesDefault) {
+  const normalized = intent.normalize("NFKC");
+  const excluded = (index: number): boolean =>
+    /(?:不使用|不用|不采用|不指定|不要(?:使用)?|无需(?:使用)?|禁止(?:使用)?|拒绝(?:使用)?)\s*(?:(?:仓内|仓库中|系统|内置)\s*)*$/u
+      .test(normalized.slice(0, index));
+  const ordinalMentions = [...normalized.matchAll(/(?:第\s*)?([0-9]+|[零一二两三四五六七八九十]+)\s*号\s*模特/gu)];
+  const selectsOne = (value: string): boolean => value === "1" || value === "一";
+  const selectedOrdinals = ordinalMentions.filter(match => !excluded(match.index)).map(match => match[1]!);
+  const explicitlyUsesOne = selectedOrdinals.some(selectsOne);
+  if (!explicitlyUsesOne && (existing.length > 0 || !explicitlyUsesDefault)) {
     return { intent, metadata };
   }
   try {
@@ -256,10 +267,22 @@ export function attachDefaultCharacterAnchor(
     const registryPath = path.join(charactersRoot, "registry.json");
     const registry = JSON.parse(readFileSync(registryPath, "utf8")) as {
       defaultModel?: string;
-      models?: Array<{ id?: string; name?: string; aliases?: string[]; archive?: string; authorization?: string }>;
+      models?: Array<{ ordinal?: number; id?: string; name?: string; aliases?: string[]; archive?: string; authorization?: string }>;
     };
-    const model = registry.models?.find((item) => item.id === registry.defaultModel);
-    if (!model?.id || !model.name || !model.archive) return { intent, metadata };
+    const model = registry.models?.find((item) => explicitlyUsesOne ? item.ordinal === 1 : item.id === registry.defaultModel);
+    if (!model?.id || !model.name || !model.archive) {
+      if (explicitlyUsesOne) throw new Error("注册表缺少有效的 1 号模特");
+      return { intent, metadata };
+    }
+    const namedIds = new Set([...normalized.matchAll(/\b[a-z\d]+(?:-[a-z\d]+)+\b/gi)]
+      .filter(match => !excluded(match.index)).map(match => match[0].toLowerCase()));
+    const alternativeId = registry.models?.some(item => item.id && item.id !== model.id && namedIds.has(item.id));
+    const alternativeOrdinal = selectedOrdinals.some(value => (selectsOne(value) ? 1 : Number(value)) !== model.ordinal);
+    const conflictingNegation = explicitlyUsesOne && ordinalMentions.some(match => selectsOne(match[1]!) && excluded(match.index));
+    const selectedId = typeof metadata.defaultCharacterId === "string" ? metadata.defaultCharacterId.trim() : "";
+    if (alternativeId || alternativeOrdinal || conflictingNegation || selectedId && selectedId !== model.id) {
+      throw new Error("BUILTIN_CHARACTER_SELECTION_CONFLICT：同一作业选定了相互冲突的内置角色");
+    }
     const archive = path.resolve(repoRoot, model.archive);
     const profilePath = path.join(archive, "profile.json");
     const profile = JSON.parse(readFileSync(profilePath, "utf8")) as {
@@ -281,6 +304,13 @@ export function attachDefaultCharacterAnchor(
     const portraitAbs = path.join(portraitDir, frontPortrait);
     if (!existsSync(portraitAbs)) throw new Error(`默认模特 front 定妆照不存在：${portraitAbs}`);
     const portraitRef = path.relative(repoRoot, portraitAbs).split(path.sep).join("/");
+    const current = existing[0] as Record<string, unknown> | undefined;
+    if (existing.length > 0 && (existing.length !== 1 || current?.id !== model.id
+      || current.name !== undefined && ![profile.name, ...(model.aliases ?? [])].includes(String(current.name))
+      || current.archive !== undefined && current.archive !== model.archive
+      || current.portraitRef !== undefined && current.portraitRef !== portraitRef)) {
+      throw new Error("BUILTIN_CHARACTER_SELECTION_CONFLICT：已指定的角色或定妆照与本次内置选角不一致");
+    }
     const authorization = profile.authorization?.status ?? model.authorization ?? "unknown";
     return {
       intent: `${intent}\n[默认模特锚点] id=${model.id}；name=${profile.name}；portraitRef=${portraitRef}；authorization=${authorization}`,
@@ -288,6 +318,7 @@ export function attachDefaultCharacterAnchor(
         ...metadata,
         defaultCharacterId: model.id,
         characters: [{
+          ...current,
           id: model.id,
           name: profile.name,
           aliases: model.aliases ?? [],
@@ -411,6 +442,7 @@ export class VideoStudio {
     let lastProjectedTarget: number | null = null;
     const bridgeScope: StudioBridgeScope = {
       log,
+      onPromptReview: cfg.onPromptReview,
       onDurationEvent: (event) => {
         if (typeof event.targetSeconds === "number" && event.targetSeconds > 0) {
           lastProjectedTarget = event.targetSeconds;
@@ -469,7 +501,10 @@ export class VideoStudio {
          */
         keep(installSharedBridge("vendor-prompt-rebuild", () => installVendorPromptRebuildBridge({ log: logFromBridge })));
         /** 后续字段质检/标题/导演增强会再改 prompt；G6 前必须重新按冻结策略投影。 */
-        keep(installSharedBridge("vendor-narrative-prompt-review", () => installVendorNarrativePromptReviewBridge({ log: logFromBridge })));
+        keep(installSharedBridge("vendor-narrative-prompt-review", () => installVendorNarrativePromptReviewBridge({
+          log: logFromBridge,
+          capture: (prompts) => studioBridgeScopes.getStore()?.onPromptReview?.(prompts),
+        })));
         /** G7 消费完整三件套、摘要、时间轴和真实有效处理时间，不接受截断摘要。 */
         keep(installSharedBridge("vendor-preproduction-review", () => installVendorPreproductionReviewBridge({ log: logFromBridge })));
         /** 非数值的 unverified 验收口径不得被算成 NaN 并让全片质检假红。 */

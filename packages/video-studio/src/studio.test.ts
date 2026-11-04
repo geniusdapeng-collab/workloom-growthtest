@@ -110,6 +110,27 @@ describe("gates 映射", () => {
     expect(attachDefaultCharacterAnchor(intent, {})).toEqual({ intent, metadata: {} });
   });
 
+  it.each(["以仓库中1号模特作为主角", "直接使用 1 号模特的定妆照", "用一号模特当主角", "使用１号模特"])("原话 %s 选中注册的 1 号和当前定妆照", (intent) => {
+    const anchored = attachDefaultCharacterAnchor(intent, {});
+    expect(anchored.intent.startsWith(`${intent}\n`)).toBe(true);
+    expect(anchored.metadata).toMatchObject({ defaultCharacterId: "chen-zhuo",
+      characters: [{ id: "chen-zhuo", portraitRef: expect.stringContaining("/portraits/v3/") }] });
+  });
+
+  it("拒绝把有冲突的编号或已有角色默认为 1 号", () => {
+    for (const [intent, metadata] of [
+      ["使用1号模特和2号模特", {}],
+      ["使用1号模特和 lin-yu-an", {}],
+      ["使用1号模特", { defaultCharacterId: "lin-yu-an" }],
+      ["使用1号模特", { characters: [{ id: "lin-yu-an" }] }],
+    ] as const) expect(() => attachDefaultCharacterAnchor(intent, metadata)).toThrow("BUILTIN_CHARACTER_SELECTION_CONFLICT");
+    for (const intent of ["不要使用1号模特", "只用2号模特", "本次不要第 1 号模特"]) {
+      expect(attachDefaultCharacterAnchor(intent, {})).toEqual({ intent, metadata: {} });
+    }
+    const existing = { characters: [{ id: "custom-character" }] };
+    expect(attachDefaultCharacterAnchor("使用内置默认模特", existing)).toEqual({ intent: "使用内置默认模特", metadata: existing });
+  });
+
   it("vendor 确认门 type 映射到业务门", () => {
     expect(resolveGate("creative-theme")).toBe("G2_THEME");
     expect(resolveGate("prd")).toBe("G4_PRD");
@@ -143,6 +164,14 @@ describe("gates 映射", () => {
     expect(sanitized).not.toContain("ized");
     expect(sanitized).not.toContain("请确认以上创意主题");
     expect(sanitized).not.toContain('回复 "确认"');
+  });
+
+  it("G2 创意主题正文移除实际内置选角附加的全角定妆照锚点", () => {
+    const intent = "使用 1 号模特制作封闭赛道短片。";
+    const anchored = attachDefaultCharacterAnchor(intent, {}).intent;
+    expect(anchored).toContain("；portraitRef=");
+    expect(sanitizeGateContent("G2_THEME", anchored)).toBe(intent);
+    expect(sanitizeGateContent("G6_PROMPT", anchored)).toBe(anchored);
   });
 
   it("作品级时长检查继承实际平台档，不把抖音片误判成默认电影档", () => {

@@ -140,6 +140,41 @@ describe("人工恢复共用运行锁", () => {
     expect(startRun).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["prompt_review", "failed", "GATE_REJECTED", true],
+    ["preproduction", "failed", "GATE_REJECTED", false],
+    ["prompt_review", "interrupted", "LLM_TIMEOUT", false],
+    [undefined, "failed", "GATE_REJECTED", false],
+  ] as const)("提示词项目从 %s 恢复仅接受明确已知失败", async (fromStage, status, errorClass, allowed) => {
+    const projectId = "VID-1";
+    const createdAt = "2026-09-26T00:00:00.000Z";
+    db.query.mockImplementation(async (sql: string) => {
+      if (sql.includes("pg_try_advisory_xact_lock")) return { rows: [{ ok: true }], rowCount: 1 };
+      if (sql.includes("AS prompt_only")) return { rows: [{ prompt_only: true }], rowCount: 1 };
+      if (sql.startsWith("SELECT title, kind")) return { rows: [{ kind: "narrative", created_at: createdAt }], rowCount: 1 };
+      if (sql.startsWith("SELECT stage_id AS")) return { rows: [{ stageId: "prompt_review", attempt: 1, status, errorClass }], rowCount: 1 };
+      if (sql.startsWith("SELECT attempt, input_ref")) return { rows: [{ attempt: 1, status, error_class: errorClass,
+        input_ref: "stages/prompt_review/attempt-1.input.json" }], rowCount: 1 };
+      return { rows: [], rowCount: 0 };
+    });
+    vi.mocked(ArchiveStore.prototype.readJson).mockImplementation(async <T>(rel: string): Promise<T | null> =>
+      rel === "stages/prompt_review/attempt-1.input.json" ? { input: { resumeInput: {
+        schemaVersion: "workloom.studio-resume-input/v1", ...scope, projectId, projectCreatedAt: createdAt,
+        intent: "用户原话与既有结构约束", rawIntent: "用户原话", metadata: {}, isMarketing: false, requiresDelegation: false,
+        scenePolicyDecision: { id: null, reason: "未选择", evidence: [], version: null, sourceSha256: null },
+        scenePolicyInput: null, platformId: "douyin", purpose: "prompt-review", durationSec: 30,
+      } } } as T : null);
+    const startRun = vi.fn().mockResolvedValue("RUN-prompt-resumed");
+    const result = await resumeProject(scope, { projectId, fromStage, startRun, actor: { id: "MEM-1", type: "human" } });
+    if (allowed) {
+      expect(result).toMatchObject({ kind: "resumed", stage: "prompt_review", runId: "RUN-prompt-resumed" });
+      expect(startRun).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ purpose: "prompt-review", durationSec: 30, rawIntent: "用户原话" }));
+    } else {
+      expect(result).toMatchObject({ kind: "noaction", stage: "prompt_review" });
+      expect(startRun).not.toHaveBeenCalled();
+    }
+  });
+
   it("异常锁回执不是 busy，更不能启动；回滚失败销毁连接", async () => {
     db.query.mockImplementation(async (sql: string) => {
       if (sql === "ROLLBACK") throw new Error("rollback failed");

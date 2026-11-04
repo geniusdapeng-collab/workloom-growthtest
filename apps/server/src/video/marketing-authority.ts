@@ -12,6 +12,7 @@ import { canonicalRenderJson, renderSha256 } from "./gen/compiled-request.js";
 import { SubmissionError } from "./gen/submission-ledger.js";
 
 type RecordValue = Record<string, unknown>;
+type MarketingStageId = "preproduction" | "prompt_review";
 export interface MarketingScope { tenantId: string; workspaceId: string; projectId: string; runId: string; attempt: number }
 interface ArchivedSource extends Omit<SourceSnapshot, "text"> { rawRef: string; textRef: string }
 interface StageFactsReport {
@@ -29,7 +30,7 @@ export interface MarketingFactsBundle {
 }
 export interface PreparedMarketingFacts {
   bundle: MarketingFactsBundle; g1Content: string; raw: Record<IntelStage, RecordValue>; storeRoot: string;
-  root: string; prefix: string; specSourceUrls: Record<string, string>;
+  root: string; prefix: string; stageId: MarketingStageId; specSourceUrls: Record<string, string>;
 }
 interface DossierEngine {
   plan(input: RecordValue): { trace_id: string; plans: Record<IntelStage, DataMiningStagePlan> };
@@ -45,6 +46,11 @@ function object(value: unknown, name: string): RecordValue {
 function component(value: string): string {
   if (!value || value === "." || value === ".." || /[/\\\0]/.test(value)) fail("MARKETING_SCOPE_INVALID", "来源作用域标识非法");
   return value;
+}
+function marketingPrefix(stageId: MarketingStageId, attempt: number): string {
+  if (stageId !== "preproduction" && stageId !== "prompt_review") fail("MARKETING_PATH_INVALID", "营销证据阶段非法");
+  if (!Number.isInteger(attempt) || attempt < 1) fail("MARKETING_SCOPE_INVALID", "来源执行编号非法");
+  return `stages/${stageId}/attempt-${attempt}.marketing`;
 }
 function accepted(verdict: ProducerVerdict | undefined, file: string, hash: string): boolean {
   return Boolean(verdict?.status === "passed" && verdict.approved === true && verdict.via === "llm" && verdict.degraded === false
@@ -101,6 +107,7 @@ const extractionContract = [
 
 export async function prepareMarketingFacts(input: {
   scope: MarketingScope; root: string; metadata: RecordValue; intent: string; llm: ExecutorLlm; env?: NodeJS.ProcessEnv;
+  stageId?: MarketingStageId;
   dependencies?: {
     search?: SearchFn;
     /** 复用 CLI 预置的真实检索缓存；A1 有命中时其它查询不会继续轰击线上引擎。 */
@@ -113,8 +120,8 @@ export async function prepareMarketingFacts(input: {
   const env = input.env ?? process.env;
   if (env.VM_DATA_MINING === "0" || env.VM_DATA_MINING_MODE === "spec") fail("MARKETING_SOURCE_REQUIRED", "正式营销不支持跳过来源采集或用任务书代替事实证据");
   const scope = { ...input.scope }; Object.values({ ...scope, attempt: String(scope.attempt) }).forEach(component);
-  if (!Number.isInteger(scope.attempt) || scope.attempt < 1) fail("MARKETING_SCOPE_INVALID", "来源执行编号非法");
-  const root = await realpath(input.root), prefix = `stages/preproduction/attempt-${scope.attempt}.marketing`;
+  const stageId = input.stageId ?? "preproduction";
+  const root = await realpath(input.root), prefix = marketingPrefix(stageId, scope.attempt);
   const storeRoot = path.join(root, `${prefix}-dossier`), product = productInput(input.metadata), collector = engine(storeRoot);
   const plan = collector.plan(product);
   const reports: StageFactsReport[] = [], sources: ArchivedSource[] = [];
@@ -224,7 +231,7 @@ export async function prepareMarketingFacts(input: {
   const g1Content = canonicalRenderJson({ facts: bundle, requestedIntent: input.intent, requestedMetadata: input.metadata,
     instruction: "用户意图与Brief仅是需求，事实只能来自已核实claims；下游创意必须遵守restrictions" });
   bundle.g1ContentSha256 = renderSha256(g1Content);
-  return { bundle, g1Content, raw: structuredClone(raw), storeRoot, root, prefix, specSourceUrls };
+  return { bundle, g1Content, raw: structuredClone(raw), storeRoot, root, prefix, stageId, specSourceUrls };
 }
 
 export async function finalizeMarketingFacts(prepared: PreparedMarketingFacts, shots: Array<{ shotId: string; prompt: string; fields: unknown }>, env: NodeJS.ProcessEnv = process.env): Promise<{ ref: string; sha256: string }> {
@@ -250,15 +257,17 @@ export async function finalizeMarketingFacts(prepared: PreparedMarketingFacts, s
       ref: evidence.ref, sha256: evidence.sha256, verdict });
   }
   const saved = await writeBound(prepared.root, `${prepared.prefix}-facts.json`, canonicalRenderJson(prepared.bundle));
-  await verifyMarketingFacts({ root: prepared.root, ref: saved.ref, sha256: saved.sha256, scope: prepared.bundle.scope, shots });
+  await verifyMarketingFacts({ root: prepared.root, ref: saved.ref, sha256: saved.sha256, scope: prepared.bundle.scope,
+    stageId: prepared.stageId, shots });
   return { ref: saved.ref, sha256: saved.sha256 };
 }
 
 export async function verifyMarketingFacts(input: {
   root: string; ref: string; sha256: string; scope: MarketingScope;
+  stageId?: MarketingStageId;
   shots: Array<{ shotId: string; prompt: string; fields: unknown }>;
 }): Promise<MarketingFactsBundle> {
-  const expectedPrefix = `stages/preproduction/attempt-${input.scope.attempt}.marketing`;
+  const expectedPrefix = marketingPrefix(input.stageId ?? "preproduction", input.scope.attempt);
   if (input.ref !== `${expectedPrefix}-facts.json`) fail("MARKETING_PATH_INVALID", "营销事实包不是当前执行产物");
   const bundle = JSON.parse((await readBound(input.root, input.ref, input.sha256)).toString("utf8")) as MarketingFactsBundle;
   if (bundle.schemaVersion !== "workloom.marketing-facts/v1" || bundle.issuer !== "workloom.marketing-authority" || bundle.policyVersion !== "source-claims/v1"

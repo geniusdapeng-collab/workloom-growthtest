@@ -2,13 +2,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TrpcContext } from "../trpc/context.js";
 
-const d = vi.hoisted(() => ({ query: vi.fn(), start: vi.fn(), existing: vi.fn(), route: vi.fn(), writable: true }));
+const d = vi.hoisted(() => ({ query: vi.fn(), start: vi.fn(), existing: vi.fn(), route: vi.fn(), promptProject: vi.fn(), writable: true }));
 vi.mock("@workloom/db", () => ({ getAppPool: () => ({ connect: async () => ({ query: d.query, release: vi.fn() }) }), getGatewayPool: () => ({}) }));
 vi.mock("../service/access-authority.js", async original => ({ ...await original<Record<string, unknown>>(),
   currentMemberAuthority: async (identity: unknown) => ({ identity, permissions: {} }),
   memberAccessGrants: () => ({ actionPermissions: d.writable ? ["workspace.write"] : [] }),
 }));
 vi.mock("./studio-worker.js", async original => ({ ...await original<Record<string, unknown>>(), startRun: d.existing, startVideoProjectRun: d.start }));
+vi.mock("./prompt-review-authority.js", async original => ({ ...await original<Record<string, unknown>>(), isStudioPromptReviewProject: d.promptProject }));
 vi.mock("../service/llm.js", async original => ({ ...await original<Record<string, unknown>>(), routedLlmCall: () => undefined }));
 vi.mock("@hyperreality/video-studio", async original => ({ ...await original<Record<string, unknown>>(), routeVideoPipeline: d.route }));
 import { videoRouter } from "./router.js";
@@ -23,6 +24,7 @@ beforeEach(() => {
   d.route.mockResolvedValue({ route: "narrative", signals: [], via: "rules" });
   d.start.mockResolvedValue({ projectId: "VID-test", runId: "RUN-test" });
   d.existing.mockReturnValue("RUN-existing");
+  d.promptProject.mockResolvedValue(false);
 });
 afterEach(() => vi.unstubAllEnvs());
 
@@ -139,6 +141,28 @@ describe("公共产品参考图路径边界", () => {
 });
 
 describe("正式一句话生产入口", () => {
+  it("提示词评审用途与用户原话和时长一起交给原生工位", async () => {
+    const input = { officialIntent: true, intent: "制作 30 秒营销短片", purpose: "prompt-review" } as const;
+    await expect(caller().studio.start(input)).resolves.toMatchObject({ purpose: input.purpose, durationSec: 30 });
+    expect(d.start).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: identity.workspaceId }),
+      expect.objectContaining({ rawIntent: input.intent, purpose: input.purpose, durationSec: 30, creativeMode: "manual" }));
+  });
+
+  it("缺失目标时长的提示词评审在派单前拒绝", async () => {
+    await expect(caller().studio.start({ officialIntent: true, intent: "营销短片", purpose: "prompt-review" }))
+      .rejects.toMatchObject({ code: "BAD_REQUEST", message: expect.stringContaining("PROMPT_TARGET_REQUIRED") });
+    expect(d.route).not.toHaveBeenCalled();
+  });
+
+  it("普通补跑不可把已立项的提示词评审项目切为完整制作", async () => {
+    d.promptProject.mockResolvedValueOnce(true);
+    await expect(caller().studio.start({ intent: "继续制作", projectId: "VID-prompt" }))
+      .rejects.toMatchObject({ code: "PRECONDITION_FAILED", message: expect.stringContaining("PROMPT_REVIEW_ONLY") });
+    expect(d.promptProject).toHaveBeenCalledWith(expect.objectContaining({ projectId: "VID-prompt", scope: expect.objectContaining({ workspaceId: identity.workspaceId }) }));
+    expect(d.route).not.toHaveBeenCalled();
+    expect(d.existing).not.toHaveBeenCalled();
+  });
+
   it.each([["叙事短片", "narrative"], ["宣传测试商品", "marketing"]] as const)("由系统分流 %s 至 %s，原话与时长随同一正式项目入档", async (intent, route) => {
     const raw = `制作 20 秒${intent}，用于抖音`;
     d.route.mockResolvedValue({ route, signals: [], via: "rules" });

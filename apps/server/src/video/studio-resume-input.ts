@@ -17,6 +17,8 @@ export interface StudioResumeInput extends Scope {
   scenePolicyDecision: ScenePolicyRouteDecision;
   scenePolicyInput: Record<string, unknown> | null;
   platformId: string;
+  purpose?: "prompt-review";
+  durationSec?: number;
 }
 
 const record = (value: unknown): Record<string, unknown> | null =>
@@ -25,7 +27,8 @@ const record = (value: unknown): Record<string, unknown> | null =>
 /** 只保存客户输入与受控选型，不把旧run的委托或已解析本机图片当作下一次运行的授权。 */
 export function captureStudioResumeInput(
   scope: Scope,
-  input: { projectId: string; intent: string; rawIntent?: string; metadata?: Record<string, unknown>; isMarketing?: boolean },
+  input: { projectId: string; intent: string; rawIntent?: string; metadata?: Record<string, unknown>; isMarketing?: boolean;
+    purpose?: "prompt-review"; durationSec?: number },
   context: { projectCreatedAt: string | null; requiresDelegation: boolean; scenePolicy: SceneSelection; platformId: string },
 ): StudioResumeInput {
   return JSON.parse(JSON.stringify({
@@ -41,6 +44,7 @@ export function captureStudioResumeInput(
     scenePolicyDecision: context.scenePolicy.decision,
     scenePolicyInput: record(context.scenePolicy.metadata.scenePolicy),
     platformId: context.platformId,
+    ...(input.purpose ? { purpose: input.purpose, durationSec: input.durationSec } : {}),
   })) as StudioResumeInput;
 }
 
@@ -51,6 +55,7 @@ export function restoreStudioResumeInput(
   intentOverride?: string,
 ): { ok: false; reason: string } | { ok: true; input: {
   projectId: string; intent: string; rawIntent: string; metadata: Record<string, unknown>; isMarketing: boolean;
+  purpose?: "prompt-review"; durationSec?: number;
   selectedScenePolicy: SceneSelection; selectedPlatform: ReturnType<typeof resolvePlatformForIntent>;
 } } {
   const saved = record(value);
@@ -75,6 +80,12 @@ export function restoreStudioResumeInput(
     || typeof saved.platformId !== "string") {
     return { ok: false, reason: "恢复输入不完整，原始约束与管线类型尚不可核实。" };
   }
+  const duration = saved.durationSec;
+  if ((saved.purpose !== undefined && saved.purpose !== "prompt-review")
+    || (saved.purpose === "prompt-review" && (typeof duration !== "number" || !Number.isSafeInteger(duration) || duration < 1 || duration > 300
+      || (intentOverride !== undefined && intentOverride !== saved.rawIntent)))) {
+    return { ok: false, reason: "提示词审核工作单的用途、原始需求或目标时长不一致。" };
+  }
   const scenePolicy = resolveScenePolicyForIntent("", decision.id === null ? undefined : {
     scenePolicy: record(saved.scenePolicyInput) ?? { id: decision.id },
   });
@@ -84,7 +95,7 @@ export function restoreStudioResumeInput(
   }
   const platform = resolvePlatformForIntent("", { platform: saved.platformId });
   if (platform.decision.id !== saved.platformId) return { ok: false, reason: "恢复输入绑定的平台不再可解析。" };
-  const intent = intentOverride ?? saved.intent;
+  const intent = saved.purpose === "prompt-review" ? saved.intent : intentOverride ?? saved.intent;
   if (!intent.trim()) return { ok: false, reason: "恢复需求为空，拒绝启动。" };
   return { ok: true, input: {
     projectId: project.projectId,
@@ -92,6 +103,7 @@ export function restoreStudioResumeInput(
     rawIntent: intentOverride ?? saved.rawIntent,
     metadata,
     isMarketing: saved.isMarketing,
+    ...(saved.purpose === "prompt-review" ? { purpose: "prompt-review", durationSec: duration as number } : {}),
     selectedScenePolicy: { ...scenePolicy, decision: decision as unknown as ScenePolicyRouteDecision },
     selectedPlatform: platform,
   } };

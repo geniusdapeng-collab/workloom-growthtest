@@ -62,6 +62,11 @@ import { upsertProductProfileFromDossier } from "./media/products.js";
 import { appendScenePolicyGuidance, resolveScenePolicyForIntent } from "./scene-policy-routing.js";
 import { appendPlatformGuidance, resolvePlatformForIntent } from "./platform-routing.js";
 import { captureStudioResumeInput } from "./studio-resume-input.js";
+import {
+  assertStudioPromptReviewSigning, assertStudioPromptReviewText, captureStudioPromptReviewShots,
+  issueStudioPromptReview, studioPromptReviewRef,
+  type StudioPromptReview, type StudioPromptReviewShot,
+} from "./prompt-review-authority.js";
 import { createDirectorGrantOnClient, verifyDirectorGrant, readExplicitDirectorPreferences } from "./director-store.js";
 import { inheritedDirectorLease } from "./director-jobs.js";
 import {
@@ -100,6 +105,7 @@ const TOTAL_DEADLINE_MS = Number(process.env.VM_TOTAL_DEADLINE_MS ?? 3_600_000);
  * G8/G9/G10/G11/G12/G15 保留原围栏质量级别，由系统自动审批替代人类等待。
  */
 const PRODUCER_MODE: ProducerMode = producerModeFromEnv();
+const PROMPT_REVIEW_STOP = "PROMPT_REVIEW_SCOPE_REACHED";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 /** 仓库根（apps/server/src/video → 上溯四级）：参考图相对路径按此解析 */
@@ -333,7 +339,7 @@ export function summarizeWorkspaceRuns(
 
 export class StudioWorkerError extends Error {
   constructor(
-    public readonly code: "LLM_MISSING" | "ARCHIVE_REQUIRED" | "IDENTITY_ASSET_REQUIRED" | "METADATA_RESERVED" | "DELEGATION_REQUIRED",
+    public readonly code: "LLM_MISSING" | "ARCHIVE_REQUIRED" | "IDENTITY_ASSET_REQUIRED" | "METADATA_RESERVED" | "DELEGATION_REQUIRED" | "PROMPT_REVIEW_SCOPE_INVALID",
     message: string,
   ) {
     super(message);
@@ -526,6 +532,8 @@ function portraitConfig(metadata?: Record<string, unknown>, directorIdentityImag
  * @throws StudioWorkerError LLM_MISSING —— LLM_* 四环境变量未配齐（禁止静默降级）
  */
 type StudioRunInput = RunInput & {
+  purpose?: "prompt-review";
+  durationSec?: number;
   /** 原始客户需求；pipelineIntent 可能清理过路由语句并追加了系统口径。 */
   rawIntent?: string;
   /** 同一入口已经做过选型时复用其受控结果，避免二次选型改写取证依据。 */
@@ -555,10 +563,12 @@ export function startDelegatedRun(scope: Scope, input: StudioRunInput, signal: A
 function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActive: () => void; signal: AbortSignal }) {
   assertPublicStudioMetadata(input.metadata);
   const directorMode=Boolean(input.creativeDelegation);
+  const promptReview = input.purpose === "prompt-review";
+  if (promptReview) requirePromptReviewScope(input.durationSec, directorMode);
   if (input.directorIdentityImages !== undefined && !directorMode) {
     throw new StudioWorkerError("DELEGATION_REQUIRED", "内部图片参数必须绑定当前项目真实导演委托");
   }
-  const effectiveProducerMode:ProducerMode=videoAutoApprovalEnabled()
+  const effectiveProducerMode:ProducerMode=promptReview || videoAutoApprovalEnabled()
     ? "review"
     : (directorMode?"review":PRODUCER_MODE);
   const directorProfile=directorMode?buildDirectorDefaults({intent:input.rawIntent??input.intent,
@@ -763,9 +773,21 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
     });
   };
 
+  let promptReviewShots: StudioPromptReviewShot[] = [];
+  let promptReviewReport: { text: string; model: string } | null = null;
+  let promptReviewStopped = false;
   const decideApproval: ApprovalCallback = async (req) => {
     // ApprovalCallback.gate 声明为 string，但适配层（studio.ts）保证已 resolveGate 过，运行时为 GateKey
     const gate = req.gate as GateKey;
+    if (promptReview && gate === "G5_PORTRAIT") {
+      return { approved: false, reason: "PROMPT_REVIEW_PORTRAIT_DEFERRED", suggestions: [] };
+    }
+    if (promptReview && gate === "G7_FINAL") {
+      promptReviewStopped = promptReviewReport !== null;
+      return { approved: false, reason: promptReviewStopped ? PROMPT_REVIEW_STOP : "PROMPT_REVIEW_G6_REQUIRED", suggestions: [] };
+    }
+    const scopedPromptGate = promptReview && gate === "G6_PROMPT";
+    if (scopedPromptGate) assertStudioPromptReviewText(req.contentMd ?? "", promptReviewShots);
     const gateObj = gateObjectOf(gate, req.vendorType);
     const objectId = gate === "G7_FINAL" ? input.projectId : `${input.projectId}:${gate.toLowerCase()}`;
     /**
@@ -785,7 +807,8 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
          * `reviewStage` 读不到文件 → 监制只看到 rubric 里的 600 字摘录 → 文档后半段
          * （需求契约/结论摘要等）等于不存在，连续三轮把 G3 判成"契约缺失"。
          */
-        const artifact = writeGateArtifact(runWorkDir, path.join(input.projectId, `attempt-${stageRef.attempt}`), gate, req.contentMd ?? "");
+        const artifact = writeGateArtifact(runWorkDir, path.join(input.projectId,
+          `${promptReview ? "prompt-review" : "attempt"}-${stageRef.attempt}`), gate, req.contentMd ?? "");
         producerVerdict = await reviewStage({
           stage: producerStage,
           projectId: input.projectId,
@@ -793,9 +816,13 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
           deterministic: gateDeterministicChecks(gate, req.contentMd ?? ""),
           rubric: [
             ...((GATE_RUBRIC[gate] ?? []) as string[]),
+            ...(scopedPromptGate ? ["以 context.request 为本次创作合同，核对每个必需剧情动作、顺序、连续性、角色身份、声音与平台时长；任何明确要求被遗漏、替换或互相冲突须拒绝。",
+              "当前只审完整提示词的文字和创作内容。G5 实际参考图、G7 整体预生产和付费渲染均未批准，不把文字中的引用描述当成已核实的媒体授权。"] : []),
             `门内容全长 ${artifact.chars} 字，已随附件送审；摘录（供定位，不是全文）：${(req.contentMd ?? "").slice(0, 600)}`
           ],
-          context: { gate, vendorType: req.vendorType, runId: entry.runId, contentChars: (req.contentMd ?? "").length },
+          context: { gate, vendorType: req.vendorType, runId: entry.runId, contentChars: (req.contentMd ?? "").length,
+            ...(scopedPromptGate ? { request: input.rawIntent ?? input.intent, targetSeconds: input.durationSec,
+              platform: selectedPlatform.decision.id, purpose: "prompt-review" } : {}) },
           // 内部准备门默认 fail-closed：评审模型不可用即打回，不静默放行
           allowFallbackApprove: (process.env.HR_PRODUCER_FALLBACK_APPROVE ?? "0") === "1",
           log: (line) => console.log(line)
@@ -859,6 +886,11 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
         via: producerVerdict?.via ?? "auto", degraded: producerVerdict?.degraded ?? true,
         model: producerVerdict?.model ?? null, evidence: producerVerdict?.evidence ?? [],
         ...(producerVerdict?.status === "not_applicable" ? { basis: producerVerdict.reason } : {}) });
+      if (scopedPromptGate && producerVerdict?.approved === true && producerVerdict.status === "passed"
+        && producerVerdict.via === "llm" && producerVerdict.degraded === false && producerVerdict.model
+        && producerVerdict.evidence?.some(item => item.scope === "complete-text" && item.sha256 === renderSha256(req.contentMd ?? ""))) {
+        promptReviewReport = { text: req.contentMd ?? "", model: producerVerdict.model };
+      }
       if (effectiveProducerMode === "auto") {
         return { approved: true, reason: `auto-approved(${req.gate})`, suggestions: [] };
       }
@@ -1090,8 +1122,9 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
     onEvent,
     totalDeadlineMs: TOTAL_DEADLINE_MS,
     // 片型硬闸必须在 G8 之前审完整分镜，禁止 env 让 vendor 在审计前直接渲染。
-    deferRender: Boolean(delegated || selectedScenePolicy.policy) || (process.env.HR_DEFER_RENDER ?? "1") !== "0",
-    portraits: portraitConfig(runInput.metadata, directorMode ? input.directorIdentityImages : undefined),
+    deferRender: promptReview || Boolean(delegated || selectedScenePolicy.policy) || (process.env.HR_DEFER_RENDER ?? "1") !== "0",
+    portraits: promptReview ? { enabled: false } : portraitConfig(runInput.metadata, directorMode ? input.directorIdentityImages : undefined),
+    ...(promptReview ? { onPromptReview: (rows) => { promptReviewShots = captureStudioPromptReviewShots(rows); } } : {}),
     /** 营销路由 → 情报五站真跑（叙事路由不装配，vendor 也不会进情报层） */
     dataMining: input.isMarketing ? undefined : dataMiningConfigFor(runInput.metadata, llm, scope.workspaceId),
     log: (line) => console.log(line),
@@ -1125,7 +1158,7 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
       restoreRunLogs = teeRunLogs(input.projectId, runLogToken);
       console.log(`[studio-worker] run 日志开始落盘：${path.join(WORK_DIR, "logs", `${input.projectId}.log`)}`);
       await archive.ensure({ kind: projectMeta.kind, title: projectMeta.title, createdAt: projectMeta.createdAt });
-      studioShadow = await ignorePipelineShadow("studio-start", () => createShadowSession({
+      studioShadow = promptReview ? null : await ignorePipelineShadow("studio-start", () => createShadowSession({
         scope,
         projectId: input.projectId,
         planKey: pipelineKind === "marketing" ? "marketing-film" : "narrative-film",
@@ -1201,7 +1234,8 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
        * 制片档案口径（T-2026-0926-0001）：每次重跑 = 新 attempt（`claimRun` 原子递增），
        * 「第几次尝试、耗时、错误分类」全部落盘，历史不丢。
        */
-      const maxAttempts = Math.max(1, Number(process.env.VM_PRODUCER_RETRY ?? 0) + 1);
+      const maxAttempts = promptReview ? 1 : Math.max(1, Number(process.env.VM_PRODUCER_RETRY ?? 0) + 1);
+      let promptReviewReceipt: StudioPromptReview | null = null;
       const runOnce = async (): Promise<Awaited<ReturnType<VideoStudio["runPreproduction"]>>> => {
         checkDelegatedRun();
         const runnerStore = archive;
@@ -1209,7 +1243,7 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
         // confirmations 决定打回重试，stages.dataMining 决定商品档案投影；两者必须完整保留。
         let rawResult: Awaited<ReturnType<VideoStudio["runPreproduction"]>> | undefined;
         await runner.run(
-          "preproduction",
+          promptReview ? "prompt_review" : "preproduction",
           { intent: runInput.intent, isMarketing: input.isMarketing ?? false, pipelineKind, scenePolicy: selectedScenePolicy.decision,
             resumeInput: captureStudioResumeInput(scope, input, { projectCreatedAt: projectMeta?.createdAt ?? null,
               requiresDelegation: directorMode, scenePolicy: selectedScenePolicy, platformId: selectedPlatform.decision.id }) },
@@ -1236,7 +1270,8 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
             let g1Failure: Awaited<ReturnType<ApprovalCallback>> | undefined;
             if (input.isMarketing) {
               marketing = await prepareMarketingFacts({ scope: { ...scope, projectId: input.projectId, runId: entry.runId, attempt: ctx.attempt },
-                root: archive.root, metadata: input.metadata ?? {}, intent: input.intent, llm });
+                root: archive.root, metadata: input.metadata ?? {}, intent: input.intent, llm,
+                ...(promptReview ? { stageId: "prompt_review" as const } : {}) });
               const verdict = await onApproval({ runId: entry.runId, gate: "G1_DOSSIER", vendorType: "host-source-dossier",
                 title: "本次营销来源正文与逐主张事实审核", contentMd: marketing.g1Content });
               const proof = gateProofs.get("G1_DOSSIER");
@@ -1264,6 +1299,31 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
               : await withVendorEngineBridge(llm, () => withVendorPortraitBindingBridge(portraitBindingOptions, () => studio.runPreproduction(runInput)));
             checkDelegatedRun();
             completedVendorResult = r;
+            if (promptReview) {
+              rawResult = r;
+              const stop = (r.stages?.preproductionReview as { reason?: unknown } | undefined)?.reason;
+              const requiredGates = [...(input.isMarketing ? ["G1_DOSSIER"] : []), "G2_THEME", "G3_INSIGHT", "G4_PRD", "G6_PROMPT"];
+              const reviewed = requiredGates.every(key => {
+                const proof = gateProofs.get(key);
+                return proof?.approved === true && proof.status === "passed" && proof.via === "llm" && proof.degraded === false;
+              });
+              if (r.success || !promptReviewStopped || stop !== PROMPT_REVIEW_STOP || !promptReviewReport || !reviewed) {
+                const message = terminalFailureMessageOf(r, "本次执行未通过完整 G6 提示词审核");
+                return { output: { purpose: "prompt-review", state: "prompt_review_failed", renderAuthorized: false, failureMessage: message },
+                  outcome: { status: "failed" as const, errorClass: isProducerRejection(r) ? "GATE_REJECTED" : classifyError(new Error(message)), errorMsg: message } };
+              }
+              const marketingFacts = marketing ? await finalizeMarketingFacts(marketing, promptReviewShots) : null;
+              const receipt = await issueStudioPromptReview({ app: getAppPool(), scope, projectId: input.projectId,
+                runId: entry.runId, attempt: ctx.attempt, pipeline: pipelineKind, targetSeconds: input.durationSec!,
+                rawIntent: input.rawIntent ?? input.intent, reviewReport: promptReviewReport.text,
+                reviewModel: promptReviewReport.model, shots: promptReviewShots, marketingFacts });
+              const ref = studioPromptReviewRef(ctx.attempt);
+              const artifact = await ctx.writeArtifact(ref, receipt);
+              if (!artifact || artifact.truncated) throw new Error("PROMPT_REVIEW_UNVERIFIED: G6 提示词未完整归档");
+              promptReviewReceipt = receipt;
+              return { output: { purpose: "prompt-review", state: receipt.state, renderAuthorized: false,
+                promptReviewRef: ref, promptReviewSha256: artifact.sha256 } };
+            }
             if (r.success) {
               // vendor 真出图批量模式跳过的是生成前询问；服务必须在实际图片存在后完成 G5。
               const portraitVerdict = await onApproval({ runId: entry.runId, gate: "G5_PORTRAIT", vendorType: "portrait-generation",
@@ -1539,6 +1599,14 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
         console.log(`[studio-worker] AI 监制打回 → 自动重跑第 ${attempts}/${maxAttempts} 次（同一项目、同一门口径）`);
         result = await runOnce();
       }
+      if (promptReview) {
+        const receipt = promptReviewReceipt as StudioPromptReview | null;
+        entry.status = receipt ? "finished" : "failed";
+        entry.error = receipt ? null : terminalFailureMessageOf(result, entry.error);
+        entry.resultSummary = { purpose: "prompt-review", state: receipt?.state ?? "prompt_review_failed",
+          renderAuthorized: false, ...(receipt ? { promptShotCount: receipt.shots.length, plannedSeconds: receipt.plannedSeconds } : {}) };
+        return;
+      }
       entry.status = result.success ? "finished" : "failed";
       entry.error = result.success ? null : terminalFailureMessageOf(result, entry.error);
       /** 情报层产出摘要（逐环节审计要看得见"档案到底有没有装订出来"） */
@@ -1661,7 +1729,7 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
           await updateContextBundle(archive, {
             pipelineKind,
             threadId: projectMeta?.threadId ?? null,
-            failedStage: "preproduction",
+            failedStage: promptReview ? "prompt_review" : "preproduction",
             errorClass: classifyError(err),
             errorMsg: entry.error,
             decisions: decisionLog,
@@ -1704,6 +1772,8 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
 export interface StartVideoProjectInput {
   intent: string;
   rawIntent?: string;
+  purpose?: "prompt-review";
+  durationSec?: number;
   /** 分流器写入商品信息之前的客户 metadata，供片型选择只取客户来源证据。 */
   customerMetadata?: Record<string, unknown> | null;
   metadata?: Record<string, unknown>;
@@ -1717,6 +1787,13 @@ export interface StartVideoProjectInput {
   identityAssetRefs?:string[];
 }
 
+function requirePromptReviewScope(durationSec: number | undefined, directorMode: boolean): void {
+  if (directorMode || !Number.isSafeInteger(durationSec) || durationSec! < 1 || durationSec! > 300) {
+    throw new StudioWorkerError("PROMPT_REVIEW_SCOPE_INVALID", "提示词审核工作单须给出明确目标秒数并使用标准 Studio");
+  }
+  assertStudioPromptReviewSigning();
+}
+
 export async function startVideoProjectRun(
   scope: { tenantId: string; workspaceId: string },
   input: StartVideoProjectInput,
@@ -1724,6 +1801,7 @@ export async function startVideoProjectRun(
   assertPublicStudioMetadata(input.metadata);
   assertPublicStudioMetadata(input.customerMetadata);
   const directorMode=input.creativeMode!=="manual";
+  if (input.purpose === "prompt-review") requirePromptReviewScope(input.durationSec, directorMode);
   if(directorMode) {
     const readiness=buildDirectorDefaults({intent:input.rawIntent??input.intent,identityAssets:input.identityAssetRefs??[]});
     if(readiness.requiredInputs.length) throw new StudioWorkerError("IDENTITY_ASSET_REQUIRED","本人出镜需要已有本人素材；添加一次后可复用。");
@@ -1776,6 +1854,7 @@ export async function startVideoProjectRun(
           projectId, kind, intent: input.intent.slice(0, 500),
           scenePolicy: selectedScenePolicy.decision,
           platform: selectedPlatform.decision,
+          ...(input.purpose ? { purpose: input.purpose, durationSec: input.durationSec } : {}),
           ...(input.threadId ? { threadId: input.threadId } : {}),
         },
         basis: ["视频标准管线立项（§5：一部片子/一个营销 Campaign）"],
@@ -1804,6 +1883,7 @@ export async function startVideoProjectRun(
     rawIntent: input.rawIntent,
     selectedScenePolicy,
     selectedPlatform,
+    ...(input.purpose ? { purpose: input.purpose, durationSec: input.durationSec } : {}),
     ...(creativeDelegation?{creativeDelegation,allocatedRunId,deliveryTargetPlan}:{}),
   });
   return { projectId, runId };

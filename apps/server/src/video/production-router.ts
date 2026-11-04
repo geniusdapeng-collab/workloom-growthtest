@@ -4,6 +4,7 @@ import { TRPCError } from "@trpc/server";
 import { getAppPool } from "@workloom/db";
 import { protectedProcedure, router, scopeOf, writeProcedure } from "../trpc/context.js";
 import { listProductionOriginals, listProductionShots, qualifyProductionShot } from "./production-authority.js";
+import { readStudioPromptReview, StudioPromptReviewError } from "./prompt-review-authority.js";
 import { SubmissionError } from "./gen/submission-ledger.js";
 
 const params = z.object({
@@ -21,6 +22,16 @@ const params = z.object({
 }).strict();
 
 export const productionRouter = router({
+  promptReview: protectedProcedure.input(z.object({
+    projectId: z.string().min(1).max(200),
+    runId: z.string().min(1).max(200),
+  }).strict()).query(async ({ ctx, input }) => {
+    try { return await readStudioPromptReview({ app: getAppPool(), scope: scopeOf(ctx.identity), ...input }); }
+    catch (error) {
+      if (error instanceof StudioPromptReviewError) throw new TRPCError({ code: "PRECONDITION_FAILED", message: error.message, cause: error });
+      throw error;
+    }
+  }),
   shots: protectedProcedure.input(z.object({ projectId: z.string().min(1).max(200) }).strict()).query(async ({ ctx, input }) => {
     try { return await listProductionShots({ app: getAppPool(), scope: scopeOf(ctx.identity), projectId: input.projectId }); }
     catch (error) {
