@@ -5743,6 +5743,10 @@ export interface Phase3RepairInput {
   rows: unknown[];
   expectedIds: string[];
   repair: (shotId: string, index: number) => Promise<unknown>;
+  /** Additional authored-field requirements shared by loaded and retried rows. */
+  validateRow?: (row: FusionRecord, expectedId: string) => boolean;
+  /** Persist accepted raw progress before a later shot or final gate can fail. */
+  onRepaired?: (rows: FusionRecord[], shotId: string, index: number) => void | Promise<void>;
   /**
    * Last-resort recovery from the already validated Phase2 shot contract. This is
    * intentionally separate from an LLM retry so a provider returning empty fields
@@ -5765,7 +5769,8 @@ export async function repairPhase3FusionRows(input: Phase3RepairInput): Promise<
     const record = row as FusionRecord;
     const id = String(record.shotId ?? record.shot_id ?? "");
     return id === expectedId && !seen.has(id) && record.degraded !== true
-      && typeof record.prompt === "string" && record.prompt.trim().length > 0;
+      && typeof record.prompt === "string" && record.prompt.trim().length > 0
+      && (!input.validateRow || input.validateRow(record, expectedId));
   };
   for (let index = 0; index < input.expectedIds.length; index += 1) {
     const expectedId = input.expectedIds[index]!;
@@ -5785,10 +5790,11 @@ export async function repairPhase3FusionRows(input: Phase3RepairInput): Promise<
         if (repairError instanceof Error) {
           throw new Error(`PHASE3_FUSION_RETRY_UNVERIFIED：镜头 ${expectedId} 重试后仍未通过（${repairError.message}）`);
         }
-        throw new Error(`PHASE3_FUSION_RETRY_UNVERIFIED：镜头 ${expectedId} 重试后仍未通过（ID、prompt 或 degraded 状态无效）`);
+        throw new Error(`PHASE3_FUSION_RETRY_UNVERIFIED：镜头 ${expectedId} 重试后仍未通过（ID、prompt、degraded 或原生字段状态无效）`);
       }
       rows[index] = row;
       repaired.push(expectedId);
+      await input.onRepaired?.(rows.slice(0, input.expectedIds.length) as FusionRecord[], expectedId, index);
     }
     seen.add(expectedId);
   }
@@ -5853,8 +5859,7 @@ function recoverPhase3RowFromSource(shot: FusionRecord): FusionRecord {
   };
 }
 
-/** Commercial assembly may format native direction, but must not replace it with a global action position. */
-function marketingNativeShotField(shot: FusionRecord, key: string, ...aliases: string[]): string {
+function marketingNativeFieldText(shot: FusionRecord, key: string, ...aliases: string[]): string {
   const fields = recordValue(shot.fields);
   for (const name of [key, ...aliases]) {
     for (const value of [fields[name], shot[name]]) {
@@ -5862,6 +5867,25 @@ function marketingNativeShotField(shot: FusionRecord, key: string, ...aliases: s
       if (text) return text;
     }
   }
+  return "";
+}
+
+const MARKETING_NATIVE_FUSION_FIELDS = [
+  ["action"], ["scene", "sceneDescription"], ["costume"], ["makeup"], ["props"], ["timeline"],
+  ["composition"], ["lighting", "lightingString"], ["color_palette", "colorPalette"], ["transition"],
+  ["mood", "emotion"], ["camera_movement", "cameraMovement", "cameraString"], ["pacing"],
+  ["depth_of_field", "depthOfField"], ["audio"],
+] as const;
+
+function validMarketingNativeFusionRow(row: FusionRecord): boolean {
+  return !Object.hasOwn(row, "_workloomLocalRecovery")
+    && MARKETING_NATIVE_FUSION_FIELDS.every(([key, ...aliases]) => Boolean(marketingNativeFieldText(row, key, ...aliases)));
+}
+
+/** Commercial assembly may format native direction, but must not replace it with a global action position. */
+function marketingNativeShotField(shot: FusionRecord, key: string, ...aliases: string[]): string {
+  const text = marketingNativeFieldText(shot, key, ...aliases);
+  if (text) return text;
   throw new Error(`MARKETING_NATIVE_SHOT_FIELD_MISSING: ${String(shot.shotId ?? shot.shot_id ?? "未编号镜头")} 缺少原生字段 ${key}`);
 }
 
@@ -7868,17 +7892,59 @@ function scopedFusionAgent(agent: FusionAgent): FusionAgent {
       args[3] = { ...opts };
       delete (args[3] as FusionRecord).shotBudget;
       delete (args[3] as FusionRecord).deadlineMs;
-      let response: unknown;
-      try {
-        response = await originalCall.apply(scoped, args);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (!/(?:JSON\s*解析失败|未找到首个完整\s*JSON)/iu.test(message)) throw error;
-        const retryArgs = [...args];
-        retryArgs[0] = `${String(retryArgs[0] ?? "")}\n严格只输出一个完整合法 JSON 对象；不要 Markdown 代码围栏、解释、前后缀或尾随文本。`;
-        response = await originalCall.apply(scoped, retryArgs);
-      }
-      return response;
+      type Author = { modelId: string; responseId: string };
+      const invoke = async (callArgs: unknown[], author?: Author, pinnedEngine?: FusionRecord) => {
+        // BaseAgent consumes failed structured results before returning its
+        // degraded result. Observe that real boundary without moving another
+        // dispatch inside its single-request timeout or sharing concurrent calls.
+        const runner = Object.create(scoped) as FusionAgent;
+        let last: LLMReasonResult | undefined;
+        let engine = pinnedEngine;
+        let sequence = 0;
+        const views = new WeakMap<object, FusionRecord>();
+        const originalGet = agent._getLLMEngine;
+        if (typeof originalGet === "function") {
+          runner._getLLMEngine = () => {
+            const actual = engine ?? originalGet.call(scoped);
+            if (!actual || typeof actual.reasonStructured !== "function") return actual;
+            engine = actual;
+            const cached = views.get(actual);
+            if (cached) return cached;
+            const view = Object.create(actual) as FusionRecord;
+            const reasonStructured = actual.reasonStructured as (...params: unknown[]) => Promise<LLMReasonResult>;
+            view.reasonStructured = async (...params: unknown[]) => {
+              const current = ++sequence;
+              last = undefined;
+              const request = [...params];
+              if (author) request[2] = { ...recordValue(request[2]), strictAuthorModel: author.modelId };
+              let response = await reasonStructured.apply(actual, request);
+              if (author && response.success && (response.unknown === true
+                || response.settledAuthor?.modelId !== author.modelId
+                || !response.settledAuthor.responseId
+                || response.settledAuthor.responseId === author.responseId)) {
+                response = { ...response, success: false, retryable: false,
+                  error: "PHASE3_STRUCTURED_REPAIR_UNVERIFIED: JSON 修复缺少同模型独立响应回执" };
+              }
+              if (current === sequence) last = response;
+              return response;
+            };
+            views.set(actual, view);
+            return view;
+          };
+        }
+        const response = await originalCall.apply(runner, callArgs);
+        return { response, last, engine };
+      };
+      const first = await invoke(args);
+      const author = first.last?.settledAuthor;
+      if (recordValue(first.response).degraded !== true || first.last?.success !== false
+        || first.last.structuredParseFailure !== true || first.last.unknown === true
+        || !author?.modelId?.trim() || !author.responseId?.trim() || !first.engine) return first.response;
+      const retryArgs = [...args];
+      retryArgs[0] = `${String(args[0] ?? "")}\n严格只输出一个完整合法 JSON 对象；不要 Markdown 代码围栏、解释、前后缀或尾随文本。`;
+      // A distinct BaseAgent call gives this settled author correction its own
+      // original single-request timer. It never recurses into another repair.
+      return (await invoke(retryArgs, author, first.engine)).response;
     };
   }
   if (agent._semanticPass && typeof agent._semanticPass === "object" && scoped._callLLM) {
@@ -8003,6 +8069,8 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
           updated = updated.map((row) => ({ ...row, degraded: true }));
         }
         const expectedIds = new Set(shots.map((shot) => String(shot.shotId ?? shot.shot_id)));
+        const nativeMarketing = Boolean(recordValue(recordValue(recordValue(blueprint.meta)._metadata)._prd)._workloomMarketingPrompt);
+        const repairedRowIds: string[] = [];
         const repairResult = await repairPhase3FusionRows({
           rows: updated,
           expectedIds: [...expectedIds],
@@ -8019,6 +8087,7 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
             const characters = Array.isArray((blueprint.character_system as FusionRecord | undefined)?.characters)
               ? (blueprint.character_system as FusionRecord).characters as FusionRecord[]
               : [];
+            scoped._currentShotIdx = index;
             const retry = await (scoped as FusionAgent & {
               _fuseSingleShot?: (
                 shot: FusionRecord,
@@ -8036,32 +8105,33 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
             );
             return retry;
           },
-          recover: async (shotId, index) => {
+          ...(nativeMarketing ? { validateRow: validMarketingNativeFusionRow } : { recover: async (shotId: string, index: number) => {
             const source = shots.find((shot) => String(shot.shotId ?? shot.shot_id) === shotId) ?? shots[index];
             if (!source) throw new CinematicSkillError("PHASE3_SHOTS_MISSING", `无法定位合同恢复镜头 ${shotId}`);
             return recoverPhase3RowFromSource(this.cloneShots([source])[0]!);
+          } }),
+          onRepaired: (rows, shotId) => {
+            const retryEvidence: FusionRecord = { repaired: [...repairedRowIds, shotId], mode: "single-shot-llm-retry" };
+            stages.phase3Retry = retryEvidence;
+            if (this.checkpointManager) {
+              const checkpointHash = pfResult.checkpointBlueprintHash;
+              if (typeof checkpointHash !== "string" || !/^[a-f0-9]{24,64}$/u.test(checkpointHash)
+                || typeof scoped._saveSubCheckpoint !== "function") {
+                throw new CinematicSkillError("PHASE3_REPAIR_CHECKPOINT_UNVERIFIED", "缺少原生单镜修复的同指纹保存接口", "unverified");
+              }
+              try {
+                // Persist each accepted native repair before another shot can fail.
+                scoped._saveSubCheckpoint(this.checkpointManager, checkpointHash, rows, rows.length, shots.length);
+                retryEvidence.rawCheckpointSaved = true;
+              } catch (error) {
+                throw new CinematicSkillError("PHASE3_REPAIR_CHECKPOINT_UNVERIFIED",
+                  error instanceof Error ? error.message : String(error), "unverified");
+              }
+            }
+            repairedRowIds.push(shotId);
           },
         });
         updated = repairResult.rows;
-        if (repairResult.repaired.length > 0) {
-          stages.phase3Retry = { repaired: repairResult.repaired, mode: "single-shot-llm-retry" };
-        }
-        if (repairResult.repaired.length > 0 && this.checkpointManager) {
-          const checkpointHash = pfResult.checkpointBlueprintHash;
-          if (typeof checkpointHash !== "string" || !/^[a-f0-9]{24,64}$/u.test(checkpointHash)
-            || typeof scoped._saveSubCheckpoint !== "function") {
-            throw new CinematicSkillError("PHASE3_REPAIR_CHECKPOINT_UNVERIFIED", "缺少原生单镜修复的同指纹保存接口", "unverified");
-          }
-          try {
-            // Raw native repair precedes canonical validation. Save it through
-            // the existing project/fingerprint path before any later hard gate.
-            scoped._saveSubCheckpoint(this.checkpointManager, checkpointHash, updated, updated.length, shots.length);
-            (stages.phase3Retry as FusionRecord).rawCheckpointSaved = true;
-          } catch (error) {
-            throw new CinematicSkillError("PHASE3_REPAIR_CHECKPOINT_UNVERIFIED",
-              error instanceof Error ? error.message : String(error), "unverified");
-          }
-        }
         if (repairResult.recovered.length > 0) {
           stages.phase3Recovery = {
             recovered: repairResult.recovered,
