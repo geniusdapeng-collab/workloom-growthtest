@@ -36,6 +36,7 @@ import {
   type CinematicSkillRouter, type CinematicSkillStatus,
 } from "./cinematic-skill-policy.js";
 import { getCoverSpec } from "./cover-platforms.js";
+import type { LLMReasonOptions, LLMReasonResult } from "./llm-adapter.js";
 
 /**
  * 注入依赖保活桥（2026-09-22 真机根因）
@@ -3675,7 +3676,7 @@ export function normalizeHomecomingPrdContinuity(prd: Record<string, unknown>, m
 export function normalizeNarrativePrdContract(
   input: Record<string, unknown>,
   discovery: Record<string, unknown>,
-  marketingContract?: { actions: string[]; props: string[] },
+  marketingContract?: { actions: string[]; props: string[]; intent?: string },
 ): Record<string, unknown> {
   const prd = input;
   const upstream = recordValue(discovery.upstreamFields);
@@ -4094,7 +4095,17 @@ export function normalizeNarrativePrdContract(
     prd.shotContract = buildShotContract(prd, canonicalCharacters, safeAreaInsets, marketingContract?.actions);
   }
   reconcileShotContractExecutionCoherence(prd);
-  return sanitizePrdText(prd, duration || 30, speechForbidden) as Record<string, unknown>;
+  const normalized = sanitizePrdText(prd, duration || 30, speechForbidden) as Record<string, unknown>;
+  delete normalized._workloomMarketingPrompt;
+  if (marketingContract?.intent) {
+    const copy = [...marketingContract.intent.matchAll(/(叠加|屏幕文字|尾帧|片尾卡)[\s：:]*[“「"]([^”」"\r\n]{1,160})[”」"]/gu)];
+    normalized._workloomMarketingPrompt = {
+      actions: marketingContract.actions,
+      overlay: copy.filter(match => /叠加|屏幕文字/u.test(match[1]!)).map(match => match[2]!),
+      endCard: copy.filter(match => /尾帧|片尾卡/u.test(match[1]!)).map(match => match[2]!),
+    } satisfies MarketingPromptPlan;
+  }
+  return normalized;
 }
 
 export function renderPrdContractMarkdown(prd: Record<string, unknown>): string {
@@ -4157,22 +4168,23 @@ export interface SourceBoundMarketingDiscovery {
   restrictions: readonly string[];
 }
 
+const sourceBoundRiskAssessment = Symbol("source-bound-marketing-risk-assessment");
+
 function marketingDiscoveryContract(discovery: Record<string, unknown>, source: SourceBoundMarketingDiscovery) {
   const scene = recordValue(discovery.sceneStructure);
   const risk = recordValue(discovery.riskAssessment);
-  const literals = (value: unknown): string[] | null => {
+  const literals = (value: unknown, allowSingleHan = false): string[] | null => {
     if (!Array.isArray(value) || value.length > 30 || !value.every(item => typeof item === "string"
-      && item.length >= 2 && item.length <= 120 && !item.includes("\n") && source.intent.includes(item))) return null;
+      && (item.length >= 2 || allowSingleHan && /^\p{Script=Han}$/u.test(item))
+      && item.length <= 120 && !item.includes("\n") && source.intent.includes(item))) return null;
     return [...new Set(value)];
   };
   const actions = literals(scene.requiredActions);
-  const props = literals(scene.requiredProps);
-  if (!actions || !props || !Array.isArray(risk.technicalRisks) || !risk.technicalRisks.length
-    || !Array.isArray(risk.mitigationSuggestions) || risk.technicalRisks.length !== risk.mitigationSuggestions.length
-    || !risk.mitigationSuggestions.every(item => typeof item === "string" && item.trim())) {
+  const props = literals(scene.requiredProps, true);
+  if (!actions || !props || !(sourceBoundRiskAssessment in risk)) {
     throw new Error("MARKETING_DISCOVERY_UNVERIFIED：场景动作和道具须绑定需求原文，技术风险须逐条对应缓解措施");
   }
-  return { actions, props: [...new Set([source.product, ...props])] };
+  return { actions, props: [...new Set([source.product, ...props])], intent: source.intent };
 }
 
 function marketingDiscoveryPrompt(agent: string | undefined, source: SourceBoundMarketingDiscovery): string {
@@ -4472,6 +4484,33 @@ export function installVendorDiscoveryNarrativeBridge(options: {
     const probe = discoveryMod?.RequirementDiscoveryEngine
       ? new discoveryMod.RequirementDiscoveryEngine({ llmEngine: null })
       : null;
+    const riskPrototype = probe?.agents?.risk ? Object.getPrototypeOf(probe.agents.risk) as Record<string, unknown> : null;
+    if (riskPrototype && typeof riskPrototype.run === "function") {
+      const originalRun = riskPrototype.run as (input: unknown, schema: unknown) => Promise<unknown>;
+      const hadOwnRun = Object.hasOwn(riskPrototype, "run");
+      riskPrototype.run = async function runSourceBoundRisk(this: {
+        _callLLM: (input: unknown, schema: unknown) => Promise<unknown>;
+      }, input: unknown, schema: unknown) {
+        if (!options.marketingDiscovery?.()) return originalRun.call(this, input, schema);
+        // Only the measured author repair below may dispatch again in this scope.
+        const result = recordValue(await this._callLLM(input, schema));
+        const { technicalRisks, mitigationSuggestions, businessConstraints } = result;
+        const nonemptyText = (value: unknown) => typeof value === "string" && Boolean(value.trim());
+        if (!Array.isArray(technicalRisks) || !technicalRisks.length || technicalRisks.length > 4
+          || !technicalRisks.map(recordValue).every(risk => nonemptyText(risk.risk) && nonemptyText(risk.impact)
+            && ["high", "medium", "low"].includes(String(risk.level)))
+          || !Array.isArray(mitigationSuggestions) || mitigationSuggestions.length !== technicalRisks.length
+          || !mitigationSuggestions.every(nonemptyText) || !Array.isArray(businessConstraints)
+          || !businessConstraints.length || !businessConstraints.every(nonemptyText)) {
+          throw new Error("MARKETING_RISK_ASSESSMENT_UNVERIFIED：风险与缓解措施缺少完整逐项对应");
+        }
+        return { ...result, [sourceBoundRiskAssessment]: true };
+      };
+      restores.push(() => {
+        if (hadOwnRun) riskPrototype.run = originalRun;
+        else delete riskPrototype.run;
+      });
+    }
     const agent = probe?.agents?.risk ?? probe?.agents?.audience ?? null;
     let agentPrototype = agent ? Object.getPrototypeOf(agent) as Record<string, unknown> : null;
     while (agentPrototype && agentPrototype !== Object.prototype && !Object.hasOwn(agentPrototype, "_callLLM")) {
@@ -4483,8 +4522,8 @@ export function installVendorDiscoveryNarrativeBridge(options: {
         this: {
           name?: string;
           llmEngine?: {
-            reason?: (prompt: string, options?: Record<string, unknown>) => Promise<Record<string, unknown>>;
-            reasonStructured?: (prompt: string, schema: unknown, options?: Record<string, unknown>) => Promise<Record<string, unknown>>;
+            reason?: (prompt: string, options?: LLMReasonOptions) => Promise<LLMReasonResult>;
+            reasonStructured?: (prompt: string, schema: unknown, options?: LLMReasonOptions) => Promise<LLMReasonResult>;
           };
           timeoutMs?: number;
           _buildPrompt?: (input: unknown) => string;
@@ -4503,11 +4542,24 @@ export function installVendorDiscoveryNarrativeBridge(options: {
           timeoutMs: this.timeoutMs,
           forceJson: true,
         };
-        const response = typeof llm.reasonStructured === "function"
+        const startedAt = Date.now();
+        let response = typeof llm.reasonStructured === "function"
           ? await llm.reasonStructured(prompt, this.name === "SceneArchitect" ? null : schema, requestOptions)
           : typeof llm.reason === "function"
             ? await llm.reason(prompt, requestOptions)
             : null;
+        const author = response?.settledAuthor;
+        const remainingMs = (requestOptions.timeoutMs ?? 180_000) - (Date.now() - startedAt);
+        if (marketing && this.name === "RiskAssessor" && llm.reasonStructured && author && remainingMs >= 1000
+          && response?.success === false && response.structuredParseFailure === true && response.unknown !== true) {
+          const revised = `${prompt}\n\n【本次作者修复】上次正文未形成可解析的 JSON 对象。请根据同一已核对合同重新提交一份紧凑 JSON，只含 technicalRisks、businessConstraints、mitigationSuggestions。禁止解释和代码围栏，每条风险必须对应同索引的一条缓解措施。`;
+          response = await llm.reasonStructured(revised, schema, { ...requestOptions, timeoutMs: remainingMs,
+            strictAuthorModel: author.modelId });
+          if (response.success && (response.settledAuthor?.modelId !== author.modelId
+            || response.settledAuthor.responseId === author.responseId)) {
+            throw new Error("MARKETING_RISK_REPAIR_UNVERIFIED：风险修复缺少同模型独立响应回执");
+          }
+        }
         if (!response?.success) throw new Error(String(response?.error ?? "LLM 调用失败"));
         if (response.data && typeof response.data === "object") return response.data;
         const extracted = extractFirstJsonValue(response.content);
@@ -5793,6 +5845,7 @@ export function applyNarrativeFinalPromptContract(
     shotIndex?: number;
     postRainOnly?: boolean;
     sourceFirstFrame?: string;
+    marketingPrompt?: MarketingPromptPlan;
   },
 ): FusionRecord {
   const next: FusionRecord = {
@@ -6111,7 +6164,7 @@ export function applyNarrativeFinalPromptContract(
         ? `${shotSize}景别，${aspect}构图；源合同主体清晰，画面边缘保留安全区，不增加人物${options.noAnimals ? "或动物" : ""}。`
       : `${shotSize}景别，${aspect}构图；${characterNames.join("、") || "已登记角色"}位于可执行表演区并保持可辨轮廓，为其动作和视线保留空间。`;
     const cameraSource = promptFieldText(next.camera_movement ?? (next.fields as FusionRecord).camera_movement) || "固定机位";
-    const cameraText = /(?:固定|锁死|locked|static|零位移)/iu.test(cameraSource)
+    const cameraText = options.marketingPrompt ? cameraSource : /(?:固定|锁死|locked|static|零位移)/iu.test(cameraSource)
       ? "固定机位，三脚架锁死，全镜零推拉零横移零变焦"
       : /后拉/u.test(cameraSource)
         ? "固定轴线极缓后拉，速度连续，末段减速停稳，不改变场景与背景"
@@ -6128,7 +6181,7 @@ export function applyNarrativeFinalPromptContract(
     const baseText = cleanText(fieldValue("基础") || "电影级写实质感；保留真实材质、自然颗粒与连续物理运动。")
       .replace(/\b(?:8K|4K)\b/giu, "电影级");
     const forbidden = [
-      "无文字", "无字幕", "无水印", "无品牌标识",
+      ...(options.marketingPrompt ? ["原始底画面不生成浮动文字或字幕", "不添加合同外水印或品牌标识"] : ["无文字", "无字幕", "无水印", "无品牌标识"]),
       ...(canonicalNoPerson ? ["无人物", "无人影", "无人体局部"] : []),
       ...(options.noAnimals ? ["无动物", "无飞鸟"] : []),
       ...sourceEnvironmentProhibitions,
@@ -6162,17 +6215,22 @@ export function applyNarrativeFinalPromptContract(
       `核对主辅光方向、白平衡、材质高光、暗部纹理与冷暖边界`,
       `核对道具数量、位置、湿度状态和跨镜连续性`,
       `核对声音事件与画面动作同帧，且不新增合同外人物、文字、品牌、字幕或配乐`,
+      ...(options.marketingPrompt?.overlay.map(text => `后期成片叠加原文“${text}”，底画面无需模型生成文字`) ?? []),
+      ...(options.isLastShot ? options.marketingPrompt?.endCard.map(text => `本镜结束在后期尾帧原文“${text}”`) ?? [] : []),
     ].join("；");
     const brightnessText = canonicalAnimalOnly
       ? "动物主体高光不过曝，按源合同保留主体表面与所接触物件的真实纹理，暗部不死黑；不要求人物面部曝光。"
       : canonicalNoPerson
         ? "画面主体高光不过曝，暗部保留材质细节；不涉及人物面部。"
         : brightnessTextForAction(assignedAction);
-    const directorIntent = canonicalAnimalOnly
+    const directorIntent = options.marketingPrompt
+      ? "按当前已核对的商业创作要求组织表演、声画与节奏，保持本镜动作和运镜连贯；后期文字按交付复核字段执行。"
+      : canonicalAnimalOnly
       ? "克制写实的动物观察短片；以动物动作、空间关系和真实光线推进，不拟人化、不增加无关叙事或模板表演。"
       : canonicalNoPerson
         ? "按源合同观察场景与物件；以主体变化、空间关系和已确认光线推进，不增加无关叙事、特效或人物表演。"
         : "克制写实的自然长镜或稳定短镜；以人物动作、空间关系和真实光线推进，不增加无关叙事、特效或模板表演。";
+    const pacing = options.marketingPrompt && fieldValue("节奏") || pacingTextForAction(assignedAction, duration);
     prompt = [
       "01.【语言约束】全部字段使用中文；画幅、分辨率、帧率、编码、时间码与资产路径可作为受控制作标记。",
       `02.【导演意图】${directorIntent}`,
@@ -6194,7 +6252,7 @@ export function applyNarrativeFinalPromptContract(
       `18.【台词】${dialogueText}`,
       `19.【时间轴】${timelineText}`,
       `20.【情绪】${emotionText}`,
-      `21.【节奏】${pacingTextForAction(assignedAction, duration)}`,
+      `21.【节奏】${pacing}`,
       `22.【转场】${transitionTextForAction(assignedAction, Boolean(options.isLastShot))}`,
       `23.【音频】${audioText}`,
       `24.【负面约束】${[...new Set([...forbidden, "无暗黑风调色", "无塑料或金属感高光"])].join("、")}。`,
@@ -6222,7 +6280,7 @@ export function applyNarrativeFinalPromptContract(
       color: colorText,
       shotSize,
       camera: cameraText,
-      equipment: "固定三脚架与常规电影镜头；具体型号未声明",
+      equipment: options.marketingPrompt ? "按本镜运镜执行；具体设备型号未声明" : "固定三脚架与常规电影镜头；具体型号未声明",
       subjectCount: canonicalNoActors ? 0 : characterNames.length,
       characterNames: canonicalNoActors ? [] : characterNames,
       costume,
@@ -6266,6 +6324,8 @@ export function applyNarrativeFinalPromptContract(
   return next;
 }
 
+interface MarketingPromptPlan { actions: string[]; overlay: string[]; endCard: string[] }
+
 export interface NarrativePromptReviewPolicy {
   noDialogue: boolean;
   maxLength: number;
@@ -6294,6 +6354,7 @@ export interface NarrativePromptReviewPolicy {
   projectColor?: string;
   projectProps: string[];
   projectActions: string[];
+  marketingPrompt?: MarketingPromptPlan;
   /** Final prompt-bound contract persisted through vendor prompt/shot synchronization. */
   shotContract?: FusionRecord;
 }
@@ -6632,6 +6693,7 @@ export function normalizeNarrativePromptsForReview(
       characterNames: normalizedPolicy.characterNames,
       noTitles: normalizedPolicy.noTitles,
       canonicalize: true,
+      marketingPrompt: normalizedPolicy.marketingPrompt,
       characterPortraits: normalizedPolicy.characterPortraits,
       postRainOnly: normalizedPolicy.postRainOnly,
       sourceFirstFrame,
@@ -7840,6 +7902,7 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
             : {}),
         })).filter((item) => item.name);
         const promptSubtitles = recordValue(recordValue(policyPrd.deliveryStandard).subtitles);
+        const marketingPrompt = policyPrd._workloomMarketingPrompt as MarketingPromptPlan | undefined;
         const promptNoTitles = promptSubtitles.mode === "none" || /(?:无字幕|无文字)/u.test(promptPolicyText);
         const promptScenePlan = recordValue(policyPrd.scenePlan);
         const promptVisual = recordValue(policyPrd.visualSpecification);
@@ -7858,7 +7921,7 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
           _originalStoryText: String(policyPrd._originalStoryText ?? promptScene),
           special_notes: String(policyMeta?.special_notes ?? ""),
         });
-        const promptActionsBase = extractedPromptActions.length > 0
+        const promptActionsBase = marketingPrompt?.actions.length ? marketingPrompt.actions : extractedPromptActions.length > 0
           ? extractedPromptActions
           : updated.map((shot) => promptFieldText(shot.action)).filter(Boolean);
         const promptActions = projectNarrativeActionSequence(promptActionsBase, updated.length);
@@ -7898,6 +7961,7 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
           projectColor: promptProjectColor,
           projectProps: promptProps,
           projectActions: promptActions,
+          marketingPrompt,
         };
         updated = updated.map((shot, shotIndex, allShots) => {
           const contractShot = promptContractShots.length > 0
@@ -7953,7 +8017,8 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
             fallbackProps: contractProps.length > 0 ? contractProps : promptReviewPolicy.projectProps,
           });
           const contractShotSize = promptFieldText(contractShot.shotSize) || shotSizeForAction(orderedAction);
-          const contractCameraMovement = promptFieldText(contractShot.cameraMovement);
+          const contractCameraMovement = marketingPrompt && promptFieldText(shot.camera_movement ?? shot.cameraMovement)
+            ? promptFieldText(shot.camera_movement ?? shot.cameraMovement) : promptFieldText(contractShot.cameraMovement);
           const rowPolicy: NarrativePromptReviewPolicy = {
             ...promptReviewPolicy,
             projectScene: direction.scene || promptReviewPolicy.projectScene,
@@ -7986,6 +8051,7 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
             sourceFirstFrame,
             noTitles: promptNoTitles,
             canonicalize: true,
+            marketingPrompt,
             characterPortraits: promptCharacterPortraits,
             projectScene: rowPolicy.projectScene,
             projectLighting: rowPolicy.projectLighting,

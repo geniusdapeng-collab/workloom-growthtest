@@ -34,6 +34,8 @@ import {
 
 export interface LLMReasonOptions {
   model?: string;
+  /** Scoped author correction must use the positively identified original provider model. */
+  strictAuthorModel?: string;
   systemPrompt?: string;
   temperature?: number;
   topP?: number;
@@ -54,6 +56,8 @@ export interface LLMReasonResult {
   error?: string;
   retryable?: boolean;
   unknown?: true;
+  settledAuthor?: { modelId: string; responseId: string };
+  structuredParseFailure?: true;
   usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number; reasoningTokens?: number };
 }
 
@@ -166,6 +170,9 @@ export class WorkloomLLMEngine {
       return { success: false, unknown: true, retryable: false, error: "VIDEO_MODEL_OUTCOME_UNKNOWN: 当前运行已有结果未知的模型请求，未重复提交" };
     }
     const activeModel = canonicalDeepSeekModel(opts.model ?? this.cfg.model);
+    if (opts.strictAuthorModel !== undefined && opts.strictAuthorModel !== activeModel) {
+      return { success: false, retryable: false, error: "VIDEO_AUTHOR_MODEL_CHANGED: 结构修复必须沿用已结算的原模型" };
+    }
     const scene = opts.scene
       ?? this.cfg.router?.scene
       ?? this.cfg.scene;
@@ -227,10 +234,16 @@ export class WorkloomLLMEngine {
         : undefined;
       if ((result.kind === "answered" || result.kind === "circuit_broken" || result.kind === "reused")
         && result.text) {
+        const author = result.kind === "answered" ? result.providerResult : undefined;
+        const settledAuthor = author?.finishReason === "stop" && author.modelId === activeModel && author.responseId
+          && Number.isSafeInteger(author.promptTokens) && author.promptTokens > 0
+          && Number.isSafeInteger(author.completionTokens) && author.completionTokens > 0
+          ? { modelId: author.modelId, responseId: author.responseId } : undefined;
         return {
           success: true,
           content: result.text,
           usage,
+          ...(settledAuthor ? { settledAuthor } : {}),
         };
       }
       return {
@@ -331,6 +344,7 @@ export class WorkloomLLMEngine {
         ...result,
         success: false,
         error: "JSON 解析失败: 未找到首个完整 JSON",
+        structuredParseFailure: true,
         retryable: false,
       };
     }
@@ -342,6 +356,7 @@ export class WorkloomLLMEngine {
         ...result,
         success: false,
         error: `JSON 解析失败: ${error instanceof Error ? error.message : String(error)}`,
+        structuredParseFailure: true,
         retryable: false,
       };
     }

@@ -2,7 +2,8 @@ import { createRequire } from "node:module";
 import { join } from "node:path";
 import { expect, it, vi } from "vitest";
 import { videoRuntimeRoot } from "./runtime-root.js";
-import { installVendorDiscoveryFixBridge, installVendorDiscoveryNarrativeBridge, normalizeNarrativePrdContract } from "./vendor-compat.js";
+import { installVendorDiscoveryFixBridge, installVendorDiscoveryNarrativeBridge, installVendorNarrativePromptReviewBridge,
+  normalizeNarrativePrdContract } from "./vendor-compat.js";
 
 it("projects the current marketing contract through native G3 and keeps its real scene props and paired risks", async () => {
   const root = videoRuntimeRoot(import.meta.url);
@@ -10,7 +11,7 @@ it("projects the current marketing contract through native G3 and keeps its real
   const { HyperrealitySystem } = require(join(root, "vendor/supermickey/hyperreality-system/index.js"));
   const { RequirementDiscoveryEngine } = require(join(root,
     "vendor/supermickey/hyperreality-system/engines/requirement-discovery-engine.js"));
-  const source = { intent: "顾客穿着围裙举起知夏茶壶，倒茶后放下茶壶。尾帧显示原样文字。",
+  const source = { intent: "顾客穿着围裙举起知夏茶壶，倒茶后放下茶壶，拿起杯。尾帧显示原样文字。",
     product: "知夏茶壶", restrictions: ["不加入商品报价"] };
   const opening = { duration: 4, purpose: "顾客穿着围裙举起知夏茶壶。", keyElements: ["围裙", "知夏茶壶"] };
   const ending = { duration: 4, purpose: "顾客放下茶壶并保持把手朝向镜头，最后叠加完整尾帧文字。", keyElements: ["茶壶"] };
@@ -18,7 +19,7 @@ it("projects the current marketing contract through native G3 and keeps its real
     mitigationSuggestions: ["在转动茶壶前锁定软光箱和曝光，逐镜对比壶身高光位置。"], businessConstraints: ["不加入商品报价"] };
   const scene = { opening, scenes: [{ index: 1, duration: 8, purpose: "顾客倒茶。", keyElements: ["知夏茶壶"], emotionalBeat: "climax" }],
     ending, totalDuration: 16, sceneCount: 3, narrativeArc: "linear", requiredActions: ["举起知夏茶壶", "倒茶", "放下茶壶"],
-    requiredProps: ["围裙", "茶壶"] };
+    requiredProps: ["围裙", "茶壶", "杯"] };
   const llm = { reasonStructured: vi.fn(async (prompt: string) => {
     expect(prompt).toContain(source.intent);
     expect(prompt).toContain(source.restrictions[0]);
@@ -49,12 +50,45 @@ it("projects the current marketing contract through native G3 and keeps its real
     const markdown = engine.generateMarkdown(discovery) + contract;
     expect(markdown).toContain("关键元素: 围裙、知夏茶壶");
     expect(markdown).not.toMatch(/手机|湿地反光|雾板遮光/u);
+    discovery.sceneStructure.requiredProps = ["碗"];
+    await expect(studio._convertDiscoveryToRequirementList(discovery, upstream)).rejects.toThrow(/MARKETING_DISCOVERY_UNVERIFIED/u);
+    discovery.sceneStructure.requiredProps = scene.requiredProps;
     discovery.sceneStructure.requiredActions = ["喝下未在原文出现的饮料"];
     await expect(studio._convertDiscoveryToRequirementList(discovery, upstream)).rejects.toThrow(/MARKETING_DISCOVERY_UNVERIFIED/u);
     expect(studio._profileResolver.resolve).toHaveBeenCalledOnce();
   } finally {
     restoreBridge();
     restoreDefaults();
+  }
+});
+
+it("preserves native follow motion and exact post text in the G6 report for a source-bound commercial", async () => {
+  const root = videoRuntimeRoot(import.meta.url);
+  const require = createRequire(join(root, "package.json"));
+  const { HyperrealitySystem } = require(join(root, "vendor/supermickey/hyperreality-system/index.js"));
+  const intent = "拍自行车训练。成片叠加“封闭场地｜请勿模仿”，尾帧“B2 训练系列”。";
+  const actions = ["骑车连续通过训练门架", "制动停稳"];
+  const prd = normalizeNarrativePrdContract({}, { upstreamFields: { duration_sec: 8 } }, { intent, actions, props: ["自行车"] });
+  const policy = { noDialogue: true, maxLength: 3000, noCharacters: false, noAnimals: true, noMusic: true,
+    noTitles: true, durationSeconds: 8, aspectRatio: "9:16", resolution: "1080x1920", characterNames: ["骑手"],
+    characterPortraits: [], projectProps: ["自行车"], projectActions: actions, marketingPrompt: prd._workloomMarketingPrompt };
+  const rows = actions.map((action, index) => ({ shotId: `S${index + 1}`, duration: 4, action,
+    camera_movement: index === 0 ? "低机位高速平行跟拍，随骑手通过训练门架" : "固定机位",
+    prompt: `01.【动作】${action}`, _workloomPromptReviewPolicy: policy }));
+  const studio = Object.create(HyperrealitySystem.prototype);
+  studio._waitForExternalConfirmation = async () => ({ approved: true });
+  const restore = installVendorNarrativePromptReviewBridge();
+  try {
+    const result = await studio._confirmPrompts(rows);
+    expect(result.report).toContain("【运镜】低机位高速平行跟拍，随骑手通过训练门架");
+    expect(rows[0]?.prompt).toContain("后期成片叠加原文“封闭场地｜请勿模仿”");
+    expect(rows[0]?.prompt).not.toContain("B2 训练系列");
+    expect(rows[1]?.prompt).toContain("后期尾帧原文“B2 训练系列”");
+    expect(rows[1]?.prompt).toContain("原始底画面不生成浮动文字或字幕");
+    expect(result.report).not.toContain("克制写实的自然长镜");
+    expect(result.report).not.toContain("无文字、无字幕、无水印、无品牌标识");
+  } finally {
+    restore();
   }
 });
 
