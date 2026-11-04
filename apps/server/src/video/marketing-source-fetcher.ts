@@ -113,14 +113,51 @@ function metaRefreshTarget(raw: string): string | null {
   return null;
 }
 
+/** Read visible HTML text without promoting hidden dialog/summary UI into article evidence. */
+function visibleHtmlText(raw: string): string {
+  const document = raw.replace(/<!--[\s\S]*?-->/g, " ").replace(/<!doctype\b[^>]*>/gi, " ")
+    .replace(/<(script|style|noscript|template)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, " ");
+  const stack: Array<{ tag: string; hidden: boolean }> = [];
+  const voidElements = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
+  const blockElements = new Set(["p", "div", "li", "h1", "h2", "h3", "h4", "h5", "h6", "tr", "article", "section"]);
+  const hidden = () => stack.at(-1)?.hidden === true;
+  let text = "", previous = 0;
+  for (const match of document.matchAll(/<\/?([a-z][\w:-]*)\b(?:"[^"]*"|'[^']*'|[^'">])*?>/giu)) {
+    if (!hidden()) text += document.slice(previous, match.index);
+    previous = match.index + match[0].length;
+    const token = match[0], tag = match[1]!.toLowerCase();
+    if (token.startsWith("</")) {
+      const wasHidden = hidden();
+      let index = stack.length - 1;
+      while (index >= 0 && stack[index]!.tag !== tag) index--;
+      if (index >= 0) stack.length = index;
+      if (!wasHidden && blockElements.has(tag)) text += "\n";
+      continue;
+    }
+    const attributes = new Map<string, string>();
+    const attributeText = token.slice(token.indexOf(match[1]!) + tag.length, -1);
+    for (const attribute of attributeText.matchAll(/([^\s=\/"'<>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/gu)) {
+      attributes.set(attribute[1]!.toLowerCase(), decodeEntities(attribute[2] ?? attribute[3] ?? attribute[4] ?? ""));
+    }
+    const style = attributes.get("style") ?? "";
+    const inlineHidden = attributes.has("hidden")
+      || /(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*(?:hidden|collapse)|content-visibility\s*:\s*hidden)\s*(?:!important\s*)?(?:;|$)/iu.test(style);
+    const excluded = hidden() || inlineHidden;
+    if (!excluded && tag === "br") text += "\n";
+    else if (!excluded) text += " ";
+    if (!voidElements.has(tag) && !/\/\s*>$/u.test(token)) stack.push({ tag, hidden: excluded });
+  }
+  if (!hidden()) text += document.slice(previous);
+  return text;
+}
+
 export function sourceDocument(raw: string, contentType: string, finalUrl: string): { text: string; assetUrls: string[] } {
   const html = /(?:html|xhtml)/i.test(contentType);
   const assetUrls = new Set<string>();
   if (html) for (const match of raw.matchAll(/<(?:img|source)\b[^>]*\b(?:src|data-src)\s*=\s*["']([^"']+)["'][^>]*>/gi)) {
     try { const url = sourceUrl(new URL(decodeEntities(match[1]!), finalUrl).href); assetUrls.add(url.href); } catch { /* 非公网图片不进入候选 */ }
   }
-  const visible = html ? raw.replace(/<!--[\s\S]*?-->/g, " ").replace(/<(script|style|noscript|template)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, " ")
-    .replace(/<(?:br|\/p|\/div|\/li|\/h[1-6]|\/tr)[^>]*>/gi, "\n").replace(/<[^>]*>/g, " ") : raw;
+  const visible = html ? visibleHtmlText(raw) : raw;
   const text = decodeEntities(visible).replace(/\r\n?/g, "\n").replace(/[\t \f]+/g, " ").replace(/ *\n */g, "\n").replace(/\n{3,}/g, "\n\n").trim();
   if (!text || /(?:请输入验证码|访问过于频繁|请完成安全验证|verify you are human|checking your browser)/i.test(text)) throw new Error("SOURCE_UNAVAILABLE：页面为空或是访问验证页");
   if (text.length > SOURCE_MAX_TEXT_CHARS) throw new Error("SOURCE_TEXT_TOO_LARGE：完整正文超过单来源审核上限，不能截断后作为证据");

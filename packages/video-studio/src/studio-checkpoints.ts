@@ -10,7 +10,7 @@ const STUDIO_STAGE_POLICY_VERSION: Record<StudioEngineCheckpointStage, string> =
   G3_PROFILE: "native-production-profile/v1",
   G4_PRD: "source-bound-prd/v1",
   SCRIPT: "native-script-and-metadata/v1",
-  PRODUCTION: "native-production-and-blueprint/v1",
+  PRODUCTION: "native-production-unicode-prompt/v2",
   OPENING_TITLE: "native-opening-title-fields/v1",
 };
 

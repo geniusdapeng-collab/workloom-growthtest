@@ -55,6 +55,7 @@ import {
 import { buildServerGateRecord, withGateLedger } from "./gate-ledger-bridge.js";
 import { createDataMiningExecutor } from "./data-mining-executor.js";
 import { checkpointMarketingFacts, prepareMarketingFacts, restoreMarketingFacts, finalizeMarketingFacts,
+  MARKETING_SOURCE_POLICY_VERSION,
   type PreparedMarketingFacts, type MarketingFactReviewCache, type MarketingShotFactReview } from "./marketing-authority.js";
 import { canonicalRenderJson, renderSha256 } from "./gen/compiled-request.js";
 import { acquireProjectLease, archiveWorkDir, makeLedgerWriter, readProjectMeta } from "./archive-host.js";
@@ -1300,7 +1301,8 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
             checkpointStore = createStudioCheckpointStore({
               identity: { ...scope, projectId: input.projectId, projectCreatedAt: projectMeta!.createdAt,
                 stageId: promptReview ? "prompt_review" : "preproduction", runId: entry.runId, attempt: ctx.attempt,
-                inputSha256: renderSha256(canonicalRenderJson({ resumeInput, gatePolicy: GATE_RUBRIC, checkpointPolicy: "studio-continuity/v1" })),
+                inputSha256: renderSha256(canonicalRenderJson({ resumeInput, gatePolicy: GATE_RUBRIC, checkpointPolicy: "studio-continuity/v1",
+                  ...(input.isMarketing ? { marketingSourcePolicy: MARKETING_SOURCE_POLICY_VERSION } : {}) })),
                 model: llm.model },
               archive, priorRunId: checkpointPriorRunId,
               repository: studioCheckpointRepository(scope, input.projectId),

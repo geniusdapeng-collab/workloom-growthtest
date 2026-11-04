@@ -234,6 +234,13 @@ describe("营销事实宿主完整执行", () => {
     expect((prepared.bundle.cards.insight_card as { market_position: { our_opening: string[] } }).market_position.our_opening).toEqual([]);
     expect((prepared.bundle.dossier.identity as { official_selling_points: unknown[] }).official_selling_points).toHaveLength(1);
   });
+  it("没有采纳价格的事实包明确禁止下游从来源正文或客户期望补回报价", async () => {
+    const prepared = await prepare();
+    expect((prepared.raw.A1.identity as { prices: unknown[] }).prices).toEqual([]);
+    expect(prepared.bundle.restrictions).toContain("没有可采纳的当前价格证据：禁止报价、优惠、价格比较或性价比数字主张；不得从未采纳的来源价格或用户期望补回。");
+    expect(prepared.g1Content).toContain("没有可采纳的当前价格证据");
+    expect(prepared.bundle.stages[0]!.supportAttempts).toHaveLength(1);
+  });
   it("跨站不同fragment指向同一规范来源时复用同次抓取快照，不因抓取时间不同破坏审核绑定", async () => {
     const prepared = await prepare({ fragmentAliases: true });
     const saved = await finalizeMarketingFacts(prepared, shots, env);
@@ -359,6 +366,26 @@ describe("营销事实宿主完整执行", () => {
     }
     await expect(verifyMarketingFacts({ root, ref: saved.ref, sha256: hash, scope: expectedScope, shots: requestedShots })).rejects.toThrow();
   });
+  it.each(["source", "shot"] as const)("%s通过裁决若同时标记结果未知，完整同步摘要后仍拒绝复用", async kind => {
+    const prepared = await prepare();
+    const saved = await finalizeMarketingFacts(prepared, shots, env);
+    const bundle = JSON.parse(await readFile(path.join(root, saved.ref), "utf8")) as PreparedMarketingFacts["bundle"];
+    if (kind === "source") {
+      const record = bundle.stages[0]!;
+      record.review!.verdict = { ...record.review!.verdict, unknownOutcome: true };
+      const attempt = record.supportAttempts!.at(-1)!;
+      const verdictText = canonicalRenderJson(record.review!.verdict);
+      await writeFile(path.join(root, attempt.verdict.ref), verdictText);
+      attempt.verdict.sha256 = renderSha256(verdictText);
+    } else {
+      bundle.outputReviews[0]!.verdict = { ...bundle.outputReviews[0]!.verdict, unknownOutcome: true };
+    }
+    const bytes = canonicalRenderJson(bundle);
+    await writeFile(path.join(root, saved.ref), bytes);
+    await expect(verifyMarketingFacts({ root, ref: saved.ref, sha256: renderSha256(bytes), scope, shots }))
+      .rejects.toMatchObject({ code: kind === "source" ? "MARKETING_SUPPORT_UNVERIFIED" : "MARKETING_PROMPTS_UNVERIFIED" });
+  });
+
   it("重复attempt写盘失败必须终止，不能当抓源失败换候选", async () => {
     await prepare(); await expect(prepare()).rejects.toMatchObject({ code: "EEXIST" });
   });

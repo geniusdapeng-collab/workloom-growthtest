@@ -114,6 +114,18 @@ describe("正式工位断点复用与原审核绑定", () => {
     expect(await next.run("G2_THEME", "input", async () => ({ theme: "重新修订" }))).toEqual({ theme: "重新修订" });
   });
 
+  it("声明通过但供应商结果未知的矛盾裁决不能保存为可复用审批", async () => {
+    const current = store();
+    await current.begin();
+    await current.saveGate("G2_THEME", "完整主题正文", { ...await approved("完整主题正文"), unknownOutcome: true }, "E-unresolved");
+    await current.finishOutcome();
+    expect(events.some(event => event.kind === "GATE_G2_THEME")).toBe(false);
+    expect(await store("RUN-next", 2, identity.runId).loadGate("G2_THEME", "完整主题正文")).toBeNull();
+    expect(await readStudioAttemptOutcome({ scope: identity, projectId: identity.projectId,
+      projectCreatedAt: identity.projectCreatedAt, stageId: identity.stageId, runId: identity.runId,
+      attempt: identity.attempt, archive, repository })).toBe("unknown");
+  });
+
   it.each([
     { inputSha256: renderSha256("需求已经变更") },
     { projectCreatedAt: "2026-11-05T00:00:00.000Z" },

@@ -93,7 +93,7 @@ function sameTask(actual: StudioAttemptIdentity, expected: StudioAttemptIdentity
 
 function reviewed(gate: SavedGate): boolean {
   const verdict = gate.verdict;
-  return sha(gate.contentSha256) && verdict?.approved === true && verdict.status === "passed" && verdict.via === "llm"
+  return sha(gate.contentSha256) && verdict?.approved === true && verdict.status === "passed" && verdict.via === "llm" && verdict.unknownOutcome !== true
     && verdict.degraded === false && Boolean(verdict.model) && Boolean(gate.reviewEventId)
     && verdict.evidence?.some(item => item.scope === "complete-text" && item.sha256 === gate.contentSha256) === true;
 }

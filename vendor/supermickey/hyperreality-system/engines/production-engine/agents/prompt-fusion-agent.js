@@ -14,6 +14,7 @@ const { resolveProfile, isSocialCommerce, constraintTemplateOf } = require('../.
 const { normalizeFields, makeGetter } = require('../../field-standardizer');
 const { FieldConsistencyChecker } = require('../../field-consistency-checker');
 const { FALLBACK_SCENES, renderFallbackAction } = require('../../../config/neutral-fallbacks');
+const PromptLengthConfig = require('../../../config/prompt-length.js');
 
 // 【v2.1.4-fix10-P25-fix3】外部专家建议:填满 schema 解决 LLM 字段缺失问题
 // 25 个标准字段的 schema 模板:键名 + 类型提示
@@ -153,7 +154,6 @@ class PromptFusionAgent extends BaseAgent {
       llmTimeout: options.llmTimeout ?? 300000,
       llmMaxRetries: options.llmMaxRetries ?? 5
     });
-    const PromptLengthConfig = require('../../../config/prompt-length.js');
     // ...
     // 【审计修复】从配置文件读取,不再硬编码
     this.maxPromptLength = options.maxPromptLength || PromptLengthConfig.HARD_MAX || 12000;
@@ -1711,7 +1711,7 @@ ${missing.map(f => `- ${f}:${FIELD_DESCS[f]}`).join('\n')}
 
     // 【v2.2.0】语言检查:检测英文输出并警告
     // 【P2-PROMPT-03 修复】语言检查不再只做警告，主动修正英文输出
-    const chineseCharCount = (fullPrompt.match(/[\u4e00-\u9fa5]/g) || []).length;
+    const chineseCharCount = (fullPrompt.match(/\p{Script=Han}/gu) || []).length;
     const totalCharCount = this._countChars(fullPrompt);
     const chineseRatio = chineseCharCount / totalCharCount;
     if (chineseRatio < 0.3 && totalCharCount > 500) {
@@ -1746,7 +1746,18 @@ ${missing.map(f => `- ${f}:${FIELD_DESCS[f]}`).join('\n')}
     }
 
     // 【v2.3.1-排版】交付前统一转换为"序号+独立行"格式（替代 ' | ' 单行连接）
-    fullPrompt = this._formatNumberedFields(fullPrompt);
+    // Count the actual delivery text, including numbering and opening fields.
+    // Reserve that formatting overhead before another field-aware compression.
+    let formatted = this._formatNumberedFields(fullPrompt);
+    if (this._countChars(formatted) > this.maxPromptLength) {
+      const formattingReserve = this._countChars(formatted) - this._countChars(fullPrompt);
+      fullPrompt = this._truncateStandardPrompt(fullPrompt, this.maxPromptLength - formattingReserve);
+      formatted = this._formatNumberedFields(fullPrompt);
+    }
+    if (this._countChars(formatted) > this.maxPromptLength) {
+      throw new Error(`PROMPT_LENGTH_EXCEEDED: 完整编号提示词超过 ${this.maxPromptLength} 字符`);
+    }
+    fullPrompt = formatted;
 
     return fullPrompt;
   }
@@ -1822,13 +1833,16 @@ ${missing.map(f => `- ${f}:${FIELD_DESCS[f]}`).join('\n')}
    * 2) 段内截断从"每次砍10字符"改为"句级安全截断"(在闭合标点处收束+括号配平)
    * 3) 重组时保留 ' | ' 分隔符(原实现 join('') 丢分隔符, 导致段间粘连)
    */
-  _truncateStandardPrompt(fullPrompt) {
-    if (this._countChars(fullPrompt) <= this.maxPromptLength) return fullPrompt;
-
-    const segments = fullPrompt.split(/(?=【)/).filter(s => s.trim());
-    if (segments.length <= 1) return fullPrompt.substring(0, this.maxPromptLength);
+  _truncateStandardPrompt(fullPrompt, maxLength = this.maxPromptLength) {
+    if (this._countChars(fullPrompt) <= maxLength) return fullPrompt;
 
     const NO_TRUNCATE = new Set(['【语言约束】', '【台词】', '【强制中文输出】']);
+    const segments = fullPrompt.split(/(?=【)/).map(s => s.trim().replace(/\s*\|$/u, '').trim()).filter(Boolean);
+    if (segments.length <= 1) {
+      const head = segments[0]?.match(/^(【[^】]+】)/)?.[1];
+      if (NO_TRUNCATE.has(head)) throw new Error(`PROMPT_PROTECTED_FIELDS_EXCEED_LIMIT: 不可截断字段已超过 ${maxLength} 字符`);
+      return PromptLengthConfig.sliceCharacters(fullPrompt, 0, maxLength);
+    }
 
     const FIELD_WEIGHTS = {
       '【语言约束】': 99, '【台词】': 99,
@@ -1841,7 +1855,7 @@ ${missing.map(f => `- ${f}:${FIELD_DESCS[f]}`).join('\n')}
       '【负面约束】': 0.5, '【角色约束】': 0.5, '【角色一致性】': 0.5, '【明亮约束】': 0.5
     };
 
-    const target = this.maxPromptLength;
+    const target = maxLength;
 
     const protectedSegs = segments.filter(seg => {
       const m = seg.match(/^(【[^】]+】)/);
@@ -1851,24 +1865,36 @@ ${missing.map(f => `- ${f}:${FIELD_DESCS[f]}`).join('\n')}
       const m = seg.match(/^(【[^】]+】)/);
       return !m || !NO_TRUNCATE.has(m[1]);
     });
-    const protectedLen = protectedSegs.reduce((sum, s) => sum + this._countChars(s) + 3, 0);
-    const compressTarget = Math.max(200, target - protectedLen);
+    const protectedLen = protectedSegs.reduce((sum, s) => sum + this._countChars(s), 0);
+    const separatorLen = Math.max(0, segments.length - 1) * 3;
 
-    let totalWeighted = 0;
     const segInfos = compressibleSegs.map(seg => {
       const segLen = this._countChars(seg);
       const headMatch = seg.match(/^(【[^】]+】)/);
       const head = headMatch ? headMatch[1] : '';
+      const headLen = this._countChars(head);
       const weight = FIELD_WEIGHTS[head] || 1.0;
-      totalWeighted += segLen * weight;
-      return { seg, segLen, head, weight };
-    });
-
-    const compressed = segInfos.map(({ seg, segLen, head, weight }) => {
-      const weightedRatio = (compressTarget / totalWeighted) * weight;
-      const want = Math.max(40, Math.floor(segLen * weightedRatio));
-      if (segLen <= want) return seg;
       const body = seg.slice(head.length);
+      const bodyLen = segLen - headLen;
+      const minimumBody = Math.max(0, Math.min(segLen, 40) - headLen);
+      return { seg, head, headLen, body, bodyLen, minimumBody, weight };
+    });
+    const headerLen = segInfos.reduce((sum, item) => sum + item.headLen, 0);
+    const bodyTarget = target - protectedLen - separatorLen - headerLen;
+    if (bodyTarget < 0) {
+      throw new Error(`PROMPT_PROTECTED_FIELDS_EXCEED_LIMIT: 不可截断字段、字段标签和分隔符已超过 ${target} 字符`);
+    }
+    const minimumTotal = segInfos.reduce((sum, item) => sum + item.minimumBody, 0);
+    for (const item of segInfos) {
+      item.base = minimumTotal <= bodyTarget ? item.minimumBody : Math.floor(bodyTarget * item.minimumBody / minimumTotal);
+    }
+    const remaining = bodyTarget - segInfos.reduce((sum, item) => sum + item.base, 0);
+    const totalWeighted = segInfos.reduce((sum, item) => sum + (item.bodyLen - item.base) * item.weight, 0);
+
+    const compressed = segInfos.map(({ seg, head, body, bodyLen, base, weight }) => {
+      const share = totalWeighted > 0 ? Math.floor(remaining * (bodyLen - base) * weight / totalWeighted) : 0;
+      const want = Math.min(bodyLen, base + share);
+      if (bodyLen <= want) return seg;
       return head + this._safeTruncateSentence(body, want);
     });
 
@@ -1880,15 +1906,15 @@ ${missing.map(f => `- ${f}:${FIELD_DESCS[f]}`).join('\n')}
    * 替代原 kept.substring(0, kept.length - 10) 的暴力砍尾
    */
   _safeTruncateSentence(text, maxChars) {
-    if (!text || text.length <= maxChars) return text || '';
-    let cut = text.substring(0, maxChars);
+    if (!text || this._countChars(text) <= maxChars) return text || '';
+    let cut = PromptLengthConfig.sliceCharacters(text, 0, maxChars);
     const closers = ['。', '；', ';'];
     let lastClose = -1;
     for (const c of closers) {
       const idx = cut.lastIndexOf(c);
       if (idx > lastClose) lastClose = idx;
     }
-    if (lastClose > maxChars * 0.5) {
+    if (lastClose >= 0 && this._countChars(cut.substring(0, lastClose + 1)) > maxChars * 0.5) {
       cut = cut.substring(0, lastClose + 1);
     }
     for (const [open, close] of [['（', '）'], ['“', '”'], ['「', '」'], ['[', ']']]) {
@@ -1923,8 +1949,9 @@ ${missing.map(f => `- ${f}:${FIELD_DESCS[f]}`).join('\n')}
   }
 
   _countChars(str) {
-    // 【P2-13 修复】使用真实字符数,中文不再按1.5计
-    return str ? String(str).length : 0;
+    // WorkLoom modification [T-2026-1104-9006]: supplementary Han and emoji
+    // each occupy one Unicode character, matching the final delivery limit.
+    return PromptLengthConfig.countCharacters(str ? String(str) : '');
   }
 
   // 【P2-PROMPT-02 修复】简单哈希函数：根据字符串生成确定性哈希值
