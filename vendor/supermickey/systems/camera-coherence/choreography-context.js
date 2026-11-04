@@ -96,7 +96,9 @@ function extractLightPlans(shots = []) {
     return {
       shotId: s.shotId || s.shot_id || 'unknown',
       scale: null,
-      scaleRaw: s.camera?.shot_size || f.composition || s.shot_type || '',
+      // WorkLoom modification [T-2026-1105-9002]: neighbor guidance must use
+      // the same final composition as the validator and rendered prompt.
+      scaleRaw: f.composition || f.shot_size || f.compositionString || f.camera?.shot_size || s.camera?.shot_size || s.shot_type || '',
       movement: s.camera?.movement || '',
       movementRaw: f.camera_movement || s.cameraString || s.camera_string || s.camera?.movement || '',
       transition: f.transition || s.transition || s.transition_intent || ''

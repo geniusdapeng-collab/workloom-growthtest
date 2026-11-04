@@ -206,6 +206,25 @@ it("keeps current-run failures active so a native fallback cannot dispatch anoth
   expect(following).not.toHaveBeenCalled();
 });
 
+it("rejects degraded production with both original camera diagnostics and never checkpoints it as completed", async () => {
+  const { adapter, records } = memoryStore();
+  const failure = vi.fn();
+  const generate = async () => ({});
+  const issues = ["R1_scale_jump", "R4_transition_mismatch"].map(rule => ({ rule, severity: "critical",
+    shots: ["S1", "S2"], message: `${rule} 原始诊断`, rewrite_hint: "由原生作者修正最终镜头" }));
+  const output = { success: true, degraded: true, stages: { cameraCoherence: { passed: false, issues } },
+    shots: [{ shotId: "S1", prompt: "未批准的原稿" }] };
+  const before = structuredClone(output);
+  const system = { creativeThemeGenerator: { generate }, requirementDiscoveryEngine: { discover: generate },
+    prdGenerator: { generate }, scriptEngine: { process: generate }, productionEngine: { produce: async () => output } };
+  bindStudioEngineCheckpoints(system, adapter, "same", { assertActive() {}, onFailure: failure });
+  await expect(system.productionEngine.produce()).rejects.toThrow(/R1_scale_jump.*S1.*S2.*R4_transition_mismatch/u);
+  expect(failure).toHaveBeenCalledOnce();
+  expect(String(failure.mock.calls[0]![0])).toContain("由原生作者修正最终镜头");
+  expect(records.size).toBe(0);
+  expect(output).toEqual(before);
+});
+
 it("rehydrates a verified source-bound discovery marker and rejects legacy fallback risks", () => {
   const source = { intent: "拿起茶杯后举杯。", product: "茶杯", restrictions: [] };
   const discovery = { sceneStructure: { requiredActions: ["拿起茶杯", "举杯"], requiredProps: ["杯"] },
@@ -271,4 +290,27 @@ it("excludes only runtime dossier reports and production deadlines from stage fi
     studioCheckpointHash(studioCheckpointInput("PRODUCTION", [{ scenes: ["S1"] }, { totalDeadlineMs, model }]));
   expect(production(1000)).toBe(production(999_999));
   expect(production(1000, "other-model")).not.toBe(production(1000));
+});
+
+it("ignores only reassembled reference fetch timestamps while retaining asset identity and permissions", () => {
+  const make = (fetchedAt: string) => ({
+    _dataDossier: { cards: { portrait_manifest: { reference_images: [{
+      id: "product-front", url: "https://example.invalid/front.png", source: "verified source",
+      sha256: "source-image-hash", angle: "front", license_risk: "high", fetched_at: fetchedAt,
+    }] } } },
+    characters: [{ portraitRef: "approved-character.png" }], fetched_at: "retained outside manifest",
+  });
+  const fingerprint = (metadata: ReturnType<typeof make>) =>
+    studioCheckpointHash(studioCheckpointInput("SCRIPT", ["完整原话", metadata]));
+  const original = make("2026-11-04T18:14:53.451Z");
+  const before = structuredClone(original);
+  expect(fingerprint(original)).toBe(fingerprint(make("2026-11-04T18:47:34.476Z")));
+  expect(original).toEqual(before);
+  for (const [field, value] of Object.entries({ id: "other-image", url: "https://example.invalid/other.png",
+    source: "different source", sha256: "changed-image-hash", angle: "side", license_risk: "low" })) {
+    const changed = make("2026-11-04T18:47:34.476Z");
+    Object.assign(changed._dataDossier.cards.portrait_manifest.reference_images[0]!, { [field]: value });
+    expect(fingerprint(changed), field).not.toBe(fingerprint(original));
+  }
+  expect(fingerprint({ ...original, fetched_at: "changed outside manifest" })).not.toBe(fingerprint(original));
 });

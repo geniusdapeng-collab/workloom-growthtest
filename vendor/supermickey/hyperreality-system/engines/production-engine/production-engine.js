@@ -699,6 +699,16 @@ class ProductionEngine {
           // 临界问题不阻断流程：标记降级 + 把可执行修复建议写进镜头 metadata
           result.degraded = true;
           const criticalIssues = coherenceReport.issues.filter(i => i.severity === 'critical');
+          // WorkLoom modification [T-2026-1105-9002]: retain every native critical diagnosis.
+          for (const issue of criticalIssues) {
+            this.log('CAMERA-COHERENCE', JSON.stringify({
+              rule: issue.rule,
+              severity: issue.severity,
+              shotIds: issue.shots,
+              message: issue.message,
+              rewrite_hint: issue.rewrite_hint
+            }));
+          }
           result.errors.push({
             stage: 'camera-coherence',
             message: `${criticalIssues.length} 处运镜/转场临界问题：${criticalIssues[0]?.message || ''}`
@@ -743,6 +753,7 @@ class ProductionEngine {
 
       // 【2026-07-17 复活】最终完整性校验（pipeline-integrity-validator 轻量化）
       const integrity = this._finalIntegrityCheck(currentShots, adaptedBlueprint);
+      result.stages.finalIntegrity = integrity;
       if (!integrity.valid) {
         this.log('INTEGRITY', `⚠️ 最终完整性校验未通过: ${integrity.errors.join('; ')}`);
         result.warnings = result.warnings || [];
@@ -751,7 +762,19 @@ class ProductionEngine {
         this.log('INTEGRITY', `✅ 最终完整性校验通过`);
       }
 
-      this._clearCheckpoints(); // 成功完成,清理 checkpoint
+      // WorkLoom modification [T-2026-1105-9002]: retain native work until existing completion checks pass.
+      const degradedShotIds = currentShots.filter(shot => shot.degraded === true)
+        .map(shot => shot.shotId || shot.shot_id);
+      if (result.success === true && result.degraded !== true && degradedShotIds.length === 0
+          && result.stages.qualityGate?.passed === true && integrity.valid === true) {
+        this._clearCheckpoints();
+      } else {
+        this.log('CHECKPOINT', `保留原生断点，制作结果尚未通过既有验收: ${JSON.stringify({
+          success: result.success, degraded: result.degraded, degradedShotIds,
+          qualityGatePassed: result.stages.qualityGate?.passed === true,
+          integrityValid: integrity.valid === true
+        })}`);
+      }
 
     } catch (error) {
       result.success = false;
