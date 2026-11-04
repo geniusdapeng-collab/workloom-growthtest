@@ -57,6 +57,7 @@ import { createDataMiningExecutor } from "./data-mining-executor.js";
 import { prepareMarketingFacts, finalizeMarketingFacts, type PreparedMarketingFacts } from "./marketing-authority.js";
 import { canonicalRenderJson, renderSha256 } from "./gen/compiled-request.js";
 import { acquireProjectLease, archiveWorkDir, makeLedgerWriter, readProjectMeta } from "./archive-host.js";
+import { isPromptReviewRejection, readLatestStudioResumeStage } from "./archive-resume.js";
 import { ingestPortraitsFromIndex } from "./media/library.js";
 import { upsertProductProfileFromDossier } from "./media/products.js";
 import { appendScenePolicyGuidance, resolveScenePolicyForIntent } from "./scene-policy-routing.js";
@@ -534,6 +535,7 @@ function portraitConfig(metadata?: Record<string, unknown>, directorIdentityImag
 type StudioRunInput = RunInput & {
   purpose?: "prompt-review";
   durationSec?: number;
+  promptReviewPrior?: { runId: string; attempt: number };
   /** 原始客户需求；pipelineIntent 可能清理过路由语句并追加了系统口径。 */
   rawIntent?: string;
   /** 同一入口已经做过选型时复用其受控结果，避免二次选型改写取证依据。 */
@@ -596,6 +598,7 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
   };
   const runInput: RunInput = {
     projectId: input.projectId,
+    rawIntent: input.rawIntent ?? input.intent,
     intent: appendPlatformGuidance(appendScenePolicyGuidance(input.intent, selectedScenePolicy.policy), selectedPlatform.decision)
       +(directorProfile?directorGuidance(directorProfile):""),
     metadata: resolvedMetadata,
@@ -816,6 +819,9 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
           deterministic: gateDeterministicChecks(gate, req.contentMd ?? ""),
           rubric: [
             ...((GATE_RUBRIC[gate] ?? []) as string[]),
+            ...(gate === "G1_DOSSIER" ? [
+              "creativeRequirements.intent 中的原文是本片创作与交付合同。人物、情节、披露和尾帧不属于商品事实，应核对两者分区及 restrictions 约束，具体镜头是否落实由后续门判定。",
+            ] : []),
             ...(scopedPromptGate ? ["以 context.request 为本次创作合同，核对每个必需剧情动作、顺序、连续性、角色身份、声音与平台时长；任何明确要求被遗漏、替换或互相冲突须拒绝。",
               "当前只审完整提示词的文字和创作内容。G5 实际参考图、G7 整体预生产和付费渲染均未批准，不把文字中的引用描述当成已核实的媒体授权。"] : []),
             `门内容全长 ${artifact.chars} 字，已随附件送审；摘录（供定位，不是全文）：${(req.contentMd ?? "").slice(0, 600)}`
@@ -1151,6 +1157,13 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
           throw new Error(`项目 ${input.projectId} 已有执行者持有档案租约（不重复启动，避免双份烧额度）`);
         }
       }
+      if (promptReview && input.promptReviewPrior) {
+        const prior = input.promptReviewPrior;
+        const latest = await readLatestStudioResumeStage(scope, input.projectId, "prompt_review");
+        if (latest?.attempt !== prior.attempt || !isPromptReviewRejection(latest, prior.runId)) {
+          throw new Error("PROMPT_REVIEW_PRIOR_CHANGED: 原提示词工作单的最新执行已变化，拒绝重复运行");
+        }
+      }
       projectMeta = await readProjectMeta(scope, input.projectId);
       if (!projectMeta) throw new Error(`PROJECT_NOT_FOUND: 项目 ${input.projectId} 不存在或不属于当前工作区`);
       if (projectMeta.kind !== pipelineKind) throw new Error("PIPELINE_KIND_MISMATCH：预生产管线与服务项目类型不一致");
@@ -1245,6 +1258,7 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
         await runner.run(
           promptReview ? "prompt_review" : "preproduction",
           { intent: runInput.intent, isMarketing: input.isMarketing ?? false, pipelineKind, scenePolicy: selectedScenePolicy.decision,
+            ...(input.promptReviewPrior ? { promptReviewPrior: input.promptReviewPrior } : {}),
             resumeInput: captureStudioResumeInput(scope, input, { projectCreatedAt: projectMeta?.createdAt ?? null,
               requiresDelegation: directorMode, scenePolicy: selectedScenePolicy, platformId: selectedPlatform.decision.id }) },
           async (ctx) => {
@@ -1270,7 +1284,7 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
             let g1Failure: Awaited<ReturnType<ApprovalCallback>> | undefined;
             if (input.isMarketing) {
               marketing = await prepareMarketingFacts({ scope: { ...scope, projectId: input.projectId, runId: entry.runId, attempt: ctx.attempt },
-                root: archive.root, metadata: input.metadata ?? {}, intent: input.intent, llm,
+                root: archive.root, metadata: input.metadata ?? {}, intent: input.rawIntent ?? input.intent, llm,
                 ...(promptReview ? { stageId: "prompt_review" as const } : {}) });
               const verdict = await onApproval({ runId: entry.runId, gate: "G1_DOSSIER", vendorType: "host-source-dossier",
                 title: "本次营销来源正文与逐主张事实审核", contentMd: marketing.g1Content });
@@ -1287,7 +1301,7 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
             const studio = new VideoStudio({ ...studioConfig, ...(marketing ? { dataMining: {
               mode: "api", storeRoot: marketing.storeRoot, refresh: true,
               verifiedRaw: { projectId: input.projectId, rawJson: canonicalRenderJson(marketing.raw), sha256: marketing.bundle.rawSha256, productQuery: marketing.bundle.productQuery,
-                specSourceUrls: marketing.specSourceUrls },
+                specSourceUrls: marketing.specSourceUrls, creativeRequirements: marketing.bundle.creativeRequirements, restrictions: marketing.bundle.restrictions },
             } } : {}) });
             /**
              * 传入 runInput（而不是 input）：它带上了本轮的片型选型结论与注入指引，

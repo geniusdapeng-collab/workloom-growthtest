@@ -175,10 +175,13 @@ export async function readVideoJob(path) {
     || Object.keys(binding).some(key => !BINDING_FIELDS.includes(key))
     || binding.repository !== REPOSITORY || !COMMIT.test(binding.commit ?? "") || typeof binding.origin !== "string"
     || ![binding.productId, binding.instance, binding.tenantId, binding.workspaceId, binding.memberId, binding.memberNo].every(id => ID.test(id ?? ""))
-    || !["start_unknown", "preproduction_submitted", "clarify", "unsupported"].includes(raw.phase)
+    || !["start_unknown", "preproduction_submitted", "clarify", "unsupported", "resume_refused"].includes(raw.phase)
     || (raw.purpose !== undefined && (raw.purpose !== PROMPT_REVIEW || raw.phase === "preproduction_submitted" && !validDuration(raw.durationSec)))
     || (raw.durationSec !== undefined && !validDuration(raw.durationSec))
     || (raw.platform !== undefined && !canonicalPlatform(raw.platform))
+    || (raw.resumedFrom !== undefined && (raw.purpose !== PROMPT_REVIEW || !record(raw.resumedFrom)
+      || !COMMIT.test(raw.resumedFrom.commit ?? "") || !ID.test(raw.resumedFrom.runId ?? "")
+      || !ID.test(raw.projectId ?? "") || !PIPELINES.has(raw.pipeline)))
     || (raw.phase === "preproduction_submitted" && (!ID.test(raw.runId ?? "") || !ID.test(raw.projectId ?? "") || !PIPELINES.has(raw.pipeline)))) {
     fail("JOB_FILE_INVALID", "工作单结构或来源不符合正式视频入口", 4);
   }
@@ -196,6 +199,7 @@ const receipt = (job, phase = job.phase, detail = {}) => ({
   ...(job.runId ? { runId: job.runId, projectId: job.projectId, pipeline: job.pipeline } : {}),
   ...(job.durationSec === undefined ? {} : { durationSec: job.durationSec }),
   ...(job.purpose === undefined ? {} : { purpose: job.purpose, renderAuthorized: false }),
+  ...(job.resumedFrom === undefined ? {} : { resumedFrom: job.resumedFrom, projectId: job.projectId, pipeline: job.pipeline }),
   ...(job.platform === undefined ? {} : { platform: job.platform }), ...detail,
 });
 
@@ -308,6 +312,7 @@ export async function statusVideo(jobFile, deps = {}) {
   const session = await verifyVideoSession(deps);
   verifyVideoJobBinding(job, session);
   if (job.phase === "start_unknown") return receipt(job, "start_unknown", { next: "保留工作单；核对服务记录，禁止重新提交" });
+  if (job.phase === "resume_refused") return receipt(job, job.phase, { error: job.error });
   if (job.phase === "clarify") return receipt(job, "clarify", { question: job.question, missing: job.missing });
   if (job.phase === "unsupported") return receipt(job, "unsupported", { handoff: job.handoff });
   let run;
@@ -339,6 +344,50 @@ export async function statusVideo(jobFile, deps = {}) {
   } catch (error) {
     return receipt(job, "status_unavailable", { error: sanitizeErrorMessage(error, deps.env ?? process.env) });
   }
+}
+
+async function resumePromptReview(jobFile, out, deps) {
+  const original = await readVideoJob(resolve(jobFile));
+  if (original.purpose !== PROMPT_REVIEW || original.phase !== "preproduction_submitted") {
+    fail("PROMPT_REVIEW_JOB_REQUIRED", "只可恢复原提示词评审工作单", 4);
+  }
+  const session = await verifyVideoSession(deps);
+  if (Object.keys(session.binding).some(key => key !== "commit" && original.binding[key] !== session.binding[key])) {
+    fail("JOB_SCOPE_MISMATCH", "续跑须使用原服务实例、工作区与成员", 4);
+  }
+  if (!session.access.actionPermissions?.includes("workspace.write")) fail("WRITE_PERMISSION_REQUIRED", "当前成员未获工作区写权限", 4);
+  const { runId, ...job } = { ...original, createdAt: new Date().toISOString(), binding: session.binding, phase: "start_unknown",
+    resumedFrom: { commit: original.binding.commit, runId: original.runId } };
+  const path = resolve(out);
+  try {
+    await writeExclusive(path, job);
+    await syncParent(path);
+  } catch (error) {
+    if (error?.code === "EEXIST") fail("JOB_ALREADY_EXISTS", "续跑工作单已存在，请用 status 回读，禁止重复提交", 4);
+    fail("JOB_WRITE_FAILED", "无法持久化续跑工作单，尚未提交", 7);
+  }
+  let result;
+  try {
+    result = await requestVideoProcedure(session, "video.studio.resume", {
+      projectId: job.projectId, fromStage: "prompt_review", expectedRunId: runId,
+    }, { mutation: true, timeoutMs: 180_000 });
+  } catch (error) {
+    return receipt(job, "start_unknown", { error: sanitizeErrorMessage(error, deps.env ?? process.env),
+      next: "保留续跑工作单；核对原项目台账，禁止重复提交" });
+  }
+  if (result?.kind === "resumed" && result.stage === "prompt_review" && result.projectId === job.projectId
+    && result.priorRunId === runId && ID.test(result.runId ?? "") && result.runId !== runId) {
+    job.phase = "preproduction_submitted";
+    job.runId = result.runId;
+  } else if (["noaction", "busy", "awaiting_approval"].includes(result?.kind)) {
+    job.phase = "resume_refused";
+    job.error = sanitizeErrorMessage(result.message ?? "续跑未启动", deps.env ?? process.env);
+  } else {
+    return receipt(job, "start_unknown", { error: "续跑回执无法绑定原项目与原运行；禁止重复提交" });
+  }
+  try { await replaceJob(path, job); }
+  catch { return receipt(job, "start_unknown", { error: "收到续跑回执但未能保存；核对原项目台账，禁止重复提交" }); }
+  return receipt(job, job.phase, job.error ? { error: job.error } : {});
 }
 
 async function exportPromptReview(jobFile, out, deps) {
@@ -390,6 +439,7 @@ async function readInputFile(path) {
 
 const usage = "node scripts/workloom-video.mjs start --input-file <JSON文件|-> --job-file <工作单>\n"
   + "node scripts/workloom-video.mjs status --job-file <工作单>\n"
+  + "node scripts/workloom-video.mjs resume-prompts --job-file <原工作单> --out <续跑工作单>\n"
   + "node scripts/workloom-video.mjs prompts --job-file <工作单> --out <新JSON文件>";
 export async function runVideoCli(argv, deps = {}) {
   const [command, ...args] = argv;
@@ -405,6 +455,7 @@ export async function runVideoCli(argv, deps = {}) {
   const out = flags.get("--out");
   if (command === "start" && jobFile && inputFile && !out) return startVideo(await readInputFile(inputFile), jobFile, deps);
   if (command === "status" && jobFile && !inputFile && !out) return statusVideo(jobFile, deps);
+  if (command === "resume-prompts" && jobFile && !inputFile && out) return resumePromptReview(jobFile, out, deps);
   if (command === "prompts" && jobFile && !inputFile && out) return exportPromptReview(jobFile, out, deps);
   fail("USAGE", usage);
 }
@@ -415,7 +466,7 @@ if (process.argv[1] && await realpath(process.argv[1]).catch(() => null) === fil
     try {
       const result = await runVideoCli(process.argv.slice(2));
       console.log(JSON.stringify(result));
-      if (["start_unknown", "preproduction_failed", "status_unavailable", "unsupported", "clarify"].includes(result.phase)) process.exitCode = 7;
+      if (["start_unknown", "preproduction_failed", "status_unavailable", "unsupported", "clarify", "resume_refused"].includes(result.phase)) process.exitCode = 7;
     } catch (error) {
       console.error(JSON.stringify({ error: { code: error.code ?? "VIDEO_ENTRY_FAILED", message: sanitizeErrorMessage(error) } }));
       process.exitCode = error.exitCode ?? 7;

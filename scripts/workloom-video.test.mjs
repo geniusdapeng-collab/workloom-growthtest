@@ -57,7 +57,7 @@ async function directory(t) {
 }
 
 function fixture({ healthBody = health, accessBody = access, post = async () => trpc(started),
-  status = run("running"), source = formalSource, reviewed = promptReview, repo = checkout, env = environment } = {}) {
+  status = run("running"), source = formalSource, reviewed = promptReview, resume, repo = checkout, env = environment } = {}) {
   const seen = [];
   return {
     seen,
@@ -66,6 +66,7 @@ function fixture({ healthBody = health, accessBody = access, post = async () => 
       if (url.pathname === "/health") return Response.json(healthBody);
       if (url.pathname === "/trpc/access.me") return trpc(accessBody);
       if (url.pathname === "/trpc/video.studio.start") return post(url, init);
+      if (url.pathname === "/trpc/video.studio.resume" && resume) return resume(init);
       if (url.pathname === "/trpc/video.studio.status") return status instanceof Response ? status : trpc(status);
       if (url.pathname === "/trpc/video.production.shots") return trpc(source);
       if (url.pathname === "/trpc/video.production.promptReview") return trpc(reviewed);
@@ -300,6 +301,43 @@ test("explicit prompt review job never reads render-eligible shots and exports o
 
   const wrongPurpose = fixture();
   assert.equal((await startVideo(promptIntent, join(root, "old-service.json"), wrongPurpose.deps)).phase, "start_unknown");
+});
+
+test("a failed prompt review continues in a new bound work order without another project start", async t => {
+  const root = await directory(t);
+  const original = join(root, "original.json");
+  const resumed = join(root, "resume.json");
+  const runId = "RUN-continuation";
+  const newCommit = "2".repeat(40);
+  const f = fixture({ post: async () => trpc({ ...started, purpose: "prompt-review" }) });
+  await startVideo({ ...intent, purpose: "prompt-review" }, original, f.deps);
+  const previous = await readFile(original, "utf8");
+  const continuation = fixture({
+    repo: { ...checkout, commit: newCommit }, healthBody: { ...health, sourceCommit: newCommit },
+    resume: async init => {
+      const marker = JSON.parse(await readFile(resumed, "utf8"));
+      assert.equal(marker.phase, "start_unknown");
+      assert.equal(marker.resumedFrom.runId, started.runId);
+      assert.deepEqual(JSON.parse(init.body), { projectId: started.projectId, fromStage: "prompt_review", expectedRunId: started.runId });
+      return trpc({ kind: "resumed", stage: "prompt_review", projectId: started.projectId, priorRunId: started.runId, runId });
+    },
+    status: null, reviewed: { ...promptReview, runId },
+  });
+  const argv = ["resume-prompts", "--job-file", original, "--out", resumed];
+  const receipt = await runVideoCli(argv, continuation.deps);
+  assert.equal(receipt.runId, runId);
+  assert.equal(receipt.commit, newCommit);
+  assert.equal(receipt.projectId, started.projectId);
+  assert.equal((await statusVideo(resumed, continuation.deps)).phase, "prompt_review_ready");
+  await assert.rejects(runVideoCli(argv, continuation.deps), { code: "JOB_ALREADY_EXISTS" });
+  assert.equal(await readFile(original, "utf8"), previous);
+  assert.equal(routePaths(continuation).filter(path => path === "/trpc/video.studio.resume").length, 1);
+  assert.ok(!routePaths(continuation).includes("/trpc/video.studio.start"));
+
+  const differentInstance = fixture({ healthBody: { ...health, desktopInstanceId: "sibling" },
+    env: { ...environment, WORKLOOM_DESKTOP_INSTANCE_ID: "sibling" } });
+  await assert.rejects(runVideoCli(["resume-prompts", "--job-file", original, "--out", join(root, "wrong.json")], differentInstance.deps),
+    { code: "JOB_SCOPE_MISMATCH" });
 });
 
 test("CLI rejects unknown arguments, invalid file encoding and symlinked or shared job records", async t => {

@@ -46,7 +46,8 @@ import {
 import { AUDIO_DISCIPLINE_CLAUSE, AUDIO_NEGATIVE_TERMS } from "./shot-spec.js";
 import { loadDurationRules } from "./duration-rules.js";
 import { installVendorMarketingPriceBridge } from "./marketing-price-contract.js";
-import { sourceBoundMarketingAssemblyRaw, verifiedMarketingDossierInput } from "./marketing-dossier-input.js";
+import { installVendorMarketingReferenceBridge, sourceBoundMarketingAssemblyRaw, verifiedMarketingDossierInput,
+  verifyMarketingCreativeRequirements, type MarketingCreativeRequirements } from "./marketing-dossier-input.js";
 
 /** 全局桥只安装一次；可变的日志和事件出口属于调用它的异步运行。 */
 interface StudioBridgeScope {
@@ -162,7 +163,8 @@ export interface StudioConfig {
     storeRoot?: string;
     staleAfterDays?: number;
     /** 仅服务宿主在完整来源/G1通过后装配；浏览器metadata中的同名字段没有权限。 */
-    verifiedRaw?: { projectId: string; rawJson: string; sha256: string; productQuery: Record<string, unknown>; specSourceUrls?: Record<string, string> };
+    verifiedRaw?: { projectId: string; rawJson: string; sha256: string; productQuery: Record<string, unknown>;
+      specSourceUrls?: Record<string, string>; creativeRequirements?: MarketingCreativeRequirements; restrictions?: string[] };
   };
 }
 
@@ -170,6 +172,8 @@ export interface RunInput {
   projectId: string;
   /** 创作意图原文（故事/主题/营销 Brief） */
   intent: string;
+  /** 宿主绑定的客户原文，供审核合同校验。intent 可以附带本次路由和片型指导。 */
+  rawIntent?: string;
   metadata?: Record<string, unknown>;
   /** 是否为社媒营销类输入（决定是否强制情报层节点 0） */
   isMarketing?: boolean;
@@ -371,7 +375,7 @@ export class VideoStudio {
     const { cfg } = this;
     const anchored = attachDefaultCharacterAnchor(input.intent, structuredClone(input.metadata ?? {}));
     const metadata = anchored.metadata;
-    const effectiveIntent = anchored.intent;
+    let effectiveIntent = anchored.intent;
     delete metadata._dataDossier;
     const verified = cfg.dataMining?.verifiedRaw;
     let verifiedRaw: Record<string, unknown> | undefined;
@@ -389,6 +393,14 @@ export class VideoStudio {
       }
       metadata.dataMining = verifiedMarketingDossierInput(parsed);
       verifiedRaw = sourceBoundMarketingAssemblyRaw(parsed, verified.specSourceUrls ?? {});
+      if (verified.creativeRequirements !== undefined) {
+        if (!verifyMarketingCreativeRequirements(verified.creativeRequirements)
+          || (input.rawIntent ?? input.intent) !== verified.creativeRequirements.intent
+          || !Array.isArray(verified.restrictions) || !verified.restrictions.every(value => typeof value === "string" && value.trim())) {
+          throw new Error("MARKETING_CREATIVE_REQUIREMENTS_UNBOUND：营销创作输入与 G1 核对的创作合同不同");
+        }
+        effectiveIntent += `\n\n【已核对的创作与交付约束】\n按本次客户创作要求（creativeRequirements.intent）落实以下限制。\n${verified.restrictions.join("\n")}`;
+      }
     }
     const log = cfg.log ?? ((line: string) => console.log(line));
     const require = createRequire(import.meta.url);
@@ -471,6 +483,7 @@ export class VideoStudio {
       let runFailure: { error: unknown } | undefined;
       try {
         keep(installVendorMarketingPriceBridge());
+        if (verifiedRaw) keep(installVendorMarketingReferenceBridge());
         /**
          * 注入依赖保活（vendor ConfigIsolator 会摊平类实例，见 vendor-compat.ts）：
          * 必须在本实例装配之前打上，否则注入的 LLM 引擎在隔离后变成"空心对象"，

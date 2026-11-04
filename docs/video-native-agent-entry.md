@@ -33,6 +33,8 @@ node scripts/workloom-source-session.mjs video -- prompts --job-file "$job_root/
 
 导出文件含项目、运行、阶段、尝试编号和正文摘要，须放在任务私有目录。回执标记 `renderAuthorized:false`。出片需要走正式制作流程的素材授权、定妆照、完整预生产和预算审核。
 
+提示词评审被门禁明确打回并修复问题后，在原实例使用 `video -- resume-prompts --job-file "$job_root/job.json" --out "$job_root/review-continuation.json"`。它在同一项目内重试原需求，核对先前失败的运行，生成一份关联原作业的新工作单。收到结果未知时先查原项目与模型台账。使用续跑工作单查询新运行和导出。
+
 ## 从同一作业渲染并交付
 
 选取运行实例目录里可用的模型，在同一项目使用经核对的 [标准后期设置](video-standard-post.md)。设置声明封面、字幕、调色与可选既有音乐，以及字体和输入摘要。封面平台须与同一正式工作单记录的平台一致。制作工作台复用已登记设置；缺授权或缺必要素材时保留当前回执。设置文件须在首次渲染前就绪。以下金额来自本次批准，由执行环境传入。

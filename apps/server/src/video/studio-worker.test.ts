@@ -685,12 +685,27 @@ describe("正式 G6 提示词工作单", () => {
     if (kind === "marketing") {
       expect(doubles.prepare).toHaveBeenCalledWith(expect.objectContaining({ stageId: "prompt_review" }));
       expect(doubles.finalize).toHaveBeenCalledWith(expect.anything(), receipt.shots);
-      expect(doubles.verifyMarketingFacts).toHaveBeenCalledWith(expect.objectContaining({ stageId: "prompt_review", shots: receipt.shots }));
+      expect(doubles.verifyMarketingFacts).toHaveBeenCalledWith(expect.objectContaining({ stageId: "prompt_review",
+        intentSha256: receipt.intentSha256, shots: receipt.shots }));
     }
     await expect(readStudioPromptReview({ ...read, runId: "RUN-stale" })).rejects.toMatchObject({ code: "PROMPT_REVIEW_NOT_READY" });
     await expect(readStudioPromptReview({ ...read, scope: { ...scope, workspaceId: "ws-other" } })).rejects.toMatchObject({ code: "PROMPT_REVIEW_NOT_READY" });
     await writeFile(path.join(root, "stages/prompt_review/attempt-1.prompt-review.json"), JSON.stringify({ ...receipt, targetSeconds: 31 }));
     await expect(readStudioPromptReview(read)).rejects.toMatchObject({ code: "PROMPT_REVIEW_UNVERIFIED" });
+  });
+
+  it("取得项目租约后再次发现原提示词执行已变化时不认领新尝试", async () => {
+    vi.stubEnv("WORKLOOM_RENDER_SIGNING_SECRET", randomBytes(32).toString("hex"));
+    doubles.query.mockImplementation(async (sql: string) => ({ rows: sql.includes("SELECT attempt, input_ref")
+      ? [{ run_id: "RUN-successor", attempt: 2, status: "done", error_class: null }] : [], rowCount: 1 }));
+    const runId = worker.startRun(scope, { projectId: "VID-stale-prompt-resume", intent: "电影", purpose: "prompt-review",
+      durationSec: 30, promptReviewPrior: { runId: "RUN-prior", attempt: 1 } });
+    await vi.waitFor(() => expect(worker.getRun(runId, scope.workspaceId)?.finishedAt).not.toBeNull());
+    expect(worker.getRun(runId, scope.workspaceId)).toMatchObject({ status: "failed", error: expect.stringContaining("PROMPT_REVIEW_PRIOR_CHANGED") });
+    expect(doubles.lease).toHaveBeenCalledOnce();
+    expect(doubles.release).toHaveBeenCalledOnce();
+    expect(doubles.nextAttempt).toBe(0);
+    expect(doubles.runPreproduction).not.toHaveBeenCalled();
   });
 
   it("没有独立签发密钥时在租约和供应商之前拒绝", () => {

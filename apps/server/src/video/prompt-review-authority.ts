@@ -192,7 +192,7 @@ export async function readStudioPromptReview(input: ReviewStageQuery & {
     if (payload.pipeline === "marketing") {
       if (!payload.marketingFacts) return unverified("营销提示词缺少本轮事实证据");
       await verifyMarketingFacts({ root, ...payload.marketingFacts, scope: { ...scope, projectId, runId, attempt: row.attempt },
-        stageId: "prompt_review", shots: payload.shots });
+        stageId: "prompt_review", intentSha256: payload.intentSha256, shots: payload.shots });
     }
     const [current] = await latestStage(input);
     if (current?.id !== row.id || current.output_sha256 !== row.output_sha256 || current.status !== "done") return notReady();

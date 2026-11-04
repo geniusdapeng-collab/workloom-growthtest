@@ -141,11 +141,14 @@ describe("人工恢复共用运行锁", () => {
   });
 
   it.each([
-    ["prompt_review", "failed", "GATE_REJECTED", true],
-    ["preproduction", "failed", "GATE_REJECTED", false],
-    ["prompt_review", "interrupted", "LLM_TIMEOUT", false],
-    [undefined, "failed", "GATE_REJECTED", false],
-  ] as const)("提示词项目从 %s 恢复仅接受明确已知失败", async (fromStage, status, errorClass, allowed) => {
+    ["prompt_review", "failed", "GATE_REJECTED", "RUN-prior", true],
+    ["preproduction", "failed", "GATE_REJECTED", "RUN-prior", false],
+    ["prompt_review", "interrupted", "LLM_TIMEOUT", "RUN-prior", false],
+    [undefined, "failed", "GATE_REJECTED", "RUN-prior", false],
+    ["prompt_review", "failed", "GATE_REJECTED", "RUN-stale", false],
+    ["prompt_review", "failed", "GATE_REJECTED", undefined, false],
+    ["prompt_review", "done", null, "RUN-prior", false],
+  ] as const)("提示词项目从 %s 恢复仅接受明确已知失败 (%s %s %s)", async (fromStage, status, errorClass, expectedRunId, allowed) => {
     const projectId = "VID-1";
     const createdAt = "2026-09-26T00:00:00.000Z";
     db.query.mockImplementation(async (sql: string) => {
@@ -154,7 +157,7 @@ describe("人工恢复共用运行锁", () => {
       if (sql.startsWith("SELECT title, kind")) return { rows: [{ kind: "narrative", created_at: createdAt }], rowCount: 1 };
       if (sql.startsWith("SELECT stage_id AS")) return { rows: [{ stageId: "prompt_review", attempt: 1, status, errorClass }], rowCount: 1 };
       if (sql.startsWith("SELECT attempt, input_ref")) return { rows: [{ attempt: 1, status, error_class: errorClass,
-        input_ref: "stages/prompt_review/attempt-1.input.json" }], rowCount: 1 };
+        input_ref: "stages/prompt_review/attempt-1.input.json", run_id: "RUN-prior" }], rowCount: 1 };
       return { rows: [], rowCount: 0 };
     });
     vi.mocked(ArchiveStore.prototype.readJson).mockImplementation(async <T>(rel: string): Promise<T | null> =>
@@ -165,10 +168,11 @@ describe("人工恢复共用运行锁", () => {
         scenePolicyInput: null, platformId: "douyin", purpose: "prompt-review", durationSec: 30,
       } } } as T : null);
     const startRun = vi.fn().mockResolvedValue("RUN-prompt-resumed");
-    const result = await resumeProject(scope, { projectId, fromStage, startRun, actor: { id: "MEM-1", type: "human" } });
+    const result = await resumeProject(scope, { projectId, fromStage, expectedRunId, startRun, actor: { id: "MEM-1", type: "human" } });
     if (allowed) {
-      expect(result).toMatchObject({ kind: "resumed", stage: "prompt_review", runId: "RUN-prompt-resumed" });
-      expect(startRun).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ purpose: "prompt-review", durationSec: 30, rawIntent: "用户原话" }));
+      expect(result).toMatchObject({ kind: "resumed", stage: "prompt_review", projectId, priorRunId: "RUN-prior", runId: "RUN-prompt-resumed", attempt: 1 });
+      expect(startRun).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ purpose: "prompt-review", durationSec: 30,
+        rawIntent: "用户原话", promptReviewPrior: { runId: "RUN-prior", attempt: 1 } }));
     } else {
       expect(result).toMatchObject({ kind: "noaction", stage: "prompt_review" });
       expect(startRun).not.toHaveBeenCalled();

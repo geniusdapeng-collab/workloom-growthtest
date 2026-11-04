@@ -765,6 +765,7 @@ const studioRouter = router({
     .input(z.object({
       projectId: z.string().min(1),
       fromStage: z.string().min(1).max(64).optional(),
+      expectedRunId: z.string().regex(/^[A-Za-z0-9_-]{1,160}$/u).optional(),
       intent: z.string().max(2000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -773,6 +774,7 @@ const studioRouter = router({
         return await resumeProject(scope, {
           projectId: input.projectId,
           fromStage: input.fromStage,
+          expectedRunId: input.expectedRunId,
           intent: input.intent,
           startRun: (runInput) => startRun(scope, runInput),
           actor: { id: ctx.identity.memberNo, type: "human" },
