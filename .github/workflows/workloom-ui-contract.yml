@@ -28,6 +28,7 @@ jobs:
       - run: corepack enable && corepack prepare pnpm@10.14.0 --activate
       - name: 私有 UI 制品校验与原锁安装
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           WORKLOOM_UI_RELEASE_READ_TOKEN: ${{ secrets.CNB_UI_RELEASE_TOKEN }}
         run: >-
           node "$WORKLOOM_DIR/scripts/ci/install-private-ui.mjs"

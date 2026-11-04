@@ -5708,6 +5708,7 @@ interface FusionAgent extends FusionRecord {
   _callLLM?: (...args: unknown[]) => Promise<unknown>;
   _getLLMEngine?: () => FusionRecord | null;
   _getAltLLMEngine?: () => FusionRecord | null;
+  _saveSubCheckpoint?: (checkpointManager: unknown, blueprintHash: string, rows: FusionRecord[], completed: number, total: number) => void;
 }
 interface FusionPhase extends FusionRecord {
   agents: { promptFusion?: FusionAgent };
@@ -6442,6 +6443,7 @@ export function applyNarrativeFinalPromptContract(
       }
     }
     let detailedQa: { verification: string; deliveryReview?: string } | undefined;
+    let hostTemplates: Record<string, string> | undefined;
     if (nativeMarketing && unicodeLength(prompt) > options.maxLength) {
       const deliveryReview = /^\d+\.【交付复核】([^\n]*)$/mu.exec(prompt)?.[1];
       const compactVerification = [
@@ -6455,6 +6457,51 @@ export function applyNarrativeFinalPromptContract(
       if (deliveryReview) prompt = prompt.replace(/^(\d+\.【交付复核】)[^\n]*$/mu,
         (_line, prefix: string) => `${prefix}详细复核见结构化镜头合同，按本镜原生字段逐项验收。`);
       detailedQa = { verification: verificationText, ...(deliveryReview ? { deliveryReview } : {}) };
+    }
+    if (nativeMarketing && unicodeLength(prompt) > options.maxLength) {
+      // Only host-authored repetition is shortened. Preserve the complete wording
+      // in the same structured contract included in the G6 report.
+      const compactHostField = (label: string, value: string, original?: string): void => {
+        const pattern = new RegExp(`^(\\d+\\.【${escapeLabel(label)}】)([^\\n]*)$`, "mu");
+        const current = pattern.exec(prompt)?.[2];
+        if (current === undefined || current === value) return;
+        (hostTemplates ??= {})[label] = original ?? current;
+        prompt = prompt.replace(pattern, (_line, prefix: string) => `${prefix}${value}`);
+      };
+      compactHostField("语言约束", "中文；技术参数、时间码、资产路径除外。");
+      compactHostField("导演意图", "依已审商业合同及本镜字段；声画连贯；后期文字见验收。");
+      compactHostField("明亮约束", canonicalNoPerson
+        ? "主体高光不过曝，暗部保留纹理；无人物面部要求。"
+        : "依灯光字段；人物/主体轮廓、明暗可辨，禁过曝及额外正面补光。");
+      compactHostField("负面约束", [
+        "底画面禁浮动文字/字幕", "禁合同外水印/品牌标识",
+        ...(canonicalNoPerson ? ["禁人物/人影/人体局部"] : []),
+        ...(options.noAnimals ? ["禁动物/飞鸟"] : []),
+        ...sourceEnvironmentProhibitions,
+        "禁生成特效/镜头光晕伪影/模糊/过曝/未声明角色/暗黑风调色/塑料或金属感高光",
+      ].join("；") + "。");
+      compactHostField("角色约束", canonicalNoPerson
+        ? "禁人物/人影/人体局部及拟人化表演。"
+        : `仅${characterNames.join("、") || "已登记角色"}入画，禁增员。`);
+      compactHostField("角色一致性", canonicalNoPerson
+        ? "无人物；场景、道具、光源、空间关系锁定。"
+        : "授权外观/服装/发型锁定；禁角色合并/替换/增减。");
+      if (!canonicalNoPerson && !canonicalAnimalOnly && characterNames.length > 0
+        && characterNames.every(name => profiles.some(profile => profile.name === name && profile.path))) {
+        // Each registered identity remains explicit and its original asset path
+        // stays in 定妆照; no unregistered or text-only identity is shortened.
+        compactHostField("角色", `${characterNames.join("、")}；外观以本镜登记定妆照和角色主档为准。`);
+      }
+      if (!portraitText.startsWith("不适用")) compactHostField("定妆照",
+        portraitText.endsWith("；禁替换。") ? portraitText : `${portraitText}；禁替换。`);
+      if (options.noDialogue) compactHostField("台词", "禁台词、对白、旁白、口播。");
+      const positiveAudio = promptFieldText((next.fields as FusionRecord).audio);
+      compactHostField("音频", `${positiveAudio}；${options.noDialogue ? "禁可辨台词/对白/旁白/口播；" : ""}${options.noMusic ? "禁音乐/配乐/音乐节拍" : "禁镜头外配乐"}。`);
+      compactHostField("本镜验收", [
+        "核对动作/声画/跨镜连续性",
+        ...options.marketingPrompt!.overlay.map(text => `后期原文“${text}”；底画面不生字`),
+        ...(options.isLastShot ? options.marketingPrompt!.endCard.map(text => `后期尾帧原文“${text}”`) : []),
+      ].join("；"), verificationText);
     }
     next._workloomShotContract = {
       schema: "workloom.prompt-shot-contract/v1",
@@ -6477,6 +6524,7 @@ export function applyNarrativeFinalPromptContract(
       timeline: timelineText,
       emotion: emotionText,
       ...detailedQa,
+      ...(hostTemplates ? { hostTemplates } : {}),
       ...(options.sourceFirstFrame ? { sourceFirstFrame: options.sourceFirstFrame } : {}),
       portraitAssets: profiles
         .filter((item) => String(item.path ?? "").trim())
@@ -7997,6 +8045,22 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
         updated = repairResult.rows;
         if (repairResult.repaired.length > 0) {
           stages.phase3Retry = { repaired: repairResult.repaired, mode: "single-shot-llm-retry" };
+        }
+        if (repairResult.repaired.length > 0 && this.checkpointManager) {
+          const checkpointHash = pfResult.checkpointBlueprintHash;
+          if (typeof checkpointHash !== "string" || !/^[a-f0-9]{24,64}$/u.test(checkpointHash)
+            || typeof scoped._saveSubCheckpoint !== "function") {
+            throw new CinematicSkillError("PHASE3_REPAIR_CHECKPOINT_UNVERIFIED", "缺少原生单镜修复的同指纹保存接口", "unverified");
+          }
+          try {
+            // Raw native repair precedes canonical validation. Save it through
+            // the existing project/fingerprint path before any later hard gate.
+            scoped._saveSubCheckpoint(this.checkpointManager, checkpointHash, updated, updated.length, shots.length);
+            (stages.phase3Retry as FusionRecord).rawCheckpointSaved = true;
+          } catch (error) {
+            throw new CinematicSkillError("PHASE3_REPAIR_CHECKPOINT_UNVERIFIED",
+              error instanceof Error ? error.message : String(error), "unverified");
+          }
         }
         if (repairResult.recovered.length > 0) {
           stages.phase3Recovery = {

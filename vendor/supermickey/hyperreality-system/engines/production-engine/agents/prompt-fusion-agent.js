@@ -389,6 +389,8 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
 
     return {
       shots: results,
+      // Host single-shot repairs must persist under this same feedback-aware key.
+      checkpointBlueprintHash: blueprintHash,
       degraded: failed > 0,
       degradeReason: failed > 0 ? `${failed}个镜头融合或补全失败` : null,
       stats: { total: shots.length, failed, success: shots.length - failed }

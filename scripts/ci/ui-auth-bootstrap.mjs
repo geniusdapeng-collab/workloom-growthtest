@@ -127,9 +127,12 @@ export function validateAssetRedirect(location, platform = 'cnb') {
   return url;
 }
 
-async function downloadPublicGithubArchive(fetchImplementation) {
-  // Public mirror reads never receive the optional legacy CNB credential.
-  const headers = { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2026-03-10' };
+async function downloadPublicGithubArchive(fetchImplementation, githubToken) {
+  // The optional Actions token is scoped to the two fixed GitHub API URLs.
+  // Public reads remain available without it; the legacy CNB credential is separate.
+  if (githubToken !== undefined) requireFact(typeof githubToken === 'string' && githubToken.length > 0 && githubToken.length < 4096 && !/\s/.test(githubToken), 'INVALID_GITHUB_TOKEN');
+  const authorization = githubToken === undefined ? {} : { Authorization: 'Bearer ' + githubToken };
+  const headers = { ...authorization, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2026-03-10' };
   const releaseResponse = await safeFetch(fetchImplementation, PIN.releaseUrl, { method: 'GET', headers, credentials: 'omit', redirect: 'error', signal: AbortSignal.timeout(30000) }, 'UI_RELEASE_REQUEST');
   requireFact(releaseResponse.status === 200, 'UI_RELEASE_HTTP_' + releaseResponse.status);
   let release;
@@ -142,7 +145,7 @@ async function downloadPublicGithubArchive(fetchImplementation) {
   const asset = assets[0];
   requireFact(asset.id === PIN.assetId && asset.state === 'uploaded' && asset.size === PIN.bytes && asset.digest === 'sha256:' + PIN.sha256, 'UI_RELEASE_ASSET_HASH');
   requireFact(asset.browser_download_url === PIN.canonicalUrl && asset.url === PIN.apiUrl, 'UI_RELEASE_ASSET_URL');
-  const options = { method: 'GET', headers: { Accept: 'application/octet-stream', 'X-GitHub-Api-Version': '2026-03-10' }, credentials: 'omit', redirect: 'manual', signal: AbortSignal.timeout(60000) };
+  const options = { method: 'GET', headers: { ...authorization, Accept: 'application/octet-stream', 'X-GitHub-Api-Version': '2026-03-10' }, credentials: 'omit', redirect: 'manual', signal: AbortSignal.timeout(60000) };
   let response = await safeFetch(fetchImplementation, PIN.apiUrl, options, 'UI_ASSET_REQUEST');
   let assetOrigin = 'https://api.github.com';
   if (response.status === 302) {
@@ -154,13 +157,13 @@ async function downloadPublicGithubArchive(fetchImplementation) {
   requireFact(response.status === 200, 'UI_ASSET_DOWNLOAD_HTTP_' + response.status);
   const bytes = await boundedBody(response, PIN.bytes, 'UI_ASSET_DOWNLOAD_SIZE');
   const proof = verifyArchive(bytes);
-  return { bytes, proof: { ...proof, platform: 'github', authenticatedApi: false, credentialsForwardedToCdn: false, apiOrigin: 'https://api.github.com', assetOrigin, releaseId: String(release.id), assetId: String(asset.id) } };
+  return { bytes, proof: { ...proof, platform: 'github', authenticatedApi: githubToken !== undefined, credentialsForwardedToCdn: false, apiOrigin: 'https://api.github.com', assetOrigin, releaseId: String(release.id), assetId: String(asset.id) } };
 }
 
-/** Only the explicit legacy CNB branch receives the credential. No child receives it. */
-export async function downloadPinnedArchive({ releaseReadToken, state, fetchImplementation = fetch }) {
+/** Each API receives only its explicit platform credential. No child receives either. */
+export async function downloadPinnedArchive({ releaseReadToken, githubToken, state, fetchImplementation = fetch }) {
   validateState(state);
-  if (state.artifact.platform === 'github') return downloadPublicGithubArchive(fetchImplementation);
+  if (state.artifact.platform === 'github') return downloadPublicGithubArchive(fetchImplementation, githubToken);
   const pin = LEGACY_PIN;
   requireFact(typeof releaseReadToken === 'string' && releaseReadToken.length > 0 && releaseReadToken.length < 4096 && !/\s/.test(releaseReadToken), 'MISSING_UI_RELEASE_TOKEN');
   const headers = { Authorization: 'Bearer ' + releaseReadToken, Accept: 'application/vnd.cnb.api+json' };
@@ -380,7 +383,7 @@ export async function installCanonicalFrozen({ repoRoot, storeDir, warmProof, pn
 
 export async function bootstrapInstall(options) {
   const state = JSON.parse(await readFile(join(options.repoRoot, '.workloom-ui.json'), 'utf8'));
-  const download = await downloadPinnedArchive({ releaseReadToken: options.releaseReadToken, state, fetchImplementation: options.fetchImplementation });
+  const download = await downloadPinnedArchive({ releaseReadToken: options.releaseReadToken, githubToken: options.githubToken, state, fetchImplementation: options.fetchImplementation });
   const warm = await warmCanonicalStore({ ...options, archiveBytes: download.bytes });
   const result = await installCanonicalFrozen({ ...options, warmProof: warm });
   return { ...result, download: download.proof };
@@ -390,7 +393,7 @@ async function main() {
   const args = process.argv.slice(2); const allowed = new Set(['--repo', '--store-dir', '--staging-root', '--report']); const values = {};
   for (let i = 0; i < args.length; i += 2) { requireFact(allowed.has(args[i]) && args[i + 1] && !args[i + 1].startsWith('--'), 'UI_BOOTSTRAP_ARGUMENT'); requireFact(!values[args[i]], 'UI_BOOTSTRAP_DUPLICATE_ARGUMENT'); values[args[i]] = args[i + 1]; }
   requireFact(values['--store-dir'] && values['--report'], 'UI_BOOTSTRAP_REQUIRED_ARGUMENT');
-  const result = await bootstrapInstall({ repoRoot: resolve(values['--repo'] ?? '.'), storeDir: resolve(values['--store-dir']), stagingRoot: values['--staging-root'] ? resolve(values['--staging-root']) : tmpdir(), releaseReadToken: process.env.WORKLOOM_UI_RELEASE_READ_TOKEN });
+  const result = await bootstrapInstall({ repoRoot: resolve(values['--repo'] ?? '.'), storeDir: resolve(values['--store-dir']), stagingRoot: values['--staging-root'] ? resolve(values['--staging-root']) : tmpdir(), releaseReadToken: process.env.WORKLOOM_UI_RELEASE_READ_TOKEN, githubToken: process.env.GITHUB_TOKEN });
   await writeFile(resolve(values['--report']), JSON.stringify(result, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
   process.stdout.write(JSON.stringify({ frozenInstallPassed: result.frozenInstallPassed, version: result.installedVersion, originalLockSha256: result.originalLockSha256, originalLockUnchanged: result.originalLockUnchanged }) + '\n');
 }
