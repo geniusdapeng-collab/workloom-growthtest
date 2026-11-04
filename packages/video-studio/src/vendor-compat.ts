@@ -8087,6 +8087,7 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
             const characters = Array.isArray((blueprint.character_system as FusionRecord | undefined)?.characters)
               ? (blueprint.character_system as FusionRecord).characters as FusionRecord[]
               : [];
+            scoped._currentShotIdx = index;
             const retry = await (scoped as FusionAgent & {
               _fuseSingleShot?: (
                 shot: FusionRecord,

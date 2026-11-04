@@ -87,9 +87,14 @@ it("retries only actual14-shaped recovered S1/S5 and preserves the five genuine 
     const f = fixture(directory, first);
     const realS1 = nativeRow("S1", `检修工位，${"灰色墙面保留真实细节。".repeat(500)}`);
     const realS5 = nativeRow("S5");
-    f.repair.mockImplementation(async shot => shot.shotId === "S1" ? realS1 : realS5);
+    const neighborIndices: unknown[] = [];
+    f.repair.mockImplementation(async function (this: Row, shot: Row) {
+      neighborIndices.push(this._currentShotIdx);
+      return shot.shotId === "S1" ? realS1 : realS5;
+    });
     await expect(f.phase.execute(f.state())).rejects.toThrow("FINAL_PROMPT_SOURCE_CAPACITY_EXCEEDED");
     expect(f.repair.mock.calls.map(([shot]) => shot.shotId)).toEqual(["S1", "S5"]);
+    expect(neighborIndices).toEqual([0, 4]);
     expect(f.writer).toHaveBeenCalledTimes(2);
     const saved = JSON.parse(readFileSync(f.cache, "utf8"));
     expect(saved).toMatchObject({ blueprintHash: checkpointHash, completed: 7, total: 7 });
