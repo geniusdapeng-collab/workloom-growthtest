@@ -64,3 +64,67 @@ it("lets the existing successful production cleanup remove raw fusion rows only 
     expect(readFileSync(other, "utf8")).toBe("unrelated project");
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
+
+it("exposes the native cache key so a host-repaired S1 survives the next seven-shot resume", async () => {
+  const baseDir = mkdtempSync(resolve(tmpdir(), "wl-fusion-repaired-row-"));
+  const sevenShots = Array.from({ length: 7 }, (_, index) => ({
+    shotId: `S${index + 1}`, action: `原生镜头动作${index + 1}`,
+  }));
+  try {
+    const { agent, calls } = offlineAgent();
+    // Model calls are offline stubs. This reproduces the real seven-row cache
+    // shape (only S1 degraded), without claiming to recover its lost retry bytes.
+    calls.mockImplementation(async (shot: Record<string, unknown>) => ({ ...shot,
+      fields: { action: shot.action }, prompt: `01.【动作】${String(shot.action)}`,
+      degraded: shot.shotId === "S1" }));
+    const first = await agent.process(sevenShots, blueprint,
+      { checkpointManager: { baseDir }, blueprintHash: fingerprint });
+    expect(first.checkpointBlueprintHash).toBe(fingerprint);
+    expect(calls).toHaveBeenCalledTimes(7);
+    expect(first.shots.filter((shot: Record<string, unknown>) => shot.degraded).map((shot: Record<string, unknown>) => shot.shotId)).toEqual(["S1"]);
+    const repairedS1 = { ...first.shots[0], fields: { action: "单镜原生修复后的动作" },
+      prompt: "01.【动作】单镜原生修复后的动作", degraded: false };
+    const repaired = [repairedS1, ...first.shots.slice(1)];
+    // The host uses the existing native writer before canonical validation.
+    agent._saveSubCheckpoint({ baseDir }, first.checkpointBlueprintHash, repaired, repaired.length, sevenShots.length);
+    calls.mockClear();
+    const resumed = await agent.process(sevenShots, blueprint,
+      { checkpointManager: { baseDir }, blueprintHash: fingerprint });
+    expect(calls).not.toHaveBeenCalled();
+    expect(resumed.shots).toEqual(repaired);
+    expect(resumed.shots.slice(1)).toEqual(first.shots.slice(1));
+    expect(first.shots[0].degraded).toBe(true);
+    const saved = JSON.parse(readFileSync(resolve(baseDir, `checkpoint-phase3-${fingerprint}.json`), "utf8"));
+    expect(saved).toMatchObject({ completed: 7, total: 7, results: repaired });
+  } finally { rmSync(baseDir, { recursive: true, force: true }); }
+});
+
+it("returns the effective feedback hash and keeps host repair saves isolated by feedback", async () => {
+  const baseDir = mkdtempSync(resolve(tmpdir(), "wl-fusion-feedback-key-"));
+  const feedbackA = { ...blueprint, _workloomProductionRepairFeedback: "S1按先停车再摘盔的顺序修复" };
+  const feedbackB = { ...blueprint, _workloomProductionRepairFeedback: "S1只修复声音与动作的同步" };
+  try {
+    const { agent, calls } = offlineAgent();
+    const baseline = await agent.process(shots, blueprint,
+      { checkpointManager: { baseDir }, blueprintHash: fingerprint });
+    const first = await agent.process(shots, feedbackA,
+      { checkpointManager: { baseDir }, blueprintHash: fingerprint });
+    expect(first.checkpointBlueprintHash).toMatch(/^[0-9a-f]{24}$/u);
+    expect(first.checkpointBlueprintHash).not.toBe(fingerprint);
+    const repaired = [{ ...first.shots[0], prompt: "01.【动作】反馈A的单镜修复结果" }, first.shots[1]];
+    agent._saveSubCheckpoint({ baseDir }, first.checkpointBlueprintHash, repaired, repaired.length, shots.length);
+    const other = await agent.process(shots, feedbackB,
+      { checkpointManager: { baseDir }, blueprintHash: fingerprint });
+    expect(other.checkpointBlueprintHash).not.toBe(first.checkpointBlueprintHash);
+    expect(other.shots).toEqual(baseline.shots);
+    expect(calls).toHaveBeenCalledTimes(6);
+    calls.mockClear();
+    const resumed = await agent.process(shots, feedbackA,
+      { checkpointManager: { baseDir }, blueprintHash: fingerprint });
+    expect(resumed.checkpointBlueprintHash).toBe(first.checkpointBlueprintHash);
+    expect(resumed.shots).toEqual(repaired);
+    expect(calls).not.toHaveBeenCalled();
+    expect(agent._loadSubCheckpoint({ baseDir }, fingerprint).results).toEqual(baseline.shots);
+    expect(agent._loadSubCheckpoint({ baseDir }, other.checkpointBlueprintHash).results).toEqual(other.shots);
+  } finally { rmSync(baseDir, { recursive: true, force: true }); }
+});
