@@ -291,3 +291,26 @@ it("excludes only runtime dossier reports and production deadlines from stage fi
   expect(production(1000)).toBe(production(999_999));
   expect(production(1000, "other-model")).not.toBe(production(1000));
 });
+
+it("ignores only reassembled reference fetch timestamps while retaining asset identity and permissions", () => {
+  const make = (fetchedAt: string) => ({
+    _dataDossier: { cards: { portrait_manifest: { reference_images: [{
+      id: "product-front", url: "https://example.invalid/front.png", source: "verified source",
+      sha256: "source-image-hash", angle: "front", license_risk: "high", fetched_at: fetchedAt,
+    }] } } },
+    characters: [{ portraitRef: "approved-character.png" }], fetched_at: "retained outside manifest",
+  });
+  const fingerprint = (metadata: ReturnType<typeof make>) =>
+    studioCheckpointHash(studioCheckpointInput("SCRIPT", ["完整原话", metadata]));
+  const original = make("2026-11-04T18:14:53.451Z");
+  const before = structuredClone(original);
+  expect(fingerprint(original)).toBe(fingerprint(make("2026-11-04T18:47:34.476Z")));
+  expect(original).toEqual(before);
+  for (const [field, value] of Object.entries({ id: "other-image", url: "https://example.invalid/other.png",
+    source: "different source", sha256: "changed-image-hash", angle: "side", license_risk: "low" })) {
+    const changed = make("2026-11-04T18:47:34.476Z");
+    Object.assign(changed._dataDossier.cards.portrait_manifest.reference_images[0]!, { [field]: value });
+    expect(fingerprint(changed), field).not.toBe(fingerprint(original));
+  }
+  expect(fingerprint({ ...original, fetched_at: "changed outside manifest" })).not.toBe(fingerprint(original));
+});

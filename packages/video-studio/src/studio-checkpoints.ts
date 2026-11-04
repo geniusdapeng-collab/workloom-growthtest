@@ -127,6 +127,12 @@ export function studioCheckpointInput(stage: StudioEngineCheckpointStage, args: 
       delete dossier.saved;
       delete dossier.envelopes;
       delete dossier.chain;
+      const cards = record(dossier.cards) ? dossier.cards : null;
+      const manifest = cards && record(cards.portrait_manifest) ? cards.portrait_manifest : null;
+      if (manifest && Array.isArray(manifest.reference_images)) {
+        // Reassembly timestamps are runtime context; asset identity and permissions stay fingerprinted.
+        for (const image of manifest.reference_images) if (record(image)) delete image.fetched_at;
+      }
     }
   }
   if (stage === "PRODUCTION" && record(values[1])) {
