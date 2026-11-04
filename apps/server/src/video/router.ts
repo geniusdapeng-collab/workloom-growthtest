@@ -61,7 +61,8 @@ import { resolvePlatformForIntent } from "./platform-routing.js";
 import { makeStageArchive } from "./archive-host.js";
 import { readArchiveSummary, resumeProject, scanStaleRunsOnStartup } from "./archive-resume.js";
 import { isStudioPromptReviewProject } from "./prompt-review-authority.js";
-import { applyRouteToMetadata, buildPipelineIntent, filmTargetSecondsFromIntent, platformIdOf, routeVideoPipeline } from "@hyperreality/video-studio";
+import { applyRouteToMetadata, buildPipelineIntent, filmTargetSecondsFromIntent, platformIdOf, routeVideoPipeline,
+  unicodeLength, VIDEO_INTENT_MAX_CHARACTERS } from "@hyperreality/video-studio";
 import { routedLlmCall } from "../service/llm.js";
 import { deliveryIngestHook, mediaRouter } from "./media/index.js";
 import { whiteboardRouter } from "./whiteboard/router.js";
@@ -489,7 +490,8 @@ const studioRouter = router({
   start: writeProcedure
     .input(z.union([z.object({
       officialIntent: z.literal(true),
-      intent: z.string().min(1).max(2000).refine((value) => Boolean(value.trim())),
+      intent: z.string().min(1).refine((value) => unicodeLength(value) <= VIDEO_INTENT_MAX_CHARACTERS,
+        "intent 最多 12000 个 Unicode 字符").refine((value) => Boolean(value.trim())),
       purpose: z.literal("prompt-review").optional(),
       durationSec: z.number().int().min(1).max(300).optional(),
       platform: z.string().trim().min(1).max(40).refine(value => Boolean(platformIdOf(value)), "未登记的目标平台").optional(),
@@ -503,7 +505,8 @@ const studioRouter = router({
       officialIntent: z.undefined().optional(),
       purpose: z.undefined().optional(),
       projectId: z.string().min(1).optional(),
-      intent: z.string().min(1).max(2000),
+      intent: z.string().min(1).refine((value) => unicodeLength(value) <= VIDEO_INTENT_MAX_CHARACTERS,
+        "intent 最多 12000 个 Unicode 字符"),
       /** 原话中明确的全片创作目标；旧客户端未传时沿用 30 秒。 */
       durationSec: z.number().int().min(1).max(300).default(30),
       metadata: z.record(z.string(), z.unknown()).refine(isPublicStudioMetadata, RESERVED_STUDIO_METADATA_ERROR).optional(),
@@ -766,7 +769,8 @@ const studioRouter = router({
       projectId: z.string().min(1),
       fromStage: z.string().min(1).max(64).optional(),
       expectedRunId: z.string().regex(/^[A-Za-z0-9_-]{1,160}$/u).optional(),
-      intent: z.string().max(2000).optional(),
+      intent: z.string().refine((value) => unicodeLength(value) <= VIDEO_INTENT_MAX_CHARACTERS,
+        "intent 最多 12000 个 Unicode 字符").optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const scope = scopeOf(ctx.identity);

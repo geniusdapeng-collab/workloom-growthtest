@@ -2,7 +2,7 @@
  * T-2026-0927-0013：真实 startRun + StageRunner + ArchiveStore 回归。
  * vendor、PG、媒体登记用边界替身；档案写盘与重试/终态/商品摘要走实际代码。
  */
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { createHash, randomBytes } from "node:crypto";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -25,13 +25,16 @@ const doubles = vi.hoisted(() => ({
   detach: vi.fn(),
   review: vi.fn(),
   prepare: vi.fn(),
+  restoreMarketing: vi.fn(),
   finalize: vi.fn(),
   verifyMarketingFacts: vi.fn(),
+  dataMiningExecutor: vi.fn(),
   studioConfigs: [] as Array<Record<string, any>>,
   emitGates: true,
   connect: vi.fn(),
   query: vi.fn(),
   releaseDb: vi.fn(),
+  checkpointEvents: [] as Array<Record<string, any>>,
 }));
 
 vi.mock("@workloom/db", () => ({ getAppPool: () => ({ connect: doubles.connect }), getGatewayPool: () => ({}) }));
@@ -62,15 +65,29 @@ vi.mock("@workloom/base/workdata", async () => {
   };
 });
 vi.mock("../service/llm.js", () => ({ modelPolicyFor: () => undefined }));
-vi.mock("./marketing-authority.js", () => ({ prepareMarketingFacts: doubles.prepare, finalizeMarketingFacts: doubles.finalize,
-  verifyMarketingFacts: doubles.verifyMarketingFacts }));
-vi.mock("./data-mining-executor.js", () => ({ createDataMiningExecutor: vi.fn() }));
+vi.mock("./marketing-authority.js", async importOriginal => ({
+  ...await importOriginal<typeof import("./marketing-authority.js")>(),
+  prepareMarketingFacts: doubles.prepare, restoreMarketingFacts: doubles.restoreMarketing,
+  finalizeMarketingFacts: doubles.finalize, verifyMarketingFacts: doubles.verifyMarketingFacts,
+}));
+vi.mock("./data-mining-executor.js", async importOriginal => ({
+  ...await importOriginal<typeof import("./data-mining-executor.js")>(),
+  createDataMiningExecutor: doubles.dataMiningExecutor,
+}));
 vi.mock("./media/library.js", () => ({ ingestPortraitsFromIndex: doubles.ingest }));
 vi.mock("./media/products.js", () => ({ upsertProductProfileFromDossier: doubles.project }));
 vi.mock("./archive-host.js", () => ({
   archiveWorkDir: () => doubles.workDir,
   acquireProjectLease: doubles.lease,
   readProjectMeta: doubles.meta,
+  scopedRows: async (_scope: unknown, sql: string, params: unknown[] = []) => {
+    if (sql.includes("video.studio.checkpoint.saved")) {
+      const [workspaceId, tenantId, projectId, kind, runId] = params;
+      return doubles.checkpointEvents.filter(event => event.workspaceId === workspaceId && event.tenantId === tenantId
+        && event.projectId === projectId && event.kind === kind && event.runId === runId).slice().reverse();
+    }
+    return (await doubles.query(sql, params)).rows;
+  },
   makeLedgerWriter: () => ({
     claimRun: async (row: { inputRefTemplate: string }) => {
       const attempt = ++doubles.nextAttempt;
@@ -94,7 +111,8 @@ vi.mock("@hyperreality/video-studio", async (importOriginal) => ({
     }
   },
   reviewStage: doubles.review,
-  WorkloomLLMEngine: { fromEnv: () => ({ attachRouter: vi.fn(), attachConfiguredRouter: vi.fn() }) },
+  WorkloomLLMEngine: { fromEnv: () => ({ model: "test-author", hasUnknownOutcome: () => false,
+    attachRouter: vi.fn(), attachConfiguredRouter: vi.fn() }) },
   withVendorEngineBridge: (_engine: unknown, run: () => Promise<unknown>) => run(),
   withVendorPortraitBindingBridge: async (_options: unknown, run: () => Promise<unknown>) => {
     try { return await run(); } finally { doubles.uninstall(); }
@@ -107,7 +125,7 @@ const scope = { tenantId: "tenant-test", workspaceId: "ws-test" };
 let projectSequence = 0;
 
 beforeAll(async () => {
-  doubles.workDir = await mkdtemp(path.join(tmpdir(), "studio-result-"));
+  doubles.workDir = await realpath(await mkdtemp(path.join(tmpdir(), "studio-result-")));
   worker = await import("./studio-worker.js");
 });
 
@@ -117,18 +135,33 @@ afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 beforeEach(() => {
   vi.clearAllMocks();
   const eventReceipt = { eventId: "EVT-studio-test", seq: 1n, hash: "a".repeat(64), deduped: false, piiHits: 0 };
-  vi.mocked(gatewayAppend).mockReset().mockResolvedValue(eventReceipt);
+  doubles.checkpointEvents.length = 0;
+  vi.mocked(gatewayAppend).mockReset().mockImplementation(async (_pool, identity, event) => {
+    if (event.decision.action === "video.studio.checkpoint.saved") {
+      const after = event.decision.after;
+      if (!after || typeof after !== "object" || Array.isArray(after)) throw new Error("断点事件夹具要求对象型after");
+      doubles.checkpointEvents.push({ ...after, tenantId: identity.tenantId,
+        workspaceId: identity.workspaceId, projectId: event.object.id });
+    }
+    return eventReceipt;
+  });
   vi.mocked(gatewayAppendOnClient).mockReset().mockResolvedValue(eventReceipt);
   doubles.nextAttempt = 0;
   doubles.studioConfigs.length = 0;
-  doubles.prepare.mockReset().mockImplementation(async ({ scope, root }) => ({
-    bundle: { rawSha256: "a".repeat(64), productQuery: { name: "本次商品" } }, raw: { A1: {}, A2: {}, A3: {} },
-    prefix: `stages/preproduction/attempt-${scope.attempt}.marketing`,
-    storeRoot: path.join(root, `stages/preproduction/attempt-${scope.attempt}.marketing-dossier`),
+  doubles.prepare.mockReset().mockImplementation(async ({ scope, root, stageId = "preproduction" }) => ({
+    root, stageId, bundle: { scope, rawSha256: "a".repeat(64), productQuery: { name: "本次商品" } }, raw: { A1: {}, A2: {}, A3: {} },
+    prefix: `stages/${stageId}/attempt-${scope.attempt}.marketing`,
+    storeRoot: path.join(root, `stages/${stageId}/attempt-${scope.attempt}.marketing-dossier`),
     g1Content: JSON.stringify({ facts: { schemaVersion: "workloom.marketing-facts/v1", stages: [1, 2, 3], sources: [1], optionalValue: null }, scope }),
+  }));
+  doubles.restoreMarketing.mockReset().mockImplementation(async (prepared, { scope, stageId }) => ({
+    ...structuredClone(prepared), prefix: `stages/${stageId}/attempt-${scope.attempt}.marketing`,
+    storeRoot: path.join(prepared.root, `stages/${stageId}/attempt-${scope.attempt}.marketing-dossier`),
+    bundle: { ...structuredClone(prepared.bundle), scope, sourceScope: prepared.bundle.sourceScope ?? prepared.bundle.scope, outputReviews: [] },
   }));
   doubles.finalize.mockReset().mockResolvedValue({ ref: "stages/preproduction/attempt-1.marketing-facts.json", sha256: "b".repeat(64) });
   doubles.verifyMarketingFacts.mockReset().mockResolvedValue(undefined);
+  doubles.dataMiningExecutor.mockReset();
   doubles.emitGates = true;
   doubles.query.mockReset().mockResolvedValue({ rows: [], rowCount: 1 });
   doubles.review.mockReset().mockImplementation(async (options) => {
@@ -461,6 +494,85 @@ describe("预生产原始结果与诚实终态", () => {
     expect(doubles.uninstall).toHaveBeenCalledTimes(1);
   });
 
+  it("旧项目直接补跑不能绕过未知模型结果，拒绝发生在新attempt和供应商之前", async () => {
+    useNarrativeProject();
+    const projectId = `VID-unknown-direct-${++projectSequence}`;
+    doubles.runPreproduction.mockRejectedValueOnce(new Error("VIDEO_MODEL_OUTCOME_UNKNOWN: 原请求最终回执丢失"));
+    const firstRunId = worker.startRun(scope, { projectId, intent: "同一冻结需求" });
+    await vi.waitFor(() => expect(worker.getRun(firstRunId, scope.workspaceId)?.finishedAt).not.toBeNull());
+    const outcome = doubles.checkpointEvents.filter(event => event.kind === "OUTCOME").at(-1)!;
+    const saved = JSON.parse(await readFile(path.join(doubles.workDir, "archive", scope.workspaceId, projectId, outcome.ref), "utf8"));
+    expect(saved.payload.state).toBe("unknown");
+    doubles.query.mockImplementation(async (sql: string) => ({ rows: sql.includes("SELECT attempt, input_ref")
+      ? [{ run_id: firstRunId, attempt: 1, status: "failed", error_class: "MODEL_UNKNOWN",
+        input_ref: "stages/preproduction/attempt-1.input.json" }] : [], rowCount: 1 }));
+    doubles.runPreproduction.mockResolvedValue(success());
+    const secondRunId = worker.startRun(scope, { projectId, intent: "同一冻结需求" });
+    await vi.waitFor(() => expect(worker.getRun(secondRunId, scope.workspaceId)?.finishedAt).not.toBeNull());
+    expect(worker.getRun(secondRunId, scope.workspaceId)).toMatchObject({ status: "failed",
+      error: expect.stringContaining("STUDIO_RESUME_REQUIRED") });
+    expect(doubles.nextAttempt).toBe(1);
+    expect(doubles.runPreproduction).toHaveBeenCalledTimes(1);
+  });
+
+  it("已核实的失败只能携带同项目原run与attempt接续，正常续跑仍完成", async () => {
+    useNarrativeProject();
+    const projectId = `VID-known-resume-${++projectSequence}`;
+    doubles.runPreproduction.mockResolvedValueOnce(rejected()).mockResolvedValueOnce(success());
+    const firstRunId = worker.startRun(scope, { projectId, intent: "同一冻结需求" });
+    await vi.waitFor(() => expect(worker.getRun(firstRunId, scope.workspaceId)?.finishedAt).not.toBeNull());
+    const outcome = doubles.checkpointEvents.filter(event => event.kind === "OUTCOME").at(-1)!;
+    const saved = JSON.parse(await readFile(path.join(doubles.workDir, "archive", scope.workspaceId, projectId, outcome.ref), "utf8"));
+    expect(saved.payload.state).toBe("known");
+    doubles.query.mockImplementation(async (sql: string) => ({ rows: sql.includes("SELECT attempt, input_ref")
+      ? [{ run_id: firstRunId, attempt: 1, status: "failed", error_class: "GATE_REJECTED",
+        input_ref: "stages/preproduction/attempt-1.input.json" }] : [], rowCount: 1 }));
+    const nextRunId = worker.startRun(scope, { projectId, intent: "同一冻结需求",
+      resumePrior: { runId: firstRunId, attempt: 1, stageId: "preproduction" } });
+    await vi.waitFor(() => expect(worker.getRun(nextRunId, scope.workspaceId)?.finishedAt).not.toBeNull());
+    expect(worker.getRun(nextRunId, scope.workspaceId)).toMatchObject({ status: "finished", error: null });
+    expect(doubles.nextAttempt).toBe(2);
+    expect(doubles.runPreproduction).toHaveBeenCalledTimes(2);
+  });
+
+  it("作者完成但断点事件未落账时，proper prior恢复也必须先对账而不能再次执行作者", async () => {
+    useNarrativeProject();
+    const projectId = `VID-checkpoint-unverified-${++projectSequence}`;
+    const { createStudioCheckpointRunner } = await import("@hyperreality/video-studio");
+    const append = vi.mocked(gatewayAppend).getMockImplementation()!;
+    let eventFailure = true, authorCalls = 0;
+    vi.mocked(gatewayAppend).mockImplementation(async (pool, identity, event) => {
+      if (event.decision.action === "video.studio.checkpoint.saved"
+        && (event.decision.after as { kind?: string }).kind === "ENGINE_SCRIPT" && eventFailure) {
+        eventFailure = false;
+        throw new Error("作者已完成后的断点事件写入短暂失败");
+      }
+      return append(pool, identity, event);
+    });
+    doubles.runPreproduction.mockImplementation(async () => {
+      const config = doubles.studioConfigs.at(-1)!;
+      const runner = createStudioCheckpointRunner(config.checkpoints, "同一冻结工位种子");
+      return runner.run("SCRIPT", "同一完整输入", async () => { authorCalls++; return success(); });
+    });
+    const firstRunId = worker.startRun(scope, { projectId, intent: "同一冻结需求" });
+    await vi.waitFor(() => expect(worker.getRun(firstRunId, scope.workspaceId)?.finishedAt).not.toBeNull());
+    expect(worker.getRun(firstRunId, scope.workspaceId)?.error).toContain("STUDIO_CHECKPOINT_WRITE_UNVERIFIED");
+    const outcome = doubles.checkpointEvents.filter(event => event.kind === "OUTCOME").at(-1)!;
+    const saved = JSON.parse(await readFile(path.join(doubles.workDir, "archive", scope.workspaceId, projectId, outcome.ref), "utf8"));
+    expect(saved.payload.state).toBe("receipt_unverified");
+    doubles.query.mockImplementation(async (sql: string) => ({ rows: sql.includes("SELECT attempt, input_ref")
+      ? [{ run_id: firstRunId, attempt: 1, status: "failed", error_class: "BUG",
+        input_ref: "stages/preproduction/attempt-1.input.json" }] : [], rowCount: 1 }));
+    const nextRunId = worker.startRun(scope, { projectId, intent: "同一冻结需求",
+      resumePrior: { runId: firstRunId, attempt: 1, stageId: "preproduction" } });
+    await vi.waitFor(() => expect(worker.getRun(nextRunId, scope.workspaceId)?.finishedAt).not.toBeNull());
+    expect(worker.getRun(nextRunId, scope.workspaceId)).toMatchObject({ status: "failed",
+      error: expect.stringContaining("PROMPT_REVIEW_PRIOR_CHANGED") });
+    expect(authorCalls).toBe(1);
+    expect(doubles.runPreproduction).toHaveBeenCalledTimes(1);
+    expect(doubles.nextAttempt).toBe(1);
+  });
+
   it("归档输出写入失败时，不因已取得 rawResult 而伪称成功", async () => {
     const { ArchiveStore } = await import("@hyperreality/video-studio");
     const original = ArchiveStore.prototype.writeJsonAtomic;
@@ -684,7 +796,8 @@ describe("正式 G6 提示词工作单", () => {
     expect(receipt.reviewReportSha256).toBe(createHash("sha256").update(report).digest("hex"));
     if (kind === "marketing") {
       expect(doubles.prepare).toHaveBeenCalledWith(expect.objectContaining({ stageId: "prompt_review" }));
-      expect(doubles.finalize).toHaveBeenCalledWith(expect.anything(), receipt.shots);
+      expect(doubles.finalize).toHaveBeenCalledWith(expect.anything(), receipt.shots, process.env,
+        expect.objectContaining({ load: expect.any(Function), save: expect.any(Function) }));
       expect(doubles.verifyMarketingFacts).toHaveBeenCalledWith(expect.objectContaining({ stageId: "prompt_review",
         intentSha256: receipt.intentSha256, shots: receipt.shots }));
     }
@@ -695,6 +808,7 @@ describe("正式 G6 提示词工作单", () => {
   });
 
   it("取得项目租约后再次发现原提示词执行已变化时不认领新尝试", async () => {
+    useNarrativeProject();
     vi.stubEnv("WORKLOOM_RENDER_SIGNING_SECRET", randomBytes(32).toString("hex"));
     doubles.query.mockImplementation(async (sql: string) => ({ rows: sql.includes("SELECT attempt, input_ref")
       ? [{ run_id: "RUN-successor", attempt: 2, status: "done", error_class: null }] : [], rowCount: 1 }));
@@ -856,7 +970,8 @@ describe("默认导演委托与立项事务", () => {
     });
     const { entry, projectId } = await runToTerminal(); expect(entry.status).toBe("finished");
     expect(doubles.prepare).toHaveBeenCalledWith(expect.objectContaining({ scope: expect.objectContaining({ ...scope, projectId, attempt: 1 }) }));
-    expect(doubles.finalize).toHaveBeenCalledWith(expect.anything(), [{ shotId: "SC-1", prompt: "01.【场景】窗边桌面", fields: { scene: "窗边桌面" } }]);
+    expect(doubles.finalize).toHaveBeenCalledWith(expect.anything(), [{ shotId: "SC-1", prompt: "01.【场景】窗边桌面", fields: { scene: "窗边桌面" } }], process.env,
+      expect.objectContaining({ load: expect.any(Function), save: expect.any(Function) }));
     expect(await archiveOutput(projectId, 1)).toMatchObject({ marketingFactsRef: "stages/preproduction/attempt-1.marketing-facts.json", marketingFactsSha256: "b".repeat(64) });
     expect(doubles.studioConfigs[0]?.dataMining.verifiedRaw.projectId).toBe(projectId);
   });
@@ -959,5 +1074,182 @@ describe("公共产品参考图路径边界", () => {
     expect(doubles.runPreproduction).toHaveBeenCalledTimes(1);
     expect(doubles.studioConfigs[0]?.portraits?.referenceImages).toEqual([]);
     expect(doubles.runPreproduction.mock.calls[0]?.[0].metadata.products).toEqual(metadata.products);
+  });
+});
+
+/**
+ * The actual host admission, StageRunner, ArchiveStore, checkpoint repository and gate callbacks run.
+ * PostgreSQL, native author work-stations, source HTTP and reviewer transport use explicit fixtures.
+ * Source preparation/restoration/final fact verification and their immutable file checks run unchanged.
+ */
+describe("正式宿主按最终事实诊断返工，并保留后续基础设施恢复", () => {
+  async function fixture(mode: "semantic" | "infra" | "unknown") {
+    const authority = await vi.importActual<typeof import("./marketing-authority.js")>("./marketing-authority.js");
+    const mining = await vi.importActual<typeof import("./data-mining-executor.js")>("./data-mining-executor.js");
+    const { createStudioCheckpointRunner } = await import("@hyperreality/video-studio");
+    const { canonicalRenderJson, renderSha256 } = await import("./gen/compiled-request.js");
+    const projectId = `VID-independent-fact-continuity-${++projectSequence}`;
+    doubles.meta.mockResolvedValue({ projectId, kind: "marketing", title: "事实返工接续", threadId: "T1", createdAt: "2026-09-27T00:00:00Z" });
+    const intent = "介绍星野 R 风扇，仅表达有完整来源支持的风量9档。";
+    const sourceUrl = "https://source.example.com/independent-r";
+    const sourceText = "星野 R 风扇，风量9档。未提供其他档位或性能承诺。";
+    const source = { sourceId: "SRC-independent-host", requestedUrl: sourceUrl, finalUrl: sourceUrl,
+      redirectChain: [], fetchedAt: new Date().toISOString(), contentType: "text/plain", bytes: Buffer.byteLength(sourceText),
+      text: sourceText, textSha256: renderSha256(sourceText), rawSha256: renderSha256(sourceText), assetUrls: [] };
+    doubles.emitGates = false;
+    doubles.dataMiningExecutor.mockImplementation(mining.createDataMiningExecutor);
+    doubles.prepare.mockImplementation(input => authority.prepareMarketingFacts({ ...input,
+      llm: { reason: async (prompt: string) => {
+        const stage = /当前阶段：(A[123])/u.exec(prompt)?.[1];
+        return { success: true, data: stage === "A1" ? {
+          payload: { identity: { name: "星野 R", specs: { 风量: "9档" }, prices: [], official_selling_points: [] }, images: [] },
+          citations: [{ pointer: "/identity/name", sourceId: source.sourceId, quote: "星野 R" },
+            { pointer: "/identity/specs/风量", sourceId: source.sourceId, quote: "风量9档" }],
+        } : { payload: stage === "A2" ? { reviews: [] } : { competitors: [] }, citations: [],
+          noEvidenceReason: "当前正文没有用户评价或竞品证据，禁止补充事实" } };
+      } }, dependencies: {
+        search: async () => [{ title: "星野 R 规格来源", url: sourceUrl, snippet: "候选，不能作为事实" }],
+        fetchSource: async () => ({ snapshot: source, rawBytes: Buffer.from(sourceText) }),
+      },
+    }));
+    doubles.restoreMarketing.mockImplementation(authority.restoreMarketingFacts);
+    doubles.finalize.mockImplementation(authority.finalizeMarketingFacts);
+    doubles.verifyMarketingFacts.mockImplementation(authority.verifyMarketingFacts);
+    const defaultReview = doubles.review.getMockImplementation()!;
+    const completeReasons = new Map<string, string>();
+    let factCalls = 0;
+    doubles.review.mockImplementation(async options => {
+      const verdict = await defaultReview(options);
+      if (options.context?.purpose !== "marketing-final-fact-review") return verdict;
+      factCalls++;
+      const body = JSON.parse(await readFile(options.artifacts[0].path, "utf8"));
+      if (mode === "unknown" && factCalls === 1) return { ...verdict, approved: false, status: "unverified",
+        score: 0, unknownOutcome: true, reason: "供应商已受理但最终回执未知" };
+      if (mode === "infra" && factCalls === 1) return { ...verdict, approved: false, status: "unverified",
+        via: "fallback", degraded: true, score: 0, reason: "审核基础设施不可用，未作内容裁决" };
+      if (/999档|888档/u.test(body.shot.prompt)) {
+        const reason = `${body.shot.shotId}原始完整诊断：${"只能采用已核实的风量9档，不能把广告愿望写成事实。".repeat(40)}诊断专用尾部：保留其他已通过动作。`;
+        completeReasons.set(body.shot.shotId, reason);
+        return { ...verdict, approved: false, status: "failed", score: 20, reason,
+          issues: [`${body.shot.shotId}当前完整prompt和fields含未支持档位`],
+          suggestions: ["作者依据同一来源修复完整镜头，不能重复评审原坏字节"] };
+      }
+      return verdict;
+    });
+    const authors = { G2_THEME: 0, G3_INSIGHT: 0, G3_PROFILE: 0, G4_PRD: 0,
+      SCRIPT: 0, PRODUCTION: 0, OPENING_TITLE: 0 };
+    const feedbacks: Array<string | null> = [], promptHashes: string[] = [], gateHashes: string[] = [];
+    doubles.runPreproduction.mockImplementation(async () => {
+      const config = doubles.studioConfigs.at(-1)!;
+      feedbacks.push(config.productionRepairFeedback ?? null);
+      const runner = createStudioCheckpointRunner(config.checkpoints, { projectId, intent });
+      const author = (stage: keyof typeof authors) => async () => { authors[stage]++; return { stage, source: "同一已核实的原始输入" }; };
+      const approve = async (gate: string, contentMd: string) => {
+        expect(await config.onApproval({ gate, vendorType: "native-boundary-fixture", runId: "native-fixture",
+          title: "完整工位确认单", contentMd })).toMatchObject({ approved: true });
+      };
+      await runner.run("G2_THEME", "同一完整主题输入", author("G2_THEME"));
+      await approve("G2_THEME", "完整主题与来源合同。".repeat(30));
+      await runner.run("G3_INSIGHT", "同一完整洞察输入", author("G3_INSIGHT"));
+      await runner.run("G3_PROFILE", "同一完整档案输入", author("G3_PROFILE"));
+      await approve("G3_INSIGHT", "完整洞察与来源合同。".repeat(30));
+      await runner.run("G4_PRD", "同一完整PRD输入", author("G4_PRD"));
+      await approve("G4_PRD", "完整PRD与来源合同。".repeat(30));
+      const script = await runner.run("SCRIPT", "同一完整脚本输入", author("SCRIPT"));
+      // This is the native author boundary: the actual public config feedback participates only
+      // in the PRODUCTION request, matching the native wrapper contract tested separately.
+      const production = await runner.run("PRODUCTION", { script, feedback: config.productionRepairFeedback ?? null }, async () => {
+        const generation = ++authors.PRODUCTION;
+        const first = mode === "semantic" && generation === 1 ? 999 : 9;
+        const second = mode === "semantic" && generation <= 2 ? 888 : 9;
+        return { shots: [first, second].map((value, index) => ({ shotId: `SC-${index + 1}`,
+          prompt: `01.【商品】星野 R 风扇风量${value}档。`, fields: { 风量: `${value}档`, action: "展示产品" } })) };
+      });
+      const final = await runner.run("OPENING_TITLE", production, async () => { authors.OPENING_TITLE++; return production; });
+      const contentMd = `# 当前完整原生 G6\n${canonicalRenderJson(final.shots)}\n${"镜头遵守当前完整来源与创作合同。".repeat(20)}`;
+      promptHashes.push(renderSha256(canonicalRenderJson(final.shots)));
+      gateHashes.push(renderSha256(contentMd));
+      await approve("G6_PROMPT", contentMd);
+      await approve("G7_FINAL", `# 当前整体交付\n${canonicalRenderJson(final.shots)}\n${"完整交付合同。".repeat(30)}`);
+      return { ...success(), stages: { ...success().stages, productionEngine: final } };
+    });
+    const runs: string[] = [];
+    async function run() {
+      const prior = runs.at(-1);
+      const priorAttempt = runs.length;
+      doubles.query.mockImplementation(async (sql: string) => ({ rows: prior && sql.includes("SELECT attempt, input_ref")
+        ? [{ run_id: prior, attempt: priorAttempt, status: "failed", error_class: "BUG",
+          input_ref: `stages/preproduction/attempt-${priorAttempt}.input.json` }] : [], rowCount: 1 }));
+      const runId = worker.startRun(scope, { projectId, intent, rawIntent: intent, isMarketing: true,
+        metadata: { brief: { product: "星野 R" } },
+        ...(prior ? { resumePrior: { runId: prior, attempt: priorAttempt, stageId: "preproduction" as const } } : {}) });
+      runs.push(runId);
+      await vi.waitFor(() => expect(worker.getRun(runId, scope.workspaceId)?.finishedAt).not.toBeNull(), { timeout: 5_000, interval: 10 });
+      return worker.getRun(runId, scope.workspaceId)!;
+    }
+    return { run, projectId, authors, feedbacks, promptHashes, gateHashes, completeReasons,
+      factCalls: () => factCalls, gateCalls: (gate: string) => doubles.review.mock.calls.filter(([options]) => options.context?.gate === gate).length };
+  }
+
+  it("两次最终事实拒绝只返工生产，完整诊断跨四次宿主运行稳定，后续落盘失败不再生成好作者", async () => {
+    const scenario = await fixture("semantic");
+    const { ArchiveStore } = await import("@hyperreality/video-studio");
+    const write = ArchiveStore.prototype.writeJsonAtomic;
+    let injected = false;
+    vi.spyOn(ArchiveStore.prototype, "writeJsonAtomic").mockImplementation(function (this: InstanceType<typeof ArchiveStore>, ref, data) {
+      if (!injected && ref === "stages/preproduction/attempt-3.output.json") {
+        injected = true;
+        return Promise.reject(new Error("independent late output disk failure"));
+      }
+      return write.call(this, ref, data);
+    });
+    expect(await scenario.run()).toMatchObject({ status: "failed", error: expect.stringContaining("MARKETING_PROMPT_FACTS_REJECTED") });
+    expect(await scenario.run()).toMatchObject({ status: "failed", error: expect.stringContaining("MARKETING_PROMPT_FACTS_REJECTED") });
+    expect(await scenario.run()).toMatchObject({ status: "failed", error: "independent late output disk failure" });
+    expect(await scenario.run()).toMatchObject({ status: "finished", error: null });
+    expect(scenario.authors).toEqual({ G2_THEME: 1, G3_INSIGHT: 1, G3_PROFILE: 1, G4_PRD: 1,
+      SCRIPT: 1, PRODUCTION: 3, OPENING_TITLE: 3 });
+    expect(doubles.prepare).toHaveBeenCalledTimes(1);
+    expect(doubles.restoreMarketing).toHaveBeenCalledTimes(3);
+    expect(scenario.feedbacks[0]).toBeNull();
+    expect(scenario.feedbacks[1]).toContain(scenario.completeReasons.get("SC-1"));
+    expect(scenario.feedbacks[2]).toContain(scenario.completeReasons.get("SC-1"));
+    expect(scenario.feedbacks[2]).toContain(scenario.completeReasons.get("SC-2"));
+    expect(scenario.feedbacks[3]).toBe(scenario.feedbacks[2]);
+    expect(new Set(scenario.promptHashes.slice(0, 3)).size).toBe(3);
+    expect(scenario.promptHashes[3]).toBe(scenario.promptHashes[2]);
+    expect(new Set(scenario.gateHashes.slice(0, 3)).size).toBe(3);
+    expect(scenario.gateHashes[3]).toBe(scenario.gateHashes[2]);
+    for (const gate of ["G1_DOSSIER", "G2_THEME", "G3_INSIGHT", "G4_PRD"]) expect(scenario.gateCalls(gate)).toBe(1);
+    expect(scenario.gateCalls("G6_PROMPT")).toBe(3);
+    expect(scenario.factCalls()).toBe(4);
+    expect(injected).toBe(true);
+    expect(doubles.nextAttempt).toBe(4);
+    expect(doubles.checkpointEvents.filter(event => event.kind === "PRODUCTION_REJECTION" && event.attempt === 4)).toHaveLength(2);
+    expect((await archiveOutput(scenario.projectId, 4)).marketingFactsRef).toContain("attempt-4.marketing-facts.json");
+  });
+
+  it("最终审核基础设施未作语义裁决时恢复原生产与G6，只重试事实审核", async () => {
+    const scenario = await fixture("infra");
+    expect(await scenario.run()).toMatchObject({ status: "failed", error: expect.stringContaining("MARKETING_PROMPT_FACTS_REJECTED") });
+    expect(await scenario.run()).toMatchObject({ status: "finished", error: null });
+    expect(scenario.authors.PRODUCTION).toBe(1);
+    expect(scenario.authors.OPENING_TITLE).toBe(1);
+    expect(scenario.promptHashes[1]).toBe(scenario.promptHashes[0]);
+    expect(scenario.feedbacks).toEqual([null, null]);
+    expect(scenario.gateCalls("G6_PROMPT")).toBe(1);
+    expect(scenario.factCalls()).toBe(3);
+    expect(doubles.checkpointEvents.some(event => event.kind === "PRODUCTION_REJECTION")).toBe(false);
+  });
+
+  it("最终事实供应商结果未知时proper prior接续也不认领新attempt或调用作者", async () => {
+    const scenario = await fixture("unknown");
+    expect(await scenario.run()).toMatchObject({ status: "failed", error: expect.stringContaining("VIDEO_MODEL_OUTCOME_UNKNOWN") });
+    expect(await scenario.run()).toMatchObject({ status: "failed", error: expect.stringContaining("PROMPT_REVIEW_PRIOR_CHANGED") });
+    expect(doubles.nextAttempt).toBe(1);
+    expect(doubles.runPreproduction).toHaveBeenCalledTimes(1);
+    expect(scenario.authors.PRODUCTION).toBe(1);
+    expect(scenario.factCalls()).toBe(1);
+    expect(doubles.checkpointEvents.some(event => event.kind === "PRODUCTION_REJECTION")).toBe(false);
   });
 });

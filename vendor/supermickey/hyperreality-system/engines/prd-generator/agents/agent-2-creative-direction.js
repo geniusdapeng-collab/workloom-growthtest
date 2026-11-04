@@ -1,4 +1,5 @@
 const { BaseAgent } = require('../../production-engine/agents/base-agent');
+const { sourceBoundAudience } = require('../../requirement-discovery-engine');
 
 /**
  * Agent 2: CreativeDirectionAgent
@@ -43,6 +44,8 @@ class CreativeDirectionAgent extends BaseAgent {
 
   _buildPrompt(discoveryResult) {
     const { upstreamFields, audienceProfile, sceneStructure, referenceCases, userModifications } = discoveryResult;
+    const verifiedAudience = sourceBoundAudience(audienceProfile, { ...discoveryResult, ...upstreamFields });
+    const demographic = key => verifiedAudience.primaryAudience[key] ?? '未指定';
     
     const userModificationsSection = (userModifications && userModifications.length > 0)
       ? `\n【用户修改意见】\n${userModifications.map((m, i) => `${i + 1}. ${m}`).join('\n')}\n\n以上修改意见必须体现在创意核心中。`
@@ -64,10 +67,17 @@ class CreativeDirectionAgent extends BaseAgent {
 主题描述: ${upstreamFields.description || upstreamFields.theme || '未指定'}
 
 【受众洞察】
-主要受众: ${audienceProfile?.primaryAudience?.ageRange || '25-30'}岁，${audienceProfile?.primaryAudience?.gender || 'all'}
-兴趣标签: ${(audienceProfile?.primaryAudience?.interestTags || []).join(', ')}
-情绪触发点: ${(audienceProfile?.emotionTriggers || []).join(', ')}
-内容期望: ${(audienceProfile?.contentExpectations || []).join(', ')}
+受众依据: ${verifiedAudience.audienceBasis === 'customer-provided' ? '客户明确指定；观看兴趣与动机的延展仍是本片创作假设' : '本片创作假设（不是人口统计或用户调查）'}
+客户受众原文: ${verifiedAudience.audienceEvidenceQuote ?? '未提供'}
+人口字段证据: ${JSON.stringify(verifiedAudience.demographicEvidence)}
+年龄: ${demographic('ageRange')}
+性别: ${demographic('gender')}
+职业: ${demographic('occupation')}
+消费能力: ${demographic('consumptionLevel')}
+兴趣标签（本片创作假设）: ${verifiedAudience.primaryAudience.interestTags.join(', ')}
+情绪触发点（本片创作假设）: ${(verifiedAudience.emotionTriggers || []).join(', ')}
+内容期望（本片创作假设）: ${(verifiedAudience.contentExpectations || []).join(', ')}
+未知人口字段必须保持未知，不得根据内容、演员或兴趣补回人口属性。被剔除候选不是客户要求，不得恢复。
 
 【场景结构】
 叙事弧线: ${sceneStructure?.narrativeArc || 'setup→rising→climax→falling→resolution'}

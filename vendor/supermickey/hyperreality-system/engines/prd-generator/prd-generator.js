@@ -23,10 +23,6 @@ class PRDGenerator {
     this.agent4 = new ConstraintSynthesisAgent(options);
     this.agent5 = new DeliveryStandardAgent(options);
     
-    // 超时配置
-    this.timeoutMs = options.timeoutMs || 600000; // 10 分钟总预算
-    this.agent2TimeoutMs = options.agent2TimeoutMs || 120000; // 2 分钟
-    this.agent3TimeoutMs = options.agent3TimeoutMs || 300000; // 5 分钟
   }
 
   /**
@@ -47,11 +43,7 @@ class PRDGenerator {
       console.log(`[PRDGenerator] Step 2/5: 创意方向（LLM）...`);
       let creativeResult;
       try {
-        creativeResult = await this._runWithTimeout(
-          () => this.agent2.process(discoveryResult),
-          this.agent2TimeoutMs,
-          'Agent 2'
-        );
+        creativeResult = await this.agent2.process(discoveryResult);
       } catch (error) {
         console.warn(`[PRDGenerator] Agent 2 超时/失败: ${error.message}，使用 fallback`);
         creativeResult = this.agent2.fallback(discoveryResult);
@@ -61,11 +53,7 @@ class PRDGenerator {
       console.log(`[PRDGenerator] Step 3/5: 制作规格（LLM）...`);
       let productionResult;
       try {
-        productionResult = await this._runWithTimeout(
-          () => this.agent3.process(discoveryResult, creativeResult),
-          this.agent3TimeoutMs,
-          'Agent 3'
-        );
+        productionResult = await this.agent3.process(discoveryResult, creativeResult);
       } catch (error) {
         console.warn(`[PRDGenerator] Agent 3 超时/失败: ${error.message}，使用 fallback`);
         productionResult = this.agent3.fallback(discoveryResult, creativeResult);
@@ -107,6 +95,12 @@ class PRDGenerator {
       if (originalStory) {
         prd._originalStoryText = originalStory;
       }
+      // The confirmed raw customer input takes priority over enriched story text,
+      // including an explicitly empty value. Keep it for downstream evidence checks.
+      const audienceInput = { ...discoveryResult, ...discoveryResult.upstreamFields };
+      if (Object.hasOwn(audienceInput, '_workloomCustomerIntent')) {
+        prd._workloomCustomerIntent = audienceInput._workloomCustomerIntent;
+      }
       
       // 结构校验 + fallback 填充
       console.log(`[PRDGenerator] 🔍 结构校验...`);
@@ -123,18 +117,6 @@ class PRDGenerator {
       console.error(`[PRDGenerator] ❌ 生成失败: ${error.message}`);
       throw error;
     }
-  }
-
-  /**
-   * 带超时的 Agent 执行
-   */
-  async _runWithTimeout(fn, timeoutMs, agentName) {
-    return Promise.race([
-      fn(),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error(`${agentName} 超时 (${timeoutMs}ms)`)), timeoutMs)
-      )
-    ]);
   }
 
   /**
@@ -182,6 +164,7 @@ class PRDGenerator {
   }
 
   _generateFallbackValue(schema, path) {
+    if (Array.isArray(schema.type) && schema.type.includes('null')) return null;
     if (schema.enum) {
       return schema.enum[0];
     }
@@ -299,13 +282,9 @@ class PRDGenerator {
           consistencyStrategy: 'textual-description'
         }
       },
-      audienceProfile: {
-        primaryAudience: { ageRange: '25-30', gender: 'all', interests: ['通用'], consumptionLevel: 'medium' },
-        emotionTriggers: ['好奇心'],
-        contentExpectations: ['高质量内容']
-      },
+      audienceProfile: this.agent4._buildAudienceProfile(null),
       referenceCases: {
-        filmReferences: ['通用参考'],
+        filmReferences: [],
         adReferences: [],
         styleReferences: ['通用风格']
       },
@@ -328,13 +307,17 @@ class PRDGenerator {
    */
   generateMarkdown(prd) {
     const summary = prd.prdSummary || generateSummary(prd);
+    const audienceProfile = this.agent4._buildAudienceProfile(prd.audienceProfile, prd);
+    const demographic = key => audienceProfile.primaryAudience[key] ?? '未指定';
     
     // ⭐ v2.2.1-fix: PRD 文档携带用户原始输入，供下游剧本/提示词生成参考
-    const originalStory = prd.projectDefinition?._originalStoryText 
-      || prd.projectDefinition?.original_story_text
-      || prd._originalStoryText
-      || prd.original_story_text
-      || '';
+    const originalStory = Object.hasOwn(prd, '_workloomCustomerIntent')
+      ? (typeof prd._workloomCustomerIntent === 'string' ? prd._workloomCustomerIntent : '')
+      : (prd.projectDefinition?._originalStoryText
+        || prd.projectDefinition?.original_story_text
+        || prd._originalStoryText
+        || prd.original_story_text
+        || '');
     const originalStorySection = originalStory
       ? `\n\n---\n\n## 📖 用户原始输入（创作素材源）\n\n> 以下原始素材是用户提供的故事蓝本，剧本生成和提示词设计必须以此为核心依据：\n\n${originalStory}\n`
       : '';
@@ -441,11 +424,16 @@ ${(prd.scenePlan?.scenes || []).map((s, i) => `
 
 ## 9. 受众定位
 
-- **主要受众**：${prd.audienceProfile?.primaryAudience?.ageRange || '未指定'} 岁，${prd.audienceProfile?.primaryAudience?.gender || 'all'}
-- **兴趣标签**：${(prd.audienceProfile?.primaryAudience?.interests || []).join(', ') || '未指定'}
-- **消费能力**：${prd.audienceProfile?.primaryAudience?.consumptionLevel || 'medium'}
-- **情绪触发**：${(prd.audienceProfile?.emotionTriggers || []).join(', ') || '未指定'}
-- **内容期望**：${(prd.audienceProfile?.contentExpectations || []).join(', ') || '未指定'}
+- **受众依据**：${audienceProfile.audienceBasis === 'customer-provided' ? '客户明确指定；观看兴趣与动机的延展仍是本片创作假设' : '本片创作假设（不是人口统计或用户调查）'}
+- **客户受众原文**：${audienceProfile.audienceEvidenceQuote ?? '未提供'}
+- **年龄段**：${demographic('ageRange')}
+- **性别**：${demographic('gender')}
+- **职业**：${demographic('occupation')}
+- **消费能力**：${demographic('consumptionLevel')}
+- **人口字段证据**：${JSON.stringify(audienceProfile.demographicEvidence)}
+- **兴趣标签（本片创作假设）**：${audienceProfile.primaryAudience.interests.join(', ') || '未指定'}
+- **情绪触发（本片创作假设）**：${audienceProfile.emotionTriggers.join(', ') || '未指定'}
+- **内容期望（本片创作假设）**：${audienceProfile.contentExpectations.join(', ') || '未指定'}
 
 ## 10. 参考案例
 

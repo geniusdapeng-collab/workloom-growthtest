@@ -101,6 +101,7 @@ export class WorkloomLLMEngine {
     router?: WorkloomLLMEngineConfig["router"];
   };
   private outcomeUnknown = false;
+  private activeRequests = 0;
   readonly stats = { totalCalls: 0, totalFailures: 0 };
 
   get model(): string {
@@ -109,6 +110,11 @@ export class WorkloomLLMEngine {
 
   get fastModel(): string {
     return this.cfg.fastModel;
+  }
+
+  /** A resumed run must reconcile an uncertain dispatch before sending another request. */
+  hasUnknownOutcome(): boolean {
+    return this.outcomeUnknown || this.activeRequests > 0;
   }
 
   constructor(config: WorkloomLLMEngineConfig) {
@@ -189,6 +195,7 @@ export class WorkloomLLMEngine {
       recordDegradation: async () => undefined,
       recordCircuitBreak: async () => undefined,
     };
+    this.activeRequests++;
     try {
       const result = await routeSmart(
         {
@@ -256,11 +263,17 @@ export class WorkloomLLMEngine {
         ...(usage ? { usage } : {}),
       };
     } catch (error) {
+      // The dispatcher can fail while recording a provider failure. An event
+      // storage exception must not turn an uncertain dispatch into a safe retry.
+      this.outcomeUnknown = true;
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error),
         retryable: false,
+        unknown: true,
       };
+    } finally {
+      this.activeRequests--;
     }
   }
 

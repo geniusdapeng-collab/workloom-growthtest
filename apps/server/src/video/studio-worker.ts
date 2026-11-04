@@ -54,15 +54,18 @@ import {
 } from "@hyperreality/video-studio";
 import { buildServerGateRecord, withGateLedger } from "./gate-ledger-bridge.js";
 import { createDataMiningExecutor } from "./data-mining-executor.js";
-import { prepareMarketingFacts, finalizeMarketingFacts, type PreparedMarketingFacts } from "./marketing-authority.js";
+import { checkpointMarketingFacts, prepareMarketingFacts, restoreMarketingFacts, finalizeMarketingFacts,
+  MARKETING_SOURCE_POLICY_VERSION, marketingFactReviewCacheKey, verifyRejectedMarketingFactReview,
+  type PreparedMarketingFacts, type MarketingFactReviewCache, type MarketingShotFactReview } from "./marketing-authority.js";
 import { canonicalRenderJson, renderSha256 } from "./gen/compiled-request.js";
 import { acquireProjectLease, archiveWorkDir, makeLedgerWriter, readProjectMeta } from "./archive-host.js";
-import { isPromptReviewRejection, readLatestStudioResumeStage } from "./archive-resume.js";
+import { isKnownStudioResume, readLatestStudioResumeStage } from "./archive-resume.js";
 import { ingestPortraitsFromIndex } from "./media/library.js";
 import { upsertProductProfileFromDossier } from "./media/products.js";
 import { appendScenePolicyGuidance, resolveScenePolicyForIntent } from "./scene-policy-routing.js";
 import { appendPlatformGuidance, resolvePlatformForIntent } from "./platform-routing.js";
 import { captureStudioResumeInput } from "./studio-resume-input.js";
+import { createStudioCheckpointStore, studioCheckpointRepository } from "./studio-checkpoint-store.js";
 import {
   assertStudioPromptReviewSigning, assertStudioPromptReviewText, captureStudioPromptReviewShots,
   issueStudioPromptReview, studioPromptReviewRef,
@@ -97,8 +100,6 @@ import {
 const APPROVAL_TIMEOUT_MS = Number(process.env.HR_APPROVAL_TIMEOUT_MS ?? 7_200_000);
 /** 审批状态轮询间隔（默认 2s） */
 const APPROVAL_POLL_MS = Number(process.env.HR_APPROVAL_POLL_MS ?? 2_000);
-/** 流水线总截止（透传 vendor STORMAXE_TOTAL_DEADLINE_MS 口径，默认 1 小时） */
-const TOTAL_DEADLINE_MS = Number(process.env.VM_TOTAL_DEADLINE_MS ?? 3_600_000);
 
 /**
  * 内部门三档处置与逐门口径见 `./gate-policy.js`（服务端与本地审计跑批共用同一份定义，
@@ -536,6 +537,7 @@ type StudioRunInput = RunInput & {
   purpose?: "prompt-review";
   durationSec?: number;
   promptReviewPrior?: { runId: string; attempt: number };
+  resumePrior?: { runId: string; attempt: number; stageId: "preproduction" | "prompt_review" };
   /** 原始客户需求；pipelineIntent 可能清理过路由语句并追加了系统口径。 */
   rawIntent?: string;
   /** 同一入口已经做过选型时复用其受控结果，避免二次选型改写取证依据。 */
@@ -729,6 +731,7 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
   /** 交接包线索（来自真实事件，不猜）：门裁决 + 时长投影 */
   const decisionLog: string[] = [];
   const gateProofs = new Map<string, Record<string, unknown>>();
+  let checkpointStore: ReturnType<typeof createStudioCheckpointStore> | null = null;
   let completedVendorResult: Awaited<ReturnType<VideoStudio["runPreproduction"]>> | null = null;
 
   const onEvent: EventSink = async (e) => {
@@ -806,6 +809,9 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
     if ((AUTO_GATES.has(gate) || videoAutoApprovalEnabled()) && effectiveProducerMode !== "human" && gate!=="G5_PORTRAIT") {
       const producerStage = GATE_PRODUCER_STAGE[gate] ?? "script";
       let producerVerdict: Awaited<ReturnType<typeof reviewStage>> | null = null;
+      const cachedReview = effectiveProducerMode === "review"
+        && !gateDeterministicChecks(gate, req.contentMd ?? "").some(check => check.hard && !check.pass)
+        ? await checkpointStore?.loadGate(gate, req.contentMd ?? "") : null;
       if (effectiveProducerMode === "review") {
         /**
          * 门内容落盘后送审（真机根因修复）：此前传的是 `${gate}:${vendorType}` 标签路径，
@@ -814,7 +820,7 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
          */
         const artifact = writeGateArtifact(runWorkDir, path.join(input.projectId,
           `${promptReview ? "prompt-review" : "attempt"}-${stageRef.attempt}`), gate, req.contentMd ?? "");
-        producerVerdict = await reviewStage({
+        producerVerdict = cachedReview?.verdict ?? await reviewStage({
           stage: producerStage,
           projectId: input.projectId,
           artifacts: [{ path: artifact.path, kind: "text", note: req.title }],
@@ -837,6 +843,7 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
           allowFallbackApprove: (process.env.HR_PRODUCER_FALLBACK_APPROVE ?? "0") === "1",
           log: (line) => console.log(line)
         });
+        if (producerVerdict.unknownOutcome) checkpointStore?.markUnknown();
       }
       const approved = effectiveProducerMode === "auto" ? true : Boolean(producerVerdict?.approved);
       /**
@@ -854,11 +861,12 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
         producerMode: effectiveProducerMode
       });
       const autoClient = await getAppPool().connect();
+      let producerEventId: string | null = null;
       try {
         await autoClient.query("BEGIN");
         await autoClient.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
         await autoClient.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]);
-        await gatewayAppendOnClient(autoClient, { ...scope, actor: { ...WORKER_ACTOR } }, {
+        const producerEvent = await gatewayAppendOnClient(autoClient, { ...scope, actor: { ...WORKER_ACTOR } }, {
           who: { ...WORKER_ACTOR },
           context: {
             tenant_id: scope.tenantId, workspace_id: scope.workspaceId,
@@ -871,6 +879,7 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
               gate: req.gate, vendorType: req.vendorType, runId: entry.runId, title: req.title,
               producerMode: effectiveProducerMode,
               approved,
+              ...(cachedReview ? { reusedFrom: { runId: cachedReview.originRunId, reviewEventId: cachedReview.reviewEventId } } : {}),
               ...(producerVerdict
                 ? {
                     score: producerVerdict.score, via: producerVerdict.via, model: producerVerdict.model ?? null,
@@ -886,11 +895,16 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
           rule_impact: [],
         });
         await autoClient.query("COMMIT");
+        producerEventId = producerEvent.eventId;
       } catch (err) {
         await autoClient.query("ROLLBACK").catch(() => undefined);
         throw err;
       } finally {
         autoClient.release();
+      }
+      if (producerVerdict && producerEventId) {
+        await checkpointStore?.saveGate(gate, req.contentMd ?? "", producerVerdict,
+          cachedReview?.reviewEventId ?? producerEventId, cachedReview?.originRunId);
       }
       gateProofs.set(gate, { gate, approved, status: producerVerdict?.status ?? "unverified",
         via: producerVerdict?.via ?? "auto", degraded: producerVerdict?.degraded ?? true,
@@ -1130,7 +1144,6 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
     workDir: runWorkDir,
     onApproval,
     onEvent,
-    totalDeadlineMs: TOTAL_DEADLINE_MS,
     // 片型硬闸必须在 G8 之前审完整分镜，禁止 env 让 vendor 在审计前直接渲染。
     deferRender: promptReview || Boolean(delegated || selectedScenePolicy.policy) || (process.env.HR_DEFER_RENDER ?? "1") !== "0",
     portraits: promptReview ? { enabled: false } : portraitConfig(runInput.metadata, directorMode ? input.directorIdentityImages : undefined),
@@ -1151,6 +1164,8 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
     let detachStructuredLog: (() => void) | null = null;
     let restoreRunLogs: (() => void) | null = null;
     let projectMeta: Awaited<ReturnType<typeof readProjectMeta>> = null;
+    let verifiedResumePrior = input.resumePrior
+      ?? (input.promptReviewPrior ? { ...input.promptReviewPrior, stageId: "prompt_review" as const } : undefined);
     try {
       if (delegated) {
         delegated.signal.addEventListener("abort", abortDelegatedRun, { once: true });
@@ -1161,16 +1176,28 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
           throw new Error(`项目 ${input.projectId} 已有执行者持有档案租约（不重复启动，避免双份烧额度）`);
         }
       }
-      if (promptReview && input.promptReviewPrior) {
-        const prior = input.promptReviewPrior;
-        const latest = await readLatestStudioResumeStage(scope, input.projectId, "prompt_review");
-        if (latest?.attempt !== prior.attempt || !isPromptReviewRejection(latest, prior.runId)) {
-          throw new Error("PROMPT_REVIEW_PRIOR_CHANGED: 原提示词工作单的最新执行已变化，拒绝重复运行");
-        }
-      }
       projectMeta = await readProjectMeta(scope, input.projectId);
       if (!projectMeta) throw new Error(`PROJECT_NOT_FOUND: 项目 ${input.projectId} 不存在或不属于当前工作区`);
       if (projectMeta.kind !== pipelineKind) throw new Error("PIPELINE_KIND_MISMATCH：预生产管线与服务项目类型不一致");
+      const prior = verifiedResumePrior;
+      if (prior) {
+        const latest = await readLatestStudioResumeStage(scope, input.projectId, prior.stageId);
+        if (latest?.attempt !== prior.attempt || !await isKnownStudioResume({ scope, project: projectMeta,
+          stageId: prior.stageId, latest, expectedRunId: prior.runId, archive })) {
+          throw new Error("PROMPT_REVIEW_PRIOR_CHANGED: 原工作单的最新执行或模型结算状态已变化，拒绝重复运行");
+        }
+      } else {
+        const stageId = promptReview ? "prompt_review" : "preproduction";
+        const latest = await readLatestStudioResumeStage(scope, input.projectId, stageId);
+        if (latest && latest.status !== "done") {
+          if (delegated && latest.run_id && await isKnownStudioResume({ scope, project: projectMeta,
+            stageId, latest, expectedRunId: latest.run_id, archive })) {
+            verifiedResumePrior = { runId: latest.run_id, attempt: latest.attempt, stageId };
+          } else {
+            throw new Error("STUDIO_RESUME_REQUIRED: 原项目已有未完成的执行，请通过正式接续入口核对原运行与模型结果");
+          }
+        }
+      }
       if(directorMode) await verifyDirectorGrant({...scope,projectId:input.projectId,runId:entry.runId},input.creativeDelegation);
       restoreRunLogs = teeRunLogs(input.projectId, runLogToken);
       console.log(`[studio-worker] run 日志开始落盘：${path.join(WORK_DIR, "logs", `${input.projectId}.log`)}`);
@@ -1253,21 +1280,50 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
        */
       const maxAttempts = promptReview ? 1 : Math.max(1, Number(process.env.VM_PRODUCER_RETRY ?? 0) + 1);
       let promptReviewReceipt: StudioPromptReview | null = null;
+      let checkpointPriorRunId = verifiedResumePrior?.runId;
       const runOnce = async (): Promise<Awaited<ReturnType<VideoStudio["runPreproduction"]>>> => {
         checkDelegatedRun();
         const runnerStore = archive;
         // 档案 output 是给索引/交接包使用的摘要，不能取代 vendor 业务结果。
         // confirmations 决定打回重试，stages.dataMining 决定商品档案投影；两者必须完整保留。
         let rawResult: Awaited<ReturnType<VideoStudio["runPreproduction"]>> | undefined;
-        await runner.run(
+        const resumeInput = captureStudioResumeInput(scope, input, { projectCreatedAt: projectMeta?.createdAt ?? null,
+          requiresDelegation: directorMode, scenePolicy: selectedScenePolicy, platformId: selectedPlatform.decision.id });
+        try {
+          await runner.run(
           promptReview ? "prompt_review" : "preproduction",
           { intent: runInput.intent, isMarketing: input.isMarketing ?? false, pipelineKind, scenePolicy: selectedScenePolicy.decision,
             ...(input.promptReviewPrior ? { promptReviewPrior: input.promptReviewPrior } : {}),
-            resumeInput: captureStudioResumeInput(scope, input, { projectCreatedAt: projectMeta?.createdAt ?? null,
-              requiresDelegation: directorMode, scenePolicy: selectedScenePolicy, platformId: selectedPlatform.decision.id }) },
+            ...(verifiedResumePrior ? { resumePrior: verifiedResumePrior } : {}), resumeInput },
           async (ctx) => {
             gateProofs.clear();
             completedVendorResult = null;
+            checkpointStore = createStudioCheckpointStore({
+              identity: { ...scope, projectId: input.projectId, projectCreatedAt: projectMeta!.createdAt,
+                stageId: promptReview ? "prompt_review" : "preproduction", runId: entry.runId, attempt: ctx.attempt,
+                inputSha256: renderSha256(canonicalRenderJson({ resumeInput, gatePolicy: GATE_RUBRIC, checkpointPolicy: "studio-continuity/v1",
+                  ...(input.isMarketing ? { marketingSourcePolicy: MARKETING_SOURCE_POLICY_VERSION } : {}) })),
+                model: llm.model },
+              archive, priorRunId: checkpointPriorRunId,
+              repository: studioCheckpointRepository(scope, input.projectId),
+              hasUnknownOutcome: () => llm.hasUnknownOutcome(),
+            });
+            await checkpointStore.begin();
+            let marketing: PreparedMarketingFacts | undefined;
+            const rejectedFactKey = (key: string) => `FACT_REJECTION_${key.slice("FACT_".length)}`;
+            const factReviewCache: MarketingFactReviewCache = {
+              load: key => checkpointStore!.loadValue<MarketingShotFactReview>(key),
+              save: (key, review) => checkpointStore!.saveValue(key, review, review.scope?.runId),
+              loadRejected: key => checkpointStore!.loadValue<MarketingShotFactReview>(rejectedFactKey(key)),
+              reject: async (key, review) => {
+                if (!marketing || !review.rejectedShot || marketingFactReviewCacheKey(marketing.bundle, review.rejectedShot) !== key) {
+                  throw new Error("MARKETING_PROMPTS_UNBOUND: 生产返工缺少当前来源和完整镜头绑定");
+                }
+                await verifyRejectedMarketingFactReview(marketing, review.rejectedShot, review);
+                await checkpointStore!.saveValue(rejectedFactKey(key), review, review.scope?.runId);
+                await checkpointStore!.rejectProduction(key, review);
+              },
+            };
             /**
              * 断点快照（真机发现的方案缺陷修复，T-2026-0926-0001 留痕）：
              * vendor 在 Phase checkpoint 指纹不匹配时会**删除**自己的 checkpoint
@@ -1284,12 +1340,23 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
                 console.error(`[archive] 断点快照失败（继续执行）: ${(err as Error).message}`);
                 return { files: 0, bytes: 0, skipped: [] as string[] };
               });
-            let marketing: PreparedMarketingFacts | undefined;
             let g1Failure: Awaited<ReturnType<ApprovalCallback>> | undefined;
             if (input.isMarketing) {
-              marketing = await prepareMarketingFacts({ scope: { ...scope, projectId: input.projectId, runId: entry.runId, attempt: ctx.attempt },
+              const sourceScope = { ...scope, projectId: input.projectId, runId: entry.runId, attempt: ctx.attempt };
+              const priorFacts = await checkpointStore.loadValue<PreparedMarketingFacts>("MARKETING");
+              if (priorFacts) {
+                try {
+                  marketing = await restoreMarketingFacts(priorFacts, { root: archive.root, scope: sourceScope,
+                    intent: input.rawIntent ?? input.intent, stageId: promptReview ? "prompt_review" : "preproduction" });
+                } catch (error) {
+                  if (!(error instanceof Error) || !error.message.startsWith("MARKETING_FACTS_EXPIRED")) throw error;
+                  console.log("[studio-worker] 原来源已过期，刷新来源及依赖工位");
+                }
+              }
+              marketing ??= await checkpointMarketingFacts(await prepareMarketingFacts({ scope: sourceScope,
                 root: archive.root, metadata: input.metadata ?? {}, intent: input.rawIntent ?? input.intent, llm,
-                ...(promptReview ? { stageId: "prompt_review" as const } : {}) });
+                ...(promptReview ? { stageId: "prompt_review" as const } : {}) }));
+              await checkpointStore.saveValue("MARKETING", marketing, marketing.bundle.sourceScope?.runId);
               const verdict = await onApproval({ runId: entry.runId, gate: "G1_DOSSIER", vendorType: "host-source-dossier",
                 title: "本次营销来源正文与逐主张事实审核", contentMd: marketing.g1Content });
               const proof = gateProofs.get("G1_DOSSIER");
@@ -1302,7 +1369,25 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
               marketingDossierRoot = marketing.storeRoot;
               marketingDossierRef = path.posix.join("archive", scope.workspaceId, input.projectId, `${marketing.prefix}-dossier`);
             }
-            const studio = new VideoStudio({ ...studioConfig, ...(marketing ? { dataMining: {
+            const productionRejections: MarketingShotFactReview[] = [];
+            if (marketing) {
+              for (const rejection of await checkpointStore.loadProductionRejections()) {
+                const review = rejection.review as MarketingShotFactReview;
+                if (!review?.rejectedShot) throw new Error("STUDIO_CHECKPOINT_INVALID: 生产返工回执缺少完整原镜头");
+                if (marketingFactReviewCacheKey(marketing.bundle, review.rejectedShot) !== rejection.key) continue;
+                await verifyRejectedMarketingFactReview(marketing, review.rejectedShot, review);
+                await checkpointStore.adoptProductionRejection(rejection);
+                await checkpointStore.saveValue(rejectedFactKey(rejection.key), review, review.scope?.runId);
+                productionRejections.push(review);
+              }
+            }
+            const productionRepairFeedback = marketing && productionRejections.length ? canonicalRenderJson({
+              instruction: "根据已核实的完整来源和原事实审核诊断修订生产提示词。纠正或删除未支持的主张，保留其他已通过的创作成果；不得把原坏镜或审核指令直接拼入作品，不得修改来源或替评审作出通过裁决。",
+              sourceClaims: marketing.bundle.stages.map(stage => stage.facts), restrictions: marketing.bundle.restrictions,
+              creativeRequirements: marketing.bundle.creativeRequirements, rejected: productionRejections,
+            }) : undefined;
+            const studio = new VideoStudio({ ...studioConfig, checkpoints: checkpointStore.engine,
+              ...(productionRepairFeedback ? { productionRepairFeedback } : {}), ...(marketing ? { dataMining: {
               mode: "api", storeRoot: marketing.storeRoot, refresh: true,
               verifiedRaw: { projectId: input.projectId, rawJson: canonicalRenderJson(marketing.raw), sha256: marketing.bundle.rawSha256, productQuery: marketing.bundle.productQuery,
                 specSourceUrls: marketing.specSourceUrls, creativeRequirements: marketing.bundle.creativeRequirements, restrictions: marketing.bundle.restrictions,
@@ -1331,7 +1416,7 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
                 return { output: { purpose: "prompt-review", state: "prompt_review_failed", renderAuthorized: false, failureMessage: message },
                   outcome: { status: "failed" as const, errorClass: isProducerRejection(r) ? "GATE_REJECTED" : classifyError(new Error(message)), errorMsg: message } };
               }
-              const marketingFacts = marketing ? await finalizeMarketingFacts(marketing, promptReviewShots) : null;
+              const marketingFacts = marketing ? await finalizeMarketingFacts(marketing, promptReviewShots, process.env, factReviewCache) : null;
               const receipt = await issueStudioPromptReview({ app: getAppPool(), scope, projectId: input.projectId,
                 runId: entry.runId, attempt: ctx.attempt, pipeline: pipelineKind, targetSeconds: input.durationSec!,
                 rawIntent: input.rawIntent ?? input.intent, reviewReport: promptReviewReport.text,
@@ -1546,7 +1631,7 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
               );
             }
             const marketingFacts = marketing && r.success && promptPack ? await finalizeMarketingFacts(marketing,
-              promptPack.shots.map(shot => ({ shotId: String(shot.shotId ?? ""), prompt: shot.prompt, fields: shot.fields }))) : undefined;
+              promptPack.shots.map(shot => ({ shotId: String(shot.shotId ?? ""), prompt: shot.prompt, fields: shot.fields })), process.env, factReviewCache) : undefined;
             if (marketing && r.success && !marketingFacts) throw new Error("MARKETING_PROMPTS_UNVERIFIED：营销预生产没有完整最终镜头事实审核");
             return {
               output: {
@@ -1607,7 +1692,15 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
               ...(outcome ? { outcome } : {}),
             };
           },
-        );
+          );
+        } catch (error) {
+          if (error instanceof Error && /VIDEO_MODEL_OUTCOME_UNKNOWN/u.test(error.message)) checkpointStore?.markUnknown();
+          if (error instanceof Error && /MARKETING_FACTS_RECEIPT_UNVERIFIED/u.test(error.message)) checkpointStore?.markReceiptUnverified();
+          throw error;
+        } finally {
+          await checkpointStore?.finishOutcome();
+          checkpointPriorRunId = entry.runId;
+        }
         if (!rawResult) throw new Error("预生产档案执行器未返回业务结果");
         return rawResult;
       };

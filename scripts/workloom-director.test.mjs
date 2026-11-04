@@ -9,6 +9,16 @@ test('plan enforces text-only mode and credentials remain outside the body',asyn
  assert.equal(result.result.status,'queued');assert.equal(JSON.parse(request.body).mode,'plan');
  assert.equal(request.headers.authorization,'Bearer '+env.WORKLOOM_ACCESS_TOKEN);assert.ok(!request.body.includes(env.WORKLOOM_ACCESS_TOKEN));
 });
+test('director demand commands preserve 12000 Unicode characters and reject overflow before networking',async()=>{
+ for(const command of ['start','plan','targets'])for(const character of ['汉','𠮷']){
+  const raw=character.repeat(12000);let received,calls=0;
+  const fetcher=async(url,init)=>{calls++;received=init.method==='GET'?JSON.parse(url.searchParams.get('input')):JSON.parse(init.body);
+   return Response.json({result:{data:{status:'queued'}}});};
+  await requestDirector(command,{intent:raw,idempotencyKey:'unicode-test'},{env,fetcher});assert.equal(received.intent,raw);
+  await assert.rejects(requestDirector(command,{intent:raw+character},{env,fetcher}),{code:'INVALID_INPUT'});
+  assert.equal(calls,1);
+ }
+});
 test('missing identity, unsafe remote URLs and oversized inputs reject before networking',async()=>{
  let calls=0;const fetcher=async()=>{calls++;throw new Error('unexpected network');};
  await assert.rejects(requestDirector('start',{}, {env:{},fetcher}),{code:'UNAUTHORIZED'});

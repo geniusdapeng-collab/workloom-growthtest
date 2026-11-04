@@ -82,4 +82,24 @@ describe("来源公网地址与真实HTTP读取", () => {
     for (const value of ["", "请完成安全验证", "x".repeat(SOURCE_MAX_TEXT_CHARS + 1)]) expect(() => sourceDocument(value, "text/plain", "https://source.example.com/")).toThrow();
     expect(sourceDocument('<img src="http://127.0.0.1/x">有效正文', "text/html", "https://source.example.com/").assetUrls).toEqual([]);
   });
+  it("排除通用隐藏UI子树但保留可见正文、价格冲突和真实AI声明", () => {
+    const raw = '<div style="display: none"><div>AI摘要</div><div>内容由AI生成，仅供参考</div><span>隐藏摘要</span></div>'
+      + '<article><p>星野 R 售价1200元。</p><p>同款又报1300元，原始冲突不能删掉。</p></article>'
+      + '<div hidden><div><p>隐藏授权弹窗</p></div></div><p>本文由AI生成，仅供参考。</p>';
+    const result = sourceDocument(raw, "text/html", "https://source.example.com/f3");
+    expect(result.text).not.toContain("AI摘要");
+    expect(result.text).not.toContain("隐藏摘要");
+    expect(result.text).not.toContain("隐藏授权弹窗");
+    expect(result.text).toContain("1200元");
+    expect(result.text).toContain("1300元");
+    expect(result.text).toContain("本文由AI生成，仅供参考。");
+  });
+  it("隐藏属性按HTML节点识别，含大于号的属性和嵌套同名节点不吞可见兄弟", () => {
+    const raw = '<SECTION data-label="a > b" STYLE="visibility: hidden !important"><section><div>不可见内容</div></section></SECTION>'
+      + '<section data-hidden="true"><p>完整可见正文</p></section><input hidden><p>末尾正文</p>';
+    const result = sourceDocument(raw, "text/html", "https://source.example.com/f3");
+    expect(result.text).not.toContain("不可见内容");
+    expect(result.text).toContain("完整可见正文");
+    expect(result.text).toContain("末尾正文");
+  });
 });

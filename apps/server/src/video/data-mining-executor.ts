@@ -69,7 +69,7 @@ export interface DataMiningExecutorOptions {
   log?: (line: string) => void;
   /** 检索实现（默认 Bing 公开 RSS；测试可注入替身） */
   search?: SearchFn;
-  /** 每站最多跑几条查询（默认 A1 8 / A2 8 / A3 5；真机成本闸） */
+  /** 显式限制单站查询数；未提供时执行任务书中的完整查询矩阵。 */
   perStageQueryCap?: Partial<Record<IntelStage, number>>;
   /** 每条查询取前 N 条结果（默认 5） */
   hitsPerQuery?: number;
@@ -86,8 +86,6 @@ export interface DataMiningExecutorOptions {
 }
 
 export type DataMiningExecutor = (stage: IntelStage, plan: DataMiningStagePlan) => Promise<Record<string, unknown> | null>;
-
-const DEFAULT_QUERY_CAP: Record<IntelStage, number> = { A1: 8, A2: 8, A3: 5 };
 
 /* ================= 检索实现（多引擎、免密钥） ================= */
 
@@ -783,12 +781,11 @@ export function createDataMiningExecutor(options: DataMiningExecutorOptions): Da
 
   return async (stage, plan) => {
     const started = Date.now();
-    const cap = options.perStageQueryCap?.[stage] ?? DEFAULT_QUERY_CAP[stage];
     /**
      * 查询矩阵：A1/A2 用 `queries`，A3 旧口径用 `discovery_queries`（vendor 已补 `queries` 别名，
      * 这里再兜一层，保证任何一端先发布都不会让竞品站静默缺站）。
      */
-    const queries = (plan.queries ?? plan.discovery_queries ?? []).slice(0, cap);
+    const queries = (plan.queries ?? plan.discovery_queries ?? []).slice(0, options.perStageQueryCap?.[stage]);
     if (queries.length === 0) {
       if (options.evidenceCollector) return options.evidenceCollector(stage, plan, []);
       log(`[intel] ${stage} 任务书缺查询矩阵，按缺站处理`);

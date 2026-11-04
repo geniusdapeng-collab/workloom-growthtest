@@ -4,7 +4,8 @@ import { mkdtemp, realpath, rm, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { prepareMarketingFacts, finalizeMarketingFacts, verifyMarketingFacts, type PreparedMarketingFacts } from "./marketing-authority.js";
+import { checkpointMarketingFacts, prepareMarketingFacts, restoreMarketingFacts, finalizeMarketingFacts, verifyMarketingFacts,
+  marketingFactReviewCacheKey, verifyRejectedMarketingFactReview, type PreparedMarketingFacts, type MarketingShotFactReview } from "./marketing-authority.js";
 import { primeSearchCache } from "./data-mining-executor.js";
 import { fetchMarketingSource, requestSource } from "./marketing-source-fetcher.js";
 import { canonicalRenderJson, renderSha256 } from "./gen/compiled-request.js";
@@ -76,22 +77,26 @@ async function prepare(options: {
   largeSources?: boolean;
   largeGate?: boolean;
   queryHints?: { brand?: string; category?: string; model?: string };
+  structuralDefect?: "note" | "multiple-specs";
 } = {}): Promise<PreparedMarketingFacts> {
   let searches = 0;
   return prepareMarketingFacts({ scope: { ...scope, attempt: options.attempt ?? 1 }, stageId: options.stageId, root,
     intent: options.intent ?? "做一条风扇介绍", metadata: { brief: { product: "星野 F3", brand: "星野" }, ...(options.queryHints ? { dataMining: { name: "星野 F3", ...options.queryHints } } : {}), ...(options.largeGate ? { notes: longMetadata } : {}) }, env: { ...env, ...(options.mode ? { VM_DATA_MINING_MODE: options.mode } : {}) },
     llm: { reason: async prompt => {
       extractionCalls.push(prompt); if (options.modelFailure) return { success: false, error: "LLM unavailable" };
-      const match = /当前阶段：(A[123])\n(.*)$/s.exec(prompt)!; const source = JSON.parse(match[2]!).sources[0];
+      const match = /当前阶段：(A[123])\n(.*)$/s.exec(prompt)!; const extractionInput = JSON.parse(match[2]!); const source = extractionInput.sources[0];
       if (match[1] !== "A1") return { success: true, data: { payload: match[1] === "A2" ? { reviews: [] } : { competitors: [] }, citations: [], noEvidenceReason: "页面仅商品规格，无可核实评价或竞品" } };
-      const prices = options.zeroPrice ? [
+      const prices = options.structuralDefect === "note" ? [
+        { amount: 99, currency: "USD", source_url: sourceUrl, ...(!extractionInput.invalidExtraction ? { note: "官方定价" } : {}) },
+      ] : options.zeroPrice ? [
         { amount: 0, currency: "USD", source_url: sourceUrl }, { amount: 699, currency: "CNY", source_url: sourceUrl },
       ] : options.mixedCurrencies ? [
         { amount: 99, currency: "USD", source_url: sourceUrl }, { amount: 109, currency: "USD", source_url: sourceUrl },
         { amount: 699, currency: "CNY", source_url: sourceUrl }, { amount: 799, currency: "CNY", source_url: sourceUrl },
       ] : undefined;
-      return { success: true, data: { payload: { identity: { name: "星野 F3", specs: { 风量: "9 档" }, official_selling_points: [{ point: "风量 9 档", source_url: sourceUrl }], ...(prices ? { prices } : {}) }, images: [] }, citations: [
-        ...["/identity/name", "/identity/specs/风量", "/identity/official_selling_points/0/point"].map(pointer => ({ pointer, sourceId: source.sourceId, quote: options.badQuote ? "不存在的事实" : sourceText })),
+      const missingSpecs = options.structuralDefect === "multiple-specs" && !extractionInput.invalidExtraction;
+      return { success: true, data: { payload: { identity: { name: "星野 F3", specs: missingSpecs ? { "z-last": "9 档", "a-first": "9 档" } : { 风量: "9 档" }, official_selling_points: [{ point: "风量 9 档", source_url: sourceUrl }], ...(prices ? { prices } : {}) }, images: [] }, citations: [
+        ...["/identity/name", ...(!missingSpecs ? ["/identity/specs/风量"] : []), "/identity/official_selling_points/0/point"].map(pointer => ({ pointer, sourceId: source.sourceId, quote: options.badQuote ? "不存在的事实" : sourceText })),
         ...(prices ?? []).flatMap((price, index) => ["amount", "currency"].map(field => ({ pointer: `/identity/prices/${index}/${field}`, sourceId: source.sourceId, quote: `${price.amount}${price.currency === "USD" ? "美元" : "元"}` }))),
       ] } };
     } }, dependencies: {
@@ -112,7 +117,7 @@ async function prepare(options: {
           }),
       fetchSource: async url => {
         if (options.fragmentAliases) await new Promise(resolve => setTimeout(resolve, 5));
-        const fixturePath = options.largeSources ? "/large" : options.mixedCurrencies ? "/currencies" : undefined;
+        const fixturePath = options.largeSources ? "/large" : options.mixedCurrencies || options.structuralDefect === "note" ? "/currencies" : undefined;
         return fetchMarketingSource(url, { resolver: async () => [{ address: "93.184.216.34", family: 4 }], transport: async (requested, _address, signal) =>
           requestSource(new URL(fixturePath ?? requested.pathname, origin), { address: "127.0.0.1", family: 4 }, signal) });
       },
@@ -120,6 +125,212 @@ async function prepare(options: {
 }
 const shots = [{ shotId: "S1", prompt: "窗边展示星野 F3 风扇，字幕说明风量 9 档。", fields: { 场景: "窗边", 产品: "星野 F3", 规格: "9 档" } }];
 describe("营销事实宿主完整执行", () => {
+  it.each(["note", "multiple-specs"] as const)("%s结构失败的原raw/实际诊断/修复请求及选定有效raw完整复读", async structuralDefect => {
+    const prepared = await prepare({ structuralDefect });
+    const stage = prepared.bundle.stages[0]!, attempt = stage.supportAttempts![0]!, history = attempt.structureRepair!;
+    expect(history).toBeDefined();
+    expect(attempt.extraction.ref).toBe(`${prepared.prefix}-A1.structure-1.extraction.json`);
+    const diagnostic = JSON.parse(await readFile(path.join(root, history.validation.ref), "utf8"));
+    expect(diagnostic.error.message).toContain(structuralDefect === "note" ? "/identity/prices/0/note" : "/identity/specs/a-first,/identity/specs/z-last");
+    expect(extractionCalls.filter(prompt => /当前阶段：A1\n/u.test(prompt))).toHaveLength(2);
+    expect(modelCalls).toHaveLength(3);
+    const saved = await finalizeMarketingFacts(prepared, shots, env);
+    const checked = await verifyMarketingFacts({ root, ...saved, scope, shots });
+    expect(checked.stages[0]!.supportAttempts![0]!.structureRepair).toEqual(history);
+    const original = JSON.parse(await readFile(path.join(root, history.rejectedExtraction.ref), "utf8"));
+    if (structuralDefect === "note") expect(original.payload.identity.prices[0].note).toBe("官方定价");
+    else expect(original.payload.identity.specs).toEqual({ "a-first": "9 档", "z-last": "9 档" });
+  });
+
+  it.each(["raw", "diagnosis", "request-source", "selected-raw"])("结构修复history的%s同步改摘要也不能冒充原始成功链", async kind => {
+    const prepared = await prepare({ structuralDefect: "multiple-specs" });
+    const saved = await finalizeMarketingFacts(prepared, shots, env);
+    const bundle = JSON.parse(await readFile(path.join(root, saved.ref), "utf8")) as PreparedMarketingFacts["bundle"];
+    const attempt = bundle.stages[0]!.supportAttempts![0]!, history = attempt.structureRepair!;
+    const pointer = kind === "raw" ? history.rejectedExtraction : kind === "diagnosis" ? history.validation
+      : kind === "request-source" ? history.request : attempt.extraction;
+    const value = JSON.parse(await readFile(path.join(root, pointer.ref), "utf8"));
+    if (kind === "raw") value.citations.push({ pointer: "/identity/specs/a-first", sourceId: bundle.sources[0]!.sourceId, quote: sourceText });
+    if (kind === "diagnosis") value.error.message = "自行声明没有错误";
+    if (kind === "request-source") value.input.sources[0].text = "替换过的正文";
+    if (kind === "selected-raw") value.payload.identity.specs.风量 = "999 档";
+    const changed = canonicalRenderJson(value); await writeFile(path.join(root, pointer.ref), changed); pointer.sha256 = renderSha256(changed);
+    const text = canonicalRenderJson(bundle); await writeFile(path.join(root, saved.ref), text);
+    await expect(verifyMarketingFacts({ root, ref: saved.ref, sha256: renderSha256(text), scope, shots })).rejects.toThrow();
+  });
+
+  it("晚期真实事实拒绝会保存负回执，相同坏镜恢复时0次重新判审，改稿后仅审改变镜头", async () => {
+    const original = await checkpointMarketingFacts(await prepare());
+    const passed = new Map<string, MarketingShotFactReview>(), rejected = new Map<string, MarketingShotFactReview>();
+    let rejectFollowing = true;
+    const reject = vi.fn(async (key: string, review: MarketingShotFactReview) => { rejected.set(key, structuredClone(review)); });
+    const cache = { load: async (key: string) => passed.get(key) ?? null,
+      save: async (key: string, review: MarketingShotFactReview) => {
+        passed.set(key, structuredClone(review));
+        if (rejectFollowing && review.shotId === "S1") rejectJudge = true;
+      }, loadRejected: async (key: string) => rejected.get(key) ?? null, reject };
+    const bad = { ...shots[0]!, shotId: "S2", prompt: "镜头二虚构999档商品规格。" };
+    const input = [...shots, bad];
+    const sourceCalls = modelCalls.length;
+    await expect(finalizeMarketingFacts(original, input, env, cache)).rejects.toThrow("MARKETING_PROMPT_FACTS_REJECTED");
+    expect(modelCalls.length - sourceCalls).toBe(2);
+    expect(passed.size).toBe(1); expect(rejected.size).toBe(1);
+    const negative = [...rejected.values()][0]!;
+    expect(negative.rejectedShot).toEqual(bad);
+    expect(negative.verdictArchive).toMatchObject({ ref: `${original.prefix}-shot-2.verdict.json` });
+    await expect(verifyRejectedMarketingFactReview(original, bad, negative)).resolves.toBeUndefined();
+    rejectFollowing = false; rejectJudge = false;
+    const next = await restoreMarketingFacts(original, { root, scope: { ...scope, runId: "RUN2", attempt: 2 }, intent: "做一条风扇介绍", stageId: "preproduction" });
+    expect(marketingFactReviewCacheKey(next.bundle, bad)).toBe(marketingFactReviewCacheKey(original.bundle, bad));
+    const before = modelCalls.length;
+    await expect(finalizeMarketingFacts(next, input, env, cache)).rejects.toThrow("已有完整事实拒绝");
+    expect(modelCalls).toHaveLength(before);
+    expect(reject).toHaveBeenCalledTimes(2);
+    const corrected = { ...bad, prompt: "镜头二展示有来源的风量9档。" };
+    expect(marketingFactReviewCacheKey(next.bundle, corrected)).not.toBe(marketingFactReviewCacheKey(next.bundle, bad));
+    const third = await restoreMarketingFacts(original, { root, scope: { ...scope, runId: "RUN3", attempt: 3 }, intent: "做一条风扇介绍", stageId: "preproduction" });
+    const saved = await finalizeMarketingFacts(third, [...shots, corrected], env, cache);
+    expect(modelCalls.length - before).toBe(1);
+    const checked = await verifyMarketingFacts({ root, ...saved, scope: third.bundle.scope, shots: [...shots, corrected] });
+    expect(checked.outputReviews.map(review => review.scope?.runId)).toEqual([scope.runId, "RUN3"]);
+  });
+
+  it.each(["prompt", "fields", "source", "scope", "unknown", "fallback", "passed", "missing-shot", "missing-verdict", "verdict-inline", "verdict-file"])("负回执%s变化或伪状态不能阻断别的内容或当作真实语义拒绝", async kind => {
+    const prepared = await checkpointMarketingFacts(await prepare());
+    const rejected = new Map<string, MarketingShotFactReview>();
+    rejectJudge = true;
+    await expect(finalizeMarketingFacts(prepared, shots, env, { load: async () => null, save: async () => {},
+      reject: async (key, review) => { rejected.set(key, structuredClone(review)); } })).rejects.toThrow("MARKETING_PROMPT_FACTS_REJECTED");
+    const negative = [...rejected.values()][0]!, current = structuredClone(shots[0]!);
+    if (kind === "prompt") current.prompt += " changed";
+    if (kind === "fields") current.fields.规格 = "100档";
+    if (kind === "source") prepared.bundle.restrictions.push("新事实限制");
+    if (kind === "scope") negative.scope!.tenantId = "another-tenant";
+    if (kind === "unknown") negative.verdict.unknownOutcome = true;
+    if (kind === "fallback") negative.verdict.via = "fallback";
+    if (kind === "passed") { negative.verdict.status = "passed"; negative.verdict.approved = true; negative.verdict.score = 96; }
+    if (kind === "missing-shot") delete negative.rejectedShot;
+    if (kind === "missing-verdict") delete negative.verdictArchive;
+    if (kind === "verdict-inline") negative.verdict.reason = "篡改的诊断";
+    if (kind === "verdict-file") await writeFile(path.join(root, negative.verdictArchive!.ref), "changed");
+    const before = modelCalls.length;
+    await expect(verifyRejectedMarketingFactReview(prepared, current, negative)).rejects.toThrow();
+    expect(modelCalls).toHaveLength(before);
+  });
+
+  it("模型不可用的晚期未验证结果不保存negative，恢复时保留作者内容只补独立事实审核", async () => {
+    const original = await checkpointMarketingFacts(await prepare());
+    const reject = vi.fn(async () => {}), before = modelCalls.length;
+    await expect(finalizeMarketingFacts(original, shots, {}, { load: async () => null, save: async () => {}, reject })).rejects.toThrow("MARKETING_PROMPT_FACTS_REJECTED");
+    expect(reject).not.toHaveBeenCalled();
+    expect(modelCalls).toHaveLength(before);
+    const next = await restoreMarketingFacts(original, { root, scope: { ...scope, runId: "RUN2", attempt: 2 }, intent: "做一条风扇介绍", stageId: "preproduction" });
+    await finalizeMarketingFacts(next, shots, env, { load: async () => null, save: async () => {}, reject });
+    expect(modelCalls.length - before).toBe(1);
+    expect(reject).not.toHaveBeenCalled();
+  });
+
+  it("晚期已知negative裁决归档失败标记回执待核实，不保存半个negative或再次判审", async () => {
+    const prepared = await prepare(), reject = vi.fn(async () => {});
+    const verdictRef = `${prepared.prefix}-shot-1.verdict.json`;
+    await writeFile(path.join(root, verdictRef), "immutable earlier evidence");
+    rejectJudge = true;
+    const before = modelCalls.length;
+    const cache = { load: async () => null, save: async () => {}, reject };
+    await expect(finalizeMarketingFacts(prepared, shots, env, cache)).rejects.toMatchObject({ code: "MARKETING_FACTS_RECEIPT_UNVERIFIED", cause: { code: "EEXIST" } });
+    expect(reject).not.toHaveBeenCalled();
+    expect(modelCalls.length - before).toBe(1);
+    await expect(finalizeMarketingFacts(prepared, shots, env, cache)).rejects.toThrow();
+    expect(modelCalls.length - before).toBe(1);
+    expect(await readFile(path.join(root, verdictRef), "utf8")).toBe("immutable earlier evidence");
+  });
+
+  it("晚期负缓存若返回篡改主张，实际finalize也在模型调用前拒绝", async () => {
+    const original = await checkpointMarketingFacts(await prepare());
+    let negative: MarketingShotFactReview | null = null;
+    rejectJudge = true;
+    await expect(finalizeMarketingFacts(original, shots, env, { load: async () => null, save: async () => {},
+      reject: async (_key, review) => { negative = structuredClone(review); } })).rejects.toThrow("MARKETING_PROMPT_FACTS_REJECTED");
+    const tampered = negative as unknown as MarketingShotFactReview;
+    tampered.promptSha256 = "0".repeat(64);
+    const next = await restoreMarketingFacts(original, { root, scope: { ...scope, runId: "RUN2", attempt: 2 }, intent: "做一条风扇介绍", stageId: "preproduction" });
+    const before = modelCalls.length;
+    await expect(finalizeMarketingFacts(next, shots, env, { load: async () => null, save: async () => {}, loadRejected: async () => tampered }))
+      .rejects.toMatchObject({ code: "MARKETING_PROMPTS_UNVERIFIED" });
+    expect(modelCalls).toHaveLength(before);
+  });
+
+  it("晚期provider结果未知且verdict归档冲突时保留unknown优先，不写semantic负回执", async () => {
+    const prepared = await prepare(), reject = vi.fn(async () => {});
+    await writeFile(path.join(root, `${prepared.prefix}-shot-1.verdict.json`), "immutable earlier evidence");
+    const request = vi.fn(async () => { throw new Error("socket lost after dispatch"); });
+    vi.stubGlobal("fetch", request);
+    await expect(finalizeMarketingFacts(prepared, shots, env, { load: async () => null, save: async () => {}, reject }))
+      .rejects.toMatchObject({ code: "VIDEO_MODEL_OUTCOME_UNKNOWN", cause: { code: "EEXIST" } });
+    expect(request).toHaveBeenCalledOnce();
+    expect(reject).not.toHaveBeenCalled();
+  });
+
+  it("第二镜事实审核失败后只重审该镜，保留第一镜已完成的真实审核", async () => {
+    const original = await checkpointMarketingFacts(await prepare());
+    const records = new Map<string, MarketingShotFactReview>();
+    let rejectSecond = true;
+    const cache = { load: async (key: string) => records.get(key) ?? null,
+      save: async (key: string, review: MarketingShotFactReview) => {
+        records.set(key, structuredClone(review));
+        if (rejectSecond && review.shotId === "S1") rejectJudge = true;
+      } };
+    const twoShots = [...shots, { ...shots[0]!, shotId: "S2", prompt: "镜头二继续展示已核实的风量 9 档。" }];
+    const sourceCalls = modelCalls.length;
+    await expect(finalizeMarketingFacts(original, twoShots, env, cache)).rejects.toThrow("MARKETING_PROMPT_FACTS_REJECTED");
+    expect(modelCalls.length - sourceCalls).toBe(2);
+    expect(records.size).toBe(1);
+    rejectSecond = false;
+    rejectJudge = false;
+    const nextScope = { ...scope, runId: "RUN-next", attempt: 2 };
+    const resumed = await restoreMarketingFacts(original, { root, scope: nextScope, intent: "做一条风扇介绍", stageId: "preproduction" });
+    const before = modelCalls.length;
+    const saved = await finalizeMarketingFacts(resumed, twoShots, env, cache);
+    expect(modelCalls.length - before).toBe(1);
+    const verified = await verifyMarketingFacts({ root, ...saved, scope: nextScope, shots: twoShots });
+    expect(verified.outputReviews.map(review => review.scope?.runId)).toEqual([scope.runId, nextScope.runId]);
+  });
+
+  it.each([false, true])("来源审核保留原身份和原始字节，最终镜头绑定新attempt，同run=%s", async sameRun => {
+    const intent = "做一条风扇介绍";
+    const original = await checkpointMarketingFacts(await prepare({ intent }));
+    const nextScope = { ...scope, runId: sameRun ? scope.runId : "RUN-resumed", attempt: 2 };
+    const before = extractionCalls.length;
+    const resumed = await restoreMarketingFacts(original, { root, scope: nextScope, intent, stageId: "preproduction" });
+    expect(extractionCalls).toHaveLength(before);
+    expect(resumed.g1Content).toBe(original.g1Content);
+    expect(resumed.bundle).toMatchObject({ scope: nextScope, sourceScope: scope });
+    expect(resumed.storeRoot).toBe(path.join(root, "stages/preproduction/attempt-2.marketing-dossier"));
+    const saved = await finalizeMarketingFacts(resumed, shots, env);
+    const checked = await verifyMarketingFacts({ root, ...saved, scope: nextScope, shots });
+    expect(checked.sources[0]!.textRef).toContain("attempt-1.");
+    expect(checked.outputReviews[0]!.ref).toContain("attempt-2.");
+    const sourceReview = JSON.parse(await readFile(path.join(root, checked.stages[0]!.review!.ref), "utf8"));
+    const shotReview = JSON.parse(await readFile(path.join(root, checked.outputReviews[0]!.ref), "utf8"));
+    expect(sourceReview.scope.runId).toBe(scope.runId);
+    expect(shotReview.scope.runId).toBe(nextScope.runId);
+  });
+
+  it.each(["different-intent", "different-project", "tampered-source", "expired"])("来源接续拒绝 %s", async kind => {
+    const original = await checkpointMarketingFacts(await prepare());
+    if (kind === "tampered-source") await writeFile(path.join(root, original.bundle.sources[0]!.textRef), "改过的来源");
+    if (kind === "expired") {
+      const expired = { ...original.bundle, collectedAt: new Date(Date.now() - 25 * 3600_000).toISOString() };
+      const text = canonicalRenderJson(expired);
+      await writeFile(path.join(root, original.sourceCheckpoint!.ref), text);
+      original.sourceCheckpoint!.sha256 = renderSha256(text);
+      original.bundle = expired;
+    }
+    await expect(restoreMarketingFacts(original, { root,
+      scope: { ...scope, projectId: kind === "different-project" ? "OTHER" : scope.projectId, runId: "RUN-next", attempt: 2 },
+      intent: kind === "different-intent" ? "新的意图" : "做一条风扇介绍", stageId: "preproduction" })).rejects.toThrow();
+  });
+
   it("同项目同执行号的提示词审核和正式前期使用独立来源与事实目录", async () => {
     const full = await finalizeMarketingFacts(await prepare(), shots, env);
     const prompt = await finalizeMarketingFacts(await prepare({ stageId: "prompt_review" }), shots, env);
@@ -172,6 +383,13 @@ describe("营销事实宿主完整执行", () => {
     expect((prepared.bundle.cards.theme_card as { differentiation_space: string[] }).differentiation_space).toEqual([]);
     expect((prepared.bundle.cards.insight_card as { market_position: { our_opening: string[] } }).market_position.our_opening).toEqual([]);
     expect((prepared.bundle.dossier.identity as { official_selling_points: unknown[] }).official_selling_points).toHaveLength(1);
+  });
+  it("没有采纳价格的事实包明确禁止下游从来源正文或客户期望补回报价", async () => {
+    const prepared = await prepare();
+    expect((prepared.raw.A1.identity as { prices: unknown[] }).prices).toEqual([]);
+    expect(prepared.bundle.restrictions).toContain("没有可采纳的当前价格证据：禁止报价、优惠、价格比较或性价比数字主张；不得从未采纳的来源价格或用户期望补回。");
+    expect(prepared.g1Content).toContain("没有可采纳的当前价格证据");
+    expect(prepared.bundle.stages[0]!.supportAttempts).toHaveLength(1);
   });
   it("跨站不同fragment指向同一规范来源时复用同次抓取快照，不因抓取时间不同破坏审核绑定", async () => {
     const prepared = await prepare({ fragmentAliases: true });
@@ -298,6 +516,26 @@ describe("营销事实宿主完整执行", () => {
     }
     await expect(verifyMarketingFacts({ root, ref: saved.ref, sha256: hash, scope: expectedScope, shots: requestedShots })).rejects.toThrow();
   });
+  it.each(["source", "shot"] as const)("%s通过裁决若同时标记结果未知，完整同步摘要后仍拒绝复用", async kind => {
+    const prepared = await prepare();
+    const saved = await finalizeMarketingFacts(prepared, shots, env);
+    const bundle = JSON.parse(await readFile(path.join(root, saved.ref), "utf8")) as PreparedMarketingFacts["bundle"];
+    if (kind === "source") {
+      const record = bundle.stages[0]!;
+      record.review!.verdict = { ...record.review!.verdict, unknownOutcome: true };
+      const attempt = record.supportAttempts!.at(-1)!;
+      const verdictText = canonicalRenderJson(record.review!.verdict);
+      await writeFile(path.join(root, attempt.verdict.ref), verdictText);
+      attempt.verdict.sha256 = renderSha256(verdictText);
+    } else {
+      bundle.outputReviews[0]!.verdict = { ...bundle.outputReviews[0]!.verdict, unknownOutcome: true };
+    }
+    const bytes = canonicalRenderJson(bundle);
+    await writeFile(path.join(root, saved.ref), bytes);
+    await expect(verifyMarketingFacts({ root, ref: saved.ref, sha256: renderSha256(bytes), scope, shots }))
+      .rejects.toMatchObject({ code: kind === "source" ? "MARKETING_SUPPORT_UNVERIFIED" : "MARKETING_PROMPTS_UNVERIFIED" });
+  });
+
   it("重复attempt写盘失败必须终止，不能当抓源失败换候选", async () => {
     await prepare(); await expect(prepare()).rejects.toMatchObject({ code: "EEXIST" });
   });

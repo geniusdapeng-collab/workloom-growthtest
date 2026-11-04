@@ -37,6 +37,7 @@ import {
 } from "./cinematic-skill-policy.js";
 import { getCoverSpec } from "./cover-platforms.js";
 import type { LLMReasonOptions, LLMReasonResult } from "./llm-adapter.js";
+import { unicodeLength, unicodeSlice } from "./unicode-text.mjs";
 
 /**
  * 注入依赖保活桥（2026-09-22 真机根因）
@@ -4170,6 +4171,30 @@ export interface SourceBoundMarketingDiscovery {
 
 const sourceBoundRiskAssessment = Symbol("source-bound-marketing-risk-assessment");
 
+function sourceBoundMarketingRisk(result: Record<string, unknown>): Record<string, unknown> {
+  const { technicalRisks, mitigationSuggestions, businessConstraints } = result;
+  const nonemptyText = (value: unknown) => typeof value === "string" && Boolean(value.trim());
+  if (!Array.isArray(technicalRisks) || !technicalRisks.length || technicalRisks.length > 4
+    || !technicalRisks.map(recordValue).every(risk => nonemptyText(risk.risk) && nonemptyText(risk.impact)
+      && ["high", "medium", "low"].includes(String(risk.level)))
+    || !Array.isArray(mitigationSuggestions) || mitigationSuggestions.length !== technicalRisks.length
+    || !mitigationSuggestions.every(nonemptyText) || !Array.isArray(businessConstraints)
+    || !businessConstraints.length || !businessConstraints.every(nonemptyText)) {
+    throw new Error("MARKETING_RISK_ASSESSMENT_UNVERIFIED：风险与缓解措施缺少完整逐项对应");
+  }
+  return { ...result, [sourceBoundRiskAssessment]: true };
+}
+
+/** Rebuild the nonserializable runtime marker only after authenticated checkpoint loading. */
+export function restoreMarketingDiscoveryCheckpoint(
+  discovery: Record<string, unknown>,
+  source: SourceBoundMarketingDiscovery,
+): Record<string, unknown> {
+  const restored = { ...discovery, riskAssessment: sourceBoundMarketingRisk(recordValue(discovery.riskAssessment)) };
+  marketingDiscoveryContract(restored, source);
+  return restored;
+}
+
 function marketingDiscoveryContract(discovery: Record<string, unknown>, source: SourceBoundMarketingDiscovery) {
   const scene = recordValue(discovery.sceneStructure);
   const risk = recordValue(discovery.riskAssessment);
@@ -4212,6 +4237,7 @@ export function installVendorDiscoveryNarrativeBridge(options: {
   marketingDiscovery?: () => SourceBoundMarketingDiscovery | undefined;
   /** The caller's current host run requires G4; unscoped vendor previews retain their fallback. */
   requireVerifiedPrd?: () => boolean;
+  assertActive?: () => void;
 } = {}): () => void {
   const log = options.log ?? (() => undefined);
   const restores: Array<() => void> = [];
@@ -4279,6 +4305,7 @@ export function installVendorDiscoveryNarrativeBridge(options: {
         discovery: Record<string, unknown>,
         upstream: Record<string, unknown>,
       ) {
+        options.assertActive?.();
         const marketing = options.marketingDiscovery?.();
         const marketingContract = marketing ? marketingDiscoveryContract(discovery, marketing) : null;
         const result = await original.call(this, discovery, upstream);
@@ -4484,6 +4511,26 @@ export function installVendorDiscoveryNarrativeBridge(options: {
     const probe = discoveryMod?.RequirementDiscoveryEngine
       ? new discoveryMod.RequirementDiscoveryEngine({ llmEngine: null })
       : null;
+    for (const agentName of ["audience", "reference"] as const) {
+      const agent = probe?.agents?.[agentName];
+      const prototype = agent ? Object.getPrototypeOf(agent) as Record<string, unknown> : null;
+      if (!prototype || typeof prototype.run !== "function") continue;
+      const originalRun = prototype.run as (input: unknown, schema: unknown) => Promise<unknown>;
+      const hadOwnRun = Object.hasOwn(prototype, "run");
+      prototype.run = async function runSourceBoundDiscovery(this: unknown, input: unknown, schema: unknown) {
+        const marketing = options.marketingDiscovery?.();
+        if (!marketing) return originalRun.call(this, input, schema);
+        options.assertActive?.();
+        // The native prompt and provenance validation receive the same raw customer
+        // contract. Keep the approved theme and its enriched story evidence untouched.
+        const customerInput = { ...recordValue(input), _workloomCustomerIntent: marketing.intent };
+        return originalRun.call(this, customerInput, schema);
+      };
+      restores.push(() => {
+        if (hadOwnRun) prototype.run = originalRun;
+        else delete prototype.run;
+      });
+    }
     const riskPrototype = probe?.agents?.risk ? Object.getPrototypeOf(probe.agents.risk) as Record<string, unknown> : null;
     if (riskPrototype && typeof riskPrototype.run === "function") {
       const originalRun = riskPrototype.run as (input: unknown, schema: unknown) => Promise<unknown>;
@@ -4494,17 +4541,7 @@ export function installVendorDiscoveryNarrativeBridge(options: {
         if (!options.marketingDiscovery?.()) return originalRun.call(this, input, schema);
         // Only the measured author repair below may dispatch again in this scope.
         const result = recordValue(await this._callLLM(input, schema));
-        const { technicalRisks, mitigationSuggestions, businessConstraints } = result;
-        const nonemptyText = (value: unknown) => typeof value === "string" && Boolean(value.trim());
-        if (!Array.isArray(technicalRisks) || !technicalRisks.length || technicalRisks.length > 4
-          || !technicalRisks.map(recordValue).every(risk => nonemptyText(risk.risk) && nonemptyText(risk.impact)
-            && ["high", "medium", "low"].includes(String(risk.level)))
-          || !Array.isArray(mitigationSuggestions) || mitigationSuggestions.length !== technicalRisks.length
-          || !mitigationSuggestions.every(nonemptyText) || !Array.isArray(businessConstraints)
-          || !businessConstraints.length || !businessConstraints.every(nonemptyText)) {
-          throw new Error("MARKETING_RISK_ASSESSMENT_UNVERIFIED：风险与缓解措施缺少完整逐项对应");
-        }
-        return { ...result, [sourceBoundRiskAssessment]: true };
+        return sourceBoundMarketingRisk(result);
       };
       restores.push(() => {
         if (hadOwnRun) riskPrototype.run = originalRun;
@@ -4531,6 +4568,7 @@ export function installVendorDiscoveryNarrativeBridge(options: {
         input: unknown,
         schema: unknown,
       ) {
+        options.assertActive?.();
         const llm = this.llmEngine;
         if (!llm) throw new Error("LLM 引擎未初始化");
         if (!this._buildPrompt) return original.call(this, input, schema);
@@ -4542,18 +4580,16 @@ export function installVendorDiscoveryNarrativeBridge(options: {
           timeoutMs: this.timeoutMs,
           forceJson: true,
         };
-        const startedAt = Date.now();
         let response = typeof llm.reasonStructured === "function"
           ? await llm.reasonStructured(prompt, this.name === "SceneArchitect" ? null : schema, requestOptions)
           : typeof llm.reason === "function"
             ? await llm.reason(prompt, requestOptions)
             : null;
         const author = response?.settledAuthor;
-        const remainingMs = (requestOptions.timeoutMs ?? 180_000) - (Date.now() - startedAt);
-        if (marketing && this.name === "RiskAssessor" && llm.reasonStructured && author && remainingMs >= 1000
+        if (marketing && this.name === "RiskAssessor" && llm.reasonStructured && author
           && response?.success === false && response.structuredParseFailure === true && response.unknown !== true) {
           const revised = `${prompt}\n\n【本次作者修复】上次正文未形成可解析的 JSON 对象。请根据同一已核对合同重新提交一份紧凑 JSON，只含 technicalRisks、businessConstraints、mitigationSuggestions。禁止解释和代码围栏，每条风险必须对应同索引的一条缓解措施。`;
-          response = await llm.reasonStructured(revised, schema, { ...requestOptions, timeoutMs: remainingMs,
+          response = await llm.reasonStructured(revised, schema, { ...requestOptions,
             strictAuthorModel: author.modelId });
           if (response.success && (response.settledAuthor?.modelId !== author.modelId
             || response.settledAuthor.responseId === author.responseId)) {
@@ -6026,36 +6062,37 @@ export function applyNarrativeFinalPromptContract(
     }).join("\n");
   };
   prompt = renumber(prompt);
-  if (prompt.length > options.maxLength) {
+  if (unicodeLength(prompt) > options.maxLength) {
     const lines: string[] = prompt.split("\n");
     let guard = 0;
-    while (lines.join("\n").length > options.maxLength && guard < 100) {
+    while (unicodeLength(lines.join("\n")) > options.maxLength && guard < 100) {
       guard += 1;
       const candidates = lines
         .map((line, index) => ({ line, index, match: line.match(/^(\s*\d+\.【[^】]+】)([\s\S]*)$/u) }))
         .filter((item): item is typeof item & { match: RegExpMatchArray } => Boolean(item.match))
-        .sort((a, b) => b.line.length - a.line.length);
+        .sort((a, b) => unicodeLength(b.line) - unicodeLength(a.line));
       if (candidates.length === 0) {
-        throw new Error(`FINAL_PROMPT_UNCOMPRESSIBLE: prompt ${prompt.length} 字符，缺少可裁剪的编号字段`);
+        throw new Error(`FINAL_PROMPT_UNCOMPRESSIBLE: prompt ${unicodeLength(prompt)} 字符，缺少可裁剪的编号字段`);
       }
       const candidate = candidates[0]!;
       const prefix = candidate.match[1]!;
       const body = candidate.match[2]!;
-      const overflow = lines.join("\n").length - options.maxLength;
-      const keep = Math.max(24, body.length - overflow - 1);
+      const overflow = unicodeLength(lines.join("\n")) - options.maxLength;
+      const keep = Math.max(24, unicodeLength(body) - overflow - 1);
+      const retained = unicodeSlice(body, 0, keep);
       const sentenceEnd = Math.max(
-        body.lastIndexOf("。", keep),
-        body.lastIndexOf("；", keep),
-        body.lastIndexOf("，", keep),
+        retained.lastIndexOf("。"),
+        retained.lastIndexOf("；"),
+        retained.lastIndexOf("，"),
       );
-      const shortened = sentenceEnd >= Math.floor(keep * 0.6)
-        ? body.slice(0, sentenceEnd + 1)
-        : `${body.slice(0, Math.max(1, keep - 1))}…`;
+      const shortened = unicodeLength(retained.slice(0, sentenceEnd + 1)) >= Math.floor(keep * 0.6)
+        ? retained.slice(0, sentenceEnd + 1)
+        : `${unicodeSlice(body, 0, Math.max(1, keep - 1))}…`;
       lines[candidate.index] = `${prefix}${shortened}`;
     }
     prompt = renumber(lines.join("\n"));
-    if (prompt.length > options.maxLength) {
-      throw new Error(`FINAL_PROMPT_UNCOMPRESSIBLE: 结构化字段裁剪后仍为 ${prompt.length} 字符`);
+    if (unicodeLength(prompt) > options.maxLength) {
+      throw new Error(`FINAL_PROMPT_UNCOMPRESSIBLE: 结构化字段裁剪后仍为 ${unicodeLength(prompt)} 字符`);
     }
   }
   if (options.canonicalize) {
@@ -6260,7 +6297,7 @@ export function applyNarrativeFinalPromptContract(
       `26.【角色一致性】${canonicalNoPerson ? "本镜无人物；锁定同一场景、道具、光源与空间关系。" : `分别绑定 ${characterNames.join("、") || "当前角色"} 的授权外观、服装与发型；不得合并、替换或增减人物。`}`,
       `27.【本镜验收】${verificationText}`,
     ].join("\n");
-    if (prompt.length < 1200) {
+    if (unicodeLength(prompt) < 1200) {
       const expansion = [
         `复核首帧主体位置与结束姿态，确认时间轴内动作顺序连续且没有跳变`,
         `复核${sceneText}的空间边界、光源方向与跨镜道具相对位置`,
@@ -6315,9 +6352,9 @@ export function applyNarrativeFinalPromptContract(
     };
   }
   // canonicalize 会从源合同重建字段；不得绕过前面的长度检查，也不得静默截掉源动作。
-  if (prompt.length > options.maxLength) {
+  if (unicodeLength(prompt) > options.maxLength) {
     throw new Error(
-      `FINAL_PROMPT_SOURCE_CAPACITY_EXCEEDED: ${String(next.shotId ?? next.shot_id ?? "未编号镜头")} 重建后 ${prompt.length} 字符，超过 ${options.maxLength}；保留源合同并停止本次预生产`,
+      `FINAL_PROMPT_SOURCE_CAPACITY_EXCEEDED: ${String(next.shotId ?? next.shot_id ?? "未编号镜头")} 重建后 ${unicodeLength(prompt)} 字符，超过 ${options.maxLength}；保留源合同并停止本次预生产`,
     );
   }
   next.prompt = prompt;
@@ -6720,7 +6757,7 @@ export function normalizeNarrativePromptsForReview(
     const result: FusionRecord = {
       ...normalized,
       fields,
-      promptCharCount: String(normalized.prompt ?? "").length,
+      promptCharCount: unicodeLength(String(normalized.prompt ?? "")),
       ...(boundContract ? { _workloomShotContract: boundContract } : {}),
       _workloomPromptReviewPolicy: persistedPolicy,
       _workloomPromptReview: {
@@ -7521,7 +7558,7 @@ export function installVendorNarrativePromptReviewBridge(options: {
         };
         return {
           ...row,
-          promptCharCount: String(row.prompt ?? "").length,
+          promptCharCount: unicodeLength(String(row.prompt ?? "")),
           _skillMatched: compatibleSkills(row._skillMatched),
           _appliedSkills: compatibleSkills(row._appliedSkills),
           ...(rowPolicy?.noTitles ? { sceneType: "content" } : {}),
@@ -7609,56 +7646,33 @@ export function installVendorNarrativePromptReviewBridge(options: {
 }
 
 /**
- * 每次执行独立的 agent 视图，避免并发 run 互改 deadline/retries/子服务回调。
- * 在真正 reasonStructured 调用前再检查预算，封住 BaseAgent 剩余时间保底 10s 的漏洞。
+ * 每次执行独立的 agent 视图，避免并发 run 互改重试和子服务回调。
+ * 只保留单次外调超时，不按整条任务已经运行的时间缩减后续创作。
  */
-function scopedFusionAgent(agent: FusionAgent, remaining: () => number, deadline: number): FusionAgent {
+function scopedFusionAgent(agent: FusionAgent): FusionAgent {
   const scoped = Object.create(agent) as FusionAgent;
-  scoped._globalDeadline = deadline;
-  scoped._remainingMs = remaining;
+  scoped._globalDeadline = Infinity;
+  scoped._remainingMs = () => Infinity;
   scoped._callBudget = new Map(agent._callBudget instanceof Map ? agent._callBudget : []);
-  const guardEngine = (engine: FusionRecord | null): FusionRecord | null => {
-    if (!engine || typeof engine.reasonStructured !== "function") return engine;
-    const guarded = Object.create(engine) as FusionRecord;
-    guarded.reasonStructured = async (prompt: unknown, schema: unknown, options: FusionRecord = {}) => {
-      const budget = remaining();
-      if (budget < 5000) throw new CinematicSkillError("PHASE3_BUDGET_EXHAUSTED", "提供商调用前剩余预算不足 5 秒");
-      const timeout = Number(options.timeoutMs ?? budget);
-      return (engine.reasonStructured as (...args: unknown[]) => Promise<unknown>).call(engine, prompt, schema, {
-        ...options, timeoutMs: Math.min(Number.isFinite(timeout) && timeout > 0 ? timeout : budget, budget),
-        deadlineMs: deadline,
-      });
-    };
-    return guarded;
-  };
   const originalCall = agent._callLLM;
   if (typeof originalCall === "function") {
     scoped._callLLM = async (...args: unknown[]) => {
-      const budget = remaining();
-      if (budget < 5000) throw new CinematicSkillError("PHASE3_BUDGET_EXHAUSTED", "LLM 调用前剩余预算不足 5 秒");
       const opts = args[3] && typeof args[3] === "object" ? args[3] as FusionRecord : {};
-      const requested = Number(opts.timeoutMs ?? scoped.llmTimeout ?? budget);
-      args[3] = {
-        ...opts, timeoutMs: Math.min(Number.isFinite(requested) && requested > 0 ? requested : budget, budget), shotBudget: budget,
-        ...(opts.altModel && typeof opts.altModel === "object" ? { altModel: guardEngine(opts.altModel as FusionRecord) } : {}),
-      };
+      args[3] = { ...opts };
+      delete (args[3] as FusionRecord).shotBudget;
+      delete (args[3] as FusionRecord).deadlineMs;
       let response: unknown;
       try {
         response = await originalCall.apply(scoped, args);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        if (!/(?:JSON\s*解析失败|未找到首个完整\s*JSON)/iu.test(message) || remaining() < 5000) throw error;
+        if (!/(?:JSON\s*解析失败|未找到首个完整\s*JSON)/iu.test(message)) throw error;
         const retryArgs = [...args];
         retryArgs[0] = `${String(retryArgs[0] ?? "")}\n严格只输出一个完整合法 JSON 对象；不要 Markdown 代码围栏、解释、前后缀或尾随文本。`;
         response = await originalCall.apply(scoped, retryArgs);
       }
-      if (remaining() <= 0) throw new CinematicSkillError("PHASE3_BUDGET_EXHAUSTED", "LLM 返回时阶段预算已耗尽");
       return response;
     };
-  }
-  for (const getter of ["_getLLMEngine", "_getAltLLMEngine"] as const) {
-    const originalEngine = agent[getter];
-    if (typeof originalEngine === "function") scoped[getter] = () => guardEngine(originalEngine.call(scoped));
   }
   if (agent._semanticPass && typeof agent._semanticPass === "object" && scoped._callLLM) {
     const semantic = Object.create(agent._semanticPass) as FusionRecord;
@@ -7746,35 +7760,15 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
         const blueprint = fusionRecord(state.adaptedBlueprint, "adaptedBlueprint");
         const agent = this.agents.promptFusion;
         if (!agent || typeof agent.process !== "function") throw new CinematicSkillError("PHASE3_AGENT_MISSING", "PromptFusion Agent 不可用", "unverified");
-        const initialBudget = this.budgetRemaining();
-        if (!Number.isFinite(initialBudget) || initialBudget <= 0) throw new CinematicSkillError("PHASE3_BUDGET_UNVERIFIED", "缺少有限且有效的阶段剩余预算", "unverified");
-        // 入场保留每镜一次最小可用 LLM 时间；实际每次外调再按剩余额度硬裁剪，不虚构重试预算。
-        const minimumNeedMs = shots.length * 5000 + 1000;
-        if (initialBudget < minimumNeedMs || !this.checkBudget(minimumNeedMs, "Phase 3")) {
-          throw new CinematicSkillError("PHASE3_BUDGET_EXHAUSTED", `剩余 ${initialBudget}ms 不能承担最低 ${minimumNeedMs}ms`);
-        }
-        const agentDeadline = Number(agent._globalDeadline);
-        const deadline = Math.min(start + initialBudget, Number.isFinite(agentDeadline) && agentDeadline > 0 ? agentDeadline : Infinity);
-        const remaining = (): number => {
-          const currentBudget = this.budgetRemaining();
-          if (!Number.isFinite(currentBudget)) {
-            throw new CinematicSkillError("PHASE3_BUDGET_UNVERIFIED", "阶段剩余预算在运行中变为未知，停止外部调用", "unverified");
-          }
-          return Math.max(0, Math.min(deadline - Date.now(), currentBudget));
-        };
-        const requireBudget = () => {
-          if (remaining() < 5000) throw new CinematicSkillError("PHASE3_BUDGET_EXHAUSTED", "阶段剩余预算不足，停止新外部调用");
-        };
-        requireBudget();
-        evidence.budget = { initialMs: initialBudget, minimumNeedMs, deadline };
+        evidence.budget = { policy: "no-task-deadline" };
         evidence.blueprintHash = cinematicSkillHash(blueprint);
-        const scoped = scopedFusionAgent(agent, remaining, deadline);
+        const scoped = scopedFusionAgent(agent);
         if (this.healthMonitor) {
-          this.healthMonitor.setLongTaskMode("ProductionEngine", true, remaining());
+          this.healthMonitor.setLongTaskMode("ProductionEngine", true, Infinity);
           healthEnabled = true;
         }
         const plan = await planCinematicSkills(shots, blueprint, router, {
-          registryHash, beforeExternalCall: requireBudget,
+          registryHash,
           ...(scoped._callLLM ? { llmCaller: async (prompt: string) => {
             const raw = await scoped._callLLM!(prompt, { required: ["picks"] }, () => null, { critical: true });
             const response = fusionRecord(raw, "技能精选响应");
@@ -7791,10 +7785,8 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
         stages.skillPrematch = [...plan.values()].map(({ contextText: _context, qcEntries: _qc, ...entry }) => ({
           ...entry, injection: entry.matched.length ? "pre" : "none",
         }));
-        requireBudget();
         const blueprintHash = cinematicSkillHash({ policy: PHASE3_FUSION_POLICY_VERSION, blueprint, registryHash, shots });
         const pfResult = await scoped.process(this.cloneShots(shots), blueprint, { checkpointManager: this.checkpointManager, blueprintHash });
-        if (remaining() <= 0) throw new CinematicSkillError("PHASE3_BUDGET_EXHAUSTED", "融合返回时阶段预算已耗尽");
         const rawUpdated = pfResult.shots;
         if (!Array.isArray(rawUpdated) || rawUpdated.length !== shots.length) {
           throw new CinematicSkillError("PHASE3_FUSION_UNVERIFIED", "融合返回缺镜头或包含降级/失败，不接受规则兜底", "unverified");
@@ -7833,7 +7825,7 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
               ratio,
               characters,
               blueprint,
-              remaining(),
+              Infinity,
             );
             return retry;
           },
@@ -8074,7 +8066,6 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
         }
         const merged = this.mergeShots(shots, updated as FusionRecord[], FUSION_MERGE_FIELDS);
         const timed = await this._checkDialogueTiming(merged, blueprint);
-        if (remaining() <= 0) throw new CinematicSkillError("PHASE3_BUDGET_EXHAUSTED", "台词检查后阶段预算已耗尽");
         if (!Array.isArray(timed) || timed.length !== shots.length
           || new Set(timed.map((shot) => String(shot.shotId ?? shot.shot_id))).size !== shots.length) {
           throw new CinematicSkillError("PHASE3_CONTRACT_INVALID", "台词检查后镜头数量或 id 不一致", "unverified");

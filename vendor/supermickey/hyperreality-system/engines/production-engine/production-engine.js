@@ -35,7 +35,6 @@ const DEFAULT_AGENT_CONFIG = {
   llmMaxRetries: 2,          // 【v2.1.8-fix】恢复2次重试（时间预算增加后）
   llmModel: process.env.STORMAXE_LLM_MODEL || 'deepseek-flash',
   fastModel: process.env.STORMAXE_LLM_FAST_MODEL || process.env.STORMAXE_LLM_MODEL || 'deepseek-flash',
-  totalDeadlineMs: parseInt(process.env.STORMAXE_TOTAL_DEADLINE_MS || '3600000'), // 【v2.1.8-fix】从环境变量读取，默认 60 分钟
   memThresholdMB: 1800,
   promptFusionConcurrency: 1, // 【v2.1.8-fix】串行模式（预算增加后更稳定）
   maxMsPerShot: 180000,      // 3分钟/镜头
@@ -470,34 +469,14 @@ class ProductionEngine {
       this.updateAgentConfig(runtimeAgentConfig);
     }
 
-    // 【P1-ARCH-01 修复】动态预算分配：根据剩余镜头数和阶段动态调整预算
-    // 将总预算分为阶段预算池，前面节省的时间可流入后续阶段
-    const HARD_BUDGET_MS = this.agentConfig.totalDeadlineMs || 1200000;
-    const PHASE_BUDGET_RATIOS = {
-      phase1: 0.08,   // Phase 1: 8% 总预算
-      phase2: 0.15,   // Phase 2: 15% 总预算 (并行化后耗时减少)
-      phase3: 0.70,   // Phase 3: 70% 总预算 (PromptFusion 最耗时，给予更多预算)
-      phase3_5: 0.07  // Phase 3.5: 7% 总预算
-    };
-    const phaseBudgets = {};
-    let accumulatedBudget = 0;
-    for (const [phase, ratio] of Object.entries(PHASE_BUDGET_RATIOS)) {
-      phaseBudgets[phase] = Math.floor(HARD_BUDGET_MS * ratio);
-      accumulatedBudget += phaseBudgets[phase];
-    }
-    // 剩余预算分配给 Phase 3
-    phaseBudgets.phase3 += (HARD_BUDGET_MS - accumulatedBudget);
-    
-    this.log('PRODUCE', `💰 动态预算分配: phase1=${phaseBudgets.phase1}ms phase2=${phaseBudgets.phase2}ms phase3=${phaseBudgets.phase3}ms phase3.5=${phaseBudgets.phase3_5}ms`);
-    const SAFETY_MARGIN_MS = 60000; // 余量60s
-    const globalDeadline = startTime + HARD_BUDGET_MS - SAFETY_MARGIN_MS;
-    this._globalDeadline = globalDeadline;
-    this._setAgentDeadline(globalDeadline);
-    // 【P1-7 修复】Phase35 FieldQuality 同步下发 deadline
+    // WorkLoom modification [T-2026-1104-9006]: every model request retains
+    // its own timeout. A previous run's task deadline cannot shorten this run.
+    this._globalDeadline = null;
+    this._setAgentDeadline(null);
     if (this.phase35) {
-      this.phase35.globalDeadline = globalDeadline;
+      this.phase35.globalDeadline = null;
       if (this.phase35.fieldQualityPipeline && typeof this.phase35.fieldQualityPipeline.setDeadline === 'function') {
-        this.phase35.fieldQualityPipeline.setDeadline(globalDeadline);
+        this.phase35.fieldQualityPipeline.setDeadline(null);
       }
     }
 
@@ -519,7 +498,12 @@ class ProductionEngine {
     // 【P1-9 修复】生成 blueprint 指纹，用于 checkpoint 一致性校验
     // 【修复 P3-1】使用稳定序列化（键排序）消除 JSON 键序不确定性导致的哈希漂移
     const crypto = require('crypto');
-    const stableHashInput = JSON.stringify(adaptedBlueprint.scenes || [], (k, v) => {
+    const repairFeedback = typeof adaptedBlueprint._workloomProductionRepairFeedback === 'string'
+      ? adaptedBlueprint._workloomProductionRepairFeedback : '';
+    const phaseInput = repairFeedback
+      ? { scenes: adaptedBlueprint.scenes || [], productionRepairFeedback: repairFeedback }
+      : adaptedBlueprint.scenes || [];
+    const stableHashInput = JSON.stringify(phaseInput, (k, v) => {
       if (v && typeof v === 'object' && !Array.isArray(v)) {
         return Object.keys(v).sort().reduce((sorted, key) => { sorted[key] = v[key]; return sorted; }, {});
       }

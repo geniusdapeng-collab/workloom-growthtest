@@ -79,6 +79,8 @@ export interface ProducerArtifact {
 
 export interface ProducerVerdict {
   status: QualityStatus;
+  /** The provider may have accepted a request whose final receipt was lost. */
+  unknownOutcome?: true;
   /** Binds the exact supplied source contracts; absent means no structured contract was supplied. */
   contractHash?: string;
   evidence?: Array<{ path: string; sha256: string; scope: string }>;
@@ -622,7 +624,10 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
       rerun: !approved, via: "llm", model: llm.model, ms: Date.now() - started,
       reason: answers.map((a) => a.reason).join("；") + (approved ? "" : `（所有证据批次需通过且评分≥${minScore}）`), degraded: false, evidence, receipts };
   } catch (err) {
-    return reject(err instanceof Error ? err.message : String(err), "fallback", llm.model);
+    return {
+      ...reject(err instanceof Error ? err.message : String(err), "fallback", llm.model),
+      ...(err instanceof ModelProviderError && err.unknown ? { unknownOutcome: true as const } : {}),
+    };
   } finally {
     for (const path of tempPaths) {
       try { rmSync(path, { recursive: true, force: true }); }

@@ -1,4 +1,6 @@
 
+const { sourceBoundAudience } = require('../../requirement-discovery-engine');
+
 /**
  * Agent 4: ConstraintSynthesisAgent
  * 约束合成 Agent - 规则引擎为主，无需 LLM
@@ -19,7 +21,7 @@ class ConstraintSynthesisAgent {
     const productionConstraints = this._buildConstraints(type, difficulty, riskAssessment, upstreamFields, budgetProfile, userModifications);
     
     // 2. 受众定位（直接透传）
-    const audienceProfileOut = this._buildAudienceProfile(audienceProfile);
+    const audienceProfileOut = this._buildAudienceProfile(audienceProfile, { ...discoveryResult, ...upstreamFields });
     
     // 3. 参考案例（直接透传）
     const referenceCasesOut = this._buildReferenceCases(referenceCases);
@@ -131,36 +133,35 @@ class ConstraintSynthesisAgent {
     };
   }
 
-  _buildAudienceProfile(audienceProfile) {
-    if (!audienceProfile) {
-      return {
-        primaryAudience: {
-          ageRange: '25-30',
-          gender: 'all',
-          interests: ['通用内容'],
-          consumptionLevel: 'medium'
-        },
-        emotionTriggers: ['好奇心', '共鸣'],
-        contentExpectations: ['高质量内容']
-      };
-    }
-    
+  _buildAudienceProfile(audienceProfile, input = {}) {
+    const value = audienceProfile && typeof audienceProfile === 'object' ? audienceProfile : {};
+    const primary = value.primaryAudience || {};
+    const verified = sourceBoundAudience({ ...value, primaryAudience: {
+      ...primary,
+      interestTags: Array.isArray(primary.interestTags) ? primary.interestTags : primary.interests
+    } }, input);
     return {
       primaryAudience: {
-        ageRange: audienceProfile.primaryAudience?.ageRange || '25-30',
-        gender: audienceProfile.primaryAudience?.gender || 'all',
-        interests: (audienceProfile.primaryAudience?.interestTags || ['通用内容']).slice(0, 5),
-        consumptionLevel: audienceProfile.primaryAudience?.consumptionLevel || 'medium'
+        ageRange: verified.primaryAudience.ageRange,
+        gender: verified.primaryAudience.gender,
+        occupation: verified.primaryAudience.occupation,
+        interests: (Array.isArray(primary.interestTags) || Array.isArray(primary.interests)
+          ? verified.primaryAudience.interestTags : ['通用内容']).slice(0, 5),
+        consumptionLevel: verified.primaryAudience.consumptionLevel
       },
-      emotionTriggers: (audienceProfile.emotionTriggers || ['好奇心', '共鸣']).slice(0, 5),
-      contentExpectations: (audienceProfile.contentExpectations || ['高质量内容']).slice(0, 4)
+      audienceBasis: verified.audienceBasis,
+      audienceEvidenceQuote: verified.audienceEvidenceQuote,
+      demographicEvidence: verified.demographicEvidence,
+      excludedDemographics: verified.excludedDemographics,
+      emotionTriggers: (Array.isArray(verified.emotionTriggers) ? verified.emotionTriggers : ['好奇心', '共鸣']).slice(0, 5),
+      contentExpectations: (Array.isArray(verified.contentExpectations) ? verified.contentExpectations : ['高质量内容']).slice(0, 4)
     };
   }
 
   _buildReferenceCases(referenceCases) {
     if (!referenceCases) {
       return {
-        filmReferences: ['通用参考'],
+        filmReferences: [],
         adReferences: [],
         styleReferences: ['通用风格']
       };

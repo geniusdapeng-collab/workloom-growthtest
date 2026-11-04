@@ -20,7 +20,8 @@ beforeEach(async () => {
   db.query.mockImplementation(async (sql: string) => {
     if (sql.includes("pg_try_advisory_xact_lock")) return { rows: [{ ok: true }], rowCount: 1 };
     if (sql.startsWith("SELECT stage_id AS")) return { rows: [{ stageId: "preproduction", attempt: 3, status: "failed", errorClass: "GATE_REJECTED", startedAt: createdAt }], rowCount: 1 };
-    if (sql.startsWith("SELECT attempt, input_ref")) return { rows: [{ attempt: 3, input_ref: "stages/preproduction/attempt-3.input.json" }], rowCount: 1 };
+    if (sql.startsWith("SELECT attempt, input_ref")) return { rows: [{ attempt: 3, input_ref: "stages/preproduction/attempt-3.input.json",
+      status: "failed", error_class: "GATE_REJECTED", run_id: "RUN-prior" }], rowCount: 1 };
     if (sql.startsWith("SELECT title, kind")) return { rows: [{ title: originalIntent.slice(0, 200), kind: "narrative", created_at: createdAt, thread_id: null }], rowCount: 1 };
     return { rows: [], rowCount: 0 };
   });
@@ -62,7 +63,9 @@ describe("档案恢复使用原始完整输入而非项目标题", () => {
   it("显式重跑已完成的前期阶段，仍采用最新合法输入快照", async () => {
     await save(snapshot());
     const query = db.query.getMockImplementation()!;
-    db.query.mockImplementation((sql: string) => sql.startsWith("SELECT stage_id AS") ? Promise.resolve({ rows: [], rowCount: 0 }) : query(sql));
+    db.query.mockImplementation((sql: string) => sql.startsWith("SELECT stage_id AS") ? Promise.resolve({ rows: [], rowCount: 0 })
+      : sql.startsWith("SELECT attempt, input_ref") ? Promise.resolve({ rows: [{ attempt: 3,
+        input_ref: "stages/preproduction/attempt-3.input.json", status: "done", error_class: null, run_id: "RUN-prior" }], rowCount: 1 }) : query(sql));
     const startRun = vi.fn().mockReturnValue("RUN-forced");
     const result = await resumeProject(scope, { projectId, fromStage: "preproduction", startRun, actor: { id: "MEM", type: "human" } });
     expect(result).toMatchObject({ kind: "resumed", attempt: 3 });

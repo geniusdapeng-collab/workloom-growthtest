@@ -434,5 +434,6 @@ describe("vendor 核心可加载", () => {
     const actual = studioMocks.create.mock.calls[0]![0];
     expect(actual).toContain(intent);
     expect(actual).toContain(restrictions[0]);
+    expect(studioMocks.create.mock.calls[0]![2]).toMatchObject({ _workloomCustomerIntent: rawIntent });
   });
 });

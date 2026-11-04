@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { CapabilityError, sanitizeErrorMessage } from './agent-capabilities.mjs';
+import { VIDEO_INTENT_MAX_CHARACTERS, unicodeLength } from '../packages/video-studio/src/unicode-text.mjs';
 const COMMANDS=Object.freeze({start:['start','POST'],plan:['start','POST'],targets:['resolveTargets','GET'],job:['job','GET'],
  jobs:['jobs','GET'],versions:['getVersions','GET'],render:['renderVariants','POST'],feedback:['feedback','POST'],
  cancel:['cancel','POST'],budget:['approveBudget','POST'],'authorize-identity':['authorizeIdentity','POST'],
@@ -13,6 +14,8 @@ export async function requestDirector(command,input={}, {env=process.env,fetcher
  if(!descriptor) throw new CapabilityError('USAGE','命令须为 '+Object.keys(COMMANDS).join('|'),2);
  if(!input||typeof input!=='object'||Array.isArray(input)) throw new CapabilityError('INVALID_INPUT','输入须为 JSON 对象',2);
  if(Buffer.byteLength(JSON.stringify(input))>1024*1024) throw new CapabilityError('INVALID_INPUT','输入超过 1 MiB',2);
+ if(['start','plan','targets'].includes(command)&&typeof input.intent==='string'&&unicodeLength(input.intent)>VIDEO_INTENT_MAX_CHARACTERS)
+  throw new CapabilityError('INVALID_INPUT','intent 最多 12000 个 Unicode 字符',2);
  const product=JSON.parse(await readFile(path.join(root,'product.manifest.json'),'utf8'));
  let base;
  try{base=new URL(env.WORKLOOM_BASE_URL??`http://127.0.0.1:${8787+(product.desktop?.portOffset??0)}`);}

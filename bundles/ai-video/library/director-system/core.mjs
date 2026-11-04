@@ -1,6 +1,7 @@
 /** Industry-local V2 contracts shared by UI/service/CLI/post/MCP. No render or network calls. */
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { VIDEO_INTENT_MAX_CHARACTERS, unicodeLength } from "../../../../packages/video-studio/src/unicode-text.mjs";
 
 export class DirectorError extends Error {
   constructor(code, message) { super(message); this.name = "DirectorError"; this.code = code; }
@@ -38,7 +39,9 @@ function platformId(value) {
 /** Publishing destinations, exclusions and aesthetic references have separate evidence. */
 export function resolveDeliveryTargets(rawIntent = "", options = {}) {
   const intent = text(rawIntent);
-  if (intent.length > 20_000) fail("INTENT_TOO_LARGE", "需求超过 20000 字");
+  if (typeof rawIntent === "string" && unicodeLength(rawIntent) > VIDEO_INTENT_MAX_CHARACTERS) {
+    fail("INTENT_TOO_LARGE", "需求超过 12000 个 Unicode 字符");
+  }
   const decisions = [];
   const included = []; const excluded = []; const references = [];
   const mentions = [...intent.matchAll(/微信视频号|视频号|小红书|抖音|\b(?:wechat-channels|xiaohongshu|douyin|xhs)\b/giu)];

@@ -400,7 +400,10 @@ describe("解说片 submit 路由不可变请求复放", () => {
     vi.doMock("../gen/submit.js", () => ({ submitGenJob: submit }));
     vi.doMock("@workloom/base/asset-cms", () => ({ create, approve }));
     vi.doMock("@workloom/base/fence-engine", () => ({ judge: () => ({ level: "auto", impacts: [], triggeredBy: [] }) }));
-    vi.doMock("@workloom/base/model-router", () => ({ checkRenderBudget: () => ({ allowed: true }), planTierToPlanId: () => "pro" }));
+    vi.doMock("@workloom/base/model-router", async (importOriginal) => ({
+      ...await importOriginal<typeof import("@workloom/base/model-router")>(),
+      checkRenderBudget: () => ({ allowed: true }), planTierToPlanId: () => "pro",
+    }));
     vi.doMock("../router.js", () => ({ loadActiveRules: async () => ({ rules: [], defaultLevel: "auto" }) }));
     vi.doMock("../project-compute-budget.js", () => ({
       projectComputeBudget: async () => ({ used: computeUsed, cap: computeCap }),

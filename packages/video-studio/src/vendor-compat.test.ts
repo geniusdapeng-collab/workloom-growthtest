@@ -3809,7 +3809,7 @@ ${body}
 }
 
 describe("Phase3 宿主融合桥（C1）", () => {
-  it("原 const 重赋坏例被修复：真实 Phase3 完成融合、字段合并、台词检查与 checkpoint", () => {
+  it("真实原生 Phase3 与宿主桥都完成工位，宿主额外绑定最终融合凭据", () => {
     const result = runInChild(phase3Fixture(`
 const before = await makePhase().execute(makeState());
 const beforeCalls = counters.fusion;
@@ -3823,12 +3823,12 @@ console.log("RESULT " + JSON.stringify({ beforeSuccess: before.success, beforeEr
  reviewPolicy: after.shots[0]._workloomPromptReviewPolicy,
  originalHasPrompt: Boolean(state.shots[0].prompt) }));
 `));
-    expect(result.beforeSuccess).toBe(false);
-    expect(result.beforeError).toContain("Assignment to constant variable");
-    expect(result.beforeCalls).toBe(0);
+    expect(result.beforeSuccess).toBe(true);
+    expect(result.beforeError).toBeUndefined();
+    expect(result.beforeCalls).toBe(1);
     expect(result.afterSuccess).toBe(true);
     expect(result.status).toBe("passed");
-    expect(result.counters).toEqual(expect.objectContaining({ fusion: 1, checkpoints: 1, timing: 1 }));
+    expect(result.counters).toEqual(expect.objectContaining({ fusion: 2, checkpoints: 2, timing: 2 }));
     expect(result.originalHasPrompt).toBe(false);
     expect(result.reviewPolicy).toMatchObject({
       maxLength: expect.any(Number),
@@ -3959,7 +3959,7 @@ console.log("RESULT " + JSON.stringify({
     expect(result.policy).toMatchObject({ aspectRatio: expect.any(String), maxLength: expect.any(Number) });
   }, 90_000);
 
-  it("预算拒绝或未知预算在任何路由模型/融合调用之前停止", () => {
+  it("旧的阶段耗时预算不再阻止完整融合和断点保存", () => {
     const result = runInChild(phase3Fixture(`
 const uninstall = installVendorPhase3FusionBridge();
 const errors = [];
@@ -3970,25 +3970,21 @@ for (const opts of [{ canAfford: () => false }, { budgetRemaining: () => Infinit
 uninstall();
 console.log("RESULT " + JSON.stringify({ errors, counters }));
 `));
-    expect(result.errors).toEqual([
-      { code: "PHASE3_BUDGET_EXHAUSTED", status: "failed" },
-      { code: "PHASE3_BUDGET_UNVERIFIED", status: "unverified" },
-      { code: "PHASE3_BUDGET_UNVERIFIED", status: "unverified" },
-    ]);
-    expect(result.counters).toEqual({ fusion: 0, checkpoints: 0, llm: 0, timing: 0 });
+    expect(result.errors).toEqual([]);
+    expect(result.counters).toEqual({ fusion: 3, checkpoints: 3, llm: 0, timing: 3 });
   }, 90_000);
 
-  it("提供商边界再次核预算：第一次返回后耗尽，第二次绝不发出；原 agent 未被改写", () => {
+  it("第二次独立外调保留其单次超时，原 agent 服务引用未被改写", () => {
     const result = runInChild(phase3Fixture(`
 const uninstall = installVendorPhase3FusionBridge();
 let left = 120000, providerCalls = 0, providerOptions = null;
 const rawEngine = { reasonStructured: async (_prompt, _schema, opts) => { providerCalls++; providerOptions = opts; left = 100; return {}; } };
 const phase = makePhase({
  _getLLMEngine: () => rawEngine,
- process: async function () {
+ process: async function (shots) {
   await this._getLLMEngine().reasonStructured("first", {}, { timeoutMs: 300000 });
   await this._getLLMEngine().reasonStructured("second", {}, { timeoutMs: 300000 });
-  throw new Error("不应到达");
+  return { shots: shots.map(shot => ({ ...shot, prompt: "保留完整动作与场景" })) };
  }
 }, { budgetRemaining: () => left });
 const originalEngine = phase.agents.promptFusion._getLLMEngine;
@@ -4000,15 +3996,15 @@ console.log("RESULT " + JSON.stringify({ providerCalls, providerOptions, code, c
  unchanged: phase.agents.promptFusion._getLLMEngine === originalEngine,
  status: state.result.stages.phase3Fusion.status }));
 `));
-    expect(result.providerCalls).toBe(1);
-    expect(result.code).toBe("PHASE3_BUDGET_EXHAUSTED");
-    expect(result.status).toBe("failed");
-    expect(Number((result.providerOptions as Record<string, unknown>).timeoutMs)).toBeLessThanOrEqual(120000);
+    expect(result.providerCalls).toBe(2);
+    expect(result.code).toBeNull();
+    expect(result.status).toBe("passed");
+    expect(Number((result.providerOptions as Record<string, unknown>).timeoutMs)).toBe(300000);
     expect(result.unchanged).toBe(true);
-    expect((result.counters as Record<string, unknown>).checkpoints).toBe(0);
+    expect((result.counters as Record<string, unknown>).checkpoints).toBe(1);
   }, 90_000);
 
-  it("运行中预算变未知与 health 清理失败不会落通过 checkpoint", () => {
+  it("旧的耗时计算不会让已完成工位失效，health 清理失败仍不落通过断点", () => {
     const result = runInChild(phase3Fixture(`
 const uninstall = installVendorPhase3FusionBridge();
 const errors = [];
@@ -4025,13 +4021,12 @@ uninstall();
 console.log("RESULT " + JSON.stringify({ errors, counters }));
 `));
     expect(result.errors).toEqual([
-      { code: "PHASE3_BUDGET_UNVERIFIED", status: "unverified" },
       { code: "PHASE3_HEALTH_CLEANUP_FAILED", status: "unverified" },
     ]);
-    expect((result.counters as Record<string, unknown>).checkpoints).toBe(0);
+    expect((result.counters as Record<string, unknown>).checkpoints).toBe(1);
   }, 90_000);
 
-  it("真实 BaseAgent 的 critical 备用模型与最终缩短重试也遵守外调预算", () => {
+  it("真实 BaseAgent 的独立备用调用不受之前工位的耗时计算影响", () => {
     const result = runInChild(phase3Fixture(`
 const uninstall = installVendorPhase3FusionBridge();
 let mainCalls = 0, altCalls = 0;
@@ -4056,7 +4051,7 @@ for (const source of ["getter", "option"]) {
 uninstall();
 console.log("RESULT " + JSON.stringify({ mainCalls, altCalls, errors, checkpoints: counters.checkpoints }));
 `));
-    expect(result).toEqual({ mainCalls: 2, altCalls: 0, errors: ["PHASE3_BUDGET_EXHAUSTED", "PHASE3_BUDGET_EXHAUSTED"], checkpoints: 0 });
+    expect(result).toEqual({ mainCalls: 2, altCalls: 2, errors: ["PHASE3_EXECUTION_FAILED", "PHASE3_EXECUTION_FAILED"], checkpoints: 0 });
   }, 90_000);
 
   it("无源合同的融合异常仍失败关闭，空 prompt 和错 id 只能通过源合同恢复", () => {
@@ -4153,7 +4148,7 @@ let fail = false;
 entry.HyperrealitySystem = class OfflineSystem {
  async create() {
   installedAtCreate = installedAtCreate || listSharedBridges().some(x => x.key === "phase3-fusion-policy-v1");
-  const output = await makePhase({}, fail ? { canAfford: () => false } : {}).execute(makeState());
+  const output = await makePhase(fail ? { process: async () => { throw new Error("native provider unavailable"); } } : {}).execute(makeState());
   return { success: output.success, stages: { productionEngine: { ...output.result, shots: output.shots } } };
  }
 };
@@ -4172,7 +4167,7 @@ console.log("RESULT " + JSON.stringify({ success, status, failure, installedAtCr
 `));
     expect(result.success).toBe(true);
     expect(result.status).toBe("passed");
-    expect(result.failure).toBe("PHASE3_BUDGET_EXHAUSTED");
+    expect(result.failure).toBe("PHASE3_EXECUTION_FAILED");
     expect(result.installedAtCreate).toBe(true);
     expect(result.restored).toBe(true);
     expect(result.events).toEqual(expect.arrayContaining(["pipeline.started", "pipeline.finished", "pipeline.failed"]));

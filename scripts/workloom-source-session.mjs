@@ -6,6 +6,7 @@ import { constants, createReadStream } from "node:fs";
 import { lstat, mkdir, open, readFile, realpath, stat } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { VIDEO_INTENT_MAX_CHARACTERS, unicodeLength } from "../packages/video-studio/src/unicode-text.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const entries = Object.freeze({
@@ -116,11 +117,11 @@ async function studioInput(args, input) {
     invalid("STUDIO_INPUT_INVALID", "无法读取合法的制片请求 JSON");
   }
   if (!isObject(body) || Object.keys(body).some(key => !["intent", "durationSec", "metadata", "route"].includes(key))
-    || typeof body.intent !== "string" || !body.intent.trim() || body.intent.length > 2000
+    || typeof body.intent !== "string" || !body.intent.trim() || unicodeLength(body.intent) > VIDEO_INTENT_MAX_CHARACTERS
     || (body.durationSec !== undefined && (!Number.isInteger(body.durationSec) || body.durationSec < 1 || body.durationSec > 300))
     || (body.metadata !== undefined && !isObject(body.metadata))
     || (body.route !== undefined && !["auto", "marketing", "narrative"].includes(body.route))) {
-    invalid("STUDIO_INPUT_INVALID", "输入只接受原话 intent、1–300 秒的整数目标 durationSec、已知 metadata 和已确认 route");
+    invalid("STUDIO_INPUT_INVALID", "输入只接受不超过 12000 个 Unicode 字符的原话 intent、1–300 秒的整数目标 durationSec、已知 metadata 和已确认 route");
   }
   return { command, workRoot: resolve(third), body: {
     intent: body.intent,

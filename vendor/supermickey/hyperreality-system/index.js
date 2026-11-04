@@ -105,7 +105,6 @@ class HyperrealitySystem {
     // ⭐ v2.1.8: 需求洞察引擎 - 基于上游 12 字段进行深度业务洞察
     this.requirementDiscoveryEngine = new RequirementDiscoveryEngine({
       llmEngine: this.llmEngine,
-      timeoutMs: 720000,
       agentTimeoutMs: 180000
     });
     this.creativeIntensityEngine = new CreativeIntensityEngine(options.creativeIntensityEngine);
@@ -132,7 +131,6 @@ class HyperrealitySystem {
     // ⭐ v2.1.9: PRD 生成器 - Step 3.5 产品需求文档生成
     this.prdGenerator = new PRDGenerator({
       llmEngine: this.llmEngine,
-      timeoutMs: 600000,
       agent2TimeoutMs: 120000,
       agent3TimeoutMs: 180000,
       budgetProfile: options.budgetProfile || null
@@ -471,29 +469,11 @@ class HyperrealitySystem {
     let productionResult = null;
 
     try {
-      // v2.1.7: 系统级修复:整个创作过程启用长时间任务模式,避免HealthMonitor误判
-      // 【v2.1.8-fix】60 分钟（3600000ms），支持环境变量覆盖
-      const totalDeadlineMs = parseInt(process.env.STORMAXE_TOTAL_DEADLINE_MS || '3600000');
-      this.stabilityShield.setLongTaskMode('ProductionEngine', true, totalDeadlineMs);
-
-      // 【审计修复·全局预算协调】此前 totalDeadlineMs 只约束 ProductionEngine 内部预算和健康监控阈值，
-      // 前置层(需求/PRD/剧本)与渲染/后期层各自为政，整体任务耗时可远超预期总时长。
-      // 现建立全局截止时间，在各层入口按"剩余预算"动态调度。
-      // 【v2.1.16-fix 预算吞等待时间】改为 let：人工确认等待时间将补偿到全局截止时间
-      let globalDeadline = totalStart + totalDeadlineMs;
-      this._globalDeadline = globalDeadline;
-      console.log(` ⏱️ 全局任务预算: ${Math.round(totalDeadlineMs/60000)} 分钟 | 截止: ${new Date(globalDeadline).toISOString()}`);
-
-      // 【v2.1.16-fix 预算吞等待时间】确认等待补偿器：
-      // 用户思考确认的时间(可能10-30分钟)原本直接吃掉全局截止(墙钟)，
-      // 导致到达制作层时预算归零→切换纯规则模式。现每次确认返回后把等待时长
-      // 补偿到 globalDeadline，与"等待时间不计入流程有效时间"的设计对齐
-      const _extendDeadlineForWait = (waitTimeMs, stepName) => {
-        if (!waitTimeMs || waitTimeMs <= 0) return;
-        globalDeadline += waitTimeMs;
-        this._globalDeadline = globalDeadline;
-        console.log(`   ⏱️ [${stepName}] 确认等待 ${Math.round(waitTimeMs/60000)} 分钟已补偿到全局截止时间（新截止: ${new Date(globalDeadline).toISOString()}）`);
-      };
+      // WorkLoom modification [T-2026-1104-9006]: request timeouts belong to
+      // individual transports. Elapsed creation time cannot disable later work
+      // or cause the health monitor to restart a still-running production.
+      this._globalDeadline = null;
+      this.stabilityShield.setLongTaskMode('ProductionEngine', true, Infinity);
 
       // ========== 🧵 Layer -2: 数据挖掘引擎（珍妮纺织机）==========
       // 情报层：营销/商品模式在主题生成之前产出《商品情报档案》。
@@ -551,7 +531,6 @@ class HyperrealitySystem {
               result.confirmations.dataMining = dmConfirmation;
               if (dmConfirmation.waitTimeMs) {
                 result.totalWaitTimeMs += dmConfirmation.waitTimeMs;
-                _extendDeadlineForWait(dmConfirmation.waitTimeMs, '商品情报档案');
               }
               dmApproved = dmConfirmation.approved;
               dmRejectReason = dmConfirmation.reason || null;
@@ -636,7 +615,6 @@ class HyperrealitySystem {
         // 【v2.1.10-hotfix】累加等待时间
         if (themeConfirmation.waitTimeMs) {
           result.totalWaitTimeMs += themeConfirmation.waitTimeMs;
-          _extendDeadlineForWait(themeConfirmation.waitTimeMs, '创意主题');
         }
 
         if (!themeConfirmation.approved) {
@@ -714,6 +692,10 @@ class HyperrealitySystem {
       // 从上游 CreativeThemeGenerator 获取 12 字段
       const upstreamFields = {
         ...metadata._creativeTheme,
+        // Keep the customer's own wording separate from generated theme and
+        // dossier text so discovery can verify audience/reference provenance.
+        _workloomCustomerIntent: typeof options._workloomCustomerIntent === 'string'
+          ? options._workloomCustomerIntent : String(intent || ''),
         // 【方案A-fix】原始故事文本透传到需求洞察
         _originalStoryText: metadata._originalStoryText || metadata._creativeTheme?._originalStoryText || ''
       };
@@ -768,7 +750,6 @@ class HyperrealitySystem {
       // 【v2.1.10-hotfix】累加等待时间
       if (requirementConfirmation.waitTimeMs) {
         result.totalWaitTimeMs += requirementConfirmation.waitTimeMs;
-        _extendDeadlineForWait(requirementConfirmation.waitTimeMs, '需求清单');
       }
 
       if (!requirementConfirmation.approved) {
@@ -1002,7 +983,6 @@ class HyperrealitySystem {
         // 【v2.1.10-hotfix】累加等待时间
         if (prdConfirmation.waitTimeMs) {
           result.totalWaitTimeMs += prdConfirmation.waitTimeMs;
-          _extendDeadlineForWait(prdConfirmation.waitTimeMs, 'PRD');
         }
 
         if (!prdConfirmation.approved) {
@@ -1284,20 +1264,7 @@ class HyperrealitySystem {
         }
       }
 
-      // 【审计修复·全局预算协调】将"全局剩余预算"下发给制作引擎，取代其独立的60分钟预算；
-      // 预留渲染/后期时间；预算告急时切换纯规则模式保交付，而不是整体超时崩盘
-      const RENDER_RESERVE_MS = parseInt(process.env.STORMAXE_RENDER_RESERVE_MS || '300000'); // 渲染+后期预留(默认5分钟)
-      const remainingForProduction = globalDeadline - Date.now() - RENDER_RESERVE_MS;
-      const MIN_PRODUCTION_BUDGET_MS = 10 * 60 * 1000;
       const baseAgentConfig = { ...(options.productionEngine?.agentConfig || {}) };
-      if (remainingForProduction < MIN_PRODUCTION_BUDGET_MS) {
-        console.warn(` ⏰ 全局预算告急: 制作环节仅剩 ${Math.max(0, Math.round(remainingForProduction/60000))} 分钟，切换纯规则模式保交付`);
-        baseAgentConfig.enableLLMAgents = false;
-        baseAgentConfig.totalDeadlineMs = Math.max(remainingForProduction, 60000);
-      } else {
-        baseAgentConfig.totalDeadlineMs = remainingForProduction;
-        console.log(` 💰 全局预算: 制作引擎可用 ${Math.round(remainingForProduction/60000)} 分钟(已预留渲染/后期 ${Math.round(RENDER_RESERVE_MS/60000)} 分钟)`);
-      }
 
       // 【修复】应用运行时 agentConfig(解决配置不生效问题)
       this.productionEngine.updateAgentConfig(baseAgentConfig);
@@ -2064,7 +2031,6 @@ class HyperrealitySystem {
 
             if (portraitConfirmation.waitTimeMs) {
               result.totalWaitTimeMs += portraitConfirmation.waitTimeMs;
-              _extendDeadlineForWait(portraitConfirmation.waitTimeMs, '定妆照生成');
             }
 
             portraitApproved = portraitConfirmation.approved;
@@ -2163,10 +2129,9 @@ class HyperrealitySystem {
         const promptConfirmation = await this._confirmPrompts(productionResult.prompts);
         result.confirmations.prompts = promptConfirmation;
 
-        // 【v2.1.16-fix】累加等待时间并补偿全局截止（与其余三个确认点对齐）
+        // 累加确认等待时间，供有效处理时间报告使用。
         if (promptConfirmation.waitTimeMs) {
           result.totalWaitTimeMs += promptConfirmation.waitTimeMs;
-          _extendDeadlineForWait(promptConfirmation.waitTimeMs, '提示词');
         }
 
         if (!promptConfirmation.approved) {
@@ -2200,7 +2165,6 @@ class HyperrealitySystem {
 
         if (preproductionConfirmation.waitTimeMs) {
           result.totalWaitTimeMs += preproductionConfirmation.waitTimeMs;
-          _extendDeadlineForWait(preproductionConfirmation.waitTimeMs, '预生产结果');
         }
 
         if (!preproductionConfirmation.approved) {
@@ -2293,13 +2257,6 @@ class HyperrealitySystem {
         try {
           console.log('\n🎨 [Layer 3] 渲染引擎 - 提交 Seedance...');
           const stage3Start = Date.now();
-
-          // 【审计修复·全局预算协调】渲染前检查全局剩余预算，不足时显式跳过而非渲染到一半被外部杀掉
-          const remainingForRender = globalDeadline - Date.now();
-          if (remainingForRender <= 60000) {
-            throw new Error(`全局预算耗尽(剩余 ${Math.max(0, Math.round(remainingForRender/1000))}s)，跳过渲染保产出物；Prompts 已生成，可单独提交渲染`);
-          }
-          console.log(` ⏱️ 全局预算: 渲染可用约 ${Math.round(remainingForRender/60000)} 分钟`);
 
           renderResult = await this.renderingEngine.render(productionResult.prompts, {
             // 【P0-9 修复】dryRun 仅由显式选项控制,不再因缺 apiKey 强制开启
@@ -2461,8 +2418,6 @@ class HyperrealitySystem {
                 llmMaxRetries: 2,
                 llmModel: process.env.STORMAXE_LLM_FAST_MODEL || process.env.STORMAXE_LLM_MODEL || 'deepseek-flash'
               });
-              // 【P2-10 修复】下发 deadline,防止不受控挂起
-              optimizer.setDeadline(Date.now() + 180000); // 3分钟总体预算
               const blueprint = result.stages?.adapter || { title: result.title || '未命名' };
               const optimized = await optimizer.optimize(openingShot, blueprint);
 
@@ -2730,9 +2685,6 @@ class HyperrealitySystem {
       }
     }
 
-    // 清除长时间任务模式
-    this.stabilityShield.setLongTaskMode('ProductionEngine', false);
-
     return result;
   }
 
@@ -2777,6 +2729,14 @@ class HyperrealitySystem {
    */
   async _convertDiscoveryToRequirementList(discoveryResult, upstreamFields) {
     const { audienceProfile, sceneStructure, riskAssessment, referenceCases } = discoveryResult;
+    // Discovery sanitizes its generated theme fields. Retain the separately
+    // supplied customer wording and confirmed parameters for G4 revalidation;
+    // the profile checkpoint persists this context change on a later resume.
+    discoveryResult.upstreamFields = {
+      ...(discoveryResult.upstreamFields || {}),
+      ...Object.fromEntries(['_workloomCustomerIntent', 'duration_sec', 'aspect_ratio', 'platform', 'platform_id']
+        .filter(key => Object.hasOwn(upstreamFields, key)).map(key => [key, upstreamFields[key]]))
+    };
 
     // 生成生产画像（三级兜底，永不失败）
     if (!this._profileResolver) {
@@ -2790,14 +2750,28 @@ class HyperrealitySystem {
     const resolved = await this._profileResolver.resolve({
       theme: upstreamFields.theme,
       description: upstreamFields.description,
-      type: upstreamFields.type // 用户声明的题材（含自定义类型），原样保留
+      type: upstreamFields.type, // 用户声明的题材（含自定义类型），原样保留
+      duration_sec: upstreamFields.duration_sec,
+      aspect_ratio: upstreamFields.aspect_ratio
     });
+    const audienceInterests = audienceProfile?.primaryAudience?.interestTags || audienceProfile?.primaryAudience?.interests || [];
+    const audienceBasis = audienceProfile?.audienceBasis === 'customer-provided' && audienceProfile.audienceEvidenceQuote
+      ? `客户指定受众：${audienceProfile.audienceEvidenceQuote}`
+      : `创作假设（非客户事实）：${audienceInterests.join('、') || upstreamFields.target_audience || '待补充具体观看兴趣'}`;
+    const productionProfile = {
+      ...resolved.profile,
+      audience: audienceBasis,
+      // Newly inferred type defaults cannot create a hard prohibition. The
+      // actual customer contract and risk constraints remain in their own fields.
+      special_constraints: Array.isArray(upstreamFields.special_constraints)
+        ? upstreamFields.special_constraints.filter(value => typeof value === 'string' && value.trim()) : []
+    };
 
     return {
       // 【新】双轨字段
       genre: resolved.genre, // 开放题材（'宠物殡葬纪实'原样保留）
       genreConfidence: resolved.genreConfidence,
-      productionProfile: resolved.profile, // 生产画像（下游决策唯一依据）
+      productionProfile, // 生产画像（下游决策唯一依据）
 
       // 【旧字段保留，但语义降级】仅用于展示/旧链路兼容，不再做决策
       videoType: resolved.presetRef, // 最接近的预设标签（展示用）
@@ -2853,7 +2827,7 @@ class HyperrealitySystem {
       targetAudience: upstreamFields.target_audience || null,
       dialogueRequirement: upstreamFields.dialogue_requirement || null,
       contentConstraints: riskAssessment?.businessConstraints || [],
-      specialConstraints: resolved.profile.special_constraints,
+      specialConstraints: productionProfile.special_constraints,
       uncertainties: [],
       _analysis: {
         confidence: 0.8,
@@ -3228,9 +3202,12 @@ class HyperrealitySystem {
     // 确认门要核对的"受众结论/风险结论"（此前只散落在第二节正文里，门容易判"缺失"）
     const profile = discoveryResult?.audienceProfile || {};
     const primary = profile.primaryAudience || {};
+    const genderLabel = { female: '女性为主', male: '男性为主', all: '不限性别' }[primary.gender] || '性别：客户未指定';
+    const audienceBasis = profile.audienceBasis === 'customer-provided' ? '客户原文指定' : '创作假设（非客户事实）';
     const audienceText = [
-      primary.ageRange, primary.gender === 'female' ? '女性为主' : primary.gender === 'male' ? '男性为主' : '不限性别',
-      ...(primary.interestTags || []).slice(0, 4),
+      audienceBasis,
+      primary.ageRange || '年龄：客户未指定', genderLabel,
+      ...(primary.interests || primary.interestTags || []).slice(0, 4),
     ].filter(Boolean).join(' · ');
     const risk = discoveryResult?.riskAssessment || {};
     const risks = Array.isArray(risk.technicalRisks) ? risk.technicalRisks : [];
@@ -3342,7 +3319,6 @@ ${line('动作', actions, '（动作以镜头卡 action 字段为准）')}
       llmMaxRetries: 2,
       llmModel: process.env.STORMAXE_LLM_FAST_MODEL || process.env.STORMAXE_LLM_MODEL || 'deepseek-flash'
     });
-    optimizer.setDeadline(Date.now() + 180000);
     const themeMeta = metadata?._creativeTheme || {};
     const blueprint = (result?.stages?.adapter && Object.keys(result.stages.adapter).length > 0)
       ? result.stages.adapter
@@ -3451,9 +3427,9 @@ ${line('动作', actions, '（动作以镜头卡 action 字段为准）')}
       productPositioning: {
         productType: '剧情短片',
         genre: type,
-        targetPlatform: '通用',
+        targetPlatform: upstreamFields?.platform || '通用',
         targetDuration: duration,
-        aspectRatio: '16:9',
+        aspectRatio: upstreamFields?.aspect_ratio || '16:9',
         resolution: '1080p',
         frameRate: 24
       },
@@ -3494,13 +3470,16 @@ ${line('动作', actions, '（动作以镜头卡 action 字段为准）')}
           consistencyStrategy: 'textual-description'
         }
       },
-      audienceProfile: {
-        primaryAudience: { ageRange: '25-30', gender: 'all', interests: ['通用'], consumptionLevel: 'medium' },
+      audienceProfile: discoveryResult.audienceProfile || {
+        primaryAudience: { ageRange: null, gender: null, interests: [], consumptionLevel: null },
+        audienceBasis: 'creative-hypothesis',
+        audienceEvidenceQuote: null,
+        demographicEvidence: { ageRange: null, gender: null, consumptionLevel: null },
         emotionTriggers: ['好奇心'],
         contentExpectations: ['高质量内容']
       },
-      referenceCases: {
-        filmReferences: [theme],
+      referenceCases: discoveryResult.referenceCases || {
+        filmReferences: [],
         adReferences: [],
         styleReferences: ['通用风格']
       },
@@ -3551,7 +3530,7 @@ ${line('动作', actions, '（动作以镜头卡 action 字段为准）')}
       report: promptReport,
       reason: confirmPath.reason,
       suggestions: confirmPath.suggestions,
-      waitTimeMs: confirmPath.waitTimeMs // 【v2.1.16-fix】透传等待时间用于全局截止补偿
+      waitTimeMs: confirmPath.waitTimeMs
     };
   }
 

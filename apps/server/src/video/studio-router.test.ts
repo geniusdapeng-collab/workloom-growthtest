@@ -2,14 +2,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TrpcContext } from "../trpc/context.js";
 
-const d = vi.hoisted(() => ({ query: vi.fn(), start: vi.fn(), existing: vi.fn(), route: vi.fn(), promptProject: vi.fn(), writable: true }));
+const d = vi.hoisted(() => ({ query: vi.fn(), start: vi.fn(), existing: vi.fn(), resume: vi.fn(), route: vi.fn(), promptProject: vi.fn(),
+  directorQueue: vi.fn(), directorDispatch: vi.fn(), explainerProject: vi.fn(), explainerInsert: vi.fn(), writable: true }));
 vi.mock("@workloom/db", () => ({ getAppPool: () => ({ connect: async () => ({ query: d.query, release: vi.fn() }) }), getGatewayPool: () => ({}) }));
 vi.mock("../service/access-authority.js", async original => ({ ...await original<Record<string, unknown>>(),
   currentMemberAuthority: async (identity: unknown) => ({ identity, permissions: {} }),
   memberAccessGrants: () => ({ actionPermissions: d.writable ? ["workspace.write"] : [] }),
+  resolveAuthoritativeClientAccess: async () => ({ navigationPermissions: ["ai-video.assets.read"] }),
 }));
 vi.mock("./studio-worker.js", async original => ({ ...await original<Record<string, unknown>>(), startRun: d.existing, startVideoProjectRun: d.start }));
 vi.mock("./prompt-review-authority.js", async original => ({ ...await original<Record<string, unknown>>(), isStudioPromptReviewProject: d.promptProject }));
+vi.mock("./archive-resume.js", async original => ({ ...await original<Record<string, unknown>>(), resumeProject: d.resume }));
+vi.mock("./director-jobs.js", async original => ({ ...await original<Record<string, unknown>>(), queueDirectorJob: d.directorQueue }));
+vi.mock("./director-worker.js", async original => ({ ...await original<Record<string, unknown>>(), dispatchDirectorJob: d.directorDispatch }));
+vi.mock("./explainer/db.js", async original => ({ ...await original<Record<string, unknown>>(),
+  createExplainerProject: d.explainerProject, insertShotbook: d.explainerInsert }));
 vi.mock("../service/llm.js", async original => ({ ...await original<Record<string, unknown>>(), routedLlmCall: () => undefined }));
 vi.mock("@hyperreality/video-studio", async original => ({ ...await original<Record<string, unknown>>(), routeVideoPipeline: d.route }));
 import { videoRouter } from "./router.js";
@@ -24,9 +31,65 @@ beforeEach(() => {
   d.route.mockResolvedValue({ route: "narrative", signals: [], via: "rules" });
   d.start.mockResolvedValue({ projectId: "VID-test", runId: "RUN-test" });
   d.existing.mockReturnValue("RUN-existing");
+  d.resume.mockResolvedValue({ kind: "noaction", projectId: "VID-existing" });
   d.promptProject.mockResolvedValue(false);
+  d.directorQueue.mockResolvedValue({ job: { id: "DJ-test", project_id: "VID-test", status: "queued", receipt: null }, reused: false });
+  d.explainerProject.mockResolvedValue("VID-explainer");
+  d.explainerInsert.mockResolvedValue("BOOK-explainer");
 });
 afterEach(() => vi.unstubAllEnvs());
+
+describe("Studio 原话的 Unicode 字符上限", () => {
+  it.each(["汉", "𠮷"])("正式与兼容入口保留恰好 12000 个 %s 字符，超限在派单前拒绝", async character => {
+    const raw = character.repeat(12000);
+    for (const officialIntent of [undefined, true] as const) {
+      await caller().studio.start({ intent: raw, ...(officialIntent ? { officialIntent } : {}) });
+      expect(d.start.mock.calls.at(-1)?.[1].rawIntent).toBe(raw);
+      vi.clearAllMocks();
+      await expect(caller().studio.start({ intent: raw + character, ...(officialIntent ? { officialIntent } : {}) }))
+        .rejects.toMatchObject({ code: "BAD_REQUEST" });
+      expect(d.route).not.toHaveBeenCalled();
+      expect(d.start).not.toHaveBeenCalled();
+    }
+  });
+
+  it("续跑接受 12000 个扩展区汉字，超限时不调用恢复执行器", async () => {
+    const raw = "𠮷".repeat(12000);
+    await caller().studio.resume({ projectId: "VID-existing", intent: raw });
+    expect(d.resume).toHaveBeenCalledWith(expect.any(Object), expect.objectContaining({ intent: raw }));
+    d.resume.mockClear();
+    await expect(caller().studio.resume({ projectId: "VID-existing", intent: raw + "𠮷" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(d.resume).not.toHaveBeenCalled();
+  });
+
+  it.each(["汉", "𠮷"])("导演目标与方案入口保留 12000 个 %s 字符，超限在队列前拒绝", async character => {
+    const raw = character.repeat(12000);
+    await caller().creative.resolveTargets({ intent: raw });
+    await caller().creative.start({ intent: raw, mode: "plan", idempotencyKey: "unicode-boundary-test" });
+    expect(d.directorQueue).toHaveBeenCalledWith(expect.any(Object), expect.objectContaining({ intent: raw }));
+    d.directorQueue.mockClear(); d.directorDispatch.mockClear();
+    await expect(caller().creative.resolveTargets({ intent: raw + character })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(caller().creative.start({ intent: raw + character, mode: "plan", idempotencyKey: "unicode-overflow-test" }))
+      .rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(d.directorQueue).not.toHaveBeenCalled(); expect(d.directorDispatch).not.toHaveBeenCalled();
+  });
+
+  it("导演入口验证时不改写原话中的首尾空白", async () => {
+    const raw = "  雨后的民宿\n保留原始动作。  ";
+    await caller().creative.start({ intent: raw, mode: "plan", idempotencyKey: "unicode-original-intent" });
+    expect(d.directorQueue).toHaveBeenCalledWith(expect.any(Object), expect.objectContaining({ intent: raw }));
+  });
+
+  it.each(["汉", "𠮷"])("解说片立项保留 12000 个 %s 字符，超限在数据库之前拒绝", async character => {
+    const raw = character.repeat(12000);
+    await caller().explainer.create({ intent: raw, scriptText: "这是测试口播。" });
+    expect(d.explainerProject).toHaveBeenCalledWith(expect.any(Object), expect.objectContaining({ intent: raw }));
+    d.explainerProject.mockClear(); d.explainerInsert.mockClear();
+    await expect(caller().explainer.create({ intent: raw + character, scriptText: "这是测试口播。" }))
+      .rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(d.explainerProject).not.toHaveBeenCalled(); expect(d.explainerInsert).not.toHaveBeenCalled();
+  });
+});
 
 describe("普通视频入口的内部素材字段边界", () => {
   it.each([undefined, "VID-existing"])("projectId=%s的任意内部metadata字段在路由/查项目之前拒绝", async projectId => {

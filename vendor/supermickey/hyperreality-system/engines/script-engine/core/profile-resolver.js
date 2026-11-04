@@ -9,7 +9,7 @@
  * （取代 DynamicTypeResolver 的生产管控职责；主题生成器侧的动态类型配置可继续用它）
  */
 
-const { normalizeProfile, closestPreset } = require('../../../config/production-profile');
+const { normalizeProfile, closestPreset, PROFILE_SCHEMA } = require('../../../config/production-profile');
 
 class ProfileResolver {
   constructor(options = {}) {
@@ -24,8 +24,8 @@ class ProfileResolver {
    * @returns {Promise<{genre: string, genreConfidence: string, profile: object, profileSource: string, presetRef: string}>}
    */
   async resolve(intent) {
-    const { text, genreHint } = this._extractIntent(intent);
-    const cacheKey = this._hash(text + '|' + (genreHint || ''));
+    const { text, genreHint, confirmedProfile = {} } = this._extractIntent(intent);
+    const cacheKey = this._hash(JSON.stringify({ text, genreHint, confirmedProfile }));
     if (this._cache.has(cacheKey)) {
       console.log('[ProfileResolver] ✅ 缓存命中');
       return this._cache.get(cacheKey);
@@ -36,7 +36,7 @@ class ProfileResolver {
     // 第一级：LLM 生成
     if (this.llmEngine) {
       try {
-        result = await this._resolveWithLLM(text, genreHint);
+        result = await this._resolveWithLLM(text, genreHint, confirmedProfile);
       } catch (e) {
         console.warn(`[ProfileResolver] ⚠️ LLM 画像生成失败: ${e.message}，降级关键词粗推`);
       }
@@ -48,7 +48,9 @@ class ProfileResolver {
     }
 
     // 第三级：normalizeProfile 保证任何残缺都安全落地（永不出错）
-    result.profile = normalizeProfile(result.profile);
+    // Brief values are confirmed inputs. A model inference or a default must
+    // never disagree with them in the nested profile used by production.
+    result.profile = normalizeProfile({ ...result.profile, ...confirmedProfile });
     result.presetRef = closestPreset(result.profile);
     this._cache.set(cacheKey, result);
 
@@ -59,20 +61,30 @@ class ProfileResolver {
   _extractIntent(intent) {
     if (typeof intent === 'string') return { text: intent, genreHint: null };
     if (intent && typeof intent === 'object') {
+      const confirmedProfile = {};
+      const duration = Number(intent.duration_sec ?? intent.duration_target);
+      const durationRule = PROFILE_SCHEMA.duration_target;
+      if (Number.isFinite(duration) && duration >= durationRule.min && duration <= durationRule.max) {
+        confirmedProfile.duration_target = duration;
+      }
+      const aspect = intent.aspect_ratio ?? intent.aspectRatio;
+      if (PROFILE_SCHEMA.aspect_ratio.enum.includes(aspect)) confirmedProfile.aspect_ratio = aspect;
       return {
         text: [intent.theme, intent.description, intent.text, intent.title].filter(Boolean).join('。'),
-        genreHint: intent.type || intent.genre || null
+        genreHint: intent.type || intent.genre || null,
+        confirmedProfile
       };
     }
     return { text: String(intent || ''), genreHint: null };
   }
 
-  async _resolveWithLLM(text, genreHint) {
+  async _resolveWithLLM(text, genreHint, confirmedProfile = {}) {
     const prompt = `你是一位视频制作总监。根据用户的创作意图，输出"题材(genre)"和"制作画像(profile)"。
 
 【用户意图】
 ${text || '未明确'}
 ${genreHint ? `【用户声明的题材】${genreHint}（原样保留，不要改写）` : ''}
+${Object.keys(confirmedProfile).length ? `【已确认的制作参数】${JSON.stringify(confirmedProfile)}（必须原样保留，不得推断覆盖）` : ''}
 
 【输出要求】只输出合法 JSON：
 {
@@ -85,8 +97,9 @@ ${genreHint ? `【用户声明的题材】${genreHint}（原样保留，不要�
     "visual_register": "realistic(写实)|stylized(风格化)|abstract(抽象)",
     "pacing": "slow|medium|fast",
     "duration_target": 目标时长秒数(数字),
-    "audience": "目标受众一句话",
-    "special_constraints": ["该题材专属的硬性约束，如'不出现品牌logo'，没有就空数组"]
+    "aspect_ratio": "16:9|9:16|1:1|4:3，有已确认参数时必须保持一致",
+    "audience": "已指定的目标受众；专业推演必须注明创作假设，不得猜测年龄、性别、职业或消费水平",
+    "special_constraints": ["仅保留客户明示的硬性约束，没有就空数组；禁止按题材新增或猜测硬性限制"]
   }
 }
 
