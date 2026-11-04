@@ -206,6 +206,25 @@ it("keeps current-run failures active so a native fallback cannot dispatch anoth
   expect(following).not.toHaveBeenCalled();
 });
 
+it("rejects degraded production with both original camera diagnostics and never checkpoints it as completed", async () => {
+  const { adapter, records } = memoryStore();
+  const failure = vi.fn();
+  const generate = async () => ({});
+  const issues = ["R1_scale_jump", "R4_transition_mismatch"].map(rule => ({ rule, severity: "critical",
+    shots: ["S1", "S2"], message: `${rule} 原始诊断`, rewrite_hint: "由原生作者修正最终镜头" }));
+  const output = { success: true, degraded: true, stages: { cameraCoherence: { passed: false, issues } },
+    shots: [{ shotId: "S1", prompt: "未批准的原稿" }] };
+  const before = structuredClone(output);
+  const system = { creativeThemeGenerator: { generate }, requirementDiscoveryEngine: { discover: generate },
+    prdGenerator: { generate }, scriptEngine: { process: generate }, productionEngine: { produce: async () => output } };
+  bindStudioEngineCheckpoints(system, adapter, "same", { assertActive() {}, onFailure: failure });
+  await expect(system.productionEngine.produce()).rejects.toThrow(/R1_scale_jump.*S1.*S2.*R4_transition_mismatch/u);
+  expect(failure).toHaveBeenCalledOnce();
+  expect(String(failure.mock.calls[0]![0])).toContain("由原生作者修正最终镜头");
+  expect(records.size).toBe(0);
+  expect(output).toEqual(before);
+});
+
 it("rehydrates a verified source-bound discovery marker and rejects legacy fallback risks", () => {
   const source = { intent: "拿起茶杯后举杯。", product: "茶杯", restrictions: [] };
   const discovery = { sceneStructure: { requiredActions: ["拿起茶杯", "举杯"], requiredProps: ["杯"] },

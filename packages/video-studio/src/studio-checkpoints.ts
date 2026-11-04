@@ -10,7 +10,7 @@ const STUDIO_STAGE_POLICY_VERSION: Record<StudioEngineCheckpointStage, string> =
   G3_PROFILE: "native-source-aware-production-profile/v2",
   G4_PRD: "source-bound-prd-and-assumptions/v2",
   SCRIPT: "native-script-and-metadata/v1",
-  PRODUCTION: "native-production-repair-feedback/v3",
+  PRODUCTION: "native-production-final-camera-authority/v4",
   OPENING_TITLE: "native-opening-title-fields/v1",
 };
 
@@ -186,7 +186,14 @@ export function bindStudioEngineCheckpoints(
           options.assertActive();
           if (stage === "OPENING_TITLE") return { productionAfter: plainCheckpointValue(args[0]) };
           if (!record(result) || result.success === false || result.degraded === true) {
-            throw new StudioCheckpointError("STUDIO_CHECKPOINT_INVALID", `${stage} 未完成有效原生产物`);
+            const stages = record(result) && record(result.stages) ? result.stages : null;
+            const coherence = stages && record(stages.cameraCoherence) ? stages.cameraCoherence : null;
+            const critical = coherence && Array.isArray(coherence.issues)
+              ? coherence.issues.filter((issue): issue is RecordValue => record(issue) && issue.severity === "critical") : [];
+            const diagnosis = critical.map(issue => JSON.stringify({ rule: issue.rule, shots: issue.shots,
+              message: issue.message, rewrite_hint: issue.rewrite_hint })).join("；");
+            throw new StudioCheckpointError("STUDIO_CHECKPOINT_INVALID",
+              `${stage} 未完成有效原生产物${diagnosis ? `；运镜诊断：${diagnosis}` : ""}`);
           }
           if (stage === "G3_PROFILE") return { result, discoveryAfter: plainCheckpointValue(args[0]) };
           if (stage === "SCRIPT") return { result, metadataAfter: plainCheckpointValue(args[1]) };

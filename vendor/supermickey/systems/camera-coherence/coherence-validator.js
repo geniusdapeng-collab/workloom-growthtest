@@ -60,11 +60,11 @@ class CoherenceValidator {
    */
   extractCameraPlan(shot) {
     const f = shot.fields || shot;
-    // 景别：优先结构化 camera.shot_size，其次 composition 文本，再次 sceneType
+    // WorkLoom modification [T-2026-1105-9002]: PromptFusion's final
+    // composition is the rendered contract; camera can still be an older VL plan.
     const scaleRaw =
-      shot.camera?.shot_size ||
-      f.camera?.shot_size ||
       f.composition || f.shot_size || f.compositionString ||
+      f.camera?.shot_size || shot.camera?.shot_size ||
       shot.shot_type || '';
     // 运镜：cameraString / camera_movement / camera.movement
     const movementRaw =
