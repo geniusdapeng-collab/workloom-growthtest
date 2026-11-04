@@ -87,7 +87,8 @@ it("keeps speech and music prohibitions active while preserving a native empty s
   expect(rendered(result, "动作")).toBe(shot.fields.action);
   expect(rendered(result, "角色")).toContain("无人物");
   expect(rendered(result, "服装")).not.toContain("项目级外套");
-  expect(rendered(result, "音频")).toContain("无人物声、无旁白");
+  expect(rendered(result, "音频")).toContain("无可辨台词、对白、旁白或口播");
+  expect(rendered(result, "音频")).not.toContain("无人物声");
   expect(rendered(result, "音频")).toContain("无音乐、无配乐、无音乐节拍");
   expect(rendered(result, "音频")).not.toContain("钢琴");
 });

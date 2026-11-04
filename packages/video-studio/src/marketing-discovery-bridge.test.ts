@@ -80,6 +80,7 @@ it("preserves native follow motion and exact post text in the G6 report for a so
     transition: "动作落定后硬切至下一镜", mood: "视线跟随训练门架，结束后放松呼吸",
     pacing: "前段完成主要动作，末段稳定收束", depth_of_field: "中等景深，骑手与训练门架清楚可辨",
     character: "骑手按本镜动作保持平衡，视线沿训练方向移动",
+    audio: "车轮滚动与轮胎接触地面的摩擦声；护具随动作产生的轻响。",
     camera_movement: index === 0 ? "低机位高速平行跟拍，随骑手通过训练门架" : "固定机位",
     prompt: `01.【动作】${action}`, _workloomPromptReviewPolicy: policy }));
   const studio = Object.create(HyperrealitySystem.prototype);
