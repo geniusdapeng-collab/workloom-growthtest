@@ -1,4 +1,4 @@
-/** Source-bound extraction and one diagnosed semantic repair, each independently reviewed. */
+/** Source-bound extraction with separate, diagnosed structural and semantic repair. */
 import { reviewStage, type ProducerVerdict } from "@hyperreality/video-studio";
 import type { DataMiningStagePlan, ExecutorLlm, IntelStage } from "./data-mining-executor.js";
 import { validateStageFacts, type ValidatedStageFacts } from "./marketing-facts.js";
@@ -6,7 +6,7 @@ import type { SourceSnapshot } from "./marketing-source-fetcher.js";
 import { canonicalRenderJson, renderSha256 } from "./gen/compiled-request.js";
 import { SubmissionError } from "./gen/submission-ledger.js";
 
-export const MARKETING_SOURCE_POLICY_VERSION = "source-claims/v2" as const;
+export const MARKETING_SOURCE_POLICY_VERSION = "source-claims/v3" as const;
 const MIN_SUPPORT_SCORE = 85;
 type SourceScope = { tenantId: string; workspaceId: string; projectId: string; runId: string; attempt: number };
 interface BoundArtifact { ref: string; path: string; sha256: string }
@@ -14,11 +14,39 @@ export interface MarketingSourceSupportAttempt {
   extraction: { ref: string; sha256: string };
   evidence: { ref: string; sha256: string };
   verdict: { ref: string; sha256: string };
+  structureRepair?: {
+    rejectedExtraction: { ref: string; sha256: string };
+    validation: { ref: string; sha256: string };
+    request: { ref: string; sha256: string };
+  };
+}
+
+/** Only an author's payload/citation defect is repairable; source drift and infrastructure are not. */
+export function isRepairableMarketingExtractionError(error: unknown): error is Error {
+  return error instanceof Error && (error.name === "ZodError"
+    || /^MARKETING_(?:PAYLOAD_INVALID|CITATION_INVALID|CITATION_SOURCE_MISMATCH|CLAIM_UNSOURCED|CLAIM_UNSUPPORTED_NORMALIZATION|PRICE_SOURCE_MISMATCH|REVIEW_PARAPHRASED|URL_UNVERIFIED|A1_INCOMPLETE|EVIDENCE_EMPTY)(?:[:：]|$)/u.test(error.message));
+}
+
+export function marketingExtractionValidationRecord(input: {
+  scope: SourceScope; stage: IntelStage; productQuery: Record<string, unknown>; sources: SourceSnapshot[];
+  extraction: { ref: string; sha256: string }; error: unknown;
+}) {
+  return { schemaVersion: "workloom.marketing-extraction-validation/v1", policyVersion: MARKETING_SOURCE_POLICY_VERSION,
+    scope: input.scope, stage: input.stage, productQuery: input.productQuery, sourcesSha256: renderSha256(canonicalRenderJson(input.sources)),
+    extraction: input.extraction, error: { name: input.error instanceof Error ? input.error.name : "unknown",
+      message: input.error instanceof Error ? input.error.message : String(input.error) } };
+}
+
+export function marketingFactsReceiptError(message: string, cause: unknown, unknownOutcome = false): SubmissionError {
+  const error = new SubmissionError(unknownOutcome ? "VIDEO_MODEL_OUTCOME_UNKNOWN" : "MARKETING_FACTS_RECEIPT_UNVERIFIED", message);
+  Object.defineProperty(error, "cause", { value: cause, configurable: true });
+  return error;
 }
 
 const extractionContract = [
   '输出严格JSON {"payload":本阶段结构,"citations":[{"pointer":"/identity/name","sourceId":"SRC-…","quote":"正文连续原文"}],"noEvidenceReason":"仅无可用证据时填写"}。',
   "每个非空事实叶子（商品名/品牌/类别/型号/specs全部值/价格金额币种/卖点/评价原话评分/竞品名和属性）都必须有且只有一条citations。",
+  "prices[].note同样是事实叶子，不是来源元数据；填写时必须为对应/identity/prices/下标/note提供连续原文引证，无独立支持则省略note。所有其他可选字段只要填写也必须引证，不能用省略引证规避合同。",
   "pointer按JSON Pointer指向payload叶子；quote必须是提供正文的连续原文，不能改写或拼接。数组下标从0开始，规格键中~用~0、/用~1。",
   "URL/source/channel/suspect是来源元数据，不代替事实引证；任何URL只能来自提供的actual来源URL，商品图片只能从source.assetUrls选择，未知角度填unknown。",
   "不输出 inferred_notes/adjacent_notes 中的推断。A1至少有商品名及一个真实规格或卖点；A2无评价输出reviews:[]；A3无竞品输出competitors:[]，空站写noEvidenceReason。",
@@ -26,7 +54,7 @@ const extractionContract = [
   "先辨明本次检索商品的完整型号、后缀、版本、市场及时间。来源讨论同系列其他型号时，仅作排除或对照证据，不能将其他型号的价格、规格或卖点拼入目标商品。查询类别是线索，不要求复制该类别措辞；分类可省略，不能改商品身份来凑证据。",
   "同一型号、版本、时点的同一属性出现未能解释的冲突时，省略这个可选属性及其引证，保留完整来源供审核；不得择一、取平均、补换算或把争议值挪到卖点中。无争议且独立获得支持的其他属性仍可保留。",
   "official_selling_points 仅容纳有明确来源支持的具体产品行为或配置；媒体修辞、绝对化优势、全称断言和比较结论不得当作已证事实。媒体报道不等于官方确认、实测或独立交叉验证；来源归属和限定必须保留，无法合规表达时省略卖点，用具体specs。",
-  'A1 payload: {"identity":{"name":"","brand":"可选","category":"可选","model":"可选","specs":{},"prices":[{"amount":399,"currency":"CNY","note":"可选","source_url":"实际URL"}],"official_selling_points":[{"point":"","source_url":"实际URL"}]},"images":[]}',
+  'A1 payload: {"identity":{"name":"","brand":"可选","category":"可选","model":"可选","specs":{},"prices":[{"amount":399,"currency":"CNY","source_url":"实际URL"}],"official_selling_points":[{"point":"","source_url":"实际URL"}]},"images":[]}',
   'A2 payload: {"reviews":[{"text":"实际评价原文","url":"实际URL","rating":5,"suspect":false}]}；无评分时省略rating。',
   'A3 payload: {"competitors":[{"name":"","selling_points":[{"point":"","source_url":"实际URL"}],"price_band":"有证据才填","price_source_url":"实际URL","weakness_notes":"有证据才填"}]}，最多3个竞品。',
 ].join("\n");
@@ -55,6 +83,44 @@ export async function extractAndReviewMarketingSources(input: {
   const review = input.review ?? reviewStage;
   const supportAttempts: MarketingSourceSupportAttempt[] = [];
   let prior: { facts: ValidatedStageFacts; verdict: ProducerVerdict } | undefined;
+  let structureRepairUsed = false;
+  const persist = async (suffix: string, bytes: string, unknownOutcome = false): Promise<BoundArtifact> => {
+    try { return await input.writeArtifact(suffix, bytes); }
+    catch (error) { throw marketingFactsReceiptError("模型已返回，但来源事实或修复历史归档未完成；保留原执行先核对回执", error, unknownOutcome); }
+  };
+  type ExtractionAttempt = { parsed: unknown; extraction: BoundArtifact } & (
+    | { kind: "valid"; facts: ValidatedStageFacts }
+    | { kind: "invalid"; error: unknown; validation: BoundArtifact });
+  const extract = async (prompt: string, suffix: string): Promise<ExtractionAttempt> => {
+    const result = await input.llm.reason(prompt, { forceJson: true, temperature: 0 });
+    if (result?.unknown === true) throw new SubmissionError("VIDEO_MODEL_OUTCOME_UNKNOWN", "来源作者请求结果待对账，保留原执行且禁止重发");
+    if (!result?.success) {
+      const error = result?.error ?? "空回包";
+      throw new SubmissionError(/VIDEO_MODEL_OUTCOME_UNKNOWN|MODEL_OUTCOME_UNKNOWN/u.test(String(error))
+        ? "VIDEO_MODEL_OUTCOME_UNKNOWN" : "MARKETING_EXTRACTION_UNVERIFIED", `事实提取或修复失败：${error}`);
+    }
+    let parsed: unknown;
+    try { parsed = result.data ?? JSON.parse(result.content ?? ""); }
+    catch { throw new SubmissionError("MARKETING_EXTRACTION_UNVERIFIED", "事实提取不是可核实JSON"); }
+    const extractionBytes = canonicalRenderJson(parsed);
+    // Validate the same complete JSON value/order that replay will read from the immutable file.
+    // Citation arrays preserve author order; object keys carry no product-fact ordering semantics.
+    parsed = JSON.parse(extractionBytes);
+    const extraction = await persist(`${suffix}.extraction.json`, extractionBytes);
+    try { return { kind: "valid", parsed, extraction, facts: validateStageFacts(input.stage, parsed, input.sources) }; }
+    catch (error) {
+      const validation = await persist(`${suffix}.validation.json`, canonicalRenderJson(marketingExtractionValidationRecord({
+        scope: input.scope, stage: input.stage, productQuery: input.productQuery, sources: input.sources,
+        extraction: { ref: extraction.ref, sha256: extraction.sha256 }, error,
+      })));
+      return { kind: "invalid", parsed, extraction, error, validation };
+    }
+  };
+  const exhaustedAuthorRepair = (cause: Error): SubmissionError => {
+    const error = new SubmissionError("MARKETING_EXTRACTION_REJECTED", `一次结构修复后仍未满足来源事实合同：${cause.message}`);
+    Object.defineProperty(error, "cause", { value: cause, configurable: true });
+    return error;
+  };
   for (const repair of [false, true]) {
     const suffix = repair ? ".repair-1" : "";
     const body = { sources: input.sources, plan: input.plan,
@@ -67,18 +133,34 @@ export async function extractAndReviewMarketingSources(input: {
       "如目标商品身份或A1至少一个真实规格/卖点无法保留，明确失败，不得拿其他型号代替。修复后输出完整payload/citations，仍须重新独立审核；不要输出approved、评分或解释性前后文。",
     ].join("\n") : "";
     const prompt = `${extractionContract}\n${correction}\n本次查询线索（不是事实）：${canonicalRenderJson(input.productQuery)}\n当前阶段：${input.stage}\n${canonicalRenderJson(body)}`;
-    if (prior) await input.writeArtifact(`${suffix}.input.json`, canonicalRenderJson({ policyVersion: MARKETING_SOURCE_POLICY_VERSION, prompt }));
-    const result = await input.llm.reason(prompt, { forceJson: true, temperature: 0 });
-    if (!result?.success) throw new SubmissionError("MARKETING_EXTRACTION_UNVERIFIED", `事实${repair ? "定点修复" : "提取"}失败：${result?.error ?? "空回包"}`);
-    let parsed: unknown;
-    try { parsed = result.data ?? JSON.parse(result.content ?? ""); }
-    catch { throw new SubmissionError("MARKETING_EXTRACTION_UNVERIFIED", "事实提取不是可核实JSON"); }
-    const extraction = await input.writeArtifact(`${suffix}.extraction.json`, canonicalRenderJson(parsed));
-    const facts = validateStageFacts(input.stage, parsed, input.sources);
+    if (prior) await persist(`${suffix}.input.json`, canonicalRenderJson({ policyVersion: MARKETING_SOURCE_POLICY_VERSION, prompt }));
+    let extracted = await extract(prompt, suffix);
+    let structureRepair: MarketingSourceSupportAttempt["structureRepair"];
+    if (extracted.kind === "invalid") {
+      if (!isRepairableMarketingExtractionError(extracted.error)) throw extracted.error;
+      if (structureRepairUsed) throw exhaustedAuthorRepair(extracted.error);
+      structureRepairUsed = true;
+      const rejectedExtraction = { ref: extracted.extraction.ref, sha256: extracted.extraction.sha256 };
+      const validation = { ref: extracted.validation.ref, sha256: extracted.validation.sha256 };
+      const validationRecord = marketingExtractionValidationRecord({ scope: input.scope, stage: input.stage,
+        productQuery: input.productQuery, sources: input.sources, extraction: rejectedExtraction, error: extracted.error });
+      const structureInput = { sources: input.sources, plan: input.plan, invalidExtraction: extracted.parsed,
+        validationError: validationRecord.error, ...(prior ? { semanticRejection: prior.verdict } : {}) };
+      const repairPrompt = `${extractionContract}\n【结构与逐项引证修复】只依据实际validationError修复invalidExtraction，保持同一商品及完整来源。为未覆盖叶子补真实连续原文引用；不能支持的可选字段可删除，必需字段不可伪造。不得豁免note或其他事实叶子的引证，不得修改来源或自行批准。输出完整payload/citations。\n本次查询线索（不是事实）：${canonicalRenderJson(input.productQuery)}\n当前阶段：${input.stage}\n${canonicalRenderJson(structureInput)}`;
+      const request = await persist(`${suffix}.structure-1.input.json`, canonicalRenderJson({
+        policyVersion: MARKETING_SOURCE_POLICY_VERSION, scope: input.scope, stage: input.stage, productQuery: input.productQuery,
+        sourcesSha256: validationRecord.sourcesSha256, rejectedExtraction, validation, input: structureInput, prompt: repairPrompt,
+      }));
+      structureRepair = { rejectedExtraction, validation, request: { ref: request.ref, sha256: request.sha256 } };
+      extracted = await extract(repairPrompt, `${suffix}.structure-1`);
+      if (extracted.kind === "invalid") throw isRepairableMarketingExtractionError(extracted.error)
+        ? exhaustedAuthorRepair(extracted.error) : extracted.error;
+    }
+    const { facts, extraction } = extracted;
     if (prior && renderSha256(canonicalRenderJson(facts)) === renderSha256(canonicalRenderJson(prior.facts))) {
       throw new SubmissionError("MARKETING_SUPPORT_REJECTED", `定点修复未改变被拒绝的事实，停止重复审核：${prior.verdict.reason}`);
     }
-    const evidence = await input.writeArtifact(`${suffix}.review.json`, canonicalRenderJson({
+    const evidence = await persist(`${suffix}.review.json`, canonicalRenderJson({
       scope: input.scope, productQuery: input.productQuery, facts, sources: input.sources,
     }));
     const verdict = await review({ stage: "script", projectId: input.scope.projectId, env: input.env,
@@ -87,18 +169,13 @@ export async function extractAndReviewMarketingSources(input: {
       requiredCheckIds: ["claims-source-bound"], minScore: MIN_SUPPORT_SCORE, rubric: supportRubric,
       context: { purpose: "marketing-source-support", stage: input.stage, scope: input.scope, policyVersion: MARKETING_SOURCE_POLICY_VERSION },
     });
-    let verdictArtifact: BoundArtifact;
-    try { verdictArtifact = await input.writeArtifact(`${suffix}.verdict.json`, canonicalRenderJson(verdict)); }
-    catch (error) {
-      if (!verdict.unknownOutcome) throw error;
-      const unresolved = new SubmissionError("VIDEO_MODEL_OUTCOME_UNKNOWN", "来源评审的供应商回执待核实，且回执归档失败；保留原请求并核对原执行");
-      Object.defineProperty(unresolved, "cause", { value: error, configurable: true });
-      throw unresolved;
-    }
+    const verdictArtifact = await persist(`${suffix}.verdict.json`, canonicalRenderJson(verdict), verdict.unknownOutcome === true);
     supportAttempts.push({ extraction: { ref: extraction.ref, sha256: extraction.sha256 },
-      evidence: { ref: evidence.ref, sha256: evidence.sha256 }, verdict: { ref: verdictArtifact.ref, sha256: verdictArtifact.sha256 } });
+      evidence: { ref: evidence.ref, sha256: evidence.sha256 }, verdict: { ref: verdictArtifact.ref, sha256: verdictArtifact.sha256 },
+      ...(structureRepair ? { structureRepair } : {}) });
     if (verdict.unknownOutcome) throw new SubmissionError("VIDEO_MODEL_OUTCOME_UNKNOWN", "来源评审的供应商回执待核实，保留原请求");
-    await input.verifyArtifact(evidence);
+    try { await input.verifyArtifact(evidence); }
+    catch (error) { throw marketingFactsReceiptError("来源审核完成后的原证据待核实，禁止重复派发", error); }
     if (boundVerdict(verdict, evidence) && verdict.status === "passed" && verdict.approved === true
       && typeof verdict.score === "number" && verdict.score >= MIN_SUPPORT_SCORE) {
       return { facts, review: { ref: evidence.ref, sha256: evidence.sha256, verdict }, supportAttempts };

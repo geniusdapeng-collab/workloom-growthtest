@@ -498,7 +498,12 @@ class ProductionEngine {
     // 【P1-9 修复】生成 blueprint 指纹，用于 checkpoint 一致性校验
     // 【修复 P3-1】使用稳定序列化（键排序）消除 JSON 键序不确定性导致的哈希漂移
     const crypto = require('crypto');
-    const stableHashInput = JSON.stringify(adaptedBlueprint.scenes || [], (k, v) => {
+    const repairFeedback = typeof adaptedBlueprint._workloomProductionRepairFeedback === 'string'
+      ? adaptedBlueprint._workloomProductionRepairFeedback : '';
+    const phaseInput = repairFeedback
+      ? { scenes: adaptedBlueprint.scenes || [], productionRepairFeedback: repairFeedback }
+      : adaptedBlueprint.scenes || [];
+    const stableHashInput = JSON.stringify(phaseInput, (k, v) => {
       if (v && typeof v === 'object' && !Array.isArray(v)) {
         return Object.keys(v).sort().reduce((sorted, key) => { sorted[key] = v[key]; return sorted; }, {});
       }

@@ -10,7 +10,7 @@ const STUDIO_STAGE_POLICY_VERSION: Record<StudioEngineCheckpointStage, string> =
   G3_PROFILE: "native-production-profile/v1",
   G4_PRD: "source-bound-prd/v1",
   SCRIPT: "native-script-and-metadata/v1",
-  PRODUCTION: "native-production-unicode-prompt/v2",
+  PRODUCTION: "native-production-repair-feedback/v3",
   OPENING_TITLE: "native-opening-title-fields/v1",
 };
 
@@ -60,6 +60,45 @@ export function studioCheckpointJson(value: unknown): string {
 
 type RecordValue = Record<string, unknown>;
 const record = (value: unknown): value is RecordValue => Boolean(value && typeof value === "object" && !Array.isArray(value));
+
+/**
+ * Install outside the PRODUCTION checkpoint wrapper so its input hash includes
+ * the private, host-verified diagnosis. Upstream metadata and seed stay intact.
+ */
+export function bindStudioProductionRepairFeedback(system: RecordValue, feedback: string): void {
+  if (typeof feedback !== "string" || !feedback.trim()) {
+    throw new StudioCheckpointError("STUDIO_CHECKPOINT_INVALID", "生产修复诊断必须是宿主核实的完整非空文本");
+  }
+  const production = system.productionEngine;
+  if (!record(production) || typeof production.produce !== "function") {
+    throw new StudioCheckpointError("STUDIO_CHECKPOINT_INVALID", "PRODUCTION 原生作者不可读取");
+  }
+  const original = production.produce as (...args: unknown[]) => Promise<unknown>;
+  const clearPrivateContext = (value: unknown, seen = new WeakSet<object>()): void => {
+    if (!value || typeof value !== "object" || seen.has(value)) return;
+    seen.add(value);
+    delete (value as RecordValue)._workloomProductionRepairFeedback;
+    for (const child of Object.values(value)) clearPrivateContext(child, seen);
+  };
+  production.produce = async function diagnosedNativeProduction(this: RecordValue, ...args: unknown[]) {
+    const blueprint = args[0];
+    if (!record(blueprint)) throw new StudioCheckpointError("STUDIO_CHECKPOINT_INVALID", "生产修复缺少原生蓝图");
+    const field = "_workloomProductionRepairFeedback";
+    const prior = Object.getOwnPropertyDescriptor(blueprint, field);
+    Object.defineProperty(blueprint, field, { value: feedback, enumerable: true, writable: true, configurable: true });
+    try {
+      const output = await original.apply(this, args);
+      // Replayed native rows can hold detached blueprint copies. Clear the
+      // private context there too so downstream fingerprints match fresh work.
+      clearPrivateContext(output);
+      return output;
+    }
+    finally {
+      if (prior) Object.defineProperty(blueprint, field, prior);
+      else delete blueprint[field];
+    }
+  };
+}
 
 /** Preserve aliases held by the native run report, including its existing prompts array and shot rows. */
 function replayInPlace(destination: RecordValue | unknown[], source: RecordValue | unknown[]): void {

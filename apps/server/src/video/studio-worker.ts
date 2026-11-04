@@ -55,7 +55,7 @@ import {
 import { buildServerGateRecord, withGateLedger } from "./gate-ledger-bridge.js";
 import { createDataMiningExecutor } from "./data-mining-executor.js";
 import { checkpointMarketingFacts, prepareMarketingFacts, restoreMarketingFacts, finalizeMarketingFacts,
-  MARKETING_SOURCE_POLICY_VERSION,
+  MARKETING_SOURCE_POLICY_VERSION, marketingFactReviewCacheKey, verifyRejectedMarketingFactReview,
   type PreparedMarketingFacts, type MarketingFactReviewCache, type MarketingShotFactReview } from "./marketing-authority.js";
 import { canonicalRenderJson, renderSha256 } from "./gen/compiled-request.js";
 import { acquireProjectLease, archiveWorkDir, makeLedgerWriter, readProjectMeta } from "./archive-host.js";
@@ -1309,9 +1309,20 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
               hasUnknownOutcome: () => llm.hasUnknownOutcome(),
             });
             await checkpointStore.begin();
+            let marketing: PreparedMarketingFacts | undefined;
+            const rejectedFactKey = (key: string) => `FACT_REJECTION_${key.slice("FACT_".length)}`;
             const factReviewCache: MarketingFactReviewCache = {
               load: key => checkpointStore!.loadValue<MarketingShotFactReview>(key),
               save: (key, review) => checkpointStore!.saveValue(key, review, review.scope?.runId),
+              loadRejected: key => checkpointStore!.loadValue<MarketingShotFactReview>(rejectedFactKey(key)),
+              reject: async (key, review) => {
+                if (!marketing || !review.rejectedShot || marketingFactReviewCacheKey(marketing.bundle, review.rejectedShot) !== key) {
+                  throw new Error("MARKETING_PROMPTS_UNBOUND: 生产返工缺少当前来源和完整镜头绑定");
+                }
+                await verifyRejectedMarketingFactReview(marketing, review.rejectedShot, review);
+                await checkpointStore!.saveValue(rejectedFactKey(key), review, review.scope?.runId);
+                await checkpointStore!.rejectProduction(key, review);
+              },
             };
             /**
              * 断点快照（真机发现的方案缺陷修复，T-2026-0926-0001 留痕）：
@@ -1329,7 +1340,6 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
                 console.error(`[archive] 断点快照失败（继续执行）: ${(err as Error).message}`);
                 return { files: 0, bytes: 0, skipped: [] as string[] };
               });
-            let marketing: PreparedMarketingFacts | undefined;
             let g1Failure: Awaited<ReturnType<ApprovalCallback>> | undefined;
             if (input.isMarketing) {
               const sourceScope = { ...scope, projectId: input.projectId, runId: entry.runId, attempt: ctx.attempt };
@@ -1359,7 +1369,25 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
               marketingDossierRoot = marketing.storeRoot;
               marketingDossierRef = path.posix.join("archive", scope.workspaceId, input.projectId, `${marketing.prefix}-dossier`);
             }
-            const studio = new VideoStudio({ ...studioConfig, checkpoints: checkpointStore.engine, ...(marketing ? { dataMining: {
+            const productionRejections: MarketingShotFactReview[] = [];
+            if (marketing) {
+              for (const rejection of await checkpointStore.loadProductionRejections()) {
+                const review = rejection.review as MarketingShotFactReview;
+                if (!review?.rejectedShot) throw new Error("STUDIO_CHECKPOINT_INVALID: 生产返工回执缺少完整原镜头");
+                if (marketingFactReviewCacheKey(marketing.bundle, review.rejectedShot) !== rejection.key) continue;
+                await verifyRejectedMarketingFactReview(marketing, review.rejectedShot, review);
+                await checkpointStore.adoptProductionRejection(rejection);
+                await checkpointStore.saveValue(rejectedFactKey(rejection.key), review, review.scope?.runId);
+                productionRejections.push(review);
+              }
+            }
+            const productionRepairFeedback = marketing && productionRejections.length ? canonicalRenderJson({
+              instruction: "根据已核实的完整来源和原事实审核诊断修订生产提示词。纠正或删除未支持的主张，保留其他已通过的创作成果；不得把原坏镜或审核指令直接拼入作品，不得修改来源或替评审作出通过裁决。",
+              sourceClaims: marketing.bundle.stages.map(stage => stage.facts), restrictions: marketing.bundle.restrictions,
+              creativeRequirements: marketing.bundle.creativeRequirements, rejected: productionRejections,
+            }) : undefined;
+            const studio = new VideoStudio({ ...studioConfig, checkpoints: checkpointStore.engine,
+              ...(productionRepairFeedback ? { productionRepairFeedback } : {}), ...(marketing ? { dataMining: {
               mode: "api", storeRoot: marketing.storeRoot, refresh: true,
               verifiedRaw: { projectId: input.projectId, rawJson: canonicalRenderJson(marketing.raw), sha256: marketing.bundle.rawSha256, productQuery: marketing.bundle.productQuery,
                 specSourceUrls: marketing.specSourceUrls, creativeRequirements: marketing.bundle.creativeRequirements, restrictions: marketing.bundle.restrictions,
@@ -1667,6 +1695,7 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
           );
         } catch (error) {
           if (error instanceof Error && /VIDEO_MODEL_OUTCOME_UNKNOWN/u.test(error.message)) checkpointStore?.markUnknown();
+          if (error instanceof Error && /MARKETING_FACTS_RECEIPT_UNVERIFIED/u.test(error.message)) checkpointStore?.markReceiptUnverified();
           throw error;
         } finally {
           await checkpointStore?.finishOutcome();

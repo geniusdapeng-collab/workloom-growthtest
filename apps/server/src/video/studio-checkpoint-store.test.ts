@@ -126,6 +126,54 @@ describe("正式工位断点复用与原审核绑定", () => {
       attempt: identity.attempt, archive, repository })).toBe("unknown");
   });
 
+  it.each([false, true])("晚期事实语义拒绝只使对应生产和G6失效，基础设施故障保留作者，semantic=%s", async semantic => {
+    const calls = { theme: 0, script: 0, production: 0, opening: 0 };
+    const first = store();
+    const run = createStudioCheckpointRunner(first.engine, "same source and frozen intent");
+    await run.run("G2_THEME", "theme input", async () => { calls.theme++; return { theme: "已过主题" }; });
+    await first.saveGate("G2_THEME", "完整主题", await approved("完整主题"), "E-theme");
+    await run.run("SCRIPT", "approved PRD", async () => { calls.script++; return { script: "已完成剧本" }; });
+    const bad = await run.run("PRODUCTION", "same script", async () => { calls.production++; return { prompt: "未支持的999档" }; });
+    await run.run("OPENING_TITLE", bad, async () => { calls.opening++; return bad; });
+    await first.saveGate("G6_PROMPT", "旧G6完整999档正文", await approved("旧G6完整999档正文"), "E-g6-old");
+    if (semantic) await first.rejectProduction(`FACT_${renderSha256("exact source and bad shot")}`, { proof: "caller-verified semantic rejection" });
+    await first.finishOutcome();
+
+    const second = store("RUN-second", 2, identity.runId);
+    const resumed = createStudioCheckpointRunner(second.engine, "same source and frozen intent");
+    await resumed.run("G2_THEME", "theme input", async () => { calls.theme++; return { theme: "重新生成" }; });
+    await resumed.run("SCRIPT", "approved PRD", async () => { calls.script++; return { script: "重新生成" }; });
+    const output = await resumed.run("PRODUCTION", "same script", async () => { calls.production++; return { prompt: "已支持的9档" }; });
+    await resumed.run("OPENING_TITLE", output, async () => { calls.opening++; return output; });
+    expect(calls).toEqual({ theme: 1, script: 1, production: semantic ? 2 : 1, opening: semantic ? 2 : 1 });
+    expect(output.prompt).toBe(semantic ? "已支持的9档" : "未支持的999档");
+    expect(Boolean(await second.loadGate("G6_PROMPT", "旧G6完整999档正文"))).toBe(!semantic);
+    if (semantic) {
+      const rejected = await second.loadProductionRejections();
+      expect(rejected).toHaveLength(1);
+      await second.adoptProductionRejection(rejected[0]!);
+      await second.saveGate("G6_PROMPT", "修订后完整9档正文", await approved("修订后完整9档正文"), "E-g6-new");
+      const third = store("RUN-third", 3, "RUN-second");
+      expect(await third.loadGate("G6_PROMPT", "修订后完整9档正文")).toMatchObject({ reviewEventId: "E-g6-new" });
+      expect(await third.loadProductionRejections()).toHaveLength(1);
+    }
+  });
+
+  it("多份事实返工诊断跨接续保持稳定顺序，不因事件追加次序改变生产输入", async () => {
+    const first = store();
+    await first.saveGate("G6_PROMPT", "两个镜头的完整G6", await approved("两个镜头的完整G6"), "E-g6");
+    for (const suffix of ["b", "a"]) await first.rejectProduction(`FACT_${suffix.repeat(64)}`, { shotId: suffix });
+    const second = store("RUN-second", 2, identity.runId);
+    const original = await second.loadProductionRejections();
+    expect(original.map(item => item.key)).toEqual([`FACT_${"a".repeat(64)}`, `FACT_${"b".repeat(64)}`]);
+    for (const item of original) await second.adoptProductionRejection(item);
+    const third = store("RUN-third", 3, "RUN-second");
+    const replayed = await third.loadProductionRejections();
+    expect(JSON.stringify(replayed)).toBe(JSON.stringify(original));
+    for (const item of replayed) await third.adoptProductionRejection(item);
+    expect(await store("RUN-fourth", 4, "RUN-third").loadProductionRejections()).toEqual(original);
+  });
+
   it.each([
     { inputSha256: renderSha256("需求已经变更") },
     { projectCreatedAt: "2026-11-05T00:00:00.000Z" },

@@ -21,7 +21,7 @@ import { runWithConfirmationHandler, type ConfirmationHandler } from "./confirma
 import { resolveGate, type GateVerdict } from "./gates.js";
 import { WorkloomLLMEngine } from "./llm-adapter.js";
 import { createPortraitRuntime, type PortraitRuntimeOptions } from "./portrait-runtime.js";
-import { bindStudioEngineCheckpoints, type StudioCheckpointAdapter } from "./studio-checkpoints.js";
+import { bindStudioEngineCheckpoints, bindStudioProductionRepairFeedback, type StudioCheckpointAdapter } from "./studio-checkpoints.js";
 import {
   applyDurationPolicyToManager,
   installVendorAudioDisciplineBridge,
@@ -128,6 +128,8 @@ export interface StudioConfig {
   onPromptReview?: (prompts: readonly Record<string, unknown>[]) => void;
   /** The host verifies durable checkpoint identity, approval, dependencies and source freshness. */
   checkpoints?: StudioCheckpointAdapter;
+  /** Private verified late-stage diagnosis; affects only PRODUCTION author input and descendants. */
+  productionRepairFeedback?: string;
   /** @deprecated 仅保留调用兼容性，已忽略；超时由各次模型请求的传输层负责。 */
   totalDeadlineMs?: number;
   llmTimeoutMs?: number;
@@ -670,6 +672,9 @@ export class VideoStudio {
               restoreDiscovery: (output) => restoreMarketingDiscoveryCheckpoint(output, marketingDiscovery!),
             } : {}),
           });
+        }
+        if (cfg.productionRepairFeedback !== undefined) {
+          bindStudioProductionRepairFeedback(system as unknown as Record<string, unknown>, cfg.productionRepairFeedback);
         }
         /** 实例级放宽 rhythmProfiles（standard 12 / slow 15 → 模型上限），否则 30s 单镜会被重新夹紧 */
         applyDurationPolicyToManager(

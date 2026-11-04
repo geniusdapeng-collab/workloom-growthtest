@@ -32,6 +32,13 @@ interface SavedGate {
   reviewEventId: string;
   originRunId: string;
 }
+export interface StudioProductionRejection<T = unknown> {
+  key: string;
+  review: T;
+  gateContentSha256: string;
+  engineOutputSha256ByStage: Record<string, string>;
+  originRunId: string;
+}
 export interface StudioCheckpointRepository {
   readPointers(kind: string, runId: string): Promise<CheckpointPointer[]>;
   append(action: string, after: Record<string, unknown>): Promise<void>;
@@ -107,6 +114,7 @@ export function createStudioCheckpointStore(options: {
 }) {
   const { identity, archive, repository } = options;
   const currentOutputs = new Map<string, string>();
+  const currentGates = new Map<string, SavedGate>();
   const refPrefix = `stages/${identity.stageId}/attempt-${identity.attempt}.continuity`;
   let unknown = false;
   let receiptUnverified = false;
@@ -144,9 +152,23 @@ export function createStudioCheckpointStore(options: {
   const loadApprovedGate = async (gate: string): Promise<SavedGate | null> => {
     for (const record of await load(`GATE_${gate}`)) {
       const saved = record.payload as SavedGate;
-      if (reviewed(saved)) return saved;
+      if (!reviewed(saved)) continue;
+      if (gate === "G6_PROMPT" && (await productionRejections()).some(rejection => rejection.gateContentSha256 === saved.contentSha256)) return null;
+      return saved;
     }
     return null;
+  };
+  const productionRejections = async (): Promise<StudioProductionRejection[]> => {
+    const rejected = new Map<string, StudioProductionRejection>();
+    for (const record of await load("PRODUCTION_REJECTION")) {
+      const payload = record.payload as StudioProductionRejection;
+      if (!payload || !/^FACT_[a-f0-9]{64}$/u.test(payload.key) || !sha(payload.gateContentSha256)
+        || !payload.engineOutputSha256ByStage || typeof payload.engineOutputSha256ByStage !== "object"
+        || Object.values(payload.engineOutputSha256ByStage).some(value => !sha(value))
+        || payload.originRunId !== record.originRunId) throw new Error("STUDIO_CHECKPOINT_INVALID: 生产语义拒绝回执未绑定原运行");
+      if (!rejected.has(payload.key)) rejected.set(payload.key, payload);
+    }
+    return [...rejected.values()].sort((left, right) => left.key < right.key ? -1 : left.key > right.key ? 1 : 0);
   };
   const engine: StudioCheckpointAdapter = {
     async load(request: StudioCheckpointRequest) {
@@ -183,8 +205,24 @@ export function createStudioCheckpointStore(options: {
     async saveGate(gate: string, content: string, verdict: ProducerVerdict, reviewEventId: string, originRunId = identity.runId) {
       if (verdict.unknownOutcome) unknown = true;
       if (!reviewed({ verdict, contentSha256: renderSha256(content), engineOutputSha256ByStage: {}, reviewEventId, originRunId })) return;
-      await save(`GATE_${gate}`, { contentSha256: renderSha256(content), verdict, reviewEventId, originRunId,
-        engineOutputSha256ByStage: Object.fromEntries(currentOutputs) } satisfies SavedGate, originRunId);
+      const saved = { contentSha256: renderSha256(content), verdict, reviewEventId, originRunId,
+        engineOutputSha256ByStage: Object.fromEntries(currentOutputs) } satisfies SavedGate;
+      await save(`GATE_${gate}`, saved, originRunId);
+      currentGates.set(gate, saved);
+    },
+    async rejectProduction(key: string, review: unknown) {
+      const gate = currentGates.get("G6_PROMPT");
+      if (!/^FACT_[a-f0-9]{64}$/u.test(key) || !gate) {
+        receiptUnverified = true;
+        throw new Error("STUDIO_CHECKPOINT_INVALID: 生产语义拒绝缺少对应的完整G6审核");
+      }
+      const rejection: StudioProductionRejection = { key, review, gateContentSha256: gate.contentSha256,
+        engineOutputSha256ByStage: gate.engineOutputSha256ByStage, originRunId: identity.runId };
+      await save("PRODUCTION_REJECTION", rejection);
+    },
+    loadProductionRejections: productionRejections,
+    async adoptProductionRejection(rejection: StudioProductionRejection) {
+      await save("PRODUCTION_REJECTION", rejection, rejection.originRunId);
     },
     async loadValue<T>(kind: string): Promise<T | null> {
       const record = (await load(kind))[0];
@@ -194,6 +232,7 @@ export function createStudioCheckpointStore(options: {
     },
     saveValue: save,
     markUnknown() { unknown = true; },
+    markReceiptUnverified() { receiptUnverified = true; },
     async finishOutcome() {
       const state = unknown || options.hasUnknownOutcome() ? "unknown" : receiptUnverified ? "receipt_unverified" : "known";
       await save("OUTCOME", { state });

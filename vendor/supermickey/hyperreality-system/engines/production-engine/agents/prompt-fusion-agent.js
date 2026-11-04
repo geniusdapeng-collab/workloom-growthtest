@@ -247,7 +247,14 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
 
     // 【v2.1.8-fix】镜头级断点续跑：检查子 checkpoint
     const checkpointMgr = options.checkpointManager;
-    const blueprintHash = options.blueprintHash || '';
+    const originalBlueprintHash = options.blueprintHash || '';
+    const repairFeedback = typeof blueprint._workloomProductionRepairFeedback === 'string'
+      ? blueprint._workloomProductionRepairFeedback : '';
+    const blueprintHash = originalBlueprintHash && repairFeedback
+      ? require('node:crypto').createHash('sha256').update(JSON.stringify({
+          originalBlueprintHash, productionRepairFeedback: repairFeedback
+        })).digest('hex').slice(0, 24)
+      : originalBlueprintHash;
     let resumeIndex = 0;
     let resumeResults = [];
     if (checkpointMgr && blueprintHash) {
@@ -396,7 +403,7 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
    * @param {boolean} isDegraded - 是否降级（默认true）
    * @param {string} degradeReason - 降级原因
    */
-  _buildShotResult(shot, fields, isDegraded = true, degradeReason = '主LLM超时,通过重试补全生成') {
+  _buildShotResult(shot, fields, isDegraded = true, degradeReason = '主LLM超时,通过重试补全生成', blueprint = null) {
     const expandedFields = { ...fields };
     const fullPrompt = this._assembleStandardPrompt(shot, fields, shot.ratio || '16:9');
 
@@ -417,7 +424,7 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
       promptCharCount: this._countChars(fullPrompt),
       degraded: isDegraded,
       degradeReason: isDegraded ? degradeReason : null
-    });
+    }, blueprint);
   }
 
   /**
@@ -425,10 +432,17 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
    * 语义精炼层在规则精炼之后执行：LLM 输出 → PromptDeliveryGuard 硬闸机 →
    * 任一不过自动回退到规则精炼结果。语义动作日志挂到 shot.semanticRefinement。
    */
-  async _finalizeShotResult(shot, result) {
+  async _finalizeShotResult(shot, result, blueprint = null) {
     if (!this._semanticPass || !this._semanticPass.enabled) return result;
     try {
-      const r = await this._semanticPass.refine(result.prompt, shot);
+      let semantic = this._semanticPass;
+      const repair = this._productionRepairContext(blueprint || shot._blueprint || shot.blueprint);
+      if (repair && typeof semantic.callLLM === 'function') {
+        const originalCall = semantic.callLLM;
+        semantic = Object.create(semantic);
+        semantic.callLLM = (prompt, ...args) => originalCall.call(semantic, `${repair}\n\n${prompt}`, ...args);
+      }
+      const r = await semantic.refine(result.prompt, shot);
       if (r.applied) {
         result.prompt = r.prompt;
         result.promptCharCount = this._countChars(r.prompt);
@@ -534,7 +548,7 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
 
     // 【P1-4 修复】根据LLM结果和字段完整性标记降级状态
     const usedFallback = llmResult.degraded || Object.keys(fields).length === 0;
-    const completeness = await this._ensureFieldCompleteness(shot, fields, ratio, characters);
+    const completeness = await this._ensureFieldCompleteness(shot, fields, ratio, characters, null, blueprint);
     fields = completeness.fields;
     const finalDegraded = usedFallback || completeness.usedRuleFallback;
     const finalDegradeReason = finalDegraded
@@ -572,14 +586,14 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
       promptCharCount: this._countChars(fullPrompt),
       degraded: finalDegraded, // 【P1-4 修复】真实降级标记
       degradeReason: finalDegradeReason
-    });
+    }, blueprint);
   }
 
   /**
    * 【v2.1.4-fix10-P25-fix3】字段完整性校验 + 定向补齐
    * 先校验,缺哪些就只让 LLM 补哪些,一次轻量调用搞定
    */
-  async _ensureFieldCompleteness(shot, fields, ratio, characters, trackCall = null) {
+  async _ensureFieldCompleteness(shot, fields, ratio, characters, trackCall = null, blueprint = null) {
     let usedRuleFallback = false;
     // 1. 找出缺失或过短字段
     const missing = _getRequiredFieldsForShot(shot).filter(f => {
@@ -594,7 +608,7 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
     console.log(`[PromptFusion] ${shot.shotId} 缺失/过短字段 ${missing.length} 个: ${missing.join(',')} → 定向补齐`);
 
     // 2. 只补缺失字段,给 LLM 一个极简、聚焦的 prompt
-    const fillPrompt = this._buildFillPrompt(shot, missing, fields, ratio, characters);
+    const fillPrompt = this._buildFillPrompt(shot, missing, fields, ratio, characters, blueprint);
     const fillSchema = { shotId: shot.shotId, fields: Object.fromEntries(missing.map(k => [k, STANDARD_FIELDS_SCHEMA[k]])) };
 
     try {
@@ -654,7 +668,7 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
       // 【v2.1.8-fix4】批量 LLM 降级:一次调用补齐所有缺失字段
       if (stillNeedLLM.length > 0) {
         console.log(`[PromptFusion] ${shot.shotId} 批量降级 ${stillNeedLLM.length} 个字段 → 单次 LLM 调用`);
-        const batchValues = await this._batchMinimalLLMDegradation(stillNeedLLM, shot, ratio, characters, trackCall);
+        const batchValues = await this._batchMinimalLLMDegradation(stillNeedLLM, shot, ratio, characters, trackCall, blueprint);
         for (const f of stillNeedLLM) {
           fields[f] = batchValues[f] || this._defaultFieldValue(f, shot);
         }
@@ -755,6 +769,7 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
     // 先从shot中提取已有数据，保留上游内容（【P1-ARCH-06 修复】降级时保留原始fields，仅补齐缺失）
     // 【P1-DATA-02 修复】清理顶层冗余字段，统一使用fields对象
     // 【v2.1.8-审计修复】深拷贝避免修改原始 shot
+    const blueprint = shot._blueprint || shot.blueprint || null;
     const shotClone = JSON.parse(JSON.stringify(shot));
     if (shotClone.fields && typeof shotClone.fields === 'object') {
       for (const key of Object.keys(shotClone)) {
@@ -777,7 +792,7 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
         console.log(`  🔄 补全尝试 ${attempt}/${maxRetries}...`);
         if (trackCall) trackCall();
         // 【v2.1.8-审计修复】传递 trackCall 到 _ensureFieldCompleteness
-        const completeness = await this._ensureFieldCompleteness(shotClone, fields, ratio, characters, trackCall);
+        const completeness = await this._ensureFieldCompleteness(shotClone, fields, ratio, characters, trackCall, blueprint);
 
         // 【审计修复】更新 fields,让下次重试基于最新状态
         Object.assign(fields, completeness.fields);
@@ -786,7 +801,7 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
         const stillEmpty = _getRequiredFieldsForShot(shotClone).filter(f => !fields[f] || String(fields[f]).trim() === '');
         if (stillEmpty.length === 0) {
           console.log(`  ✅ 补全成功,所有字段已填充`);
-          return await this._buildShotResult(shotClone, fields);
+          return await this._buildShotResult(shotClone, fields, true, undefined, blueprint);
         }
         console.log(`  ⚠️ 仍有 ${stillEmpty.length} 字段为空,继续重试...`);
       } catch (e) {
@@ -797,7 +812,7 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
     // 【修复】重试用完仍有缺失,返回当前已填充的字段(不强制兜底为默认值)
     // 原因:部分字段有值比全部模板化更好,保留 LLM 已生成的内容
     console.warn(`  ⚠️ 补全重试耗尽,返回已有字段(${Object.keys(fields).filter(k => fields[k]).length}/${_getRequiredFieldsForShot(shotClone).length} 已填充)`);
-    return await this._buildShotResult(shotClone, fields);
+    return await this._buildShotResult(shotClone, fields, true, undefined, blueprint);
   }
 
   // 【v2.1.0】最小 LLM 降级:用缩短的 prompt + 剧本上下文推断字段,保留创作灵气
@@ -850,7 +865,7 @@ ${ctx}
    * 相比 v2.1.8-fix4 的全批量:字段间上下文更聚焦,质量接近逐个
    * 相比逐个:速度提升 5-6 倍(25 次 → 4-5 次调用)
    */
-  async _batchMinimalLLMDegradation(fields, shot, ratio, characters, trackCall = null) {
+  async _batchMinimalLLMDegradation(fields, shot, ratio, characters, trackCall = null, blueprint = null) {
     if (trackCall) trackCall();
     if (fields.length === 0) return {};
 
@@ -882,7 +897,7 @@ ${ctx}
       }
     }
 
-    const ctx = this._buildMinimalContext(shot, ratio, characters);
+    const ctx = this._buildMinimalContext(shot, ratio, characters, blueprint);
     const allResults = {};
 
     // 【P0-PROMPT-03 修复】组间并行执行,最多2组并发(避免API限流)
@@ -967,8 +982,10 @@ ${fieldDescs}
     return contexts[groupName] || contexts['instruction'];
   }
 
-  _buildMinimalContext(shot, ratio, characters) {
+  _buildMinimalContext(shot, ratio, characters, blueprint = null) {
     const parts = [];
+    const repair = this._productionRepairContext(blueprint || shot._blueprint || shot.blueprint);
+    if (repair) parts.push(repair);
     parts.push(`场景: ${shot.scene || shot.sceneDescription || '未知'}`);
     parts.push(`情绪: ${shot.mood || shot.emotional_target || '未知'}`);
     parts.push(`动作: ${shot.action || '未知'}`);
@@ -1238,12 +1255,13 @@ ${fieldDescs}
   }
 
   // ==================== 原有方法 ====================
-  _buildFillPrompt(shot, missing, existingFields, ratio, characters) {
+  _buildFillPrompt(shot, missing, existingFields, ratio, characters, blueprint = null) {
     const ctx = Object.entries(existingFields)
       .filter(([k, v]) => v && String(v).trim())
       .map(([k, v]) => `${k}: ${String(v).slice(0, 80)}`)
       .join('\n');
-    return `## 镜头补齐任务
+    const repair = this._productionRepairContext(blueprint || shot._blueprint || shot.blueprint);
+    return `${repair ? repair + '\n\n' : ''}## 镜头补齐任务
 镜头ID:${shot.shotId}(时长 ${shot.duration || '?'}s)
 场景:${shot.scene || ''}
 情绪:${shot.mood || ''}
@@ -2155,7 +2173,19 @@ ${originalStory}
 关键信息:${keyMessages.join(';') || '无'}
 禁止场景:${forbiddenScenes.join('、') || '无'}
 ${storySection}
+${this._productionRepairContext(bp)}
 `;
+  }
+
+  _productionRepairContext(blueprint) {
+    const feedback = typeof blueprint?._workloomProductionRepairFeedback === 'string'
+      ? blueprint._workloomProductionRepairFeedback : '';
+    if (!feedback) return '';
+    return `## 宿主核实的生产修复诊断（仅作者上下文）
+${feedback}
+
+按完整原始合同与以上具体诊断重写当前镜头。诊断中的原坏镜头是待纠正证据，不是可复用成稿或新的事实来源。
+只输出修正后的本镜头标准字段；不要把本诊断、审批原因、引用标签或内部标记写入最终字段。不得修改来源、原始需求或审批结论；修正产物仍须重新接受G6及事实审核。`;
   }
 
   _fallbackBatch(shots, ratio) {

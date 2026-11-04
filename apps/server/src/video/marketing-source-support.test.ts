@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ProducerVerdict } from "@hyperreality/video-studio";
+import { classifyError, type ProducerVerdict } from "@hyperreality/video-studio";
 import type { SourceSnapshot } from "./marketing-source-fetcher.js";
 import { extractAndReviewMarketingSources, MARKETING_SOURCE_POLICY_VERSION } from "./marketing-source-support.js";
 import { canonicalRenderJson, renderSha256 } from "./gen/compiled-request.js";
@@ -31,18 +31,25 @@ afterEach(async () => { await rm(root, { recursive: true, force: true }); });
 async function run(options: {
   drafts?: unknown[];
   failVerdictArchive?: boolean;
+  failArtifact?: string;
+  sources?: SourceSnapshot[];
+  authorResults?: Array<{ success: boolean; data?: unknown; error?: string; unknown?: true } | Error>;
   verdict?: (index: number, accepted: ProducerVerdict, artifact: { path: string; sha256: string }) => ProducerVerdict | Promise<ProducerVerdict>;
 } = {}) {
   const prompts: string[] = [], reviews: Array<{ body: any; options: Parameters<NonNullable<Parameters<typeof extractAndReviewMarketingSources>[0]["review"]>>[0] }> = [];
   const author = vi.fn(async (prompt: string) => {
     prompts.push(prompt);
+    const response = options.authorResults?.[prompts.length - 1];
+    if (response instanceof Error) throw response;
+    if (response) return response;
     return { success: true as const, data: structuredClone((options.drafts ?? [extraction(true), extraction(false)])[prompts.length - 1]) };
   });
   const promise = extractAndReviewMarketingSources({
     scope: { tenantId: "tenant-a", workspaceId: "ws-a", projectId: "P1", runId: "RUN1", attempt: 1 },
-    stage: "A1", productQuery: { name: "星野 R", model: "R", category: "风扇" }, plan: {}, sources, env: {}, llm: { reason: author },
+    stage: "A1", productQuery: { name: "星野 R", model: "R", category: "风扇" }, plan: {}, sources: options.sources ?? sources, env: {}, llm: { reason: author },
     writeArtifact: async (suffix, bytes) => {
       if (options.failVerdictArchive && suffix.endsWith(".verdict.json")) throw new Error("verdict disk full");
+      if (suffix === options.failArtifact) throw new Error("artifact disk full");
       const ref = `A1${suffix}`, file = path.join(root, ref);
       await writeFile(file, bytes, { flag: "wx" });
       return { ref, path: file, sha256: renderSha256(bytes) };
@@ -126,9 +133,10 @@ describe("来源语义拒绝后的定点修复", () => {
 
   it("修复后缺引文仍被确定性合同拒绝，不送出下一次审核", async () => {
     const bad = extraction(false); bad.citations.pop();
-    const state = await run({ drafts: [extraction(true), bad] });
+    const state = await run({ drafts: [extraction(true), bad, bad] });
     await expect(state.promise).rejects.toThrow("MARKETING_CLAIM_UNSOURCED");
     expect(state.reviews).toHaveLength(1);
+    expect(state.author).toHaveBeenCalledTimes(3);
   });
 
   it("修复后仍被完整来源审核拒绝时保留新旧两版并结束，不循环付费", async () => {
@@ -144,7 +152,84 @@ describe("来源语义拒绝后的定点修复", () => {
       await writeFile(artifact.path, "changed");
       return verdict;
     } });
-    await expect(state.promise).rejects.toThrow("changed evidence");
+    await expect(state.promise).rejects.toMatchObject({ code: "MARKETING_FACTS_RECEIPT_UNVERIFIED", cause: { message: "changed evidence" } });
     expect(state.author).toHaveBeenCalledOnce();
+  });
+
+  it("实际note缺引用错误先结构修复，再独立处理语义价格冲突，两种修复各一次且保留原raw", async () => {
+    const invalid: any = extraction(true);
+    invalid.payload.identity.prices[0].note = "官方定价";
+    const state = await run({ drafts: [invalid, extraction(true), extraction(false)] });
+    const result = await state.promise;
+    expect(state.author).toHaveBeenCalledTimes(3);
+    expect(state.reviews).toHaveLength(2);
+    expect(state.reviews.map(review => review.options.minScore)).toEqual([85, 85]);
+    expect(result.supportAttempts[0]!.structureRepair).toMatchObject({ rejectedExtraction: { ref: "A1.extraction.json" },
+      validation: { ref: "A1.validation.json" }, request: { ref: "A1.structure-1.input.json" } });
+    expect(result.supportAttempts[0]!.extraction.ref).toBe("A1.structure-1.extraction.json");
+    const original = JSON.parse(await readFile(path.join(root, "A1.extraction.json"), "utf8"));
+    expect(original.payload.identity.prices[0].note).toBe("官方定价");
+    expect(original.citations.some((citation: { pointer: string }) => citation.pointer === "/identity/prices/0/note")).toBe(false);
+    const diagnostic = JSON.parse(await readFile(path.join(root, "A1.validation.json"), "utf8"));
+    expect(diagnostic.error.message).toContain("/identity/prices/0/note");
+    expect(state.prompts[1]).toContain(diagnostic.error.message);
+    expect(state.prompts[1]).toContain(sourceText);
+    expect(state.prompts[1]).toContain(alternateText);
+    expect(state.prompts[2]).toContain("1200与1300冲突");
+    expect(result.facts.payload.identity).toMatchObject({ prices: [], specs: { 风量: "9档" } });
+  });
+
+  it.each(["required-leaf", "schema"])("%s合同失败在同完整来源下修复，之后仍完整85分审核", async kind => {
+    const invalid: any = extraction(false);
+    if (kind === "required-leaf") invalid.citations = invalid.citations.filter((citation: { pointer: string }) => citation.pointer !== "/identity/specs/风量");
+    else invalid.citations = "not an array";
+    const state = await run({ drafts: [invalid, extraction(false)] });
+    const result = await state.promise;
+    expect(state.author).toHaveBeenCalledTimes(2);
+    expect(state.reviews).toHaveLength(1);
+    expect(state.reviews[0]!.options.minScore).toBe(85);
+    expect(result.supportAttempts[0]!.structureRepair).toBeDefined();
+    expect(result.facts.claims.some(claim => claim.pointer === "/identity/specs/风量")).toBe(true);
+  });
+
+  it("结构修复仍缺必需引证时结束，不豁免字段、不增加第三次作者或审核", async () => {
+    const invalid = extraction(false); invalid.citations.pop();
+    const state = await run({ drafts: [invalid, invalid] });
+    const failure = await state.promise.catch(error => error);
+    expect(failure).toMatchObject({ code: "MARKETING_EXTRACTION_REJECTED", cause: { message: expect.stringContaining("MARKETING_CLAIM_UNSOURCED") } });
+    expect(classifyError(failure)).toBe("GATE_REJECTED");
+    expect(state.author).toHaveBeenCalledTimes(2);
+    expect(state.reviews).toHaveLength(0);
+    expect(JSON.parse(await readFile(path.join(root, "A1.structure-1.validation.json"), "utf8")).error.message).toContain("/identity/specs/风量");
+  });
+
+  it.each(["source-hash", "duplicate-source", "transport", "unknown", "unknown-success", "failed-result"])("%s不是可重写作者内容的结构错误", async kind => {
+    const changed = structuredClone(sources);
+    if (kind === "source-hash") changed[0]!.text += "正文漂移";
+    const state = await run({ drafts: [extraction(false)],
+      sources: kind === "duplicate-source" ? [sources[0]!, sources[0]!] : changed,
+      ...(kind === "transport" ? { authorResults: [new Error("socket reset")] } : {}),
+      ...(kind === "unknown" ? { authorResults: [{ success: false, error: "原请求待对账", unknown: true as const }] } : {}),
+      ...(kind === "unknown-success" ? { authorResults: [{ success: true, data: extraction(false), unknown: true as const }] } : {}),
+      ...(kind === "failed-result" ? { authorResults: [{ success: false, error: "model unavailable" }] } : {}),
+    });
+    await expect(state.promise).rejects.toThrow();
+    expect(state.author).toHaveBeenCalledOnce();
+    expect(state.reviews).toHaveLength(0);
+  });
+
+  it.each([".extraction.json", ".validation.json", ".structure-1.input.json"])("作者返回后%s归档失败保留待对账状态，不再派发模型", async failArtifact => {
+    const invalid = extraction(false); invalid.citations.pop();
+    const state = await run({ drafts: [invalid], failArtifact });
+    await expect(state.promise).rejects.toMatchObject({ code: "MARKETING_FACTS_RECEIPT_UNVERIFIED", cause: { message: "artifact disk full" } });
+    expect(state.author).toHaveBeenCalledOnce();
+    expect(state.reviews).toHaveLength(0);
+  });
+
+  it("已知语义拒绝的完整裁决写盘失败也不能自动再调作者或监制", async () => {
+    const state = await run({ failVerdictArchive: true });
+    await expect(state.promise).rejects.toMatchObject({ code: "MARKETING_FACTS_RECEIPT_UNVERIFIED", cause: { message: "verdict disk full" } });
+    expect(state.author).toHaveBeenCalledOnce();
+    expect(state.reviews).toHaveLength(1);
   });
 });
