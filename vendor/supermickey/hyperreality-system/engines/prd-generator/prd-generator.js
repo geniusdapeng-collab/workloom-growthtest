@@ -309,6 +309,8 @@ class PRDGenerator {
     const summary = prd.prdSummary || generateSummary(prd);
     const audienceProfile = this.agent4._buildAudienceProfile(prd.audienceProfile, prd);
     const demographic = key => audienceProfile.primaryAudience[key] ?? '未指定';
+    const demographicEvidence = [['ageRange', '年龄段'], ['gender', '性别'], ['occupation', '职业'], ['consumptionLevel', '消费能力']]
+      .map(([key, label]) => `${label}：${audienceProfile.demographicEvidence[key] ?? '未提供'}`).join('；');
     
     // ⭐ v2.2.1-fix: PRD 文档携带用户原始输入，供下游剧本/提示词生成参考
     const originalStory = Object.hasOwn(prd, '_workloomCustomerIntent')
@@ -430,7 +432,7 @@ ${(prd.scenePlan?.scenes || []).map((s, i) => `
 - **性别**：${demographic('gender')}
 - **职业**：${demographic('occupation')}
 - **消费能力**：${demographic('consumptionLevel')}
-- **人口字段证据**：${JSON.stringify(audienceProfile.demographicEvidence)}
+- **人口字段证据**：${demographicEvidence}
 - **兴趣标签（本片创作假设）**：${audienceProfile.primaryAudience.interests.join(', ') || '未指定'}
 - **情绪触发（本片创作假设）**：${audienceProfile.emotionTriggers.join(', ') || '未指定'}
 - **内容期望（本片创作假设）**：${audienceProfile.contentExpectations.join(', ') || '未指定'}
