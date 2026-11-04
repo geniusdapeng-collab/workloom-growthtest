@@ -43,4 +43,13 @@ describe("服务端目标平台识别", () => {
     expect(intent).toContain("前 5 秒");
     expect(intent).toContain("目标 3.5 字/秒、上限 4.2 字/秒");
   });
+
+  it("无台词项目保留画幅和开场钩子，原文允许旁白时保留语速口径", () => {
+    const decision = resolvePlatformForIntent("制作抖音短片").decision;
+    const intent = "仅保留雨声。供应商提供的旁白默认值不构成客户要求。";
+    const silent = appendPlatformGuidance(intent, decision, "无台词，仅保留雨声。");
+    expect(silent).toContain("画幅 9:16；开场钩子须落在前 3 秒。");
+    expect(silent).not.toMatch(/字\/秒|配音基础速率/u);
+    expect(appendPlatformGuidance(intent, decision, "无台词，使用旁白说明。")).toContain("目标 4.8 字/秒");
+  });
 });

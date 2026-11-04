@@ -60,6 +60,7 @@ import { resolveScenePolicyForIntent, ScenePolicyRouteError } from "./scene-poli
 import { resolvePlatformForIntent } from "./platform-routing.js";
 import { makeStageArchive } from "./archive-host.js";
 import { readArchiveSummary, resumeProject, scanStaleRunsOnStartup } from "./archive-resume.js";
+import { isStudioPromptReviewProject } from "./prompt-review-authority.js";
 import { applyRouteToMetadata, buildPipelineIntent, filmTargetSecondsFromIntent, platformIdOf, routeVideoPipeline } from "@hyperreality/video-studio";
 import { routedLlmCall } from "../service/llm.js";
 import { deliveryIngestHook, mediaRouter } from "./media/index.js";
@@ -489,6 +490,7 @@ const studioRouter = router({
     .input(z.union([z.object({
       officialIntent: z.literal(true),
       intent: z.string().min(1).max(2000).refine((value) => Boolean(value.trim())),
+      purpose: z.literal("prompt-review").optional(),
       durationSec: z.number().int().min(1).max(300).optional(),
       platform: z.string().trim().min(1).max(40).refine(value => Boolean(platformIdOf(value)), "未登记的目标平台").optional(),
       product: z.object({
@@ -499,6 +501,7 @@ const studioRouter = router({
       }).strict().optional(),
     }).strict(), z.object({
       officialIntent: z.undefined().optional(),
+      purpose: z.undefined().optional(),
       projectId: z.string().min(1).optional(),
       intent: z.string().min(1).max(2000),
       /** 原话中明确的全片创作目标；旧客户端未传时沿用 30 秒。 */
@@ -519,6 +522,10 @@ const studioRouter = router({
       const durationSec = official
         ? input.durationSec ?? (statedSeconds !== null && statedSeconds <= 300 && Number.isInteger(statedSeconds) ? statedSeconds : undefined)
         : input.durationSec;
+      const purpose = official ? input.purpose : undefined;
+      if (purpose && durationSec === undefined) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "PROMPT_TARGET_REQUIRED: 请提供明确的创作目标秒数" });
+      }
       const metadata = official ? {
         brief: { ...(durationSec === undefined ? {} : { duration: durationSec }), ...(input.platform ? { platform: input.platform } : {}) },
         ...(input.product ? { products: [input.product] } : {}),
@@ -532,6 +539,9 @@ const studioRouter = router({
             : "narrative";
 
       if (!official && input.projectId) {
+        if (await isStudioPromptReviewProject({ app: getAppPool(), scope, projectId: input.projectId })) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "PROMPT_REVIEW_ONLY: 请通过原项目的制片档案续跑" });
+        }
         // 指定 projectId 的补跑：项目行已存在，仅重启管线（kind 以项目行为准，避免改写立项语义）
         const rows = await scopedQuery<{ kind: string | null }>(
           getAppPool(), scope,
@@ -634,6 +644,7 @@ const studioRouter = router({
           platform: standardPlatform.decision.id,
           isMarketing: decision.route === "marketing",
           ...(official ? { creativeMode: "manual" as const } : {}),
+          ...(purpose ? { purpose, durationSec } : {}),
           by: { id: ctx.identity.memberNo, type: "human" },
         });
         return {
@@ -643,6 +654,7 @@ const studioRouter = router({
           pipeline: decision.route,
           product: decision.product?.name ?? null,
           ...(official ? { platform: standardPlatform.decision.id, ...(durationSec === undefined ? {} : { durationSec }) } : {}),
+          ...(purpose ? { purpose } : {}),
           via: decision.via,
         };
       } catch (err) {
@@ -753,6 +765,7 @@ const studioRouter = router({
     .input(z.object({
       projectId: z.string().min(1),
       fromStage: z.string().min(1).max(64).optional(),
+      expectedRunId: z.string().regex(/^[A-Za-z0-9_-]{1,160}$/u).optional(),
       intent: z.string().max(2000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -761,6 +774,7 @@ const studioRouter = router({
         return await resumeProject(scope, {
           projectId: input.projectId,
           fromStage: input.fromStage,
+          expectedRunId: input.expectedRunId,
           intent: input.intent,
           startRun: (runInput) => startRun(scope, runInput),
           actor: { id: ctx.identity.memberNo, type: "human" },

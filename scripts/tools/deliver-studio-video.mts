@@ -105,6 +105,7 @@ export async function deliverStudioVideo(options: {
   if (jobFile !== requestedJob) fail("JOB_FILE_INVALID", "请使用同一工作单的规范路径");
   const job: Job = await readVideoJob(jobFile);
   if (job.phase !== "preproduction_submitted" || !identifier(job.projectId)) fail("FORMAL_JOB_REQUIRED", "工作单缺少正式运行");
+  if (job.purpose === "prompt-review") fail("PROMPT_REVIEW_ONLY", "提示词评审工作单不能提交渲染");
   const session = await verifyVideoSession();
   verifyVideoJobBinding(job, session);
   const readSource = () => requestVideoProcedure(session, "video.production.shots", { projectId: job.projectId });

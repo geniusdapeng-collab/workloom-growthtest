@@ -66,6 +66,8 @@ async function prepare(options: {
   modelFailure?: boolean;
   mode?: string;
   attempt?: number;
+  stageId?: "preproduction" | "prompt_review";
+  intent?: string;
   searchCacheFile?: string;
   redirectAliases?: boolean;
   mixedCurrencies?: boolean;
@@ -76,7 +78,8 @@ async function prepare(options: {
   queryHints?: { brand?: string; category?: string; model?: string };
 } = {}): Promise<PreparedMarketingFacts> {
   let searches = 0;
-  return prepareMarketingFacts({ scope: { ...scope, attempt: options.attempt ?? 1 }, root, intent: "做一条风扇介绍", metadata: { brief: { product: "星野 F3", brand: "星野" }, ...(options.queryHints ? { dataMining: { name: "星野 F3", ...options.queryHints } } : {}), ...(options.largeGate ? { notes: longMetadata } : {}) }, env: { ...env, ...(options.mode ? { VM_DATA_MINING_MODE: options.mode } : {}) },
+  return prepareMarketingFacts({ scope: { ...scope, attempt: options.attempt ?? 1 }, stageId: options.stageId, root,
+    intent: options.intent ?? "做一条风扇介绍", metadata: { brief: { product: "星野 F3", brand: "星野" }, ...(options.queryHints ? { dataMining: { name: "星野 F3", ...options.queryHints } } : {}), ...(options.largeGate ? { notes: longMetadata } : {}) }, env: { ...env, ...(options.mode ? { VM_DATA_MINING_MODE: options.mode } : {}) },
     llm: { reason: async prompt => {
       extractionCalls.push(prompt); if (options.modelFailure) return { success: false, error: "LLM unavailable" };
       const match = /当前阶段：(A[123])\n(.*)$/s.exec(prompt)!; const source = JSON.parse(match[2]!).sources[0];
@@ -117,6 +120,38 @@ async function prepare(options: {
 }
 const shots = [{ shotId: "S1", prompt: "窗边展示星野 F3 风扇，字幕说明风量 9 档。", fields: { 场景: "窗边", 产品: "星野 F3", 规格: "9 档" } }];
 describe("营销事实宿主完整执行", () => {
+  it("同项目同执行号的提示词审核和正式前期使用独立来源与事实目录", async () => {
+    const full = await finalizeMarketingFacts(await prepare(), shots, env);
+    const prompt = await finalizeMarketingFacts(await prepare({ stageId: "prompt_review" }), shots, env);
+    expect(full.ref).toBe("stages/preproduction/attempt-1.marketing-facts.json");
+    expect(prompt.ref).toBe("stages/prompt_review/attempt-1.marketing-facts.json");
+    const verified = await verifyMarketingFacts({ root, ...prompt, scope, shots, stageId: "prompt_review" });
+    expect(verified.sources[0]!.rawRef).toMatch(/^stages\/prompt_review\//);
+    expect(verified.outputReviews[0]!.ref).toMatch(/^stages\/prompt_review\//);
+    await expect(verifyMarketingFacts({ root, ...prompt, scope, shots })).rejects.toMatchObject({ code: "MARKETING_PATH_INVALID" });
+    await expect(verifyMarketingFacts({ root, ...full, scope, shots, stageId: "prompt_review" })).rejects.toMatchObject({ code: "MARKETING_PATH_INVALID" });
+  });
+
+  it("无授权商品图的交接和虚构披露尾帧要求分别归档，后者原样进入 G1 和逐镜事实审核", async () => {
+    const intent = "用虚构角色演示风扇。成片叠加“情节为创作演示”，尾帧显示“星野 F3”。";
+    const prepared = await prepare({ intent });
+    const { creativeRequirements, cards } = prepared.bundle;
+    expect(cards.portrait_manifest).toMatchObject({ reference_images: [], hero_image_id: null,
+      needs_more_reference: true, handoff_note: expect.stringContaining("没有可交接的商品参考图") });
+    expect(JSON.stringify(cards.portrait_manifest)).not.toContain("免重复检索");
+    expect(creativeRequirements).toEqual({ role: "creative-and-delivery", intent, intentSha256: renderSha256(intent) });
+    const g1 = JSON.parse(prepared.g1Content);
+    expect(g1.facts.creativeRequirements).toEqual(creativeRequirements);
+    expect(g1.facts.restrictions).toEqual(expect.arrayContaining([expect.stringContaining("披露、屏幕文字、字幕和尾帧")]));
+    expect(JSON.stringify(prepared.raw)).not.toContain("情节为创作演示");
+    const saved = await finalizeMarketingFacts(prepared, shots, env);
+    const verified = await verifyMarketingFacts({ root, ...saved, scope, shots, intentSha256: renderSha256(intent) });
+    const evidence = JSON.parse(await readFile(path.join(root, verified.outputReviews[0]!.ref), "utf8"));
+    expect(evidence.creativeRequirements).toEqual(creativeRequirements);
+    await expect(verifyMarketingFacts({ root, ...saved, scope, shots, intentSha256: renderSha256("另一个客户原文") }))
+      .rejects.toMatchObject({ code: "MARKETING_CREATIVE_REQUIREMENTS_UNBOUND" });
+  });
+
   it("未进入已审A1主张的品牌、类别、型号仍只是检索线索，不能兜底成档案身份", async () => {
     const hints = { brand: "仅供检索品牌", category: "仅供检索服务", model: "仅供检索型号" };
     const prepared = await prepare({ queryHints: hints });
@@ -203,7 +238,9 @@ describe("营销事实宿主完整执行", () => {
   it("真实HTTP正文→三站提取/完整支持审核→A1–A5→逐最终镜头事实审核→复读", async () => {
     const prepared = await prepare();
     expect(prepared.bundle.stages.map(stage => [stage.stage, stage.facts.status])).toEqual([["A1", "source_bound"], ["A2", "no_evidence"], ["A3", "no_evidence"]]);
-    expect(prepared.bundle.sources).toHaveLength(1); expect(prepared.bundle.restrictions).toHaveLength(2); expect(extractionCalls).toHaveLength(3);
+    expect(prepared.bundle.sources).toHaveLength(1);
+    expect(prepared.bundle.restrictions).toEqual(expect.arrayContaining([expect.stringContaining("没有可核实用户评价"), expect.stringContaining("没有可核实竞品证据")]));
+    expect(extractionCalls).toHaveLength(3);
     expect((prepared.bundle.dossier.provenance as Array<{ claim_ref?: string }>).some(item => item.claim_ref === "identity.specs.风量")).toBe(true);
     expect(JSON.stringify(prepared.bundle.dossier.gaps)).not.toContain("规格 \"风量\" 无来源");
     expect(prepared.g1Content).toContain('"schemaVersion":"workloom.marketing-facts/v1"'); expect(modelCalls).toHaveLength(3);

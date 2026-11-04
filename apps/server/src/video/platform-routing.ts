@@ -10,6 +10,7 @@
  * 显式参数 > 调用方元数据（platform / coverPlatform / brief.platform）> 需求文本命中 > 默认抖音。
  */
 import {
+  narrativeSpeechPolicy,
   platformDeliveryGuidance,
   resolvePlatformIntent,
   type PlatformIntentDecision,
@@ -57,6 +58,6 @@ export function resolvePlatformForIntent(
 }
 
 /** 把平台制作口径写进供应商与生成端都能看到的需求正文（元数据可能被旧 vendor 忽略）。 */
-export function appendPlatformGuidance(intent: string, decision: PlatformIntentDecision): string {
-  return `${intent}${platformDeliveryGuidance(decision)}`;
+export function appendPlatformGuidance(intent: string, decision: PlatformIntentDecision, rawIntent = intent): string {
+  return `${intent}${platformDeliveryGuidance(decision, narrativeSpeechPolicy(rawIntent).allSpeechForbidden)}`;
 }

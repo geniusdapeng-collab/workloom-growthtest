@@ -6,7 +6,8 @@ import { resolveGate } from "./gates.js";
 import { autoApproveHandler, runWithConfirmationHandler } from "./confirmation.js";
 import { WorkloomLLMEngine } from "./llm-adapter.js";
 import { buildRenderScript, loadPromptLengthSpec } from "./render-scripts.js";
-import { VideoStudio, attachDefaultCharacterAnchor, packageAuditOptions, sanitizeGateContent, type ApprovalCallback, type EventSink } from "./studio.js";
+import { freezeMarketingCreativeRequirements } from "./marketing-dossier-input.js";
+import { VideoStudio, attachDefaultCharacterAnchor, packageAuditOptions, sanitizeGateContent, type ApprovalCallback, type EventSink, type StudioConfig } from "./studio.js";
 
 const repoRoot = resolve(import.meta.dirname, "../../..");
 const studioMocks = vi.hoisted(() => ({
@@ -110,6 +111,27 @@ describe("gates 映射", () => {
     expect(attachDefaultCharacterAnchor(intent, {})).toEqual({ intent, metadata: {} });
   });
 
+  it.each(["以仓库中1号模特作为主角", "直接使用 1 号模特的定妆照", "用一号模特当主角", "使用１号模特"])("原话 %s 选中注册的 1 号和当前定妆照", (intent) => {
+    const anchored = attachDefaultCharacterAnchor(intent, {});
+    expect(anchored.intent.startsWith(`${intent}\n`)).toBe(true);
+    expect(anchored.metadata).toMatchObject({ defaultCharacterId: "chen-zhuo",
+      characters: [{ id: "chen-zhuo", portraitRef: expect.stringContaining("/portraits/v3/") }] });
+  });
+
+  it("拒绝把有冲突的编号或已有角色默认为 1 号", () => {
+    for (const [intent, metadata] of [
+      ["使用1号模特和2号模特", {}],
+      ["使用1号模特和 lin-yu-an", {}],
+      ["使用1号模特", { defaultCharacterId: "lin-yu-an" }],
+      ["使用1号模特", { characters: [{ id: "lin-yu-an" }] }],
+    ] as const) expect(() => attachDefaultCharacterAnchor(intent, metadata)).toThrow("BUILTIN_CHARACTER_SELECTION_CONFLICT");
+    for (const intent of ["不要使用1号模特", "只用2号模特", "本次不要第 1 号模特"]) {
+      expect(attachDefaultCharacterAnchor(intent, {})).toEqual({ intent, metadata: {} });
+    }
+    const existing = { characters: [{ id: "custom-character" }] };
+    expect(attachDefaultCharacterAnchor("使用内置默认模特", existing)).toEqual({ intent: "使用内置默认模特", metadata: existing });
+  });
+
   it("vendor 确认门 type 映射到业务门", () => {
     expect(resolveGate("creative-theme")).toBe("G2_THEME");
     expect(resolveGate("prd")).toBe("G4_PRD");
@@ -143,6 +165,14 @@ describe("gates 映射", () => {
     expect(sanitized).not.toContain("ized");
     expect(sanitized).not.toContain("请确认以上创意主题");
     expect(sanitized).not.toContain('回复 "确认"');
+  });
+
+  it("G2 创意主题正文移除实际内置选角附加的全角定妆照锚点", () => {
+    const intent = "使用 1 号模特制作封闭赛道短片。";
+    const anchored = attachDefaultCharacterAnchor(intent, {}).intent;
+    expect(anchored).toContain("；portraitRef=");
+    expect(sanitizeGateContent("G2_THEME", anchored)).toBe(intent);
+    expect(sanitizeGateContent("G6_PROMPT", anchored)).toBe(anchored);
   });
 
   it("作品级时长检查继承实际平台档，不把抖音片误判成默认电影档", () => {
@@ -369,7 +399,7 @@ describe("vendor 核心可加载", () => {
  describe("营销只消费宿主绑定回填", () => {
   const rawJson = JSON.stringify({ A1: { identity: { name: "本次商品" } }, A2: { reviews: [] }, A3: { competitors: [] } });
   const sha256 = createHash("sha256").update(rawJson).digest("hex");
-  function marketing(verifiedRaw?: { projectId: string; rawJson: string; sha256: string; productQuery: Record<string, unknown> }) {
+  function marketing(verifiedRaw?: NonNullable<StudioConfig["dataMining"]>["verifiedRaw"]) {
     return new VideoStudio({ llm: new WorkloomLLMEngine({ baseUrl: "https://example.invalid", apiKey: "test-only", model: "deepseek-flash" }),
       workDir: "/unused/marketing-test", onApproval: async () => ({ approved: true }), log: () => undefined,
       dataMining: { mode: "api", raw: { A1: { identity: { name: "旧缓存商品" } } }, storeRoot: "/unused/current-attempt", verifiedRaw } });
@@ -389,5 +419,20 @@ describe("vendor 核心可加载", () => {
     await marketing({ projectId: "P1", rawJson, sha256, productQuery: { name: "本次商品" } }).runPreproduction({ projectId: "P1", intent: "营销", isMarketing: true, metadata });
     expect(studioMocks.create).toHaveBeenCalledWith("营销", { brief: metadata.brief, dataMining: { name: "本次商品" } }, expect.objectContaining({ dataMiningRaw: JSON.parse(rawJson), dataMiningRefresh: true, skipDataMiningReview: true }));
     expect(metadata._dataDossier.name).toBe("伪造档案");
+  });
+  it("营销原生起稿消费 G1 核对的本轮原文和限制，拒绝换成另一个需求", async () => {
+    studioMocks.create.mockResolvedValue({ success: true, stages: {} });
+    const intent = "虚构角色演示商品，尾帧显示品牌。";
+    const rawIntent = `用 GrowthTest ${intent}`;
+    const creativeRequirements = freezeMarketingCreativeRequirements(rawIntent);
+    const restrictions = ["用户设定不属于已核实商品主张。"];
+    const studio = marketing({ projectId: "P1", rawJson, sha256, productQuery: { name: "本次商品" }, creativeRequirements, restrictions });
+    await expect(studio.runPreproduction({ projectId: "P1", intent: "另一个请求", isMarketing: true }))
+      .rejects.toThrow("MARKETING_CREATIVE_REQUIREMENTS_UNBOUND");
+    expect(studioMocks.create).not.toHaveBeenCalled();
+    await studio.runPreproduction({ projectId: "P1", intent: `${intent}\n已登记平台要求`, rawIntent, isMarketing: true });
+    const actual = studioMocks.create.mock.calls[0]![0];
+    expect(actual).toContain(intent);
+    expect(actual).toContain(restrictions[0]);
   });
 });

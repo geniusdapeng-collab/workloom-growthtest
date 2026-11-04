@@ -3,7 +3,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
-import { open, readFile, realpath, rename, rm } from "node:fs/promises";
+import { link, open, readFile, realpath, rename, rm } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { COVER_PLATFORM_IDS } from "../packages/video-studio/src/cover-platforms.ts";
@@ -13,6 +13,7 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const REPOSITORY = "geniusdapeng-collab/workloom-growthtest";
 const JOB_SCHEMA = "workloom.official-video-job/v1";
 const RESULT_SCHEMA = "workloom.official-video-cli/v1";
+const PROMPT_REVIEW = "prompt-review";
 const MAX_FILE_BYTES = 64 * 1024;
 const PIPELINES = new Set(["marketing", "narrative"]);
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/u;
@@ -27,10 +28,11 @@ const canonicalPlatform = value => typeof value === "string" && PLATFORM.test(va
 const fail = (code, message, exitCode = 2) => { throw new CapabilityError(code, message, exitCode); };
 
 export function validateVideoIntent(input) {
-  if (!record(input) || Object.keys(input).some(key => !["intent", "durationSec", "platform", "product"].includes(key))
+  if (!record(input) || Object.keys(input).some(key => !["intent", "durationSec", "platform", "product", "purpose"].includes(key))
     || typeof input.intent !== "string" || !input.intent.trim() || input.intent.length > 2000) {
-    fail("INVALID_INPUT", "start 只接受非空 intent（最多 2000 字符）及已明确的 durationSec、platform、product");
+    fail("INVALID_INPUT", "start 需要非空 intent（最多 2000 字符），只接受额外的 durationSec、platform、product、purpose");
   }
+  if (input.purpose !== undefined && input.purpose !== PROMPT_REVIEW) fail("INVALID_INPUT", "purpose 仅支持 prompt-review");
   if (input.durationSec !== undefined && !validDuration(input.durationSec)) {
     fail("INVALID_INPUT", "durationSec 须为 1 到 300 的整数");
   }
@@ -47,6 +49,7 @@ export function validateVideoIntent(input) {
   return { intent: input.intent, ...(input.durationSec === undefined ? {} : { durationSec: input.durationSec }),
     ...(input.platform === undefined ? {} : { platform: input.platform.trim() }),
     ...(product === undefined ? {} : { product: Object.fromEntries(Object.entries(product).map(([key, value]) => [key, value.trim()])) }),
+    ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
     officialIntent: true };
 }
 
@@ -172,9 +175,13 @@ export async function readVideoJob(path) {
     || Object.keys(binding).some(key => !BINDING_FIELDS.includes(key))
     || binding.repository !== REPOSITORY || !COMMIT.test(binding.commit ?? "") || typeof binding.origin !== "string"
     || ![binding.productId, binding.instance, binding.tenantId, binding.workspaceId, binding.memberId, binding.memberNo].every(id => ID.test(id ?? ""))
-    || !["start_unknown", "preproduction_submitted", "clarify", "unsupported"].includes(raw.phase)
+    || !["start_unknown", "preproduction_submitted", "clarify", "unsupported", "resume_refused"].includes(raw.phase)
+    || (raw.purpose !== undefined && (raw.purpose !== PROMPT_REVIEW || raw.phase === "preproduction_submitted" && !validDuration(raw.durationSec)))
     || (raw.durationSec !== undefined && !validDuration(raw.durationSec))
     || (raw.platform !== undefined && !canonicalPlatform(raw.platform))
+    || (raw.resumedFrom !== undefined && (raw.purpose !== PROMPT_REVIEW || !record(raw.resumedFrom)
+      || !COMMIT.test(raw.resumedFrom.commit ?? "") || !ID.test(raw.resumedFrom.runId ?? "")
+      || !ID.test(raw.projectId ?? "") || !PIPELINES.has(raw.pipeline)))
     || (raw.phase === "preproduction_submitted" && (!ID.test(raw.runId ?? "") || !ID.test(raw.projectId ?? "") || !PIPELINES.has(raw.pipeline)))) {
     fail("JOB_FILE_INVALID", "工作单结构或来源不符合正式视频入口", 4);
   }
@@ -191,6 +198,8 @@ const receipt = (job, phase = job.phase, detail = {}) => ({
   schemaVersion: RESULT_SCHEMA, phase, mediaReady: false, ...job.binding, requestSha256: job.requestSha256,
   ...(job.runId ? { runId: job.runId, projectId: job.projectId, pipeline: job.pipeline } : {}),
   ...(job.durationSec === undefined ? {} : { durationSec: job.durationSec }),
+  ...(job.purpose === undefined ? {} : { purpose: job.purpose, renderAuthorized: false }),
+  ...(job.resumedFrom === undefined ? {} : { resumedFrom: job.resumedFrom, projectId: job.projectId, pipeline: job.pipeline }),
   ...(job.platform === undefined ? {} : { platform: job.platform }), ...detail,
 });
 
@@ -203,6 +212,7 @@ export async function startVideo(input, jobFile, deps = {}) {
   }
   const job = { schemaVersion: JOB_SCHEMA, createdAt: new Date().toISOString(), binding: session.binding,
     requestSha256: hash(JSON.stringify(wire)), phase: "start_unknown",
+    ...(wire.purpose === undefined ? {} : { purpose: wire.purpose }),
     ...(wire.durationSec === undefined ? {} : { durationSec: wire.durationSec }) };
   try {
     await writeExclusive(path, job);
@@ -226,9 +236,10 @@ export async function startVideo(input, jobFile, deps = {}) {
     job.phase = "unsupported";
     job.handoff = "video.explainer";
   } else if (result?.kind === "routed" && ID.test(result.runId ?? "") && ID.test(result.projectId ?? "") && PIPELINES.has(result.pipeline)) {
-    if (result.durationSec !== undefined && (!validDuration(result.durationSec)
-      || (wire.durationSec !== undefined && result.durationSec !== wire.durationSec))) {
-      return receipt(job, "start_unknown", { error: "服务回执时长与原工作单不符；核对同一运行，禁止重新提交",
+    if (result.purpose !== wire.purpose || wire.purpose === PROMPT_REVIEW && !validDuration(result.durationSec)
+      || result.durationSec !== undefined && (!validDuration(result.durationSec)
+        || wire.durationSec !== undefined && result.durationSec !== wire.durationSec)) {
+      return receipt(job, "start_unknown", { error: "服务回执用途或时长与原工作单不符；核对同一运行，禁止重新提交",
         runId: result.runId, projectId: result.projectId, pipeline: result.pipeline });
     }
     if (result.platform !== undefined && (!canonicalPlatform(result.platform)
@@ -268,11 +279,40 @@ export function validateFormalVideoSource(source, job) {
   return { stageRunId: source.sourceStageRunId, attempt: source.sourceAttempt, promptsSha256: source.promptsSha256, shots };
 }
 
+async function readPromptReview(session, job) {
+  const source = await requestVideoProcedure(session, "video.production.promptReview", { projectId: job.projectId, runId: job.runId });
+  if (source?.schemaVersion !== "workloom.studio-prompt-review/v1" || source.state !== "prompt_review_ready"
+    || source.issuer !== "workloom.studio-worker" || source.purpose !== PROMPT_REVIEW
+    || source.tenantId !== job.binding.tenantId || source.workspaceId !== job.binding.workspaceId
+    || source.projectId !== job.projectId || source.runId !== job.runId || source.pipeline !== job.pipeline
+    || source.targetSeconds !== job.durationSec || source.renderAuthorized !== false
+    || !ID.test(source.stageRunId ?? "") || !Number.isSafeInteger(source.attempt) || source.attempt < 1
+    || typeof source.reviewReport !== "string" || !source.reviewReport.trim() || hash(source.reviewReport) !== source.reviewReportSha256
+    || !Array.isArray(source.shots) || source.shots.length < 1 || source.shots.length > 100
+    || !source.shots.every(shot => ID.test(shot?.shotId ?? "") && validDuration(shot.durationSec)
+      && typeof shot.prompt === "string" && shot.prompt.trim() && hash(shot.prompt) === shot.promptSha256)
+    || new Set(source.shots.map(shot => shot.shotId)).size !== source.shots.length
+    || source.plannedSeconds !== source.shots.reduce((total, shot) => total + shot.durationSec, 0)) {
+    fail("PROMPT_REVIEW_UNVERIFIED", "提示词评审回执的作用域、作业或正文摘要不符", 7);
+  }
+  const canonicalShots = JSON.stringify(source.shots, (_key, value) => record(value)
+    ? Object.fromEntries(Object.keys(value).sort().map(key => [key, value[key]]))
+    : value);
+  if (hash(canonicalShots) !== source.promptsSha256) fail("PROMPT_REVIEW_UNVERIFIED", "逐镜提示词包摘要不符", 7);
+  return source;
+}
+
+function promptReviewSummary(source) {
+  return { stageRunId: source.stageRunId, attempt: source.attempt, plannedSeconds: source.plannedSeconds,
+    shotCount: source.shots.length, reviewReportSha256: source.reviewReportSha256, promptsSha256: source.promptsSha256 };
+}
+
 export async function statusVideo(jobFile, deps = {}) {
   const job = await readVideoJob(resolve(jobFile));
   const session = await verifyVideoSession(deps);
   verifyVideoJobBinding(job, session);
   if (job.phase === "start_unknown") return receipt(job, "start_unknown", { next: "保留工作单；核对服务记录，禁止重新提交" });
+  if (job.phase === "resume_refused") return receipt(job, job.phase, { error: job.error });
   if (job.phase === "clarify") return receipt(job, "clarify", { question: job.question, missing: job.missing });
   if (job.phase === "unsupported") return receipt(job, "unsupported", { handoff: job.handoff });
   let run;
@@ -288,11 +328,15 @@ export async function statusVideo(jobFile, deps = {}) {
     if (run.status === "running") return receipt(job, "preproduction_running");
     if (run.status === "awaiting_approval") return receipt(job, "awaiting_approval", { gate: run.currentGate ?? null, pendingApprovalId: run.pendingApprovalId ?? null });
     if (run.status === "failed") return receipt(job, "preproduction_failed", { error: sanitizeErrorMessage(run.error ?? "预生产失败", deps.env ?? process.env) });
-    if (run.status !== "finished" || run.resultSummary?.success !== true) {
+    if (run.status !== "finished" || (job.purpose !== PROMPT_REVIEW && run.resultSummary?.success !== true)) {
       return receipt(job, "status_unavailable", { error: "运行终态没有预生产成功证明" });
     }
   }
   try {
+    if (job.purpose === PROMPT_REVIEW) {
+      const source = await readPromptReview(session, job);
+      return receipt(job, "prompt_review_ready", { source: promptReviewSummary(source) });
+    }
     // The live run registry is process-local. Only the exact current archived
     // source can recover readiness when the previous worker is no longer listed.
     const source = await requestVideoProcedure(session, "video.production.shots", { projectId: job.projectId });
@@ -300,6 +344,71 @@ export async function statusVideo(jobFile, deps = {}) {
   } catch (error) {
     return receipt(job, "status_unavailable", { error: sanitizeErrorMessage(error, deps.env ?? process.env) });
   }
+}
+
+async function resumePromptReview(jobFile, out, deps) {
+  const original = await readVideoJob(resolve(jobFile));
+  if (original.purpose !== PROMPT_REVIEW || original.phase !== "preproduction_submitted") {
+    fail("PROMPT_REVIEW_JOB_REQUIRED", "只可恢复原提示词评审工作单", 4);
+  }
+  const session = await verifyVideoSession(deps);
+  if (Object.keys(session.binding).some(key => key !== "commit" && original.binding[key] !== session.binding[key])) {
+    fail("JOB_SCOPE_MISMATCH", "续跑须使用原服务实例、工作区与成员", 4);
+  }
+  if (!session.access.actionPermissions?.includes("workspace.write")) fail("WRITE_PERMISSION_REQUIRED", "当前成员未获工作区写权限", 4);
+  const { runId, ...job } = { ...original, createdAt: new Date().toISOString(), binding: session.binding, phase: "start_unknown",
+    resumedFrom: { commit: original.binding.commit, runId: original.runId } };
+  const path = resolve(out);
+  try {
+    await writeExclusive(path, job);
+    await syncParent(path);
+  } catch (error) {
+    if (error?.code === "EEXIST") fail("JOB_ALREADY_EXISTS", "续跑工作单已存在，请用 status 回读，禁止重复提交", 4);
+    fail("JOB_WRITE_FAILED", "无法持久化续跑工作单，尚未提交", 7);
+  }
+  let result;
+  try {
+    result = await requestVideoProcedure(session, "video.studio.resume", {
+      projectId: job.projectId, fromStage: "prompt_review", expectedRunId: runId,
+    }, { mutation: true, timeoutMs: 180_000 });
+  } catch (error) {
+    return receipt(job, "start_unknown", { error: sanitizeErrorMessage(error, deps.env ?? process.env),
+      next: "保留续跑工作单；核对原项目台账，禁止重复提交" });
+  }
+  if (result?.kind === "resumed" && result.stage === "prompt_review" && result.projectId === job.projectId
+    && result.priorRunId === runId && ID.test(result.runId ?? "") && result.runId !== runId) {
+    job.phase = "preproduction_submitted";
+    job.runId = result.runId;
+  } else if (["noaction", "busy", "awaiting_approval"].includes(result?.kind)) {
+    job.phase = "resume_refused";
+    job.error = sanitizeErrorMessage(result.message ?? "续跑未启动", deps.env ?? process.env);
+  } else {
+    return receipt(job, "start_unknown", { error: "续跑回执无法绑定原项目与原运行；禁止重复提交" });
+  }
+  try { await replaceJob(path, job); }
+  catch { return receipt(job, "start_unknown", { error: "收到续跑回执但未能保存；核对原项目台账，禁止重复提交" }); }
+  return receipt(job, job.phase, job.error ? { error: job.error } : {});
+}
+
+async function exportPromptReview(jobFile, out, deps) {
+  const job = await readVideoJob(resolve(jobFile));
+  const session = await verifyVideoSession(deps);
+  verifyVideoJobBinding(job, session);
+  if (job.purpose !== PROMPT_REVIEW || job.phase !== "preproduction_submitted") {
+    fail("PROMPT_REVIEW_JOB_REQUIRED", "只可导出原提示词评审工作单", 4);
+  }
+  const source = await readPromptReview(session, job);
+  const destination = resolve(out);
+  const temporary = join(dirname(destination), `.workloom-prompt-review-${randomUUID()}.tmp`);
+  try {
+    await writeExclusive(temporary, source);
+    await link(temporary, destination);
+    await syncParent(destination);
+  } catch (error) {
+    if (error?.code === "EEXIST") fail("PROMPT_REVIEW_EXISTS", "导出文件已存在", 4);
+    fail("PROMPT_REVIEW_WRITE_FAILED", "无法写入提示词评审回执", 7);
+  } finally { await rm(temporary, { force: true }); }
+  return receipt(job, "prompt_review_ready", { source: promptReviewSummary(source), out: destination });
 }
 
 async function readInputFile(path) {
@@ -329,20 +438,25 @@ async function readInputFile(path) {
 }
 
 const usage = "node scripts/workloom-video.mjs start --input-file <JSON文件|-> --job-file <工作单>\n"
-  + "node scripts/workloom-video.mjs status --job-file <工作单>";
+  + "node scripts/workloom-video.mjs status --job-file <工作单>\n"
+  + "node scripts/workloom-video.mjs resume-prompts --job-file <原工作单> --out <续跑工作单>\n"
+  + "node scripts/workloom-video.mjs prompts --job-file <工作单> --out <新JSON文件>";
 export async function runVideoCli(argv, deps = {}) {
   const [command, ...args] = argv;
   const flags = new Map();
   for (let i = 0; i < args.length; i += 2) {
     const flag = args[i];
     const value = args[i + 1];
-    if (!["--input-file", "--job-file"].includes(flag) || flags.has(flag) || !value || value.startsWith("--")) fail("USAGE", usage);
+    if (!["--input-file", "--job-file", "--out"].includes(flag) || flags.has(flag) || !value || value.startsWith("--")) fail("USAGE", usage);
     flags.set(flag, value);
   }
   const jobFile = flags.get("--job-file");
   const inputFile = flags.get("--input-file");
-  if (command === "start" && jobFile && inputFile) return startVideo(await readInputFile(inputFile), jobFile, deps);
-  if (command === "status" && jobFile && !inputFile) return statusVideo(jobFile, deps);
+  const out = flags.get("--out");
+  if (command === "start" && jobFile && inputFile && !out) return startVideo(await readInputFile(inputFile), jobFile, deps);
+  if (command === "status" && jobFile && !inputFile && !out) return statusVideo(jobFile, deps);
+  if (command === "resume-prompts" && jobFile && !inputFile && out) return resumePromptReview(jobFile, out, deps);
+  if (command === "prompts" && jobFile && !inputFile && out) return exportPromptReview(jobFile, out, deps);
   fail("USAGE", usage);
 }
 
@@ -352,7 +466,7 @@ if (process.argv[1] && await realpath(process.argv[1]).catch(() => null) === fil
     try {
       const result = await runVideoCli(process.argv.slice(2));
       console.log(JSON.stringify(result));
-      if (["start_unknown", "preproduction_failed", "status_unavailable", "unsupported", "clarify"].includes(result.phase)) process.exitCode = 7;
+      if (["start_unknown", "preproduction_failed", "status_unavailable", "unsupported", "clarify", "resume_refused"].includes(result.phase)) process.exitCode = 7;
     } catch (error) {
       console.error(JSON.stringify({ error: { code: error.code ?? "VIDEO_ENTRY_FAILED", message: sanitizeErrorMessage(error) } }));
       process.exitCode = error.exitCode ?? 7;

@@ -20,6 +20,21 @@ node scripts/workloom-source-session.mjs video -- status --job-file "$job_root/j
 - `preproduction_ready`：返回当前项目、运行、前期 attempt、镜头原文摘要、时长与管线。开工前核对人物、商品、平台及已知预算、使用权和供应商接收条件。
 - `start_unknown`：保留工作单和原实例。先查立项记录；重复启动可能创建第二个项目。单独的导演预览或已有镜头稿入口各有其合同。
 
+## 只交付已通过评审的提示词
+
+客户明确把交付范围限定在提示词时，在启动 JSON 添加 `"purpose":"prompt-review"`，同时给出创作目标时长。系统仍负责分流、编剧、分镜、G6 提示词审核，以及营销任务的来源和逐镜事实审核。此用途在立项时固定。它推迟定妆照、完整预生产和渲染，不触发图像或视频生成。
+
+用同一工作单回读 `prompt_review_ready` 后导出原始审核正文和来源回执：
+
+```bash
+node scripts/workloom-source-session.mjs video -- status --job-file "$job_root/job.json"
+node scripts/workloom-source-session.mjs video -- prompts --job-file "$job_root/job.json" --out "$job_root/prompt-review.json"
+```
+
+导出文件含项目、运行、阶段、尝试编号和正文摘要，须放在任务私有目录。回执标记 `renderAuthorized:false`。出片需要走正式制作流程的素材授权、定妆照、完整预生产和预算审核。
+
+提示词评审被门禁明确打回并修复问题后，在原实例使用 `video -- resume-prompts --job-file "$job_root/job.json" --out "$job_root/review-continuation.json"`。它在同一项目内重试原需求，核对先前失败的运行，生成一份关联原作业的新工作单。收到结果未知时先查原项目与模型台账。使用续跑工作单查询新运行和导出。
+
 ## 从同一作业渲染并交付
 
 选取运行实例目录里可用的模型，在同一项目使用经核对的 [标准后期设置](video-standard-post.md)。设置声明封面、字幕、调色与可选既有音乐，以及字体和输入摘要。封面平台须与同一正式工作单记录的平台一致。制作工作台复用已登记设置；缺授权或缺必要素材时保留当前回执。设置文件须在首次渲染前就绪。以下金额来自本次批准，由执行环境传入。

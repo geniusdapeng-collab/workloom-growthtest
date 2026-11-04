@@ -246,6 +246,8 @@ export interface ProducerGateOptions {
   batchSize?: number;
   context?: Record<string, unknown>;
   contracts?: ProducerReviewContracts;
+  /** Concept and requirements gates precede any independently approved shot contract. */
+  evidencePhase?: "theme" | "requirements";
   /** @deprecated 仅为旧调用方保留；不会授予正式通过资格。 */
   allowFallbackApprove?: boolean;
   env?: Record<string, string | undefined>;
@@ -499,7 +501,11 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
       encoded.push([{ type: "text", text: image.label }, { type: "image_url", image_url: { url: `data:${png ? "image/png" : jpeg ? "image/jpeg" : "image/webp"};base64,${bytes.toString("base64")}` } }]);
     }
     const context = options.context ? JSON.stringify(options.context) : "";
-    const contractText = contract ? JSON.stringify(contract) : "未提供结构化镜头合同；不得宣称已核实年代、人数、空间或设备型号。";
+    const contractText = contract
+      ? `结构化原镜头合同优先于通用rubric；不得把合同当产物质量证明。\n${JSON.stringify(contract)}`
+      : stage === "script" && options.evidencePhase
+        ? "当前证据为分镜前的文字工件。按本环节实际应交付的内容核对原始需求和约束；逐镜合同及其核验归后续阶段，不能以缺少后续产物作为本环节的缺项。"
+        : "未提供结构化镜头合同；不得宣称已核实年代、人数、空间或设备型号。";
     /**
      * 批次大小：默认 6 张/批；成套定妆照（同一角色的多角度）必须能一批看完再判"是不是同一个人"。
      * 非法/缺省值回落到 6（调小只会切得更碎，不构成风险；调大由调用方自证上下文预算）。
@@ -523,7 +529,7 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
         summarizeArtifacts(options.artifacts),
         "确定性检查（含失败与不适用）：", ...options.deterministic.map((c) => `${c.id}: ${c.status ?? (c.pass ? "passed" : "failed")} ${c.detail}`),
         context,
-        "结构化原镜头合同优先于通用rubric；只对实际适用项目评审，不得把合同当产物质量证明。", contractText,
+        "只对当前阶段适用的项目评审。", contractText,
         '只输出 JSON: {"approved":true|false,"score":0-100,"issues":[],"suggestions":[],"reason":"结论"}'
       ].join("\n") }, ...textContent, ...encoded.slice(batch * batchSize, Math.min(artifactImages, (batch + 1) * batchSize)).flat(), ...encoded.slice(artifactImages).flat()];
       const requestReview = () => provider.chat([{ role: "user", content }], {

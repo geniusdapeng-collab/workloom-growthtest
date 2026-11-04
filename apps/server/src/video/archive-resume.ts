@@ -19,6 +19,8 @@ import { getAppPool, getOwnerPool } from "@workloom/db";
 import { ArchiveStore, readContextBundle, type ContextBundle } from "@hyperreality/video-studio";
 import { scopedRows, archiveWorkDir, projectRunLockKey, readProjectMeta } from "./archive-host.js";
 import { restoreStudioResumeInput } from "./studio-resume-input.js";
+import { isStudioPromptReviewProject } from "./prompt-review-authority.js";
+import { scopedQuery } from "./gen/db.js";
 import type { resolveScenePolicyForIntent } from "./scene-policy-routing.js";
 import type { resolvePlatformForIntent } from "./platform-routing.js";
 
@@ -42,6 +44,8 @@ export interface ResumeOptions {
   projectId: string;
   /** 人工裁决：强制从指定环节重跑 */
   fromStage?: string;
+  /** 提示词工作单必须绑定最新已明确打回的运行。 */
+  expectedRunId?: string;
   /** 可选覆盖预生产需求；缺省使用归档原始需求 */
   intent?: string;
   /** 复用既有补跑入口（router 传 `startRun(scope, …)`） */
@@ -51,6 +55,9 @@ export interface ResumeOptions {
     isMarketing: boolean;
     metadata?: Record<string, unknown>;
     rawIntent?: string;
+    purpose?: "prompt-review";
+    durationSec?: number;
+    promptReviewPrior?: { runId: string; attempt: number };
     selectedScenePolicy?: ReturnType<typeof resolveScenePolicyForIntent>;
     selectedPlatform?: ReturnType<typeof resolvePlatformForIntent>;
   }) => string | Promise<string>;
@@ -61,7 +68,21 @@ export type ResumeResult =
   | { kind: "busy"; stage: null; message: string }
   | { kind: "awaiting_approval"; approvalId: string; stage: string; message: string }
   | { kind: "resumed"; stage: "preproduction"; runId: string; attempt: number | null; message: string }
+  | { kind: "resumed"; stage: "prompt_review"; projectId: string; priorRunId: string; runId: string; attempt: number; message: string }
   | { kind: "noaction"; stage: string; message: string };
+
+type ResumeStage = { attempt: number; input_ref: string | null; status: string; error_class: string | null; run_id: string | null };
+
+export async function readLatestStudioResumeStage(scope: Scope, projectId: string, stageId: string): Promise<ResumeStage | undefined> {
+  return (await scopedQuery<ResumeStage>(getAppPool(), scope,
+    `SELECT attempt, input_ref, status, error_class, run_id FROM production_stage_runs
+      WHERE workspace_id=$1 AND project_id=$2 AND stage_id=$3 AND pipeline_run_id IS NULL AND tenant_id=$4
+      ORDER BY attempt DESC LIMIT 1`, [scope.workspaceId, projectId, stageId, scope.tenantId]))[0];
+}
+
+export function isPromptReviewRejection(stage: ResumeStage | undefined, expectedRunId: string): boolean {
+  return Boolean(expectedRunId && stage?.run_id === expectedRunId && stage.status === "failed" && stage.error_class === "GATE_REJECTED");
+}
 
 /** 最新 attempt 的断点（每个 stage 只看最新一次；假断点会被 stage2 的成功重跑覆盖） */
 export async function readStageBreakpoints(scope: Scope, projectId: string): Promise<StageBreakpoint[]> {
@@ -179,7 +200,14 @@ export async function resumeProject(
 
   // 断点在事务提交后按同一口径重读（列别名与 readStageBreakpoints 保持一致，避免驼峰/蛇形漂移）
   breakpoints = await readStageBreakpoints(scope, opts.projectId);
-  const stuckStage = opts.fromStage ?? breakpoints[0]?.stageId ?? "preproduction";
+  const promptReview = await isStudioPromptReviewProject({ app, scope, projectId: opts.projectId });
+  if (promptReview && opts.fromStage && opts.fromStage !== "prompt_review") {
+    return { kind: "noaction", stage: "prompt_review", message: "提示词审核项目只能恢复原提示词阶段。" };
+  }
+  const stuckStage = promptReview ? "prompt_review" : opts.fromStage ?? breakpoints[0]?.stageId ?? "preproduction";
+  if (!promptReview && opts.expectedRunId) {
+    return { kind: "noaction", stage: stuckStage, message: "指定的运行只能用于续跑原提示词审核项目。" };
+  }
   const archive = new ArchiveStore(archiveWorkDir(), scope.workspaceId, opts.projectId);
   for (const stage of breakpoints) {
     // PG 完成写与失败补写可能同时不可用；本地 meta/output 仍是待对账证据。
@@ -213,24 +241,32 @@ export async function resumeProject(
     return { kind: "noaction", stage: stuckStage, message: "没有待恢复的阶段；已有完成回执的项目不会通过恢复入口重新执行。" };
   }
 
-  if (stuckStage === "preproduction") {
+  if (stuckStage === "preproduction" || (promptReview && stuckStage === "prompt_review")) {
     const project = await readProjectMeta(scope, opts.projectId);
     if (!project) {
       return { kind: "noaction", stage: stuckStage, message: `项目 ${opts.projectId} 不存在或不属于当前工作区` };
     }
-    const latest = (await scopedRows<{ attempt: number; input_ref: string | null; status: string }>(
-      scope,
-      `SELECT attempt, input_ref, status FROM production_stage_runs
-        WHERE workspace_id=$1 AND project_id=$2 AND stage_id='preproduction' AND pipeline_run_id IS NULL
-        ORDER BY attempt DESC LIMIT 1`,
-      [scope.workspaceId, opts.projectId],
-    ))[0];
+    const latest = await readLatestStudioResumeStage(scope, opts.projectId, stuckStage);
     const attempt = latest && Number.isSafeInteger(latest.attempt) && latest.attempt > 0 ? latest.attempt : null;
-    const inputRef = attempt === null ? null : `stages/preproduction/attempt-${attempt}.input.json`;
+    const priorRunId = opts.expectedRunId;
+    const prior = promptReview && opts.fromStage && attempt !== null && priorRunId && isPromptReviewRejection(latest, priorRunId)
+      ? { runId: priorRunId, attempt } : null;
+    if (promptReview && !prior) {
+      return { kind: "noaction", stage: stuckStage, message: "只允许显式续跑最新且已确认被门禁打回的原提示词工作单。" };
+    }
+    const inputRef = attempt === null ? null : `stages/${stuckStage}/attempt-${attempt}.input.json`;
     const saved = inputRef !== null && latest?.input_ref === inputRef
       ? await archive.readJson<{ input?: { resumeInput?: unknown } }>(inputRef) : null;
     const restored = restoreStudioResumeInput(saved?.input?.resumeInput, scope, project, opts.intent);
     if (!restored.ok) return { kind: "noaction", stage: stuckStage, message: restored.reason };
+    if ((restored.input.purpose === "prompt-review") !== promptReview) {
+      return { kind: "noaction", stage: stuckStage, message: "恢复输入用途与当前项目不一致。" };
+    }
+    if (prior) {
+      const runId = await opts.startRun({ ...restored.input, promptReviewPrior: prior });
+      return { kind: "resumed", stage: "prompt_review", projectId: opts.projectId, priorRunId: prior.runId, runId, attempt: prior.attempt,
+        message: `原提示词工作单 ${prior.runId} 已提交续跑（原 attempt=${prior.attempt}），保留需求原文和目标时长。` };
+    }
     const runId = await opts.startRun(restored.input);
     return {
       kind: "resumed",
