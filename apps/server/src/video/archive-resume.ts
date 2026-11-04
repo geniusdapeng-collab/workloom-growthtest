@@ -73,13 +73,25 @@ export type ResumeResult =
   | { kind: "resumed"; stage: "prompt_review"; projectId: string; priorRunId: string; runId: string; attempt: number; message: string }
   | { kind: "noaction"; stage: string; message: string };
 
-type ResumeStage = { attempt: number; input_ref: string | null; status: string; error_class: string | null; run_id: string | null };
+type ResumeStage = { attempt: number; input_ref: string | null; status: string; error_class: string | null; run_id: string | null;
+  error_msg?: string | null; started_at?: string | null; finished_at?: string | null };
 
 export async function readLatestStudioResumeStage(scope: Scope, projectId: string, stageId: string): Promise<ResumeStage | undefined> {
-  return (await scopedQuery<ResumeStage>(getAppPool(), scope,
-    `SELECT attempt, input_ref, status, error_class, run_id FROM production_stage_runs
+  type ResumeStageRow = Omit<ResumeStage, "started_at" | "finished_at"> & {
+    started_at?: string | Date | null; finished_at?: string | Date | null;
+  };
+  const row = (await scopedQuery<ResumeStageRow>(getAppPool(), scope,
+    `SELECT attempt, input_ref, status, error_class, run_id, error_msg, started_at, finished_at FROM production_stage_runs
       WHERE workspace_id=$1 AND project_id=$2 AND stage_id=$3 AND pipeline_run_id IS NULL AND tenant_id=$4
       ORDER BY attempt DESC LIMIT 1`, [scope.workspaceId, projectId, stageId, scope.tenantId]))[0];
+  if (!row) return undefined;
+  const iso = (value: string | Date | null | undefined): string | null => {
+    if (value == null) return null;
+    const date = value instanceof Date ? value : new Date(value);
+    if (!Number.isFinite(date.getTime())) throw new Error("STUDIO_RESUME_STAGE_INVALID: 原运行时间无效");
+    return date.toISOString();
+  };
+  return { ...row, started_at: iso(row.started_at), finished_at: iso(row.finished_at) };
 }
 
 export function isPromptReviewRejection(stage: ResumeStage | undefined, expectedRunId: string): boolean {

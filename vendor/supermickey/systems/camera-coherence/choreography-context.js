@@ -37,7 +37,7 @@ function buildGlobalChoreographyGuide(shots = []) {
 ${shotList}
 
 一、景别节奏规则：
-1. 相邻镜头景别差 ≤1 级 → 硬切合法；差 2 级 → 建议叠化/匹配剪辑；差 ≥3 级 → 必须声明动机
+1. 相邻镜头景别差 ≤1 级 → 硬切合法；差 2 级 → 建议叠化/匹配剪辑；差 ≥3 级 → 必须有原始合同与镜头真实内容支持的合法动机，否则减小景别跨度
 2. 避免同景别三连：连续 3 个相同景别会让观众感到单调
 3. 全片景别序列应形成宏观曲线：开场有建立镜（远景/大远景），高潮段提高近景/特写密度，结尾可拉回全景收束
 4. 七级景别：ELS大远景 → LS远景 → FS全景 → MS中景 → MCU近景 → CU特写 → ECU大特写
@@ -56,7 +56,8 @@ ${motivations}
 
 五、转场字段输出规范：
 转场 = 方式(hard_cut/smooth_dissolve/match_cut/rack_focus/whip_pan/object_occlusion/light_flash) + 持续时长 + 方向
-如为跳景别（差≥3级），追加 "motivation: <白名单id>"`;
+当前协调校验器按“上一镜→本镜”检查本镜 transition；如另述“本镜→下一镜”，须单独标明边界，不得混写。
+如为跳景别（差≥3级），仅在原始合同与镜头真实内容支持时追加 "motivation: <白名单id>" 并说明依据；否则减小景别跨度。叠化、淡入或闪白不能代替 R1 所需的真实动机，禁止为通过检查编造动机或新增情节。`;
 }
 
 /**
@@ -82,8 +83,12 @@ function buildNeighborContext(plans, index) {
   if (prevLine) lines.push(prevLine); else lines.push('  （本镜为全片第一个镜头，开场镜建议远景/大远景建立空间）');
   if (nextLine) lines.push(nextLine); else lines.push('  （本镜为全片最后一个镜头，收尾镜可考虑拉回全景定格）');
   lines.push('协调要求：');
-  lines.push('1. 你的 composition（景别）与上一镜差 ≤1 级为佳；差 2 级请在 transition 写明软化方式；差 ≥3 级必须在 transition 标注 motivation');
+  lines.push('1. 你的 composition（景别）与上一镜差 ≤1 级为佳；差 2 级请在 transition 写明软化方式；差 ≥3 级必须有原始合同与镜头真实内容支持的合法动机，否则减小景别跨度。叠化、淡入或闪白不能代替 R1 所需的真实动机。');
   lines.push('2. 你的 camera_movement 避免与上一镜方向硬反转；timeline 的末段（落幅）状态应考虑下一镜的起幅衔接');
+  lines.push('3. 当前协调校验器按“上一镜→本镜”检查本镜 transition；如另述“本镜→下一镜”，须单独标明边界，不得混写。');
+  lines.push('4. 仅在原始合同与镜头真实内容支持时写明 motivation: <白名单id> 并说明依据；禁止为通过检查编造动机、场景或动作。');
+  lines.push('冲击切换动机词表（只选真实适用项）：');
+  lines.push(...Object.entries(SHOCK_MOTIVATIONS).map(([id, m]) => `  - ${id}(${m.name}): ${m.desc}`));
   return lines.join('\n');
 }
 

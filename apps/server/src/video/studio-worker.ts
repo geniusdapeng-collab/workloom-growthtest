@@ -66,6 +66,8 @@ import { appendScenePolicyGuidance, resolveScenePolicyForIntent } from "./scene-
 import { appendPlatformGuidance, resolvePlatformForIntent } from "./platform-routing.js";
 import { captureStudioResumeInput } from "./studio-resume-input.js";
 import { createStudioCheckpointStore, studioCheckpointRepository } from "./studio-checkpoint-store.js";
+import { loadNativeProductionRepairEvidence, type KnownNativeProductionPrior,
+  type NativeProductionRepairEvidence } from "./studio-native-repair-feedback.js";
 import {
   assertStudioPromptReviewSigning, assertStudioPromptReviewText, captureStudioPromptReviewShots,
   issueStudioPromptReview, studioPromptReviewRef,
@@ -1166,6 +1168,7 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
     let projectMeta: Awaited<ReturnType<typeof readProjectMeta>> = null;
     let verifiedResumePrior = input.resumePrior
       ?? (input.promptReviewPrior ? { ...input.promptReviewPrior, stageId: "prompt_review" as const } : undefined);
+    let verifiedNativePrior: KnownNativeProductionPrior | undefined;
     try {
       if (delegated) {
         delegated.signal.addEventListener("abort", abortDelegatedRun, { once: true });
@@ -1186,6 +1189,8 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
           stageId: prior.stageId, latest, expectedRunId: prior.runId, archive })) {
           throw new Error("PROMPT_REVIEW_PRIOR_CHANGED: 原工作单的最新执行或模型结算状态已变化，拒绝重复运行");
         }
+        verifiedNativePrior = { ...prior, status: latest!.status, errorClass: latest!.error_class,
+          errorMessage: latest!.error_msg, startedAt: latest!.started_at, finishedAt: latest!.finished_at };
       } else {
         const stageId = promptReview ? "prompt_review" : "preproduction";
         const latest = await readLatestStudioResumeStage(scope, input.projectId, stageId);
@@ -1193,6 +1198,8 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
           if (delegated && latest.run_id && await isKnownStudioResume({ scope, project: projectMeta,
             stageId, latest, expectedRunId: latest.run_id, archive })) {
             verifiedResumePrior = { runId: latest.run_id, attempt: latest.attempt, stageId };
+            verifiedNativePrior = { ...verifiedResumePrior, status: latest.status, errorClass: latest.error_class,
+              errorMessage: latest.error_msg, startedAt: latest.started_at, finishedAt: latest.finished_at };
           } else {
             throw new Error("STUDIO_RESUME_REQUIRED: 原项目已有未完成的执行，请通过正式接续入口核对原运行与模型结果");
           }
@@ -1381,10 +1388,23 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
                 productionRejections.push(review);
               }
             }
-            const productionRepairFeedback = marketing && productionRejections.length ? canonicalRenderJson({
-              instruction: "根据已核实的完整来源和原事实审核诊断修订生产提示词。纠正或删除未支持的主张，保留其他已通过的创作成果；不得把原坏镜或审核指令直接拼入作品，不得修改来源或替评审作出通过裁决。",
-              sourceClaims: marketing.bundle.stages.map(stage => stage.facts), restrictions: marketing.bundle.restrictions,
-              creativeRequirements: marketing.bundle.creativeRequirements, rejected: productionRejections,
+            const nativeRepairEvidence = await loadNativeProductionRepairEvidence({ archiveRoot: archive.root,
+              prior: checkpointPriorRunId === verifiedNativePrior?.runId ? verifiedNativePrior : undefined,
+              priorOutcome: await checkpointStore.loadValue("OUTCOME"),
+              inherited: await checkpointStore.loadValue<NativeProductionRepairEvidence>("NATIVE_PRODUCTION_FEEDBACK"),
+            });
+            if (nativeRepairEvidence) await checkpointStore.saveValue("NATIVE_PRODUCTION_FEEDBACK", nativeRepairEvidence,
+              nativeRepairEvidence.diagnoses.at(-1)!.originRunId);
+            const productionRepairFeedback = productionRejections.length || nativeRepairEvidence ? canonicalRenderJson({
+              instruction: [
+                ...(productionRejections.length ? ["根据已核实的完整来源和原事实审核诊断修订生产提示词。纠正或删除未支持的主张，保留其他已通过的创作成果；不得把原坏镜或审核指令直接拼入作品，不得修改来源或替评审作出通过裁决。"] : []),
+                ...(nativeRepairEvidence ? ["根据完整冻结需求、当前蓝图逐镜动作合同、已核实来源和原失败诊断修订生产提示词。保持每个必需动作及先后顺序，不得为修运镜而删除动作、人物或服装变化；转场须区分入场/出场边界，景别跨度达到原生门槛时须有真实成立的白名单动机或调整景别，不能只改叠化/闪白或虚构标签。保留其他已通过创作成果，不得把原坏镜或审核指令直接拼入作品，不得修改来源或替评审作出通过裁决。"] : []),
+              ].join("\n"),
+              ...(marketing ? { sourceClaims: marketing.bundle.stages.map(stage => stage.facts), restrictions: marketing.bundle.restrictions,
+                creativeRequirements: marketing.bundle.creativeRequirements } : {}),
+              ...(nativeRepairEvidence ? { frozenUserRequirements: input.rawIntent ?? input.intent,
+                nativeProductionFailures: nativeRepairEvidence.diagnoses } : {}),
+              ...(productionRejections.length ? { rejected: productionRejections } : {}),
             }) : undefined;
             const studio = new VideoStudio({ ...studioConfig, checkpoints: checkpointStore.engine,
               ...(productionRepairFeedback ? { productionRepairFeedback } : {}), ...(marketing ? { dataMining: {
@@ -1696,6 +1716,7 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
         } catch (error) {
           if (error instanceof Error && /VIDEO_MODEL_OUTCOME_UNKNOWN/u.test(error.message)) checkpointStore?.markUnknown();
           if (error instanceof Error && /MARKETING_FACTS_RECEIPT_UNVERIFIED/u.test(error.message)) checkpointStore?.markReceiptUnverified();
+          if (error instanceof Error && /STUDIO_NATIVE_REPAIR_FEEDBACK_UNVERIFIED/u.test(error.message)) checkpointStore?.markReceiptUnverified();
           throw error;
         } finally {
           await checkpointStore?.finishOutcome();
