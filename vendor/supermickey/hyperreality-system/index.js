@@ -3720,6 +3720,11 @@ ${line('动作', actions, '（动作以镜头卡 action 字段为准）')}
 
   _generatePromptsReport(prompts) {
     const lines = [];
+    // T-2026-1105-9003: overview and body share the same final formatted fields.
+    const formattedPrompts = prompts.map(p => {
+      const isOpening = p.shotId === 'SC00' || p.shotId === 'S00' || p.sceneType === 'opening';
+      return { p, isOpening, formattedPrompt: this._formatPromptWithSequenceNumbers(p.prompt, isOpening, p) };
+    });
 
     lines.push('# 📝 提示词审核报告');
     lines.push('');
@@ -3734,7 +3739,7 @@ ${line('动作', actions, '（动作以镜头卡 action 字段为准）')}
     lines.push('| 镜头 | 时长 | 字符数 | 字段数 | 技能命中 | 有定妆照 | 有时间轴 | 有约束 |');
     lines.push('|------|------|--------|--------|----------|----------|----------|--------|');
 
-    for (const p of prompts) {
+    for (const { p, isOpening, formattedPrompt } of formattedPrompts) {
       const promptText = typeof p.prompt === 'string' ? p.prompt : '';
       const hasImages = (p.characterRef && p.characterRef !== 'NONE')
         || (promptText.includes('【定妆照】') && !/【定妆照】\s*[，。]/.test(promptText));
@@ -3742,13 +3747,7 @@ ${line('动作', actions, '（动作以镜头卡 action 字段为准）')}
         || promptText.includes('【时间轴】');
       const hasConstraints = typeof p.prompt === 'string' && p.prompt.includes('角色一致性') || false;
       const charCount = p.promptCharCount || (typeof p.prompt === 'string' ? p.prompt.length : 0);
-      // 【v2.2.1-fix】统计字段数（片头5专属字段计入）
-      const isOpening = p.shotId === 'SC00' || p.shotId === 'S00' || p.sceneType === 'opening';
-      const baseFieldCount = (promptText.match(/【/g) || []).length;
-      const openingExtra = isOpening
-        ? ['title_content','subtitle_content','title_animation','title_font_design','opening_audio_design']
-          .filter(k => p[k] && String(p[k]).trim()).length : 0;
-      const fieldCount = baseFieldCount + openingExtra;
+      const fieldCount = (formattedPrompt.match(/^\s*\d+\.【[^】]+】/gmu) || []).length;
       // 【v2.2.0】片头30字段(25标准+5片头专属), 内容镜头25字段
       const expectedFields = isOpening ? 30 : 25;
       const fieldStatus = fieldCount >= expectedFields ? '✅' : (fieldCount >= expectedFields - 3 ? '⚠️' : '❌');
@@ -3764,8 +3763,7 @@ ${line('动作', actions, '（动作以镜头卡 action 字段为准）')}
     lines.push('## 完整提示词');
     lines.push('');
 
-    for (const p of prompts) {
-      const isOpening = p.shotId === 'SC00' || p.sceneType === 'opening';
+    for (const { p, isOpening, formattedPrompt } of formattedPrompts) {
       lines.push(`### ${p.shotId}${isOpening ? '(片头·30字段)' : '(内容·25字段)'}`);
       const charCount = p.promptCharCount || (typeof p.prompt === 'string' ? p.prompt.length : 0);
       const _promptText = typeof p.prompt === 'string' ? p.prompt : '';
@@ -3783,7 +3781,7 @@ ${line('动作', actions, '（动作以镜头卡 action 字段为准）')}
       }
       // 【v2.1.4-fix13】使用新格式:序号+换行+情绪增强
       lines.push('```markdown');
-      lines.push(this._formatPromptWithSequenceNumbers(p.prompt, isOpening, p));
+      lines.push(formattedPrompt);
       lines.push('```');
       lines.push('');
       lines.push('---');
