@@ -11,7 +11,7 @@ const STUDIO_STAGE_POLICY_VERSION: Record<StudioEngineCheckpointStage, string> =
   G4_PRD: "source-bound-prd-and-assumptions/v2",
   SCRIPT: "native-script-and-metadata/v1",
   PRODUCTION: "native-production-camera-repair-feedback/v8",
-  OPENING_TITLE: "native-opening-title-fields/v1",
+  OPENING_TITLE: "native-opening-title-fields/v2",
 };
 
 export interface StudioCheckpointRequest {

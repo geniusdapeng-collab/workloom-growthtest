@@ -9,6 +9,7 @@ const { FALLBACK_SCENES, renderFallbackAction } = require('../../config/neutral-
 // v2.1.5-refactor: 提取工具函数
 const { safeStringify } = require('./utils/safe-stringify');
 const { CheckpointManager } = require('./utils/checkpoint-manager');
+const { hydrateProductionBlueprintContext } = require('./utils/blueprint-context');
 const { LLMOutputNormalizer } = require('./utils/llm-output-normalizer');
 const { ContentBoundaryGuard } = require('./utils/content-boundary-guard');
 const { RuleFallbackEngine } = require('./utils/rule-fallback');
@@ -540,6 +541,11 @@ class ProductionEngine {
       let startPhase = 1;
       if (ckpt) {
         currentShots = ckpt.shots;
+        if (ckpt.phase === 'phase1' || ckpt.phase === 'phase2') {
+          hydrateProductionBlueprintContext(adaptedBlueprint, this.log.bind(this));
+          // safeStringify omits this runtime reference; restore it from the current blueprint.
+          currentShots = currentShots.map(shot => ({ ...shot, _blueprint: adaptedBlueprint }));
+        }
         result.opening = ckpt.opening || null;
         result.llmStats = ckpt.llmStats || {};
         if (ckpt.phase === 'phase1') startPhase = 2;

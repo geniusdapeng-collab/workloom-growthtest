@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
-import { applyNarrativeFinalPromptContract } from "./vendor-compat.js";
+import { applyNarrativeFinalPromptContract, normalizeNarrativePromptsForReview,
+  type NarrativePromptReviewPolicy } from "./vendor-compat.js";
 
 const options = {
   noDialogue: true, noMusic: true, noCharacters: false, noAnimals: true, maxLength: 3000,
@@ -132,4 +133,38 @@ it("retains complete registered identity text in the report contract while keepi
   expect((result._workloomShotContract as Record<string, unknown>).portraitAssets)
     .toMatchObject([{ name: portrait.name, path: portrait.path, authorization: "unverified" }]);
   expect(String(result.prompt)).toContain(options.marketingPrompt.overlay[0]);
+});
+
+it("rebuilds an observed3823-character unnumbered postprocess draft from native marketing fields before the final cap", () => {
+  const shot = { ...nativeShot(), prompt: "稿".repeat(3823) };
+  const before = structuredClone(shot);
+  const policy: NarrativePromptReviewPolicy = { ...options, noTitles: false, resolution: "1080x1920",
+    characterPortraits: [], projectProps: [], projectActions: options.marketingPrompt.actions };
+  const full = applyNarrativeFinalPromptContract(nativeShot(), { ...options, maxLength: 10000 });
+  const result = normalizeNarrativePromptsForReview([shot], policy)[0]!;
+  expect(Array.from(String(result.prompt)).length).toBeLessThanOrEqual(3000);
+  for (const label of ["场景", "动作", "服装", "化妆", "道具", "时间轴", "构图", "灯光设计", "色彩/色调", "转场", "情绪", "节奏", "运镜", "景深"]) {
+    expect(field(result.prompt, label), label).toBe(field(full.prompt, label));
+  }
+  for (const key of ["title_content", "subtitle_content", "title_animation", "title_font_design", "opening_audio_design"] as const) {
+    expect(String(result.prompt)).toContain(shot[key]);
+  }
+  expect(normalizeNarrativePromptsForReview([result], policy)[0]!.prompt).toBe(result.prompt);
+  expect(shot).toEqual(before);
+});
+
+it("does not bypass unstructured input limits without marketing canonical reconstruction", () => {
+  const shot = { ...nativeShot(), prompt: "稿".repeat(3823) };
+  expect(() => applyNarrativeFinalPromptContract(shot, { ...options, canonicalize: false }))
+    .toThrow("FINAL_PROMPT_UNCOMPRESSIBLE");
+  expect(() => applyNarrativeFinalPromptContract(shot, { ...options, marketingPrompt: undefined }))
+    .toThrow("FINAL_PROMPT_UNCOMPRESSIBLE");
+});
+
+it("still rejects oversized native creative content after discarding an unnumbered postprocess draft", () => {
+  const shot = { ...atLength(4500), prompt: "稿".repeat(3823) };
+  const before = structuredClone(shot);
+  expect(() => applyNarrativeFinalPromptContract(shot, options))
+    .toThrow(/FINAL_PROMPT_SOURCE_CAPACITY_EXCEEDED.*3000/u);
+  expect(shot).toEqual(before);
 });

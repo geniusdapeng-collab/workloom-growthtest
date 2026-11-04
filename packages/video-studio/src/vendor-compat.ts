@@ -5963,6 +5963,8 @@ export function applyNarrativeFinalPromptContract(
     noTitles?: boolean;
     canonicalize?: boolean;
     requireOpeningFields?: boolean;
+    /** Internal author-budget measurement; never shortens native creative fields. */
+    forceCompactMarketingHost?: boolean;
     characterPortraits?: Array<{
       name: string;
       path: string;
@@ -6176,7 +6178,10 @@ export function applyNarrativeFinalPromptContract(
     }).join("\n");
   };
   prompt = renumber(prompt);
-  if (unicodeLength(prompt) > options.maxLength) {
+  // Marketing canonicalization below rebuilds the delivery text from complete
+  // native fields. Its decorated draft may have lost all line numbering during
+  // postprocessing; apply the hard cap to the rebuilt text, not that draft.
+  if (!(options.canonicalize && options.marketingPrompt) && unicodeLength(prompt) > options.maxLength) {
     const lines: string[] = prompt.split("\n");
     let guard = 0;
     while (unicodeLength(lines.join("\n")) > options.maxLength && guard < 100) {
@@ -6354,7 +6359,8 @@ export function applyNarrativeFinalPromptContract(
       ...sourceEnvironmentProhibitions,
       "无生成特效", "无镜头光晕伪影", "无模糊", "无过曝", "无未声明角色",
     ];
-    const portraitLine = portraitText.startsWith("不适用") ? portraitText : `使用 ${portraitText}；跨镜不得替换。`;
+    const portraitLine = portraitText.startsWith("不适用") || portraitText.endsWith("；跨镜不得替换。")
+      ? portraitText : `使用 ${portraitText}；跨镜不得替换。`;
     const rawSceneText = nativeMarketing?.scene ?? sceneTextForAction(
       assignedAction,
       cleanText(options.projectScene ?? "") || source("场景", "scene", "sceneDescription"),
@@ -6468,7 +6474,7 @@ export function applyNarrativeFinalPromptContract(
     }
     let detailedQa: { verification: string; deliveryReview?: string } | undefined;
     let hostTemplates: Record<string, string> | undefined;
-    if (nativeMarketing && unicodeLength(prompt) > options.maxLength) {
+    if (nativeMarketing && (options.forceCompactMarketingHost || unicodeLength(prompt) > options.maxLength)) {
       const deliveryReview = /^\d+\.【交付复核】([^\n]*)$/mu.exec(prompt)?.[1];
       const compactVerification = [
         "按本镜原生合同核对动作、声画与跨镜连续性",
@@ -6482,7 +6488,7 @@ export function applyNarrativeFinalPromptContract(
         (_line, prefix: string) => `${prefix}详细复核见结构化镜头合同，按本镜原生字段逐项验收。`);
       detailedQa = { verification: verificationText, ...(deliveryReview ? { deliveryReview } : {}) };
     }
-    if (nativeMarketing && unicodeLength(prompt) > options.maxLength) {
+    if (nativeMarketing && (options.forceCompactMarketingHost || unicodeLength(prompt) > options.maxLength)) {
       // Only host-authored repetition is shortened. Preserve the complete wording
       // in the same structured contract included in the G6 report.
       const compactHostField = (label: string, value: string, original?: string): void => {
@@ -6574,7 +6580,7 @@ export function applyNarrativeFinalPromptContract(
       } : {}),
     };
   }
-  // canonicalize 会从源合同重建字段；不得绕过前面的长度检查，也不得静默截掉源动作。
+  // 营销先从完整原生字段重建；所有路径在此校验实际交付正文，不截断源动作。
   if (unicodeLength(prompt) > options.maxLength) {
     throw new Error(
       `FINAL_PROMPT_SOURCE_CAPACITY_EXCEEDED: ${String(next.shotId ?? next.shot_id ?? "未编号镜头")} 重建后 ${unicodeLength(prompt)} 字符，超过 ${options.maxLength}；保留源合同并停止本次预生产`,
@@ -7755,6 +7761,169 @@ export function installVendorNarrativePromptReviewBridge(options: {
   const originalReport = typeof prototype._generatePromptsReport === "function"
     ? prototype._generatePromptsReport as (this: Record<string, unknown>, prompts: FusionRecord[]) => string
     : null;
+  const originalOpening = typeof prototype._optimizeOpeningTitle === "function"
+    ? prototype._optimizeOpeningTitle as (this: FusionRecord, production: FusionRecord, result: FusionRecord, metadata: FusionRecord) => Promise<unknown>
+    : null;
+  const openingKeys = ["title_content", "subtitle_content", "title_animation", "title_font_design", "opening_audio_design"] as const;
+  const openingLabels = ["主标题内容", "副标题内容", "标题动画设计", "标题字体设计", "开场音频设计"];
+  const isOpening = (row: FusionRecord): boolean => row.sceneType === "opening"
+    || /^(S?C?00($|-|_)|OP|opening|intro)/iu.test(String(row.shotId ?? row.shot_id ?? ""));
+  const openingValue = (row: FusionRecord, key: string): unknown => row[key] ?? recordValue(row.fields)[key];
+  type OpeningContext = { budget: number; basePrompt: string; policy: NarrativePromptReviewPolicy;
+    source: FusionRecord; index: number; count: number; fallbackUsed: boolean };
+  const openingScope = new AsyncLocalStorage<OpeningContext>();
+  const projectOpening = (row: FusionRecord, context: Pick<OpeningContext, "policy" | "index" | "count">,
+    forceCompact = false, measuring = false): FusionRecord => applyNarrativeFinalPromptContract(
+    { ...row, sceneType: "opening" }, { ...context.policy, canonicalize: true, chineseOnly: true,
+      requireOpeningFields: !measuring, forceCompactMarketingHost: forceCompact,
+      ...(measuring ? { maxLength: Number.MAX_SAFE_INTEGER } : {}),
+      shotIndex: context.index, isLastShot: context.index === context.count - 1 });
+  const validateOpening = (value: FusionRecord, context: OpeningContext): void => {
+    const missing = openingKeys.filter(key => typeof value[key] !== "string" || !String(value[key]).trim()
+      || /待片头优化器生成|需单独配置/u.test(String(value[key])));
+    if (missing.length) throw new Error(`OPENING_TITLE_FIELDS_UNVERIFIED: ${missing.join("、")} 必须是原生作者的完整非空字符串`);
+    const total = openingKeys.reduce((sum, key) => sum + unicodeLength(value[key] as string), 0);
+    if (total > context.budget) throw new Error(`OPENING_TITLE_CAPACITY_EXCEEDED: 五字段 ${total} 字符超过当前正文剩余 ${context.budget}`);
+    const audio = value.opening_audio_design as string;
+    if (marketingAudioForContract(audio, { noDialogue: context.policy.noDialogue, noMusic: context.policy.noMusic,
+      shotId: String(context.source.shotId ?? context.source.shot_id ?? ""), field: "opening_audio_design" }) !== audio.trim()) {
+      throw new Error("OPENING_TITLE_AUDIO_UNVERIFIED: 原生片头声音设计违反冻结声音合同，须由原作者重写");
+    }
+  };
+  let restoreOpeningAuthor: (() => void) | undefined;
+  if (originalOpening) {
+    const openingMod = vendorRequire(resolvePath(repoRoot,
+      "vendor/supermickey/hyperreality-system/engines/production-engine/agents/opening-title-optimizer.js")) as {
+      OpeningTitleOptimizer?: { prototype?: FusionRecord } };
+    const authorPrototype = openingMod.OpeningTitleOptimizer?.prototype;
+    if (!authorPrototype || typeof authorPrototype._buildPrompt !== "function"
+      || typeof authorPrototype._getSystemPrompt !== "function" || typeof authorPrototype.optimize !== "function"
+      || typeof authorPrototype._fallback !== "function") {
+      throw new Error("OPENING_TITLE_AUTHOR_UNAVAILABLE: 原生片头作者接口不完整");
+    }
+    const build = authorPrototype._buildPrompt as (this: FusionRecord, shot: FusionRecord, blueprint: FusionRecord) => string;
+    const systemPrompt = authorPrototype._getSystemPrompt as (this: FusionRecord) => string;
+    const optimize = authorPrototype.optimize as (this: FusionRecord, shot: FusionRecord, blueprint: FusionRecord) => Promise<FusionRecord>;
+    const fallback = authorPrototype._fallback as (this: FusionRecord, ...args: unknown[]) => unknown;
+    authorPrototype._getSystemPrompt = function contractBoundOpeningSystemPrompt(this: FusionRecord) {
+      const originalPrompt = systemPrompt.call(this);
+      const context = openingScope.getStore();
+      if (!context) return originalPrompt;
+      return `${originalPrompt}\n\n本次冻结片头合同优先于以上默认设计规则与篇幅建议：`
+        + `五字段字符串值合计最多 ${context.budget} 个 Unicode 字符，必须完整非空。`
+        + `${context.policy.noMusic ? "禁止音乐、配乐、器乐、旋律或音乐节拍；原规则中的低沉器乐音要求取消，仅允许本镜原生环境声与动作声。" : "禁止合同外镜头外配乐；原规则中的低沉器乐音要求取消，声音仅取自本镜冻结的原生现场声；合同允许的画内实况音乐按源字段保留。"}`
+        + `${context.policy.noDialogue ? "禁止可辨台词、对白、旁白或口播；保留合同允许的非语义现场声。" : "人声遵循本镜冻结合同。"}`
+        + "原文字段篇幅要求由本次总预算覆盖；动画、字体、声音仍须写出完整可执行设计，不省略字段，不用占位词。";
+    };
+    authorPrototype._buildPrompt = function budgetedOpeningPrompt(this: FusionRecord, shot: FusionRecord, blueprint: FusionRecord) {
+      const originalPrompt = build.call(this, shot, blueprint);
+      const context = openingScope.getStore();
+      if (!context) return originalPrompt;
+      const nativeFields = Object.fromEntries(MARKETING_NATIVE_FUSION_FIELDS.map(([key, ...aliases]) =>
+        [key, marketingNativeShotField(context.source, key, ...aliases)]));
+      const frozenPolicy = Object.fromEntries([
+        "noDialogue", "noMusic", "noCharacters", "noAnimals", "noTitles", "maxLength", "durationSeconds",
+        "aspectRatio", "resolution", "colorTemperature", "characterNames", "characterPortraits",
+        "postRainOnly", "sourceFirstFrame", "projectScene", "projectLighting", "projectColor", "projectProps",
+        "projectActions", "marketingPrompt",
+      ].map(key => [key, (context.policy as unknown as FusionRecord)[key]]));
+      return `${originalPrompt}\n\n## 本次冻结合同与片头实际容量（优先于默认篇幅及示例）\n`
+        + `五字段字符串值合计最多 ${context.budget} 个 Unicode 字符；JSON键、引号不计，最终五个编号标签及换行已预留。原文字段篇幅要求由本次总预算覆盖。\n`
+        + "五个字段仍须完整非空：主副标题表达具体主题；动画保留起幅、成型、定格的时间顺序；字体写清字形及颜色；声音写清原生声音与动效同步点。用紧凑完整句，不省略字段、不用占位词，不改动下列原生镜头内容或后期文字原文。\n"
+        + `${context.policy.noDialogue ? "禁止可辨台词、对白、旁白或口播；" : "人声遵循冻结合同；"}`
+        + `${context.policy.noMusic ? "禁止音乐、配乐、器乐、旋律或音乐节拍；" : "禁止合同外镜头外配乐；"}`
+        + "原示例中的声音签名或器乐建议若与本合同冲突，以本合同为准，只设计当前镜头允许的原生声音。\n"
+        + `完整原生镜头字段：${JSON.stringify(nativeFields)}\n`
+        + `冻结交付策略：${JSON.stringify(frozenPolicy)}\n`
+        + `不含片头五字段的最终正文：\n${context.basePrompt}\n只输出原定五字段JSON，不附解释。`;
+    };
+    authorPrototype._fallback = function observedOpeningFallback(this: FusionRecord, ...args: unknown[]) {
+      const context = openingScope.getStore();
+      if (context) context.fallbackUsed = true;
+      return fallback.apply(this, args);
+    };
+    authorPrototype.optimize = async function verifiedOpeningAuthor(this: FusionRecord, shot: FusionRecord, blueprint: FusionRecord) {
+      const output = await optimize.call(this, shot, blueprint);
+      const context = openingScope.getStore();
+      if (context) {
+        if (!output || output.degraded !== false || context.fallbackUsed) {
+          throw new Error("OPENING_TITLE_AUTHOR_UNVERIFIED: 原生片头作者降级或调用fallback，不得固化片头断点");
+        }
+        validateOpening(output, context);
+      }
+      return output;
+    };
+    restoreOpeningAuthor = () => {
+      authorPrototype._buildPrompt = build; authorPrototype._getSystemPrompt = systemPrompt;
+      authorPrototype.optimize = optimize; authorPrototype._fallback = fallback;
+    };
+    prototype._optimizeOpeningTitle = async function capacityBoundOpeningTitle(
+      this: FusionRecord, production: FusionRecord, result: FusionRecord, metadata: FusionRecord,
+    ) {
+      const rows = Array.isArray(production?.prompts) ? production.prompts as FusionRecord[] : [];
+      const shots = Array.isArray(production?.shots) ? production.shots as FusionRecord[] : [];
+      const shotIndex = shots.findIndex(isOpening);
+      const originalShot = shots[shotIndex < 0 ? 0 : shotIndex];
+      const promptIndex = rows.findIndex(isOpening);
+      const originalRow = rows[promptIndex < 0 ? 0 : promptIndex] ?? originalShot;
+      const policy = recordValue(originalRow?._workloomPromptReviewPolicy
+        ?? recordValue(originalRow?.fields)._workloomPromptReviewPolicy) as unknown as NarrativePromptReviewPolicy;
+      if (!originalShot || !originalRow || !policy.marketingPrompt || policy.noTitles) {
+        return originalOpening.call(this, production, result, metadata);
+      }
+      // Work on a transaction copy: the native caller catches title exceptions.
+      // A failed author must neither mutate the live report nor save a title stage.
+      const working = structuredClone(production);
+      const workingShot = (working.shots as FusionRecord[])[shotIndex < 0 ? 0 : shotIndex]!;
+      const workingRow = (Array.isArray(working.prompts) ? working.prompts as FusionRecord[] : [])[
+        promptIndex < 0 ? 0 : promptIndex] ?? workingShot;
+      const clean: FusionRecord = { ...workingRow, fields: { ...recordValue(workingRow.fields) } };
+      for (const key of openingKeys) { delete clean[key]; delete recordValue(clean.fields)[key]; }
+      clean.prompt = String(clean.prompt ?? "").replace(new RegExp(
+        `(?:\\d+\\.)?【(?:${openingLabels.join("|")})】[\\s\\S]*?(?=(?:\\s*\\|\\s*|\\s+\\d+\\.)?【|$)`, "gu"), "");
+      const context: OpeningContext = { budget: 0, basePrompt: "", policy, source: originalRow,
+        index: promptIndex < 0 ? 0 : promptIndex, count: Math.max(rows.length, 1), fallbackUsed: false };
+      try {
+        if (!Number.isFinite(policy.maxLength) || policy.maxLength < 1) throw new Error("最终正文上限无效");
+        const base = projectOpening(clean, context, true, true);
+        const markers = { ...clean, ...Object.fromEntries(openingKeys.map(key => [key, "声"])) };
+        const marked = projectOpening(markers, context, true, true);
+        const labelOverhead = unicodeLength(String(marked.prompt)) - unicodeLength(String(base.prompt)) - openingKeys.length;
+        context.basePrompt = String(base.prompt);
+        context.budget = policy.maxLength - unicodeLength(context.basePrompt) - labelOverhead;
+        if (context.budget < openingKeys.length) throw new Error("完整正文与五个标签已无五字段非空容量");
+      } catch (error) {
+        throw new Error(`OPENING_TITLE_CAPACITY_UNAVAILABLE: ${String(originalRow.shotId ?? "")} 无可用片头容量`, { cause: error });
+      }
+      const existing = Object.fromEntries(openingKeys.map(key => [key, openingValue(workingShot, key)]));
+      let existingFits = false;
+      try {
+        validateOpening(existing, context);
+        projectOpening({ ...workingRow, ...existing }, context);
+        existingFits = openingKeys.every(key => openingValue(workingRow, key) === existing[key]);
+      } catch { existingFits = false; } // Invalid old values return to the same native author.
+      if (!existingFits) delete workingShot.title_content; // bypass native complete-fields early return on this copy only
+      await openingScope.run(context, () => originalOpening.call(this, working, result, metadata));
+      const authored = Object.fromEntries(openingKeys.map(key => [key, openingValue(workingRow, key)]));
+      validateOpening(authored, context);
+      // This happens inside the original method seen by bindStudioEngineCheckpoints,
+      // before its execute callback can save OPENING_TITLE.productionAfter.
+      // Native postprocessing appends title fields with pipes, sometimes to a
+      // numbered base line. Reuse the original title-free draft so those bodies
+      // cannot be mistaken for part of 基础 and counted a second time.
+      const finalOpening = projectOpening({ ...workingRow, ...authored, prompt: clean.prompt }, context);
+      workingRow.prompt = finalOpening.prompt;
+      workingShot.prompt = finalOpening.prompt;
+      normalizeNarrativePromptsForReview(Array.isArray(working.prompts) ? working.prompts as FusionRecord[] : [workingRow], policy);
+      for (const [destination, source] of [[originalShot, workingShot], [originalRow, workingRow]]) {
+        for (const key of [...openingKeys, "title", "subtitle", "prompt"]) {
+          if (Object.hasOwn(source!, key)) destination![key] = source![key];
+        }
+      }
+      log(`[vendor-compat] 原生片头五字段通过动态容量 ${context.budget} 与最终正文校验`);
+      return undefined;
+    };
+  }
   if (originalFormat) {
     prototype._formatPromptWithSequenceNumbers = function patchedPromptFormat(
       this: Record<string, unknown>,
@@ -7873,6 +8042,8 @@ export function installVendorNarrativePromptReviewBridge(options: {
     prototype._confirmPrompts = original;
     if (originalFormat) prototype._formatPromptWithSequenceNumbers = originalFormat;
     if (originalReport) prototype._generatePromptsReport = originalReport;
+    if (originalOpening) prototype._optimizeOpeningTitle = originalOpening;
+    restoreOpeningAuthor?.();
   };
 }
 
