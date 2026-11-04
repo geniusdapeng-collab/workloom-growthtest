@@ -9,6 +9,7 @@
  */
 
 const { PhaseExecutor } = require('./phase-executor');
+const { hydrateProductionBlueprintContext } = require('../utils/blueprint-context');
 
 class Phase1SceneDesign extends PhaseExecutor {
   constructor(options) {
@@ -27,26 +28,7 @@ class Phase1SceneDesign extends PhaseExecutor {
     this.log('PHASE-1', 'SceneDesign + OpeningDesign 并行启动...');
 
     try {
-      // 【fix-1C】补全 genre/mood/theme 映射，防止 OpeningDesignAgent 收到"题材=通用 情绪=epic"
-      if (adaptedBlueprint) {
-        const ct = adaptedBlueprint._creativeTheme || adaptedBlueprint.metadata?._creativeTheme || {};
-        if (!adaptedBlueprint.genre) {
-          adaptedBlueprint.genre = adaptedBlueprint.type || ct.type || null;
-        }
-        if (!adaptedBlueprint.mood) {
-          adaptedBlueprint.mood = adaptedBlueprint.tone || ct.tone || null;
-        }
-        if (!adaptedBlueprint.theme && ct.theme) adaptedBlueprint.theme = ct.theme;
-        if (!adaptedBlueprint.targetAudience && ct.target_audience) adaptedBlueprint.targetAudience = ct.target_audience;
-        if (!adaptedBlueprint.description && ct.description) adaptedBlueprint.description = ct.description;
-        // 【v2.4.0-B3】全片导演前置：蓝图阶段选定，场景设计即感知风格宪法
-        try {
-          const { assignFilmDirector } = require('../../../skills/hollywood-cinematography/cinematography-skill-router');
-          const fd = assignFilmDirector(adaptedBlueprint);
-          adaptedBlueprint.filmDirector = fd.director;
-          adaptedBlueprint.filmDirectorSource = fd.source;
-        } catch (e) { /* 风格指南缺失不阻断主流程 */ }
-      }
+      hydrateProductionBlueprintContext(adaptedBlueprint, this.log.bind(this));
 
       // 并行执行两个 Agent
       const [sdResult, odResult] = await this._runParallel({
