@@ -6812,6 +6812,16 @@ export function applyNarrativeFinalPromptContract(
       `FINAL_PROMPT_SOURCE_CAPACITY_EXCEEDED: ${String(next.shotId ?? next.shot_id ?? "未编号镜头")} 重建后 ${unicodeLength(prompt)} 字符，超过 ${options.maxLength}；保留源合同并停止本次预生产`,
     );
   }
+  if (options.canonicalize) {
+    // Existing technical aliases must describe the same final delivery text.
+    const fields = next.fields as FusionRecord;
+    for (const [key, label] of [["constraint", "约束"], ["baseline", "基础"]] as const) {
+      if (!Object.hasOwn(next, key) && !Object.hasOwn(fields, key)) continue;
+      const value = fieldValue(label);
+      next[key] = value;
+      fields[key] = value;
+    }
+  }
   next.prompt = prompt;
   return next;
 }
