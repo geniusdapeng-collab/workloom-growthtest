@@ -197,7 +197,7 @@ it("reuses fitting genuine title fields and leaves the nonmarketing native autho
 it("invalidates only the old title policy while reusing current production and every upstream policy", async () => {
   const seed = "same seed"; const input = { same: "frozen" };
   const prior = [ ["G2_THEME", "theme-input-and-brief/v1"], ["G3_INSIGHT", "source-bound-discovery-and-assumptions/v2"],
-    ["G3_PROFILE", "native-source-aware-production-profile/v2"], ["G4_PRD", "source-bound-prd-and-assumptions/v2"],
+    ["G3_PROFILE", "native-source-aware-production-profile/v2"], ["G4_PRD", "source-bound-prd-native-local-contract/v3"],
     ["SCRIPT", "native-script-and-metadata/v1"], ["PRODUCTION", "native-production-camera-repair-feedback/v12"],
     ["OPENING_TITLE", "native-opening-title-fields/v1"] ] as const;
   const records = new Map<string, StudioEngineCheckpoint>();
@@ -225,7 +225,7 @@ it("invalidates only the old title policy while reusing current production and e
 it("invalidates the previous production writer and its title descendant while retaining every upstream station", async () => {
   const seed = "same production input"; const input = { scenes: "same", feedback: "same" };
   const prior = [["G2_THEME", "theme-input-and-brief/v1"], ["G3_INSIGHT", "source-bound-discovery-and-assumptions/v2"],
-    ["G3_PROFILE", "native-source-aware-production-profile/v2"], ["G4_PRD", "source-bound-prd-and-assumptions/v2"],
+    ["G3_PROFILE", "native-source-aware-production-profile/v2"], ["G4_PRD", "source-bound-prd-native-local-contract/v3"],
     ["SCRIPT", "native-script-and-metadata/v1"], ["PRODUCTION", "native-production-camera-repair-feedback/v11"],
     ["OPENING_TITLE", "native-opening-title-fields/v2"]] as const;
   const records = new Map<string, StudioEngineCheckpoint>();
