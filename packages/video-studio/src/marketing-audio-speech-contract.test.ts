@@ -109,4 +109,25 @@ describe("T-2026-1105-9004 native marketing audio", () => {
     const result = applyNarrativeFinalPromptContract(source, { ...options, noTitles: false, requireOpeningFields: true });
     expect(field(result, "开场音频设计")).toBe(source.opening_audio_design);
   });
+  it.each([false, true])("preserves compact denials and literal opening audio with noMusic=%s", noMusic => {
+    const audio = "器物触桌一声轻响；仅本镜现场声，禁配乐禁台词。";
+    const source = { ...shot(), sceneType: "opening", title_content: "器物成形", subtitle_content: "材料与动作",
+      title_animation: "标题平稳进入后静止", title_font_design: "中性无衬线字体", opening_audio_design: audio };
+    source.fields.audio = audio;
+    const before = structuredClone(source);
+    const result = applyNarrativeFinalPromptContract(source, { ...options, noMusic, noTitles: false, requireOpeningFields: true });
+    expect(String((result.fields as Record<string, unknown>).audio)).toContain("仅本镜现场声，禁配乐禁台词");
+    expect(field(result, "开场音频设计")).toBe(audio);
+    expect(source).toEqual(before);
+  });
+  it.each(["禁台词但加入一句旁白", "禁配乐但加入钢琴配乐", "解禁台词", "解禁配乐", "加入一段违禁音乐"])(
+    "does not hide affirmative instructions behind compact wording: %s", instruction => {
+      const source = shot();
+      source.fields.audio = `器物触桌一声轻响；${instruction}。`;
+      const before = structuredClone(source);
+      const result = applyNarrativeFinalPromptContract(source, options);
+      expect(field(result, "音频")).toContain("器物触桌一声轻响");
+      expect(field(result, "音频")).not.toContain(instruction);
+      expect(source).toEqual(before);
+    });
 });

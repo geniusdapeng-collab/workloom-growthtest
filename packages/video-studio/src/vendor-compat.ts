@@ -5899,8 +5899,8 @@ function marketingAudioForContract(
   const native = source.split("【音频纪律】")[0]!.trim();
   const music = /背景音乐|配乐|音乐风格|音乐节拍|旋律|歌曲|音乐|弦乐|钢琴|器乐|合成器|电子鼓|贝斯|鼓点|\bBPM|\bBGM|soundtrack|background\s*music|\bmusic\b|\bscore\b/iu;
   const postproductionMusic = /背景音乐|配乐|音乐风格|音乐节拍|\bBGM\b|soundtrack|background\s*music/iu;
-  const musicDenial = /(?:无|没有|不含|不加|不出现|不加入|禁止|避免|无需|不要|严禁)[^，。；;、,\n]{0,8}(?:背景音乐|配乐|音乐|BGM|旋律|歌曲|soundtrack)/giu;
-  const speechDenial = /(?:无|没有|不添加|不加入|禁止|不得|不允许)(?:任何|额外|可辨)?(?:人声)?(?:台词|对白|对话|旁白|口播|voiceover)(?:人声)?/giu;
+  const musicDenial = /(?<![解违])禁(?:背景音乐|配乐|音乐|BGM|旋律|歌曲|soundtrack)|(?:无|没有|不含|不加|不出现|不加入|禁止|避免|无需|不要|严禁)[^，。；;、,\n]{0,8}(?:背景音乐|配乐|音乐|BGM|旋律|歌曲|soundtrack)/giu;
+  const speechDenial = /(?<![解违])禁(?:任何|额外|可辨)?(?:人声)?(?:台词|对白|对话|旁白|口播|voiceover)(?:人声)?|(?:无|没有|不添加|不加入|禁止|不得|不允许)(?:任何|额外|可辨)?(?:人声)?(?:台词|对白|对话|旁白|口播|voiceover)(?:人声)?/giu;
   const nonsemanticVoice = /欢呼|呼吸|喘息|笑声|呐喊|叹息|抽泣|哭声|咳嗽|含混|不可辨|不构成可辨语句|无可辨语义/u;
   const inSceneMusic = /画面内|画内|实况|街边音响|街头演奏|店内音响|现场(?:演奏|乐器|乐队)/u;
   const kept: string[] = [];
