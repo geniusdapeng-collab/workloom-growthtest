@@ -55,28 +55,65 @@ const SHOCK_MOTIVATIONS = {
   axis_reset: { name: '轴心重建', desc: '新场景/新空间的第一个镜头（establishing）', example: '上一场景 CU → 新场景 ELS' }
 };
 
-/**
- * 归一化景别表述 → 标准七级
- * @param {string} raw - 任意景别文本（英文枚举/中文/混排长句）
- * @returns {string|null} ELS/LS/FS/MS/MCU/CU/ECU 或 null
- */
-function normalizeScale(raw) {
-  if (!raw || typeof raw !== 'string') return null;
-  const s = raw.trim();
-  // 直接命中标准级
-  const upper = s.toUpperCase();
-  if (SHOT_SCALES.includes(upper)) return upper;
-  // 别名精确命中
-  const lower = s.toLowerCase();
-  if (SCALE_ALIASES[lower]) return SCALE_ALIASES[lower];
-  if (SCALE_ALIASES[s]) return SCALE_ALIASES[s];
-  // 长句包含匹配（如 "中景构图，主体位于黄金分割点"）
-  // 注意顺序：先长词后短词，避免"大特写"被"特写"截胡
-  const orderedKeys = Object.keys(SCALE_ALIASES).sort((a, b) => b.length - a.length);
-  for (const key of orderedKeys) {
-    if (lower.includes(key.toLowerCase())) return SCALE_ALIASES[key];
+/** Non-overlapping scale tokens in authored text order. */
+function scaleMentions(raw) {
+  if (!raw || typeof raw !== 'string') return [];
+  const lower = raw.toLowerCase();
+  const aliases = { ...SCALE_ALIASES, ...Object.fromEntries(SHOT_SCALES.map(s => [s.toLowerCase(), s])) };
+  const matches = [];
+  for (const [alias, scale] of Object.entries(aliases)) {
+    let start = lower.indexOf(alias);
+    while (start !== -1) {
+      const end = start + alias.length;
+      // English aliases and enums are tokens, not fragments of unrelated words.
+      if (!/^[a-z]/i.test(alias) ||
+        (!/[a-z0-9_]/i.test(lower[start - 1] || '') && !/[a-z0-9_]/i.test(lower[end] || ''))) {
+        matches.push({ start, end, scale });
+      }
+      start = lower.indexOf(alias, end);
+    }
   }
-  return null;
+  // Read in text order. Longest wins only for overlapping aliases at the same
+  // position (中近景/近景, extreme close-up/close-up), never over a later shot state.
+  matches.sort((a, b) => a.start - b.start || b.end - a.end);
+  return matches.filter((match, index) => !matches.slice(0, index).some(prior =>
+    prior.start <= match.start && prior.end > match.start));
+}
+
+/** 归一化景别表述 → 标准七级；未知返回 null。 */
+function normalizeScale(raw) {
+  return scaleMentions(raw)[0]?.scale || null;
+}
+
+/**
+ * Explicit current-shot temporal boundaries only; this is a bounded text rule,
+ * not a reconstruction of choreography. A plain later scale is not an exit.
+ */
+function extractScaleBoundaries(raw) {
+  const result = { scale: normalizeScale(raw), entry: null, exit: null };
+  if (typeof raw !== 'string') return result;
+  for (const clause of raw.split(/[，,；;。.!?！？\n]/u)) {
+    const mentions = scaleMentions(clause);
+    if (!mentions.length) continue;
+    const markers = [...clause.matchAll(/起幅|起始|初始|起镜|落幅|终幅|末段|结尾|最终|收束|尾帧|推至|拉至|推到|拉到|过渡到|过渡为|→|->/gu)];
+    for (const marker of markers) {
+      const before = clause.slice(0, marker.index);
+      const scope = [...before.matchAll(/上一镜|前一镜|前镜|下一镜|后一镜|后镜|本镜/gu)].at(-1)?.[0];
+      if (scope && scope !== '本镜') continue;
+      const forward = /推至|拉至|推到|拉到|过渡到|过渡为|→|->/u.test(marker[0]);
+      const candidates = mentions.filter(m => {
+        const mentionScope = [...clause.slice(0, m.start).matchAll(/上一镜|前一镜|前镜|下一镜|后一镜|后镜|本镜/gu)].at(-1)?.[0];
+        return (!mentionScope || mentionScope === '本镜') && (!forward || m.start >= marker.index + marker[0].length);
+      })
+        .map(m => ({ ...m, distance: Math.max(0, marker.index - m.end, m.start - marker.index - marker[0].length) }))
+        .filter(m => m.distance <= 16).sort((a, b) => a.distance - b.distance || a.start - b.start);
+      const nearest = candidates[0];
+      if (!nearest) continue;
+      if (/起幅|起始|初始|起镜/u.test(marker[0])) result.entry ||= nearest.scale;
+      else result.exit = nearest.scale;
+    }
+  }
+  return result;
 }
 
 /** 景别等级（0-6），未知返回 null */
@@ -142,8 +179,9 @@ function judgeTransition(fromScaleRaw, toScaleRaw, options = {}) {
 }
 
 /** 全片景别序列节奏分析 */
-function analyzeScaleRhythm(scaleSequence) {
+function analyzeScaleRhythm(scaleSequence, exitScaleSequence = scaleSequence) {
   const levels = scaleSequence.map(scaleLevel);
+  const exitLevels = exitScaleSequence.map(scaleLevel);
   const issues = [];
 
   // 1. 同景别三连检测（单调）
@@ -164,14 +202,14 @@ function analyzeScaleRhythm(scaleSequence) {
 
   // 2. ≥3 级跳变检测（动机需在镜头数据上另行标注，此处仅报告）
   for (let i = 1; i < levels.length; i++) {
-    if (levels[i] !== null && levels[i - 1] !== null) {
-      const diff = Math.abs(levels[i] - levels[i - 1]);
+    if (levels[i] !== null && exitLevels[i - 1] !== null) {
+      const diff = Math.abs(levels[i] - exitLevels[i - 1]);
       if (diff >= 3) {
         issues.push({
           type: 'abrupt_jump',
           between: [i - 1, i],
           diff,
-          message: `${SCALE_NAMES[SHOT_SCALES[levels[i - 1]]]}→${SCALE_NAMES[SHOT_SCALES[levels[i]]]} 跳变${diff}级，需确认是否有动机`
+          message: `${SCALE_NAMES[SHOT_SCALES[exitLevels[i - 1]]]}→${SCALE_NAMES[SHOT_SCALES[levels[i]]]} 跳变${diff}级，需确认是否有动机`
         });
       }
     }
@@ -187,6 +225,7 @@ module.exports = {
   SCALE_ALIASES,
   SHOCK_MOTIVATIONS,
   normalizeScale,
+  extractScaleBoundaries,
   scaleLevel,
   judgeTransition,
   analyzeScaleRhythm

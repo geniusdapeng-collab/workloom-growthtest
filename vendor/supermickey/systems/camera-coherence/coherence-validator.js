@@ -22,7 +22,7 @@
 
 const {
   SHOT_SCALES, SCALE_NAMES, SHOCK_MOTIVATIONS,
-  normalizeScale, scaleLevel, judgeTransition, analyzeScaleRhythm
+  extractScaleBoundaries, judgeTransition, analyzeScaleRhythm
 } = require('./shot-scale-matrix');
 
 // 运镜方向向量（用于 R3 突变检测）
@@ -49,6 +49,31 @@ const FAST_MOVEMENTS = ['whip', 'fast', 'rapid', 'crash', '快速摇', '甩', '�
 // 精细动作（R7 冲突检测）
 const FINE_ACTIONS = ['whisper', 'subtle', 'delicate', 'micro', '低语', '微表情', '细微', '精细', '轻抚', '眨眼'];
 
+// Explicit labels define the checked previous→current boundary. Unlabelled
+// legacy declarations remain valid; an outgoing-only section is not incoming.
+function incomingTransition(raw) {
+  const text = String(raw || '');
+  const labels = [...text.matchAll(/(入场|进场|incoming|上一镜\s*(?:→|->)\s*本镜|出场|退场|outgoing|本镜\s*(?:→|->)\s*下一镜)\s*[:：]/giu)];
+  const incoming = labels.find(label => /^(入场|进场|incoming|上一镜)/iu.test(label[1]));
+  if (incoming) {
+    const next = labels.find(label => label.index > incoming.index);
+    return text.slice(incoming.index + incoming[0].length, next?.index ?? text.length);
+  }
+  return labels.length ? text.slice(0, labels[0].index) : text;
+}
+
+function declaresTransition(text, pattern) {
+  for (const match of text.matchAll(pattern)) {
+    // Negation applies only to the immediately preceding grammatical qualifier,
+    // not to another method or clause ("不叠化而硬切" still declares a hard cut).
+    const prefix = text.slice(0, match.index);
+    const negativeChinese = /(?:不|勿|非|禁止|严禁|无需|无须|避免|取消|去掉|没有|不要|不得)(?:\s|再|另|额外|加|使用|采用|需要|做|进行|要|得|应|能|可|允许|任何|一个|是)*$/u;
+    const negativeEnglish = /\b(?:no|not|without|avoid|never)(?:\s+(?:a|an|any|use|using|add|added|adding|additional|perform|performing|to))*\s*$/iu;
+    if (!negativeChinese.test(prefix) && !negativeEnglish.test(prefix)) return true;
+  }
+  return false;
+}
+
 class CoherenceValidator {
   constructor(options = {}) {
     this.strictness = options.strictness || 'normal'; // relaxed | normal | strict
@@ -72,24 +97,33 @@ class CoherenceValidator {
       shot.camera?.movement || f.camera?.movement || '';
     // Current validation checks this shot's transition at the previous→current boundary.
     const transitionRaw = f.transition || shot.transition || shot.transition_intent || '';
+    const incoming = incomingTransition(transitionRaw);
     // 动机（若 LLM 按新规范标注了 transition_motivation，或从 transition 字符串解析 'motivation: id'）
     let motivation = f.transition_motivation || shot.transition_motivation || null;
-    if (!motivation && typeof transitionRaw === 'string') {
-      const m = transitionRaw.match(/motivation[:\s]+(\w+)/i);
+    if (!motivation) {
+      const m = incoming.match(/motivation[:\s]+(\w+)/i);
       if (m) motivation = m[1];
     }
     // 屏幕方向
     const screenDirection = shot.screen_direction || f.screen_direction || null;
+    const primary = extractScaleBoundaries(scaleRaw);
+    // Final composition remains authoritative. Other final fused fields can
+    // supply an explicit exit, never an unmarked background or next-shot scale.
+    const secondary = [f.camera_movement, f.timeline].map(extractScaleBoundaries);
+    const scale = primary.entry || primary.scale || secondary.find(p => p.entry)?.entry || null;
+    const exitScale = primary.exit || secondary.find(p => p.exit)?.exit || scale;
 
     return {
       shotId: shot.shotId || shot.shot_id || 'unknown',
       sceneId: shot.scene_id || shot.sceneId || null,
       sceneType: shot.sceneType || shot.type || null,
-      scale: normalizeScale(scaleRaw),
+      scale,
+      exitScale,
       scaleRaw: String(scaleRaw).slice(0, 60),
       movement: this._normalizeMovement(movementRaw),
       movementRaw: String(movementRaw).slice(0, 80),
-      transition: String(transitionRaw).slice(0, 80),
+      transition: String(transitionRaw),
+      incomingTransition: incoming,
       motivation: SHOCK_MOTIVATIONS[motivation] ? motivation : null,
       screenDirection,
       duration: shot.duration || shot.timing?.duration || null,
@@ -126,7 +160,7 @@ class CoherenceValidator {
       const sceneChange = prev.sceneId && curr.sceneId && prev.sceneId !== curr.sceneId;
 
       // R1 景别转换合法性
-      const verdict = judgeTransition(prev.scale || prev.scaleRaw, curr.scale || curr.scaleRaw, {
+      const verdict = judgeTransition(prev.exitScale || prev.scaleRaw, curr.scale || curr.scaleRaw, {
         motivation: curr.motivation,
         sceneChange
       });
@@ -151,10 +185,10 @@ class CoherenceValidator {
       }
 
       // R4 转场方式与景别差匹配
-      if (curr.transition && verdict.diff !== null) {
-        const t = curr.transition.toLowerCase();
-        const declaresHardCut = /硬切|hard_cut|直接切/.test(t);
-        const declaresSoft = /叠化|淡入|淡出|渐变|dissolve|fade/.test(t);
+      if (curr.incomingTransition && verdict.diff !== null) {
+        const t = curr.incomingTransition;
+        const declaresHardCut = declaresTransition(t, /硬切|\bhard[ _-]?cut\b|直接切/giu);
+        const declaresSoft = declaresTransition(t, /叠化|淡入|淡出|渐变|\b(?:smooth[ _-])?dissolve\b|\bfade(?:[ _-](?:in|out))?\b/giu);
         if (verdict.diff >= 3 && declaresHardCut && !curr.motivation) {
           issues.push(this._issue('R4_transition_mismatch', 'critical', pair,
             `景别差${verdict.diff}级却声明硬切，且无动机标注`,
@@ -200,7 +234,7 @@ class CoherenceValidator {
     }
 
     // ---------- 全片节奏 ----------
-    const rhythm = analyzeScaleRhythm(plans.map(p => p.scale || p.scaleRaw));
+    const rhythm = analyzeScaleRhythm(plans.map(p => p.scale || p.scaleRaw), plans.map(p => p.exitScale || p.scaleRaw));
     for (const ri of rhythm.issues) {
       const pair = ri.between ? [plans[ri.between[0]].shotId, plans[ri.between[1]].shotId]
         : ri.range ? ri.range.map(idx => plans[idx].shotId) : [];
@@ -217,7 +251,7 @@ class CoherenceValidator {
       issueCount: { critical, warning: issues.filter(i => i.severity === 'warning').length, info: issues.filter(i => i.severity === 'info').length },
       issues,
       rhythm: { curve: rhythm.curve },
-      shotPlans: plans.map(p => ({ shotId: p.shotId, scale: p.scale, movement: p.movement, transition: p.transition, motivation: p.motivation }))
+      shotPlans: plans.map(p => ({ shotId: p.shotId, scale: p.scale, exitScale: p.exitScale, movement: p.movement, transition: p.transition.slice(0, 80), motivation: p.motivation }))
     };
   }
 
