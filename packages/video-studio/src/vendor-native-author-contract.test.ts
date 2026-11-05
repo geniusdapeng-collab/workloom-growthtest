@@ -176,6 +176,36 @@ it("cannot use a no-speech declaration to hide source dialogue and retains valid
     .toEqual(expect.arrayContaining([expect.stringMatching(/台词超速/u), expect.stringMatching(/台词总占比超标/u)]));
 });
 
+// _extractScenes supplies dialogueBlocks: [] alongside its legacy dialogue and
+// dialogueText strings. Empty earlier aliases must not hide those source lines.
+const unifiedLine = "演员甲|对白|平静|放好了。|LIP_SYNC:YES";
+const sourceAliases: Array<{ name: string; aliases: Row; expectsSpeech: boolean }> = [
+  { name: "empty dialogueBlocks before legacy dialogue", aliases: { dialogueBlocks: [], dialogue: unifiedLine }, expectsSpeech: true },
+  { name: "empty dialogues before legacy dialogue", aliases: { dialogues: [], dialogue: unifiedLine }, expectsSpeech: true },
+  { name: "empty arrays and string before dialogueText", aliases: { dialogueBlocks: [], dialogues: [], dialogue: "", dialogueText: "放好了。" }, expectsSpeech: true },
+  { name: "empty blocks before nonempty dialogues", aliases: { dialogueBlocks: [], dialogues: [{ speaker: "演员甲", line: "放好了。" }] }, expectsSpeech: true },
+  { name: "negative dialogue before actual dialogueText", aliases: { dialogueBlocks: [], dialogue: "无台词。", dialogueText: "放好了。" }, expectsSpeech: true },
+  { name: "mixed source denial and narration", aliases: { dialogueBlocks: [], dialogue: "无台词；但加入一句旁白。" }, expectsSpeech: true },
+  { name: "literal spoken words that say no-dialogue", aliases: { dialogueBlocks: [], dialogue: "演员甲|对白|平静|无台词|LIP_SYNC:YES" }, expectsSpeech: true },
+  { name: "quoted actual dialogueText", aliases: { dialogueBlocks: [], dialogueText: '"无台词"' }, expectsSpeech: true },
+  { name: "all empty actual29 source aliases", aliases: { dialogueBlocks: [], dialogues: [], dialogue: "", dialogueText: "" }, expectsSpeech: false },
+  { name: "explicit pure negative source string", aliases: { dialogue: "本镜无台词。", dialogueText: "" }, expectsSpeech: false },
+  { name: "pure negative strings after empty arrays", aliases: { dialogueBlocks: [], dialogues: [], dialogue: "无台词。", dialogueText: "本片无对白、无旁白、无口播。" }, expectsSpeech: false },
+  { name: "only a pure negative dialogueText", aliases: { dialogueBlocks: [], dialogues: [], dialogueText: "全程无对白、无旁白、无口播。" }, expectsSpeech: false },
+];
+
+it.each(sourceAliases)("source speech aliases stay authoritative: $name", ({ aliases, expectsSpeech }) => {
+  const shot = { ...source, ...aliases }; const before = structuredClone(shot);
+  const denied = guard.verify(prompt("无台词。"), shot);
+  expect(denied.pass).toBe(!expectsSpeech);
+  const omitted = guard.verify(prompt(), shot);
+  if (expectsSpeech) {
+    expect(denied.issues).toEqual(expect.arrayContaining([expect.stringMatching(/台词格式不规范/u)]));
+    expect(omitted.issues).toContain("数据层有台词但【台词】字段缺失");
+  } else expect(omitted).toMatchObject({ pass: true, issues: [] });
+  expect(shot).toEqual(before);
+});
+
 it("a no-speech declaration still cannot mask missing fields, opening requirements, short content or keyword-only mood", () => {
   expect(guard.verify("【台词】无台词。", source).pass).toBe(false);
   expect(guard.verify(prompt("无台词。", false, "紧张"), source).issues)

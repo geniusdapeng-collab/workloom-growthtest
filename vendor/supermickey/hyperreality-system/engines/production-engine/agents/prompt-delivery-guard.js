@@ -257,9 +257,14 @@ class PromptDeliveryGuard {
   }
 
   _shotExpectsDialogue(shot) {
-    const blocks = shot.dialogueBlocks || shot.dialogues || shot.dialogue || [];
-    if (Array.isArray(blocks)) return blocks.length > 0;
-    return !!blocks;
+    // Native extraction may retain an empty block array alongside legacy text.
+    // Every source alias is authoritative; one empty/negative alias cannot hide
+    // real speech in another. Unknown nonempty shapes remain conservative.
+    return [shot.dialogueBlocks, shot.dialogues, shot.dialogue, shot.dialogueText].some(value => {
+      if (Array.isArray(value)) return value.length > 0;
+      if (typeof value === 'string') return value.trim() !== '' && !this._isNoSpeechDeclaration(value);
+      return !!value;
+    });
   }
 
   _isEmptyShot(shot) {
