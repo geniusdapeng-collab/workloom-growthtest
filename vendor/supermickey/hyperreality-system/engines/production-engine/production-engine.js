@@ -541,8 +541,10 @@ class ProductionEngine {
       let startPhase = 1;
       if (ckpt) {
         currentShots = ckpt.shots;
+        // Every completed phase skips fresh Phase1, so restore its deterministic
+        // author context before the host verifies the original full-blueprint stamp.
+        hydrateProductionBlueprintContext(adaptedBlueprint, this.log.bind(this));
         if (ckpt.phase === 'phase1' || ckpt.phase === 'phase2') {
-          hydrateProductionBlueprintContext(adaptedBlueprint, this.log.bind(this));
           // safeStringify omits this runtime reference; restore it from the current blueprint.
           currentShots = currentShots.map(shot => ({ ...shot, _blueprint: adaptedBlueprint }));
         }

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { expect, it, vi } from "vitest";
 import { installVendorPhase3FusionBridge } from "./vendor-compat.js";
+import { cinematicSkillHash } from "./cinematic-skill-policy.js";
 import { videoRuntimeRoot } from "./runtime-root.js";
 
 type Row = Record<string, unknown>;
@@ -57,9 +58,16 @@ interface ProcessInput {
   effectiveKey?: unknown;
 }
 
-function productionFixture(directory: string) {
+function productionFixture(directory: string, boundedScene = false) {
   const processInputs: ProcessInput[] = [];
-  const author = vi.fn(async (shot: Row) => authoredRow(shot));
+  const author = vi.fn(async (shot: Row) => {
+    const row = authoredRow(shot);
+    if (boundedScene) {
+      row.scene = "器物摄影工位，木桌与灰墙保留真实纹理，陶杯静置桌面。";
+      (row.fields as Row).scene = row.scene;
+    }
+    return row;
+  });
   const pass = vi.fn(async (shots: Row[]) => ({ shots, timing: 0 }));
   const opening = vi.fn(async () => ({ opening: null, timing: 0 }));
   const native = new PromptFusionAgent({ semanticRefinement: false });
@@ -93,6 +101,27 @@ function productionFixture(directory: string) {
   engine.phase2 = new Phase2VisualAudio(options);
   engine.phase3 = new Phase3PromptFusion(options);
   return { engine, native, author, pass, opening, logs, processInputs };
+}
+
+async function completedFusionFixture(directory: string, phase: string) {
+  const fixture = productionFixture(directory, true);
+  Object.assign(fixture.engine, {
+    // This fixture tests completed-checkpoint admission, not field-quality model output.
+    phase35: { execute: async (state: Row) => ({ success: true, shots: state.shots }) },
+    boundaryGuard: { enforce: (shots: Row[]) => shots },
+    // Keep the native checkpoint for the second produce call under the existing cleanup rule.
+    qualityGate: { run: async () => ({ passed: false, checks: [] }) },
+  });
+  const fresh = blueprint();
+  const result = await fixture.engine.produce(fresh);
+  expect(result.stages.phase3Fusion.status).toBe("passed");
+  expect(result.shots.every((shot: Row) => (shot._workloomFusion as Row).blueprintHash === cinematicSkillHash(fresh))).toBe(true);
+  if (phase === "phase3.5") {
+    // Store only the original host-authored rows and their original stamps through the native writer.
+    await fixture.engine._saveCheckpoint(phase, result.shots, { opening: result.opening, llmStats: result.llmStats });
+  }
+  const checkpoint = resolve(directory, `checkpoint-${phase}.json`);
+  return { ...fixture, fresh, checkpoint, originalBytes: readFileSync(checkpoint) };
 }
 
 function phase1Fixture(currentBlueprint: Row) {
@@ -154,6 +183,45 @@ it("preserves already provided business context and director provenance in the r
   const f = phase1Fixture(current);
   expect((await f.phase.execute(f.state)).success).toBe(true);
   for (const [key, value] of Object.entries(provided)) expect(current[key]).toBe(value);
+});
+
+it.each(["phase3", "phase3.5"])("verifies the original full-blueprint stamp after completed native %s restore", async phase => {
+  const directory = mkdtempSync(resolve(tmpdir(), "wl-completed-fusion-context-"));
+  const uninstall = installVendorPhase3FusionBridge();
+  try {
+    const fixture = await completedFusionFixture(directory, phase);
+    const saved = JSON.parse(fixture.originalBytes.toString("utf8"));
+    expect(saved.phase).toBe(phase);
+    expect(saved.shots.every((shot: Row) => !Object.hasOwn(shot, "_blueprint"))).toBe(true);
+    const authorCalls = fixture.author.mock.calls.length;
+    const replayed = blueprint();
+    const restored = await fixture.engine.produce(replayed);
+    expect(restored.resumed).toBe(true);
+    expect(restored.stages.phase3Fusion).toMatchObject({ status: "passed", resumed: true });
+    expect(cinematicSkillHash(replayed)).toBe(cinematicSkillHash(fixture.fresh));
+    expect(restored.shots.map((shot: Row) => shot._workloomFusion)).toEqual(saved.shots.map((shot: Row) => shot._workloomFusion));
+    expect(restored.shots.every((shot: Row) => !Object.hasOwn(shot, "_blueprint"))).toBe(true);
+    expect(fixture.logs.some(row => row.stage === "RESUME" && row.message.includes(`${phase} checkpoint`))).toBe(true);
+    expect(fixture.author).toHaveBeenCalledTimes(authorCalls);
+    expect(fixture.processInputs).toHaveLength(1);
+    expect(readFileSync(fixture.checkpoint)).toEqual(fixture.originalBytes);
+  } finally { uninstall(); rmSync(directory, { recursive: true, force: true }); }
+});
+
+it.each(["phase3", "phase3.5"])("still rejects changed business context against original native %s stamps", async phase => {
+  const directory = mkdtempSync(resolve(tmpdir(), "wl-completed-fusion-context-change-"));
+  const uninstall = installVendorPhase3FusionBridge();
+  try {
+    const fixture = await completedFusionFixture(directory, phase);
+    const authorCalls = fixture.author.mock.calls.length;
+    const replayed = blueprint();
+    (replayed._creativeTheme as Row).description = "业务说明已改为观察另一种器物，不得复用原融合凭据。";
+    await expect(fixture.engine.produce(replayed)).rejects.toThrow("PHASE3_FUSION_UNVERIFIED");
+    expect(fixture.logs.some(row => row.stage === "RESUME" && row.message.includes(`${phase} checkpoint`))).toBe(true);
+    expect(fixture.author).toHaveBeenCalledTimes(authorCalls);
+    expect(fixture.processInputs).toHaveLength(1);
+    expect(readFileSync(fixture.checkpoint)).toEqual(fixture.originalBytes);
+  } finally { uninstall(); rmSync(directory, { recursive: true, force: true }); }
 });
 
 it("keeps style selection failure nonblocking and records the original error", async () => {
