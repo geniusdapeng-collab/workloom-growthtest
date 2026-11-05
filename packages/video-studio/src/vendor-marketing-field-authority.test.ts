@@ -30,7 +30,7 @@ const { PromptFusionAgent } = require(resolve(vendor, "engines/production-engine
 const { Phase3PromptFusion } = require(resolve(vendor, "engines/production-engine/phases/phase-3-prompt-fusion.js"));
 const { FieldConsistencyChecker } = require(resolve(vendor, "engines/field-consistency-checker.js"));
 const marker = "_workloomMarketingFieldWriterPolicy";
-const currentPolicy = "native-marketing-field-authority/v2";
+const currentPolicy = "native-marketing-field-authority/v3";
 const boundary = "FIELD_AUTHORITY_FIXTURE_STOP_AFTER_NATIVE_FUSION";
 const cameraIssue = "动作快速但运镜没有快速/跟踪/手持";
 const lightingIssue = "平静情绪需要均匀/柔光，当前灯光偏戏剧性 (mood: calm)";
@@ -204,7 +204,7 @@ it.each(["current", "no-marker", "old-marker", "narrative"])(
     const report = diagnostics(outside.check(input));
     expect(fieldValues(outside.autoFix(input)).lighting).toBe("natural sunlight, " + fields.lighting);
     const current = mode === "no-marker" ? blueprint(null)
-      : mode === "old-marker" ? blueprint("native-marketing-field-authority/v1")
+      : mode === "old-marker" ? blueprint("native-marketing-field-authority/v2")
         : mode === "narrative" ? blueprint(currentPolicy, false) : blueprint();
     const f = fixture(new Map([["S1", fields]]));
     const output = await f.run("S1", current);

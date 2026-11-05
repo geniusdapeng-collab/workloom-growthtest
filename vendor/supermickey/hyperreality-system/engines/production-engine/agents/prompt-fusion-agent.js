@@ -591,6 +591,14 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
   }
 
   /**
+   * Optional source-contract presence check. The native default never supplies
+   * or substitutes an authored value; a scoped host may recognize valid silence.
+   */
+  _isFieldSemanticallyComplete(_shot, _field, _fields, _blueprint = null) {
+    return false;
+  }
+
+  /**
    * 【v2.1.4-fix10-P25-fix3】字段完整性校验 + 定向补齐
    * 先校验,缺哪些就只让 LLM 补哪些,一次轻量调用搞定
    */
@@ -598,6 +606,7 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
     let usedRuleFallback = false;
     // 1. 找出缺失或过短字段
     const missing = _getRequiredFieldsForShot(shot).filter(f => {
+      if (this._isFieldSemanticallyComplete(shot, f, fields, blueprint) === true) return false;
       const v = fields[f];
       if (!v || String(v).trim() === '') return true;
       const min = MIN_LEN[f] || 0;
@@ -623,7 +632,8 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
       const fillFields = fillResult?.result?.fields || fillResult?.result?.[shot.shotId] || {};
       const normalized = normalizeFields(fillFields);
       for (const k of missing) {
-        if (normalized[k]) {
+        const semanticallyComplete = this._isFieldSemanticallyComplete(shot, k, normalized, blueprint) === true;
+        if (normalized[k] || semanticallyComplete) {
           // 【P0-PROMPT-04 修复】安全赋值:对象类型字段序列化为字符串
           let value = normalized[k];
           if (typeof value === 'object' && value !== null) {
@@ -641,7 +651,7 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
               }
             }
           }
-          if (String(value).trim() !== '' && !String(value).startsWith('[object ')) {
+          if ((String(value).trim() !== '' || semanticallyComplete) && !String(value).startsWith('[object ')) {
             fields[k] = value;
           }
         }
@@ -651,7 +661,9 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
     }
 
     // 3. 仍缺的字段,先尝试从 shotData 提取,然后批量 LLM 补齐(而非逐个),失败再用固定模板兜底
-    const stillMissing = _getRequiredFieldsForShot(shot).filter(f => !fields[f] || String(fields[f]).trim() === '');
+    const stillMissing = _getRequiredFieldsForShot(shot).filter(f =>
+      this._isFieldSemanticallyComplete(shot, f, fields, blueprint) !== true
+      && (!fields[f] || String(fields[f]).trim() === ''));
     if (stillMissing.length > 0) {
       usedRuleFallback = true;
       const shotData = this._extractFieldsFromShot(shot);
@@ -802,7 +814,9 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
         Object.assign(fields, completeness.fields);
 
         // 检查是否还有空字段
-        const stillEmpty = _getRequiredFieldsForShot(shotClone).filter(f => !fields[f] || String(fields[f]).trim() === '');
+        const stillEmpty = _getRequiredFieldsForShot(shotClone).filter(f =>
+          this._isFieldSemanticallyComplete(shotClone, f, fields, blueprint) !== true
+          && (!fields[f] || String(fields[f]).trim() === ''));
         if (stillEmpty.length === 0) {
           console.log(`  ✅ 补全成功,所有字段已填充`);
           return await this._buildShotResult(shotClone, fields, true, undefined, blueprint);
