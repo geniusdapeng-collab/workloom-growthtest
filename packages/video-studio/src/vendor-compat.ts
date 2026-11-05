@@ -5709,6 +5709,7 @@ interface FusionAgent extends FusionRecord {
   _getLLMEngine?: () => FusionRecord | null;
   _getAltLLMEngine?: () => FusionRecord | null;
   _saveSubCheckpoint?: (checkpointManager: unknown, blueprintHash: string, rows: FusionRecord[], completed: number, total: number) => void;
+  _workloomSetFusionDraftRows?: (rows: FusionRecord[]) => void;
 }
 interface FusionPhase extends FusionRecord {
   agents: { promptFusion?: FusionAgent };
@@ -8078,10 +8079,135 @@ export function installVendorNarrativePromptReviewBridge(options: {
  * 每次执行独立的 agent 视图，避免并发 run 互改重试和子服务回调。
  * 只保留单次外调超时，不按整条任务已经运行的时间缩减后续创作。
  */
-const MARKETING_FIELD_WRITER_POLICY = "native-marketing-field-authority/v1";
+const MARKETING_FIELD_WRITER_POLICY = "native-marketing-field-authority/v2";
 
 function nativeMarketingBlueprint(blueprint: FusionRecord): boolean {
   return Boolean(recordValue(recordValue(recordValue(blueprint.meta)._metadata)._prd)._workloomMarketingPrompt);
+}
+
+/** Per-run author context only; source rows, native checkpoints and approval stamps are never rewritten. */
+function scopeNativeMarketingAuthorContext(scoped: FusionAgent, agent: FusionAgent, blueprint: FusionRecord): () => string {
+  const sourceKeys = [
+    "shotId", "shot_id", "sceneType", "sceneFunction", "scene_function", "action", "scene", "sceneDescription",
+    "duration", "timing", "characters", "character", "characterRef", "characterDescs", "costume", "makeup", "props",
+    "visualDirection", "visualNotes", "visual_notes", "cameraString", "cameraMovement", "camera", "composition",
+    "lightingString", "lighting", "timeline", "audio", "audioLayer", "dialogue", "dialogueText", "dialogueBlocks",
+    "emotionalTarget", "emotionArcTarget", "transition",
+  ];
+  const continuityFields = [
+    ["scene", "sceneDescription"], ["action"], ["character"], ["costume"], ["makeup"], ["props"], ["timeline"],
+    ["composition"], ["camera_movement", "cameraMovement", "cameraString"], ["lighting", "lightingString"],
+    ["color_palette", "colorPalette"], ["depth_of_field", "depthOfField"], ["transition"], ["mood", "emotion"],
+    ["pacing"], ["audio"],
+  ];
+  const project = (row: FusionRecord, keys: string[]): FusionRecord => structuredClone(Object.fromEntries(
+    keys.filter(key => row[key] !== undefined).map(key => [key, row[key]]),
+  ));
+  const prd = recordValue(recordValue(recordValue(blueprint.meta)._metadata)._prd);
+  const registered = recordValue(prd.characterSystem).characters;
+  const characters = Array.isArray(registered) ? registered : recordValue(blueprint.character_system).characters;
+  const registeredCharacters = (Array.isArray(characters) ? characters : []).map(value => project(recordValue(value), [
+    "id", "character_id", "name", "gender", "sex", "pronouns", "appearance", "description", "visual_anchor",
+    "visualAnchor", "costume", "makeup", "role",
+  ]));
+  let sourcePlan: FusionRecord[] = [];
+  let sourceIndexes = new Map<string, number>();
+  const drafts = new Map<string, { shotId: string; origin: string; degraded: unknown; fields: FusionRecord }>();
+  let mode: "serial" | "targeted-repair" = "serial";
+  let processing = false;
+  let activeIndex: number | undefined;
+  const remember = (rows: unknown[], origin?: string) => {
+    for (const value of rows) {
+      const row = recordValue(value);
+      const id = String(row.shotId ?? row.shot_id ?? "");
+      if (!sourceIndexes.has(id)) continue;
+      const fields = recordValue(row.fields);
+      const selected: FusionRecord = {};
+      for (const [key, ...aliases] of continuityFields) {
+        if (!key) continue;
+        for (const name of [key, ...aliases]) {
+          const actual = fields[name] ?? row[name];
+          if (actual !== undefined && actual !== null && actual !== "") { selected[key] = actual; break; }
+        }
+      }
+      drafts.set(id, { shotId: id, origin: origin ?? drafts.get(id)?.origin ?? "native-result",
+        degraded: row.degraded ?? null, fields: structuredClone(selected) });
+    }
+  };
+  const visibleDrafts = (index: number) => [...drafts.values()].filter(row => {
+    const position = sourceIndexes.get(row.shotId)!;
+    return position !== index && (mode === "targeted-repair" || position < index);
+  }).sort((left, right) => sourceIndexes.get(left.shotId)! - sourceIndexes.get(right.shotId)!);
+  const refreshNeighbors = (index: number) => {
+    if (!Array.isArray(scoped._cameraPlans)) return;
+    const actual = new Map(visibleDrafts(index).map(row => [row.shotId, row.fields]));
+    scoped._cameraPlans = scoped._cameraPlans.map(value => {
+      const plan = recordValue(value);
+      const fields = actual.get(String(plan.shotId ?? ""));
+      return fields ? { ...plan,
+        ...(fields.composition ? { scaleRaw: promptFieldText(fields.composition) } : {}),
+        ...(fields.camera_movement ? { movementRaw: promptFieldText(fields.camera_movement) } : {}),
+        ...(fields.transition ? { transition: promptFieldText(fields.transition) } : {}),
+      } : { ...plan };
+    });
+  };
+  const originalProcess = agent.process;
+  scoped.process = async function processWithCurrentAuthorContext(shots, currentBlueprint, options) {
+    sourcePlan = shots.map(row => ({ ...project(row, sourceKeys), shotId: String(row.shotId ?? row.shot_id ?? "") }));
+    sourceIndexes = new Map(sourcePlan.map((row, index) => [String(row.shotId), index]));
+    drafts.clear(); mode = "serial"; processing = true;
+    try { return await originalProcess.call(this, shots, currentBlueprint, options); }
+    finally { processing = false; }
+  };
+  const originalLoad = agent._loadSubCheckpoint;
+  if (typeof originalLoad === "function") {
+    scoped._loadSubCheckpoint = function loadActualAuthorPrefix(...args: unknown[]) {
+      const loaded = originalLoad.apply(this, args);
+      const rows = recordValue(loaded).results;
+      if (Array.isArray(rows)) remember(rows, "native-raw-checkpoint");
+      return loaded;
+    };
+  }
+  const originalSave = agent._saveSubCheckpoint;
+  if (originalSave) {
+    scoped._saveSubCheckpoint = function saveActualAuthorPrefix(...args) {
+      originalSave.apply(this, args);
+      remember(args[2]);
+    };
+  }
+  const originalFuse = agent._fuseSingleShot;
+  if (typeof originalFuse === "function") {
+    scoped._fuseSingleShot = async function authorWithActualNeighbors(...args: unknown[]) {
+      const shot = recordValue(args[0]);
+      const index = sourceIndexes.get(String(shot.shotId ?? shot.shot_id ?? ""));
+      const previousActive = activeIndex;
+      const previousIndex = scoped._currentShotIdx;
+      activeIndex = index;
+      if (index !== undefined) { scoped._currentShotIdx = index; refreshNeighbors(index); }
+      try {
+        const row = await originalFuse.apply(this, args);
+        remember([row], "native-result");
+        return row;
+      } finally { activeIndex = previousActive; scoped._currentShotIdx = previousIndex; }
+    };
+  }
+  Object.defineProperty(scoped, "_workloomSetFusionDraftRows", { value: (rows: FusionRecord[]) => {
+    remember(rows); mode = "targeted-repair";
+  } });
+  return () => {
+    const index = activeIndex ?? (processing && typeof scoped._currentShotIdx === "number" ? scoped._currentShotIdx : undefined);
+    const target = index === undefined ? undefined : sourcePlan[index];
+    if (!target || index === undefined) return "";
+    return ["【本轮跨镜作者上下文】", JSON.stringify({ schemaVersion: "workloom.native-shot-author-context/v1",
+      mode, targetShotId: target.shotId, sourcePlan, registeredCharacters, authoredDrafts: visibleDrafts(index) }),
+    "【跨镜执行边界】",
+    "冻结用户原始需求和宿主核实的最新具体诊断优先。sourcePlan 是当前设计输入，用于分配逐镜动作职责与进出场衔接，不是已批准产物；可以按真实诊断修正设计，但不能把其他镜头的一次性动作复制到本镜。",
+    "authoredDrafts 只包含本轮实际已有的原生草稿或原始断点记录，尚未批准，不是质量证明。历史失败诊断中的旧稿仅为待纠正证据，不是本轮状态、可复用成稿或新增动作指令。",
+    "人物名和代词须与已登记身份及性别一致；未知性别和属性不得按姓名猜测。服装、妆发、道具数量、穿戴或持有状态、开闭状态、位置和姿态须承接前镜实际草稿；源计划要求变化时完整拍出变化，不得无动作逆转状态或重演前镜已完成的一次性动作。",
+    "逐条核对相邻边界：上一镜出场与本镜入场的转场类型、时长、方向及起落幅须一致；本镜出场须单独标明交给下一镜的边界。已写邻镜优先参照其真实当前落幅，不能沿用已被重写的旧摄影摘要。",
+    "全片计划和已有草稿只用于约束当前镜头，不得把未来剧情写入本镜、提前表演或预告。不要把上下文、诊断JSON或内部标签复制为交付正文；继续只按当前原生schema返回本镜完整字段，不得减少字段或截断原始需求与源事实。",
+    "", ""].join("\n");
+  };
 }
 
 function scopedFusionAgent(agent: FusionAgent, blueprint: FusionRecord): FusionAgent {
@@ -8089,16 +8215,18 @@ function scopedFusionAgent(agent: FusionAgent, blueprint: FusionRecord): FusionA
   scoped._globalDeadline = Infinity;
   scoped._remainingMs = () => Infinity;
   scoped._callBudget = new Map(agent._callBudget instanceof Map ? agent._callBudget : []);
+  const currentMarketingWriter = nativeMarketingBlueprint(blueprint)
+    && blueprint._workloomMarketingFieldWriterPolicy === MARKETING_FIELD_WRITER_POLICY;
+  const authorContext = currentMarketingWriter ? scopeNativeMarketingAuthorContext(scoped, agent, blueprint) : () => "";
   const checker = agent.consistencyChecker as FusionRecord | undefined;
-  if (nativeMarketingBlueprint(blueprint)
-    && blueprint._workloomMarketingFieldWriterPolicy === MARKETING_FIELD_WRITER_POLICY
+  if (currentMarketingWriter
     && checker && typeof checker.check === "function" && typeof checker.autoFix === "function") {
     const nativeCheck = checker.check as (this: FusionRecord, shot: unknown) => FusionRecord;
     const nativeAutoFix = checker.autoFix as (this: FusionRecord, shot: unknown) => unknown;
     const checkerView = Object.create(checker) as FusionRecord;
     checkerView.autoFix = function preserveNativeMarketingDirection(shot: unknown) {
       // Keep the public native check and its diagnostics unchanged. Only the
-      // automatic writer sees these two observed creative inferences as reports.
+      // automatic writer sees these bounded heuristic inferences as reports.
       const fixView = Object.create(checker) as FusionRecord;
       fixView.check = function diagnosticNativeMarketingCheck(value: unknown) {
         const result = nativeCheck.call(checker, value);
@@ -8108,7 +8236,11 @@ function scopedFusionAgent(agent: FusionAgent, blueprint: FusionRecord): FusionA
             && issue.message === "动作快速但运镜没有快速/跟踪/手持";
           const calmLighting = issue.fieldA === "mood" && issue.fieldB === "lighting"
             && issue.message === "平静情绪需要均匀/柔光，当前灯光偏戏剧性 (mood: calm)";
-          return fastCamera || calmLighting ? { ...issue, fixable: false } : item;
+          const indoorLighting = issue.fieldA === "scene" && issue.fieldB === "lighting"
+            && issue.message === "室内场景但灯光没有室内光源描述";
+          const outdoorLighting = issue.fieldA === "scene" && issue.fieldB === "lighting"
+            && issue.message === "室外场景但灯光没有自然光描述";
+          return fastCamera || calmLighting || indoorLighting || outdoorLighting ? { ...issue, fixable: false } : item;
         }) : result.issues;
         return { ...result, issues };
       };
@@ -8119,6 +8251,8 @@ function scopedFusionAgent(agent: FusionAgent, blueprint: FusionRecord): FusionA
   const originalCall = agent._callLLM;
   if (typeof originalCall === "function") {
     scoped._callLLM = async (...args: unknown[]) => {
+      const context = authorContext();
+      if (context && typeof args[0] === "string") args[0] = context + args[0];
       const opts = args[3] && typeof args[3] === "object" ? args[3] as FusionRecord : {};
       args[3] = { ...opts };
       delete (args[3] as FusionRecord).shotBudget;
@@ -8302,6 +8436,7 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
         const expectedIds = new Set(shots.map((shot) => String(shot.shotId ?? shot.shot_id)));
         const nativeMarketing = nativeMarketingBlueprint(blueprint);
         const repairedRowIds: string[] = [];
+        scoped._workloomSetFusionDraftRows?.(updated);
         const repairResult = await repairPhase3FusionRows({
           rows: updated,
           expectedIds: [...expectedIds],
@@ -8342,6 +8477,7 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
             return recoverPhase3RowFromSource(this.cloneShots([source])[0]!);
           } }),
           onRepaired: (rows, shotId) => {
+            scoped._workloomSetFusionDraftRows?.(rows);
             const retryEvidence: FusionRecord = { repaired: [...repairedRowIds, shotId], mode: "single-shot-llm-retry" };
             stages.phase3Retry = retryEvidence;
             if (this.checkpointManager) {
