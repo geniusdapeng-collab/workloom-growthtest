@@ -104,7 +104,7 @@ it("authors within the exact dynamic remainder and preserves every native field,
 });
 
 it.each(["degraded", "fallback", "missing", "nonstring", "overbudget", "music",
-  "mixed-speech", "mixed-music", "unban-speech", "unban-music"])(
+  "mixed-speech", "mixed-music", "unban-speech", "unban-music", "prohibited-music"])(
   "rejects %s before the title checkpoint save and leaves native production intact", async mode => {
     const f = fixture(async (prompt, fallback) => {
       if (mode === "fallback") { fallback(); return { result: titles, degraded: false }; }
@@ -117,6 +117,7 @@ it.each(["degraded", "fallback", "missing", "nonstring", "overbudget", "music",
       if (mode === "mixed-music") result.opening_audio_design = "器物接触轻响；禁配乐但加入钢琴配乐。";
       if (mode === "unban-speech") result.opening_audio_design = "器物接触轻响；解禁台词。";
       if (mode === "unban-music") result.opening_audio_design = "器物接触轻响；解禁配乐。";
+      if (mode === "prohibited-music") result.opening_audio_design = "器物接触轻响；加入一段违禁音乐。";
       return { result, degraded: mode === "degraded" };
     });
     try {

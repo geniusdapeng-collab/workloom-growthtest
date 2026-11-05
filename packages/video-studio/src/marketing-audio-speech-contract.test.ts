@@ -120,7 +120,7 @@ describe("T-2026-1105-9004 native marketing audio", () => {
     expect(field(result, "开场音频设计")).toBe(audio);
     expect(source).toEqual(before);
   });
-  it.each(["禁台词但加入一句旁白", "禁配乐但加入钢琴配乐", "解禁台词", "解禁配乐"])(
+  it.each(["禁台词但加入一句旁白", "禁配乐但加入钢琴配乐", "解禁台词", "解禁配乐", "加入一段违禁音乐"])(
     "does not hide affirmative instructions behind compact wording: %s", instruction => {
       const source = shot();
       source.fields.audio = `器物触桌一声轻响；${instruction}。`;
