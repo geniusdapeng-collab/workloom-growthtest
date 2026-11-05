@@ -844,6 +844,9 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
               "creativeRequirements.intent 中的原文是本片创作与交付合同。人物、情节、披露和尾帧不属于商品事实，应核对两者分区及 restrictions 约束，具体镜头是否落实由后续门判定。",
             ] : []),
             ...(scopedPromptGate ? ["以 context.request 为本次创作合同，核对每个必需剧情动作、顺序、连续性、角色身份、声音与平台时长；任何明确要求被遗漏、替换或互相冲突须拒绝。",
+              "正文中 registeredSubjectCount、registeredCharacterNames 是已登记身份参考资产的数量与名单，不代表镜头总人数；subjectCount 为 null 或 subjectCountBasis 为 not-inferred-from-portrait-registry 时，不得从身份资产登记数推断总入画人数。按原始需求、participants、人物与动作字段核对已声明的剧情参与者及其跨镜一致性；已声明参与者未登记肖像参考不自动等于违规增加人物，也不能据此放行未声明人物或真实身份、授权与人数冲突。",
+              "原文列出的必需叠加文字与尾帧是必须落实的项目，不是排他白名单，除非原文明示只能使用这些文字或禁止其他文字。原文明示的文字或人物禁令仍须执行。片头可以在原始创作许可内增加主题表达，但不得省略必需披露、引入无来源的商品事实、违反声音要求或破坏叙事连续性。",
+              "原文允许的虚构胜利、竞赛结果和表演属于创作要求，不要求用真实战绩来源证明虚构情节；仍须核对虚构边界与必需披露，不得暗示真实成绩、人物背书或商品性能保证。",
               "当前只审完整提示词的文字和创作内容。G5 实际参考图、G7 整体预生产和付费渲染均未批准，不把文字中的引用描述当成已核实的媒体授权。"] : []),
             `门内容全长 ${artifact.chars} 字，已随附件送审；摘录（供定位，不是全文）：${(req.contentMd ?? "").slice(0, 600)}`
           ],

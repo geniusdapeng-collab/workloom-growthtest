@@ -30,7 +30,7 @@ const { PromptFusionAgent } = require(resolve(vendor, "engines/production-engine
 const { Phase3PromptFusion } = require(resolve(vendor, "engines/production-engine/phases/phase-3-prompt-fusion.js"));
 const { FieldConsistencyChecker } = require(resolve(vendor, "engines/field-consistency-checker.js"));
 const marker = "_workloomMarketingFieldWriterPolicy";
-const currentPolicy = "native-marketing-field-authority/v1";
+const currentPolicy = "native-marketing-field-authority/v2";
 const boundary = "FIELD_AUTHORITY_FIXTURE_STOP_AFTER_NATIVE_FUSION";
 const cameraIssue = "动作快速但运镜没有快速/跟踪/手持";
 const lightingIssue = "平静情绪需要均匀/柔光，当前灯光偏戏剧性 (mood: calm)";
@@ -167,6 +167,51 @@ it("preserves native night hard lighting instead of prepending uniform soft ligh
     const output = await f.run("S1", blueprint());
     expect(output.diagnostics.issues.some(issue => issue.message === lightingIssue)).toBe(true);
     expect(fieldValues(output.row).lighting).toBe(fields.lighting);
+    expect(f.authorCalls).toEqual(["S1"]);
+  } finally { uninstall(); }
+});
+
+it("reports an outdoor corridor as the original indoor-lighting issue without replacing the native lighting", async () => {
+  const uninstall = installVendorPhase3FusionBridge();
+  try {
+    const fields = authoredFields(false, false);
+    fields.scene = detailed("夜间封闭赛道的短直道，两道金属护栏向消失点延伸成一条对称走廊，护栏外是露天缓冲区与看台轮廓，沥青上保留清晰胎印。", 120);
+    fields.lighting = detailed("护栏顶部排灯以5800K冷白硬光沿纵深等距排列，从上方与后侧压向沥青，主光方向和光比8:1保持不变，缝隙漏下的微弱冷光只勾出主体边缘，地面反光收成窄条，不增加柔光箱。", 150);
+    const outside = new FieldConsistencyChecker({ logLevel: "silent" }) as Checker;
+    const input = { shotId: "S1", fields: structuredClone(fields) };
+    const report = diagnostics(outside.check(input));
+    expect(report.issues).toEqual(expect.arrayContaining([expect.objectContaining({
+      fieldA: "scene", fieldB: "lighting", message: "室内场景但灯光没有室内光源描述", fixable: true,
+    })]));
+    expect(fieldValues(outside.autoFix(input)).lighting).toBe("indoor lighting, " + fields.lighting);
+    const f = fixture(new Map([["S1", fields]]));
+    const output = await f.run("S1", blueprint());
+    expect(output.diagnostics).toEqual(report);
+    expect(fieldValues(output.row).lighting).toBe(fields.lighting);
+    expect(diagnostics(f.originalChecker.check(input))).toEqual(report);
+    expect(f.authorCalls).toEqual(["S1"]);
+  } finally { uninstall(); }
+});
+
+it.each(["current", "no-marker", "old-marker", "narrative"])(
+  "preserves outdoor night lighting only for the current marketing writer (%s)", async mode => {
+  const uninstall = installVendorPhase3FusionBridge();
+  try {
+    const fields = authoredFields(false, false);
+    fields.scene = detailed("室外封闭赛道的短直道，护栏与沥青保持真实纹理，演员甲沿地面标记行进，背景露天缓冲区保持原位。", 120);
+    const outside = new FieldConsistencyChecker({ logLevel: "silent" }) as Checker;
+    const input = { shotId: "S1", fields: structuredClone(fields) };
+    const report = diagnostics(outside.check(input));
+    expect(fieldValues(outside.autoFix(input)).lighting).toBe("natural sunlight, " + fields.lighting);
+    const current = mode === "no-marker" ? blueprint(null)
+      : mode === "old-marker" ? blueprint("native-marketing-field-authority/v1")
+        : mode === "narrative" ? blueprint(currentPolicy, false) : blueprint();
+    const f = fixture(new Map([["S1", fields]]));
+    const output = await f.run("S1", current);
+    expect(output.diagnostics).toEqual(report);
+    expect(output.diagnostics.issues.some(issue => issue.message === "室外场景但灯光没有自然光描述")).toBe(true);
+    expect(fieldValues(output.row).lighting).toBe(mode === "current" ? fields.lighting : "natural sunlight, " + fields.lighting);
+    expect(diagnostics(f.originalChecker.check(input))).toEqual(report);
     expect(f.authorCalls).toEqual(["S1"]);
   } finally { uninstall(); }
 });

@@ -730,6 +730,68 @@ describe("预生产原始结果与诚实终态", () => {
 });
 
 describe("正式 G6 提示词工作单", () => {
+  it.each([
+    ["创作许可", "制作30秒竖屏短片，陈卓连续两次超车后虚构夺冠；停稳后一次摘盔甩头，再举杯。保留原生声，叠加“AI创意演绎”，尾帧“本次商品”。虚构胜利不暗示真实成绩。"],
+    ["明确禁令", "制作30秒竖屏短片，仅允许陈卓一人出镜，不得增加对手或其他人物；仅叠加“AI创意演绎”和尾帧“本次商品”，禁止额外片头标题。停稳后一次摘盔甩头，护具和转场连续。"],
+  ])("G6合同口径-%s保留原文、身份资产边界和真实连续性拒绝", async (_label, rawIntent) => {
+    vi.stubEnv("WORKLOOM_RENDER_SIGNING_SECRET", randomBytes(32).toString("hex"));
+    vi.stubEnv("VM_PRODUCER_RETRY", "9");
+    doubles.emitGates = false;
+    const prompts = ["S5", "S6"].map(shotId => ({ shotId, duration: 15,
+      prompt: `01.【动作】${shotId}：${"停稳后开卡扣、托盔、甩头；保持护具、位置和转场连续。".repeat(8)}`,
+      fields: { action: "停稳后摘盔甩头", participants: "陈卓；已声明的同场竞争者" } }));
+    const report = ["# 当前完整 G6 正文", ...prompts.flatMap(shot => [
+      `| ${shot.shotId} | 15s | ${shot.prompt.length} |`, `### ${shot.shotId}(内容·25字段)`,
+      "```markdown", shot.prompt, "```",
+    ]), "## 正文内镜头合同", "```json", JSON.stringify({ registeredSubjectCount: 1,
+      registeredCharacterNames: ["陈卓"], subjectCountBasis: "not-inferred-from-portrait-registry",
+      participants: "陈卓；已声明的同场竞争者" }), "```"].join("\n");
+    const originalReview = doubles.review.getMockImplementation()!;
+    const reason = "S5摘盔后S6又从戴盔开始，且转场、护具和性别指代冲突；明确禁令仍须执行。";
+    doubles.review.mockImplementation(async options => {
+      const verdict = await originalReview(options);
+      return options.context.gate === "G6_PROMPT" ? { ...verdict, approved: false, status: "failed", score: 58,
+        reason, issues: [reason], suggestions: ["交回原生作者修正实际冲突"] } : verdict;
+    });
+    doubles.runPreproduction.mockImplementation(async () => {
+      const config = doubles.studioConfigs.at(-1)!;
+      const approval = (gate: string, contentMd: string) => config.onApproval({ gate, vendorType: "prompt",
+        runId: "vendor-run", title: "完整确认单", contentMd });
+      for (const gate of ["G2_THEME", "G3_INSIGHT", "G4_PRD"]) await approval(gate, "完整前期合同。".repeat(30));
+      config.onPromptReview(prompts);
+      const verdict = await approval("G6_PROMPT", report);
+      expect(verdict).toMatchObject({ approved: false, reason: expect.stringContaining(reason), fatal: "producer_rejected" });
+      return { success: false, confirmations: { prompt: verdict }, stages: {} };
+    });
+    const projectId = `VID-g6-contract-semantics-${++projectSequence}`;
+    const runId = worker.startRun(scope, { projectId, rawIntent, intent: `${rawIntent}\n系统加工口径不得覆盖原文`,
+      isMarketing: true, purpose: "prompt-review", durationSec: 30 });
+    await vi.waitFor(() => expect(worker.getRun(runId, scope.workspaceId)?.finishedAt).not.toBeNull(), { timeout: 3_000, interval: 10 });
+    const g6 = doubles.review.mock.calls.find(([options]) => options.context.gate === "G6_PROMPT")?.[0];
+    expect(g6).toMatchObject({ stage: "prompt", context: { request: rawIntent, targetSeconds: 30, purpose: "prompt-review" } });
+    expect(g6.deterministic.every((check: { hard?: boolean; pass: boolean }) => !check.hard || check.pass)).toBe(true);
+    expect(g6).not.toHaveProperty("contracts");
+    expect(await readFile(g6.artifacts[0].path, "utf8")).toBe(report);
+    const rubric = g6.rubric.join("\n");
+    expect(rubric).toContain("任何明确要求被遗漏、替换或互相冲突须拒绝");
+    expect(rubric).toContain("registeredSubjectCount");
+    expect(rubric).toContain("不代表镜头总人数");
+    expect(rubric).toContain("subjectCount 为 null");
+    expect(rubric).toContain("不是排他白名单");
+    expect(rubric).toContain("原文明示的文字或人物禁令仍须执行");
+    expect(rubric).toContain("原文允许的虚构胜利");
+    expect(rubric).toContain("G5 实际参考图、G7 整体预生产和付费渲染均未批准");
+    const early = doubles.review.mock.calls.find(([options]) => options.context.gate === "G2_THEME")?.[0];
+    expect(early.rubric.join("\n")).not.toContain("registeredSubjectCount");
+    expect(worker.getRun(runId, scope.workspaceId)).toMatchObject({ status: "failed",
+      resultSummary: { state: "prompt_review_failed", renderAuthorized: false },
+      error: expect.stringContaining(`producer-rejected(G6_PROMPT · score=58)：${reason}`) });
+    expect(doubles.runPreproduction).toHaveBeenCalledTimes(1);
+    expect(doubles.checkpointEvents.some(event => event.kind === "GATE_G6_PROMPT")).toBe(false);
+    expect(doubles.finalize).not.toHaveBeenCalled();
+    expect(doubles.ingest).not.toHaveBeenCalled();
+  });
+
   it("真实G6拒绝优先于延后G5哨兵，终态分类准确且原完整负裁决留在原事件", async () => {
     useNarrativeProject();
     vi.stubEnv("WORKLOOM_RENDER_SIGNING_SECRET", randomBytes(32).toString("hex"));

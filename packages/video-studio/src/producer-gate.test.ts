@@ -141,6 +141,47 @@ describe("AI producer evidence gate", () => {
     expect(verdict.reason).toContain("HTTP 500");
   });
 
+  it.each([
+    ["inline-json", '# 当前提示词\n```json\n{"registeredSubjectCount":1,"subjectCount":null,"participants":["主角","已声明的对手"]}\n```\n摘盔和转场仍有真实冲突。'],
+    ["plain-text", "当前正文没有结构化镜头合同，只有需要核对的动作描述。"],
+  ])("distinguishes omitted contract arguments from %s evidence without overriding rejection", async (_label, content) => {
+    const path = file("contract-evidence.md", content);
+    const bodies: string[] = [];
+    const rejected = { approved: false, score: 58, issues: ["摘盔重复、转场及护具冲突"],
+      suggestions: ["修复真实连续性后重新送审"], reason: "动作和原始需求冲突" };
+    const verdict = await reviewStage(textOptions({
+      artifacts: [{ path, kind: "text" }],
+      context: { request: "先停稳，再摘盔；只用已声明的角色和文字。" },
+      fetchImpl: judge(rejected, bodies),
+    }));
+    expect(bodies).toHaveLength(1);
+    const request = JSON.parse(bodies[0]!).messages[0].content;
+    const instruction = request[0].text as string;
+    expect(instruction).toContain("未单独传入结构化镜头合同参数");
+    expect(instruction).toContain("若正文内含镜头合同");
+    expect(instruction).toContain("不代表已解析、验证或批准");
+    expect(instruction).toContain("不得把待审产物本身当作独立来源");
+    expect(instruction).not.toContain("未提供结构化镜头合同；");
+    expect(request[1].text).toBe(`以下是产物正文（完整）：${path}\n${content}`);
+    expect(verdict).toMatchObject({ approved: false, status: "failed", score: 58,
+      issues: rejected.issues, suggestions: rejected.suggestions, degraded: false, via: "llm" });
+    expect(verdict.contractHash).toBeUndefined();
+    expect(verdict.reason).toContain(rejected.reason);
+    expect(verdict.reason).toContain("所有证据批次需通过且评分≥70");
+    expect(verdict.evidence).toEqual([{ path, sha256: createHash("sha256").update(content).digest("hex"), scope: "complete-text" }]);
+  });
+
+  it("contract presentation guidance retains the score threshold and explicit content rejection", async () => {
+    for (const answer of [{ ...good, score: 69 }, { ...good, approved: false, score: 95, reason: "明确禁止的额外人物和片头标题仍出现" }]) {
+      const bodies: string[] = [];
+      const verdict = await reviewStage(textOptions({ fetchImpl: judge(answer, bodies) }));
+      expect(bodies).toHaveLength(1);
+      expect(verdict).toMatchObject({ approved: false, status: "failed", score: answer.score, via: "llm", degraded: false });
+      expect(verdict.reason).toContain(answer.reason);
+      expect(verdict.reason).toContain("所有证据批次需通过且评分≥70");
+    }
+  });
+
   it("scopes pre-storyboard evidence without overriding the judge's content rejection", async () => {
     const bodies: string[] = [];
     const rejected = { ...good, approved: false, score: 55, reason: "客户指定的结束画面缺失" };
@@ -158,7 +199,7 @@ describe("AI producer evidence gate", () => {
       expect(early).toContain("按本环节实际应交付的内容核对原始需求和约束");
       expect(early).toContain("不能以缺少后续产物作为本环节的缺项");
     }
-    expect(requests[2]).toContain("未提供结构化镜头合同");
+    expect(requests[2]).toContain("未单独传入结构化镜头合同参数");
     expect(requests[2]).not.toContain("不能以缺少后续产物作为本环节的缺项");
   });
 
