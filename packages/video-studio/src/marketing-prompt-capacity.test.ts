@@ -168,3 +168,141 @@ it("still rejects oversized native creative content after discarding an unnumber
     .toThrow(/FINAL_PROMPT_SOURCE_CAPACITY_EXCEEDED.*3000/u);
   expect(shot).toEqual(before);
 });
+
+const registeredOptions = {
+  ...options, requireOpeningFields: false, noAnimals: false, noMusic: false,
+  characterPortraits: [{ name: "角色甲", path: "bundles/characters/actor-a/portraits/front.png",
+    appearance: "短发、灰眼，穿灰色工作服。", authorization: "registered" }],
+};
+
+function atSecondCompactLength(target: number, overrides: Partial<typeof registeredOptions> = {}) {
+  const shot = nativeShot();
+  const policy = { ...registeredOptions, ...overrides };
+  shot.sceneType = "content";
+  if (policy.noCharacters) {
+    Object.assign(shot.fields, { character: "空镜无角色", costume: "不适用：无人物", makeup: "不适用：无人物",
+      action: "箱盖缓慢合上并停稳。", timeline: "T00:00-T00:04 箱盖合拢至停稳。" });
+  }
+  shot.fields.scene = "墙".repeat(2500);
+  const measure = () => Array.from(String(applyNarrativeFinalPromptContract(shot, {
+    ...policy, maxLength: Number.MAX_SAFE_INTEGER, forceCompactMarketingHost: true,
+  }).prompt)).length;
+  shot.fields.scene = "墙".repeat(2500 + target - measure());
+  expect(measure()).toBe(target);
+  return shot;
+}
+
+it.each([3067, 3123])("fits the observed %i-character second-pass boundary using only repeated host policy", target => {
+  const shot = atSecondCompactLength(target);
+  const before = structuredClone(shot);
+  const full = applyNarrativeFinalPromptContract(shot, { ...registeredOptions, maxLength: Number.MAX_SAFE_INTEGER });
+  const priorCompact = applyNarrativeFinalPromptContract(shot, {
+    ...registeredOptions, maxLength: Number.MAX_SAFE_INTEGER, forceCompactMarketingHost: true,
+  });
+  expect(Array.from(String(priorCompact.prompt))).toHaveLength(target);
+  const result = applyNarrativeFinalPromptContract(shot, registeredOptions);
+  expect(Array.from(String(result.prompt)).length).toBeLessThanOrEqual(3000);
+  for (const label of ["场景", "动作", "服装", "化妆", "道具", "时间轴", "构图", "灯光设计", "色彩/色调", "转场", "情绪", "节奏", "运镜", "景深"]) {
+    expect(field(result.prompt, label), label).toBe(field(full.prompt, label));
+  }
+  expect(field(result.prompt, "角色")).toBe(shot.fields.character);
+  expect(result.audio).toBe((result.fields as Record<string, unknown>).audio);
+  expect(String(field(result.prompt, "音频"))).toContain(String(result.audio));
+  expect(String(result.prompt)).toContain(registeredOptions.characterPortraits[0]!.path);
+  for (const literal of [...options.marketingPrompt.overlay, ...options.marketingPrompt.endCard]) expect(String(result.prompt)).toContain(literal);
+  for (const literal of ["中文", "技术参数", "时间码", "资产路径", "声画", "跨镜", "禁过曝", "正面补光",
+    "水印", "品牌", "特效", "光晕", "模糊", "暗黑", "塑料", "金属感高光", "禁未声明角色",
+    "身份", "服妆", "发型", "合并", "替换", "增减", "禁台词", "对白", "旁白", "口播", "禁镜头外配乐"]) {
+    expect(String(result.prompt), literal).toContain(literal);
+  }
+  const templates = (result._workloomShotContract as Record<string, unknown>).hostTemplates as Record<string, string>;
+  for (const label of ["导演意图", "明亮约束", "负面约束", "角色约束", "角色一致性", "角色", "音频", "本镜验收"]) {
+    expect(templates[label], label).toBe(field(full.prompt, label));
+  }
+  expect(String(result.prompt).match(/^\d+\.【[^】]+】/gmu)).toHaveLength(27);
+  expect(applyNarrativeFinalPromptContract(result, registeredOptions).prompt).toBe(result.prompt);
+  expect(shot).toEqual(before);
+});
+
+it.each([0, 1, 4, 5])("defers only pre-title marketing body lines with %i inherited native title fields", count => {
+  const shot = nativeShot();
+  const keys = ["title_content", "subtitle_content", "title_animation", "title_font_design", "opening_audio_design"] as const;
+  const kept = count === 4 ? keys.filter(key => key !== "title_animation") : keys.slice(0, count);
+  for (const key of keys) if (!kept.includes(key)) delete (shot as Record<string, unknown>)[key];
+  if (count > 0) shot.title_content = "继承旧稿".repeat(900);
+  const before = structuredClone(shot);
+  const result = applyNarrativeFinalPromptContract(shot, {
+    ...registeredOptions, deferOpeningFields: true,
+  } as Parameters<typeof applyNarrativeFinalPromptContract>[1]);
+  expect(Array.from(String(result.prompt)).length).toBeLessThanOrEqual(3000);
+  for (const key of keys) expect(result[key]).toEqual((shot as Record<string, unknown>)[key]);
+  for (const label of ["主标题内容", "副标题内容", "标题动画设计", "标题字体设计", "开场音频设计"]) {
+    expect(String(result.prompt)).not.toContain("【" + label + "】");
+  }
+  expect(shot).toEqual(before);
+  for (const [key, value] of Object.entries(shot.fields)) {
+    if (key !== "audio") expect((result.fields as Record<string, unknown>)[key], key).toBe(value);
+  }
+  expect(() => normalizeNarrativePromptsForReview([result], {
+    ...registeredOptions, noTitles: false, resolution: "1080x1920", projectProps: [], projectActions: [],
+  })).toThrow(count < keys.length ? /FINAL_PROMPT_OPENING_FIELDS_MISSING/u : /FINAL_PROMPT_SOURCE_CAPACITY_EXCEEDED/u);
+  if (count > 0) expect(() => applyNarrativeFinalPromptContract(shot, registeredOptions))
+    .toThrow(/FINAL_PROMPT_SOURCE_CAPACITY_EXCEEDED/u);
+});
+
+it("retains the exact 3000/3001 Unicode boundary after the final host pass", () => {
+  const shot = atSecondCompactLength(3123);
+  const first = applyNarrativeFinalPromptContract(shot, registeredOptions);
+  const room = 3000 - Array.from(String(first.prompt)).length;
+  shot.fields.scene += "𠮷".repeat(room);
+  const result = applyNarrativeFinalPromptContract(shot, registeredOptions);
+  expect(Array.from(String(result.prompt))).toHaveLength(3000);
+  expect(field(result.prompt, "场景")).toBe(shot.fields.scene);
+  shot.fields.scene += "𠮷";
+  const before = structuredClone(shot);
+  expect(() => applyNarrativeFinalPromptContract(shot, registeredOptions))
+    .toThrow(/FINAL_PROMPT_SOURCE_CAPACITY_EXCEEDED.*3001.*3000/u);
+  expect(shot).toEqual(before);
+});
+
+it("does not let the pre-title option bypass final opening requirements or alter nonmarketing behavior", () => {
+  const shot = nativeShot();
+  const complete = applyNarrativeFinalPromptContract(shot, {
+    ...registeredOptions, requireOpeningFields: true, deferOpeningFields: true,
+  });
+  expect(String(complete.prompt)).toContain("【标题动画设计】" + shot.title_animation);
+  const nonmarketing = applyNarrativeFinalPromptContract(shot, {
+    ...registeredOptions, marketingPrompt: undefined, deferOpeningFields: true,
+  });
+  expect(String(nonmarketing.prompt)).toContain("【标题动画设计】" + shot.title_animation);
+  delete (shot as Record<string, unknown>).title_animation;
+  expect(() => applyNarrativeFinalPromptContract(shot, {
+    ...registeredOptions, requireOpeningFields: true, deferOpeningFields: true,
+  })).toThrow(/FINAL_PROMPT_OPENING_FIELDS_MISSING/u);
+});
+
+it("keeps additional environment, animal and music prohibitions inside the third-pass prompt", () => {
+  const shot = atSecondCompactLength(3067);
+  shot.prompt += "\n24.【负面约束】无船只、无建筑、无现代设备";
+  const before = structuredClone(shot);
+  const result = applyNarrativeFinalPromptContract(shot, {
+    ...registeredOptions, noAnimals: true, noMusic: true,
+  });
+  for (const literal of ["无船只", "无建筑", "无现代设备", "禁动物/飞鸟", "禁音乐/配乐/音乐节拍", "禁台词", "对白", "旁白", "口播"]) {
+    expect(String(result.prompt), literal).toContain(literal);
+  }
+  expect(Array.from(String(result.prompt)).length).toBeLessThanOrEqual(3000);
+  expect(shot).toEqual(before);
+});
+
+it("keeps undeclared-role and no-person prohibitions when an empty shot needs the third host pass", () => {
+  const policy = { ...registeredOptions, noCharacters: true, characterNames: [], characterPortraits: [] };
+  const shot = atSecondCompactLength(3001, policy);
+  const before = structuredClone(shot);
+  const result = applyNarrativeFinalPromptContract(shot, policy);
+  for (const literal of ["未声明角色", "人物", "人影", "人体局部", "拟人化表演"]) {
+    expect(String(result.prompt), literal).toContain(literal);
+  }
+  expect(Array.from(String(result.prompt)).length).toBeLessThanOrEqual(3000);
+  expect(shot).toEqual(before);
+});

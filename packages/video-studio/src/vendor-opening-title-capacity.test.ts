@@ -198,7 +198,7 @@ it("invalidates only the old title policy while reusing current production and e
   const seed = "same seed"; const input = { same: "frozen" };
   const prior = [ ["G2_THEME", "theme-input-and-brief/v1"], ["G3_INSIGHT", "source-bound-discovery-and-assumptions/v2"],
     ["G3_PROFILE", "native-source-aware-production-profile/v2"], ["G4_PRD", "source-bound-prd-and-assumptions/v2"],
-    ["SCRIPT", "native-script-and-metadata/v1"], ["PRODUCTION", "native-production-camera-repair-feedback/v11"],
+    ["SCRIPT", "native-script-and-metadata/v1"], ["PRODUCTION", "native-production-camera-repair-feedback/v12"],
     ["OPENING_TITLE", "native-opening-title-fields/v1"] ] as const;
   const records = new Map<string, StudioEngineCheckpoint>();
   const key = (r: StudioCheckpointRequest) => `${r.stage}/${r.inputSha256}/${r.dependencySha256}`;
@@ -226,7 +226,7 @@ it("invalidates the previous production writer and its title descendant while re
   const seed = "same production input"; const input = { scenes: "same", feedback: "same" };
   const prior = [["G2_THEME", "theme-input-and-brief/v1"], ["G3_INSIGHT", "source-bound-discovery-and-assumptions/v2"],
     ["G3_PROFILE", "native-source-aware-production-profile/v2"], ["G4_PRD", "source-bound-prd-and-assumptions/v2"],
-    ["SCRIPT", "native-script-and-metadata/v1"], ["PRODUCTION", "native-production-camera-repair-feedback/v10"],
+    ["SCRIPT", "native-script-and-metadata/v1"], ["PRODUCTION", "native-production-camera-repair-feedback/v11"],
     ["OPENING_TITLE", "native-opening-title-fields/v2"]] as const;
   const records = new Map<string, StudioEngineCheckpoint>();
   const key = (record: StudioCheckpointRequest) => `${record.stage}/${record.inputSha256}/${record.dependencySha256}`;

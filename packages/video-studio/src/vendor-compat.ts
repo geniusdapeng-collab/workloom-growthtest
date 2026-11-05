@@ -5965,6 +5965,8 @@ export function applyNarrativeFinalPromptContract(
     noTitles?: boolean;
     canonicalize?: boolean;
     requireOpeningFields?: boolean;
+    /** Phase3 marketing body only; keep inherited values for the later native title transaction. */
+    deferOpeningFields?: boolean;
     /** Internal author-budget measurement; never shortens native creative fields. */
     forceCompactMarketingHost?: boolean;
     characterPortraits?: Array<{
@@ -6467,7 +6469,8 @@ export function applyNarrativeFinalPromptContract(
     // T-2026-1105-9003: G6 must retain the native opening values in its actual prompt.
     const isOpening = next.sceneType === "opening"
       || ["SC00", "S00"].includes(String(next.shotId ?? next.shot_id ?? ""));
-    if (isOpening && !options.noTitles) {
+    if (isOpening && !options.noTitles
+      && !(nativeMarketing && options.deferOpeningFields && !options.requireOpeningFields)) {
       const openingFields = [
         ["title_content", "主标题内容"], ["subtitle_content", "副标题内容"],
         ["title_animation", "标题动画设计"], ["title_font_design", "标题字体设计"],
@@ -6553,6 +6556,45 @@ export function applyNarrativeFinalPromptContract(
         ...options.marketingPrompt!.overlay.map(text => `后期原文“${text}”；底画面不生字`),
         ...(options.isLastShot ? options.marketingPrompt!.endCard.map(text => `后期尾帧原文“${text}”`) : []),
       ].join("；"), verificationText);
+    }
+    if (nativeMarketing && unicodeLength(prompt) > options.maxLength) {
+      // Keep every native value and required constraint in the prompt. Only
+      // repeated host wording is tightened after both earlier passes fail.
+      const compactRepeatedHostField = (label: string, value: string): void => {
+        const pattern = new RegExp("^(\\d+\\.【" + escapeLabel(label) + "】)([^\\n]*)$", "mu");
+        const current = pattern.exec(prompt)?.[2];
+        if (current === undefined || current === value) return;
+        const templates = hostTemplates ??= {};
+        if (!Object.hasOwn(templates, label)) templates[label] = current;
+        prompt = prompt.replace(pattern, (_line, prefix: string) => prefix + value);
+      };
+      compactRepeatedHostField("导演意图", "依源字段；声画/跨镜连贯。");
+      if (!canonicalNoPerson) compactRepeatedHostField("明亮约束", "轮廓/明暗可辨；禁过曝/额外正面补光。");
+      compactRepeatedHostField("负面约束", [
+        "禁底画文字/字幕", "禁合同外水印/品牌",
+        ...(canonicalNoPerson ? ["禁人物/人影/人体局部/未声明角色"] : []),
+        ...(options.noAnimals ? ["禁动物/飞鸟"] : []),
+        ...sourceEnvironmentProhibitions,
+        "禁特效/光晕/模糊/过曝/暗黑调色/塑料或金属感高光",
+      ].join("；") + "。");
+      // The role field and the complete registered portrait binding remain
+      // explicit; their identity-policy suffix need not be repeated here.
+      if (!canonicalNoPerson) {
+        compactRepeatedHostField("角色约束", "禁未声明角色。");
+        compactRepeatedHostField("角色一致性", "身份/服妆/发型锁定，禁合并/替换/增减。");
+        if (!canonicalAnimalOnly && registeredCharacterNames.length > 0 && nativeParticipantText) {
+          compactRepeatedHostField("角色", nativeParticipantText);
+        }
+      }
+      // The separate 台词 field still forbids every speech form when required.
+      // Keep the complete native sound events and the music boundary here.
+      compactRepeatedHostField("音频", promptFieldText((next.fields as FusionRecord).audio)
+        + (options.noMusic ? "；禁音乐/配乐/音乐节拍。" : "；禁镜头外配乐。"));
+      const overlays = [
+        ...options.marketingPrompt!.overlay.map(text => "后期叠加“" + text + "”"),
+        ...(options.isLastShot ? options.marketingPrompt!.endCard.map(text => "尾帧“" + text + "”") : []),
+      ];
+      compactRepeatedHostField("本镜验收", overlays.join("；") || "核对动作/声画/跨镜连续性。");
     }
     next._workloomShotContract = {
       schema: "workloom.prompt-shot-contract/v1",
@@ -8709,6 +8751,7 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
             postRainOnly,
             sourceFirstFrame,
             noTitles: promptNoTitles,
+            deferOpeningFields: true,
             canonicalize: true,
             marketingPrompt,
             characterPortraits: promptCharacterPortraits,
