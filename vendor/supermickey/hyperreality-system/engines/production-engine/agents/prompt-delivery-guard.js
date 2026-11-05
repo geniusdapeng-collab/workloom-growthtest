@@ -13,7 +13,7 @@
  *   1. 字段完整性：内容镜头必备 25 字段，片头镜头另备 5 专属字段（共 30）
  *   2. 长度口径：REFINED_MIN ≤ 字符数 ≤ HARD_MAX（两阶段口径②，唯一真源 prompt-length.js）
  *   3. 台词纪律：有台词镜头【台词】字段在场且格式规范（时间戳+角色+情绪副词+说:"…"）；
- *      无台词镜头禁止出现【台词】（空镜禁虚构）
+ *      无台词镜头仅允许【台词】为完整的无台词声明，禁止虚构实际话语（含空镜）
  *   4. 台词速率：分段时间戳内字数 ≤ LIMIT（按 Profile 分流；英文平台按词/秒），
  *      总时长占比 ≤ MAX_DIALOGUE_RATIO(0.8)
  *   5. 必备锚点：【时间轴】【情绪】【负面约束】【角色一致性】在场
@@ -81,19 +81,23 @@ class PromptDeliveryGuard {
     // 3. 台词纪律
     const hasDialogueField = names.includes('台词');
     const expectsDialogue = this._shotExpectsDialogue(shot);
+    const dlgBody = hasDialogueField ? this._fieldBody(text, '台词') : '';
+    // WorkLoom modification [T-2026-1106-9004]: a label alone is not speech.
+    // Only one wholly negative field may be exempt; duplicate labels, mixed
+    // content and source dialogue still follow the original rejection path.
+    const noSpeechDeclaration = !expectsDialogue && names.filter(name => name === '台词').length === 1
+      && this._isNoSpeechDeclaration(dlgBody);
     if (expectsDialogue && !hasDialogueField) issues.push('数据层有台词但【台词】字段缺失');
-    if (!expectsDialogue && hasDialogueField && !this._isEmptyShot(shot)) {
+    if (!expectsDialogue && hasDialogueField && !noSpeechDeclaration && !this._isEmptyShot(shot)) {
       // 数据层无台词但出现台词字段：LLM 可能虚构，记 issue（空镜走空镜分支）
       issues.push('数据层无台词但出现【台词】字段（疑似虚构）');
     }
     if (this._isEmptyShot(shot) && hasDialogueField) {
-      const dlgBody = this._fieldBody(text, '台词');
       if (/说[:：]/.test(dlgBody)) issues.push('空镜出现实际台词内容（空镜禁虚构）');
     }
 
     // 4. 台词格式与速率
-    if (hasDialogueField) {
-      const dlgBody = this._fieldBody(text, '台词');
+    if (hasDialogueField && !noSpeechDeclaration) {
       const blocks = dlgBody.split(/\n/).map(l => l.trim()).filter(Boolean);
       let totalDialogueChars = 0;
       for (const block of blocks) {
@@ -228,6 +232,28 @@ class PromptDeliveryGuard {
 
   _countChars(text) {
     return String(text || '').length;
+  }
+
+  /** Classify the complete field, never remove a denial and ignore the residue. */
+  _isNoSpeechDeclaration(body) {
+    let text = String(body || '').trim();
+    if (text.startsWith('（') && text.endsWith('）') || text.startsWith('(') && text.endsWith(')')) {
+      text = text.slice(1, -1).trim();
+    }
+    const clauses = text.split(/[，,；;。:\n：]+/u).map(clause => clause.trim()).filter(Boolean);
+    if (clauses.length === 0) return false;
+    const denial = /^(?:无|没有|不含|禁止)(?:可辨(?:识|认)?的?|任何)?(?:台词|对白|旁白|口播)(?:[、/](?:(?:无|没有|不含|禁止)(?:可辨(?:识|认)?的?|任何)?)?(?:台词|对白|旁白|口播))*$/u;
+    const ambientOnly = /^(?:只|仅)(?:保留|有)(?:现场)?(?:原生声|环境声|动作音效)(?:[、/](?:现场)?(?:原生声|环境声|动作音效))*$/u;
+    let hasDenial = false;
+    for (const clause of clauses) {
+      const statement = clause.replace(/^(?:本镜(?:头)?(?:及全片)?|当前镜头|本片|全片|全程)(?:全程)?/u, '');
+      if (denial.test(statement) || statement === '为无台词短片') {
+        hasDenial = true;
+      } else if (statement !== '不适用' && !ambientOnly.test(statement)) {
+        return false;
+      }
+    }
+    return hasDenial;
   }
 
   _shotExpectsDialogue(shot) {
