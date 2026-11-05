@@ -198,7 +198,7 @@ it("invalidates only the old title policy while reusing current production and e
   const seed = "same seed"; const input = { same: "frozen" };
   const prior = [ ["G2_THEME", "theme-input-and-brief/v1"], ["G3_INSIGHT", "source-bound-discovery-and-assumptions/v2"],
     ["G3_PROFILE", "native-source-aware-production-profile/v2"], ["G4_PRD", "source-bound-prd-and-assumptions/v2"],
-    ["SCRIPT", "native-script-and-metadata/v1"], ["PRODUCTION", "native-production-camera-repair-feedback/v8"],
+    ["SCRIPT", "native-script-and-metadata/v1"], ["PRODUCTION", "native-production-camera-repair-feedback/v9"],
     ["OPENING_TITLE", "native-opening-title-fields/v1"] ] as const;
   const records = new Map<string, StudioEngineCheckpoint>();
   const key = (r: StudioCheckpointRequest) => `${r.stage}/${r.inputSha256}/${r.dependencySha256}`;
@@ -220,4 +220,32 @@ it("invalidates only the old title policy while reusing current production and e
     else expect(output).toEqual({ title: "new complete title" });
   }
   expect(author).toHaveBeenCalledOnce();
+});
+
+it("invalidates the previous production writer and its title descendant while retaining every upstream station", async () => {
+  const seed = "same production input"; const input = { scenes: "same", feedback: "same" };
+  const prior = [["G2_THEME", "theme-input-and-brief/v1"], ["G3_INSIGHT", "source-bound-discovery-and-assumptions/v2"],
+    ["G3_PROFILE", "native-source-aware-production-profile/v2"], ["G4_PRD", "source-bound-prd-and-assumptions/v2"],
+    ["SCRIPT", "native-script-and-metadata/v1"], ["PRODUCTION", "native-production-camera-repair-feedback/v8"],
+    ["OPENING_TITLE", "native-opening-title-fields/v2"]] as const;
+  const records = new Map<string, StudioEngineCheckpoint>();
+  const key = (record: StudioCheckpointRequest) => `${record.stage}/${record.inputSha256}/${record.dependencySha256}`;
+  let dependencySha256 = studioCheckpointHash(seed);
+  for (const [stage, policyVersion] of prior) {
+    const output = { stage, retained: true }; const outputSha256 = studioCheckpointHash(output);
+    const inputSha256 = studioCheckpointHash({ policyVersion, input });
+    const record: StudioEngineCheckpoint = { schemaVersion: "workloom.studio-engine-checkpoint/v1", stage,
+      inputSha256, dependencySha256, output, outputSha256 };
+    records.set(key(record), record);
+    dependencySha256 = studioCheckpointHash({ previous: dependencySha256, stage, inputSha256, outputSha256 });
+  }
+  const runner = createStudioCheckpointRunner({ load: async request => records.get(key(request)) ?? null,
+    save: async record => { records.set(key(record), record); } }, seed);
+  const authored: string[] = [];
+  for (const [stage] of prior) {
+    const output = await runner.run(stage, input, async () => { authored.push(stage); return { stage, rewritten: true }; });
+    expect(output).toEqual(stage === "PRODUCTION" || stage === "OPENING_TITLE"
+      ? { stage, rewritten: true } : { stage, retained: true });
+  }
+  expect(authored).toEqual(["PRODUCTION", "OPENING_TITLE"]);
 });

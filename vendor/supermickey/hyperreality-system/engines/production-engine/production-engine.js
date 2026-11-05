@@ -501,8 +501,12 @@ class ProductionEngine {
     const crypto = require('crypto');
     const repairFeedback = typeof adaptedBlueprint._workloomProductionRepairFeedback === 'string'
       ? adaptedBlueprint._workloomProductionRepairFeedback : '';
-    const phaseInput = repairFeedback
-      ? { scenes: adaptedBlueprint.scenes || [], productionRepairFeedback: repairFeedback }
+    const fieldWriterPolicy = typeof adaptedBlueprint._workloomMarketingFieldWriterPolicy === 'string'
+      ? adaptedBlueprint._workloomMarketingFieldWriterPolicy : '';
+    const phaseInput = repairFeedback || fieldWriterPolicy
+      ? { scenes: adaptedBlueprint.scenes || [],
+          ...(repairFeedback ? { productionRepairFeedback: repairFeedback } : {}),
+          ...(fieldWriterPolicy ? { marketingFieldWriterPolicy: fieldWriterPolicy } : {}) }
       : adaptedBlueprint.scenes || [];
     const stableHashInput = JSON.stringify(phaseInput, (k, v) => {
       if (v && typeof v === 'object' && !Array.isArray(v)) {
