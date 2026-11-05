@@ -58,7 +58,7 @@ import { checkpointMarketingFacts, prepareMarketingFacts, restoreMarketingFacts,
   MARKETING_SOURCE_POLICY_VERSION, marketingFactReviewCacheKey, verifyRejectedMarketingFactReview,
   type PreparedMarketingFacts, type MarketingFactReviewCache, type MarketingShotFactReview } from "./marketing-authority.js";
 import { canonicalRenderJson, renderSha256 } from "./gen/compiled-request.js";
-import { acquireProjectLease, archiveWorkDir, makeLedgerWriter, readProjectMeta } from "./archive-host.js";
+import { acquireProjectLease, archiveWorkDir, makeLedgerWriter, readProjectMeta, scopedRows } from "./archive-host.js";
 import { isKnownStudioResume, readLatestStudioResumeStage } from "./archive-resume.js";
 import { ingestPortraitsFromIndex } from "./media/library.js";
 import { upsertProductProfileFromDossier } from "./media/products.js";
@@ -244,8 +244,9 @@ const WORKER_ACTOR = { id: "video-studio", type: "system" } as const;
  * 注册表 `entry.error` 往往是空串——`?? 兜底` 会落成空消息并被分类成 BUG。
  * 取因顺序：运行器异常 → result.error/errorMessage → vendor failures/errors → 被拒确认门 → 通用兜底。
  */
-export function terminalFailureMessageOf(result: unknown, entryError?: string | null): string {
+export function terminalFailureMessageOf(result: unknown, entryError?: string | null, options: { promptReview?: boolean } = {}): string {
   const r = (result ?? {}) as {
+    success?: boolean;
     error?: unknown;
     errorMessage?: unknown;
     failures?: Array<{ message?: unknown }>;
@@ -256,6 +257,12 @@ export function terminalFailureMessageOf(result: unknown, entryError?: string | 
   const push = (value: unknown): void => {
     if (typeof value === "string" && value.trim()) candidates.push(value.trim());
   };
+  if (options.promptReview && isProducerRejection(r, { promptReview: true })) {
+    for (const confirmation of Object.values(r.confirmations ?? {})) {
+      const verdict = confirmation as { approved?: unknown; reason?: unknown } | null;
+      if (verdict?.approved === false && typeof verdict.reason === "string" && verdict.reason.startsWith("producer-rejected(")) push(verdict.reason);
+    }
+  }
   push(entryError);
   push(r.error);
   push(r.errorMessage);
@@ -264,7 +271,9 @@ export function terminalFailureMessageOf(result: unknown, entryError?: string | 
   for (const confirmation of Object.values(r.confirmations ?? {})) {
     if (confirmation && typeof confirmation === "object") {
       const verdict = confirmation as { approved?: unknown; reason?: unknown };
-      if (verdict.approved === false) push(verdict.reason);
+      const scopeStop = options.promptReview && typeof verdict.reason === "string"
+        && ["PROMPT_REVIEW_PORTRAIT_DEFERRED", "PROMPT_REVIEW_SCOPE_REACHED"].includes(verdict.reason);
+      if (verdict.approved === false && !scopeStop) push(verdict.reason);
     }
   }
   return (candidates[0] ?? "vendor 返回 success:false").slice(0, 500);
@@ -886,7 +895,10 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
                 ? {
                     score: producerVerdict.score, via: producerVerdict.via, model: producerVerdict.model ?? null,
                     degraded: producerVerdict.degraded, issues: producerVerdict.issues.slice(0, 5),
-                    suggestions: producerVerdict.suggestions.slice(0, 5), reason: producerVerdict.reason
+                    suggestions: producerVerdict.suggestions.slice(0, 5), reason: producerVerdict.reason,
+                    // Keep the actual verdict in its existing event. Rejected G6
+                    // is author feedback, never a passed checkpoint or approval.
+                    ...(gate === "G6_PROMPT" ? { producerVerdict } : {})
                   }
                 : { autoApproved: true }),
             }, gateRecord),
@@ -1392,6 +1404,18 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
               prior: checkpointPriorRunId === verifiedNativePrior?.runId ? verifiedNativePrior : undefined,
               priorOutcome: await checkpointStore.loadValue("OUTCOME"),
               inherited: await checkpointStore.loadValue<NativeProductionRepairEvidence>("NATIVE_PRODUCTION_FEEDBACK"),
+              g6Review: { ...scope, projectId: input.projectId, model: llm.model, gateWorkDir: runWorkDir,
+                readEvents: prior => scopedRows(scope,
+                  `SELECT event_id AS "eventId", tenant_id AS "tenantId", workspace_id AS "workspaceId",
+                    payload->'object'->>'id' AS "objectId", payload->'decision'->>'action' AS action,
+                    payload->'decision'->'after' AS after, created_at::text AS "createdAt"
+                   FROM biz_events WHERE workspace_id=$1 AND tenant_id=$2
+                    AND payload->'object'->>'id'=$3 AND payload->'decision'->>'action'='prompt.confirm'
+                    AND payload->'decision'->'after'->>'runId'=$4
+                    AND created_at >= $5::timestamptz AND created_at <= $6::timestamptz
+                   ORDER BY created_at, event_id`,
+                  [scope.workspaceId, scope.tenantId, `${input.projectId}:g6_prompt`, prior.runId, prior.startedAt, prior.finishedAt]),
+              },
             });
             if (nativeRepairEvidence) await checkpointStore.saveValue("NATIVE_PRODUCTION_FEEDBACK", nativeRepairEvidence,
               nativeRepairEvidence.diagnoses.at(-1)!.originRunId);
@@ -1399,6 +1423,8 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
               instruction: [
                 ...(productionRejections.length ? ["根据已核实的完整来源和原事实审核诊断修订生产提示词。纠正或删除未支持的主张，保留其他已通过的创作成果；不得把原坏镜或审核指令直接拼入作品，不得修改来源或替评审作出通过裁决。"] : []),
                 ...(nativeRepairEvidence ? ["根据完整冻结需求、当前蓝图逐镜动作合同、已核实来源和原失败诊断修订生产提示词。保持每个必需动作及先后顺序，不得为修运镜而删除动作、人物或服装变化；转场须区分入场/出场边界，景别跨度达到原生门槛时须有真实成立的白名单动机或调整景别，不能只改叠化/闪白或虚构标签。保留其他已通过创作成果，不得把原坏镜或审核指令直接拼入作品，不得修改来源或替评审作出通过裁决。"] : []),
+                ...(nativeRepairEvidence?.diagnoses.some(diagnosis => diagnosis.kind === "g6-prompt-rejection")
+                  ? ["G6真实拒绝的完整理由、问题和建议也是待纠正证据。保留各自记录的原运行与证据范围，不得把历史事件未保存的字段当成已有完整裁决；由原生作者修正后，仍须接受相同G6和逐镜事实审核。"] : []),
               ].join("\n"),
               ...(marketing ? { sourceClaims: marketing.bundle.stages.map(stage => stage.facts), restrictions: marketing.bundle.restrictions,
                 creativeRequirements: marketing.bundle.creativeRequirements } : {}),
@@ -1432,9 +1458,9 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
                 return proof?.approved === true && proof.status === "passed" && proof.via === "llm" && proof.degraded === false;
               });
               if (r.success || !promptReviewStopped || stop !== PROMPT_REVIEW_STOP || !promptReviewReport || !reviewed) {
-                const message = terminalFailureMessageOf(r, "本次执行未通过完整 G6 提示词审核");
+                const message = terminalFailureMessageOf(r, "本次执行未通过完整 G6 提示词审核", { promptReview: true });
                 return { output: { purpose: "prompt-review", state: "prompt_review_failed", renderAuthorized: false, failureMessage: message },
-                  outcome: { status: "failed" as const, errorClass: isProducerRejection(r) ? "GATE_REJECTED" : classifyError(new Error(message)), errorMsg: message } };
+                  outcome: { status: "failed" as const, errorClass: isProducerRejection(r, { promptReview: true }) ? "GATE_REJECTED" : classifyError(new Error(message)), errorMsg: message } };
               }
               const marketingFacts = marketing ? await finalizeMarketingFacts(marketing, promptReviewShots, process.env, factReviewCache) : null;
               const receipt = await issueStudioPromptReview({ app: getAppPool(), scope, projectId: input.projectId,
@@ -1735,7 +1761,7 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
       if (promptReview) {
         const receipt = promptReviewReceipt as StudioPromptReview | null;
         entry.status = receipt ? "finished" : "failed";
-        entry.error = receipt ? null : terminalFailureMessageOf(result, entry.error);
+        entry.error = receipt ? null : terminalFailureMessageOf(result, entry.error, { promptReview: true });
         entry.resultSummary = { purpose: "prompt-review", state: receipt?.state ?? "prompt_review_failed",
           renderAuthorized: false, ...(receipt ? { promptShotCount: receipt.shots.length, plannedSeconds: receipt.plannedSeconds } : {}) };
         return;

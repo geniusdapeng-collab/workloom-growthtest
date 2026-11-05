@@ -524,8 +524,10 @@ describe("预生产原始结果与诚实终态", () => {
     const outcome = doubles.checkpointEvents.filter(event => event.kind === "OUTCOME").at(-1)!;
     const saved = JSON.parse(await readFile(path.join(doubles.workDir, "archive", scope.workspaceId, projectId, outcome.ref), "utf8"));
     expect(saved.payload.state).toBe("known");
+    const priorEntry = worker.getRun(firstRunId, scope.workspaceId)!;
     doubles.query.mockImplementation(async (sql: string) => ({ rows: sql.includes("SELECT attempt, input_ref")
       ? [{ run_id: firstRunId, attempt: 1, status: "failed", error_class: "GATE_REJECTED",
+        started_at: priorEntry.startedAt, finished_at: priorEntry.finishedAt,
         input_ref: "stages/preproduction/attempt-1.input.json" }] : [], rowCount: 1 }));
     const nextRunId = worker.startRun(scope, { projectId, intent: "同一冻结需求",
       resumePrior: { runId: firstRunId, attempt: 1, stageId: "preproduction" } });
@@ -728,6 +730,102 @@ describe("预生产原始结果与诚实终态", () => {
 });
 
 describe("正式 G6 提示词工作单", () => {
+  it("真实G6拒绝优先于延后G5哨兵，终态分类准确且原完整负裁决留在原事件", async () => {
+    useNarrativeProject();
+    vi.stubEnv("WORKLOOM_RENDER_SIGNING_SECRET", randomBytes(32).toString("hex"));
+    doubles.emitGates = false;
+    const prompt = `01.【动作】${"先拿起器物，再转动，最后放稳。".repeat(20)}`;
+    const report = `# 完整提示词报告\n| S1 | 30s | 330 |\n### S1(内容·25字段)\n\n\`\`\`markdown\n${prompt}\n\`\`\`\n`;
+    const originalReview = doubles.review.getMockImplementation()!;
+    const reason = "原合同要求的转动动作未完整执行。";
+    doubles.review.mockImplementation(async options => {
+      const verdict = await originalReview(options);
+      return options.context.gate === "G6_PROMPT" ? { ...verdict, approved: false, status: "failed", score: 42, model: "test-author",
+        reason, issues: Array.from({ length: 7 }, (_, i) => `原合同动作问题${i}`), suggestions: ["交回原生作者修正"],
+        receipts: [{ modelId: "test-author", responseId: "unit-negative-response" }] } : verdict;
+    });
+    doubles.runPreproduction.mockImplementation(async () => {
+      const config = doubles.studioConfigs.at(-1)!;
+      const approval = (gate: string, contentMd: string) => config.onApproval({ gate, vendorType: "prompt",
+        runId: "vendor-run", title: "完整确认单", contentMd });
+      for (const gate of ["G2_THEME", "G3_INSIGHT", "G4_PRD"]) await approval(gate, "完整前期合同。".repeat(30));
+      const portrait = await approval("G5_PORTRAIT", "本用途延后参考图");
+      config.onPromptReview([{ shotId: "S1", duration: 30, prompt, fields: { action: "拿起后放稳" } }]);
+      const prompts = await approval("G6_PROMPT", report);
+      return { success: false, confirmations: { portrait, prompts }, stages: {} };
+    });
+    const projectId = `VID-g6-negative-${++projectSequence}`;
+    doubles.meta.mockResolvedValue({ projectId, kind: "narrative", title: "原生G6返工用例", threadId: "T1",
+      createdAt: "2026-09-27T00:00:00Z" });
+    const runId = worker.startRun(scope, { projectId, intent: "先拿起器物，再转动，最后放稳。", purpose: "prompt-review", durationSec: 30 });
+    await vi.waitFor(() => expect(worker.getRun(runId, scope.workspaceId)?.finishedAt).not.toBeNull(), { timeout: 3_000, interval: 10 });
+    expect(worker.getRun(runId, scope.workspaceId)).toMatchObject({ status: "failed",
+      error: expect.stringContaining(`producer-rejected(G6_PROMPT · score=42)：${reason}`) });
+    expect(doubles.finish).toHaveBeenCalledWith(expect.objectContaining({ status: "failed", errorClass: "GATE_REJECTED",
+      errorMsg: expect.stringContaining(reason) }));
+    const event = vi.mocked(gatewayAppendOnClient).mock.calls.map(([, , item]) => item)
+      .find(item => item.decision.action === "prompt.confirm");
+    expect(event?.decision.after).toMatchObject({ approved: false, reason,
+      producerVerdict: { status: "failed", approved: false, via: "llm", degraded: false,
+        evidence: [{ scope: "complete-text", sha256: createHash("sha256").update(report).digest("hex") }],
+        receipts: [{ responseId: "unit-negative-response" }] } });
+    expect((event?.decision.after as any).producerVerdict.issues).toHaveLength(7);
+    expect(doubles.finalize).not.toHaveBeenCalled();
+    expect(doubles.ingest).not.toHaveBeenCalled();
+
+    // Exercise the real resume/worker/store wiring with the historical event
+    // shape: old G6 runs were labelled BUG and did not retain a full verdict.
+    const firstEntry = worker.getRun(runId, scope.workspaceId)!;
+    const legacyAfter = structuredClone(event!.decision.after) as Record<string, unknown>;
+    delete legacyAfter.producerVerdict;
+    doubles.query.mockImplementation(async (sql: string) => {
+      if (sql.includes("SELECT attempt, input_ref")) return { rows: [{ run_id: runId, attempt: 1,
+        status: "failed", error_class: "BUG", error_msg: "本次执行未通过完整G6提示词审核",
+        input_ref: "stages/prompt_review/attempt-1.input.json", started_at: firstEntry.startedAt,
+        finished_at: firstEntry.finishedAt }], rowCount: 1 };
+      if (sql.includes("payload->'decision'->>'action'='prompt.confirm'")) return { rows: [{
+        eventId: "EVT-studio-test", ...scope, objectId: `${projectId}:g6_prompt`, action: "prompt.confirm",
+        createdAt: event!.context.time, after: legacyAfter }], rowCount: 1 };
+      return { rows: [], rowCount: 0 };
+    });
+    doubles.runPreproduction.mockImplementationOnce(async () => {
+      const config = doubles.studioConfigs.at(-1)!;
+      const feedback = JSON.parse(config.productionRepairFeedback);
+      expect(feedback.frozenUserRequirements).toBe("先拿起器物，再转动，最后放稳。");
+      expect(feedback.nativeProductionFailures).toEqual([expect.objectContaining({
+        kind: "g6-prompt-rejection", originRunId: runId, reviewEventId: "EVT-studio-test",
+        message: reason, evidenceMode: "legacy-event" })]);
+      expect(feedback.instruction).toContain("仍须接受相同G6和逐镜事实审核");
+      return { success: false, error: "已验证返工输入后的合成停点", stages: {} };
+    });
+    const { readLatestStudioResumeStage } = await import("./archive-resume.js");
+    expect(await readLatestStudioResumeStage(scope, projectId, "prompt_review"))
+      .toMatchObject({ run_id: runId, attempt: 1, status: "failed", error_class: "BUG" });
+    const { ArchiveStore } = await import("@hyperreality/video-studio");
+    const { readStudioAttemptOutcome } = await import("./studio-checkpoint-store.js");
+    expect(await readStudioAttemptOutcome({ scope, projectId, projectCreatedAt: "2026-09-27T00:00:00Z",
+      stageId: "prompt_review", runId, attempt: 1, archive: new ArchiveStore(doubles.workDir, scope.workspaceId, projectId) })).toBe("known");
+    const resumed = worker.startRun(scope, { projectId, intent: "先拿起器物，再转动，最后放稳。", purpose: "prompt-review", durationSec: 30,
+      resumePrior: { runId, attempt: 1, stageId: "prompt_review" } });
+    await vi.waitFor(() => expect(worker.getRun(resumed, scope.workspaceId)?.finishedAt).not.toBeNull(), { timeout: 3_000, interval: 10 });
+    expect(worker.getRun(resumed, scope.workspaceId)?.error).toBe("已验证返工输入后的合成停点");
+    expect(doubles.runPreproduction).toHaveBeenCalledTimes(2);
+    const pointer = doubles.checkpointEvents.find(item => item.runId === resumed && item.kind === "NATIVE_PRODUCTION_FEEDBACK")!;
+    expect(pointer).toBeTruthy();
+    const persisted = JSON.parse(await readFile(path.join(doubles.workDir, "archive", scope.workspaceId, projectId, pointer.ref), "utf8"));
+    expect(persisted.originRunId).toBe(runId);
+    expect(persisted.payload.diagnoses[0]).toMatchObject({ kind: "g6-prompt-rejection", evidenceMode: "legacy-event" });
+  });
+
+  it("提示词失败提取真实拒绝但不改普通运行的异常优先级", () => {
+    const result = { confirmations: { portrait: { approved: false, reason: "PROMPT_REVIEW_PORTRAIT_DEFERRED" },
+      prompt: { approved: false, reason: "producer-rejected(G6_PROMPT)：原合同动作缺失" } } };
+    expect(worker.terminalFailureMessageOf(result)).toBe("PROMPT_REVIEW_PORTRAIT_DEFERRED");
+    expect(worker.terminalFailureMessageOf(result, "普通运行器异常")).toBe("普通运行器异常");
+    expect(worker.terminalFailureMessageOf(result, "本次执行未通过完整G6审核", { promptReview: true }))
+      .toBe("producer-rejected(G6_PROMPT)：原合同动作缺失");
+  });
+
   it.each(["marketing", "narrative"] as const)("%s 只签发 G6 实审字节，恢复绑定且不进入媒体链", async (kind) => {
     vi.stubEnv("WORKLOOM_RENDER_SIGNING_SECRET", randomBytes(32).toString("hex"));
     vi.stubEnv("HR_DEFER_RENDER", "0");

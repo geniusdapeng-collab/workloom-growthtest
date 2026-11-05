@@ -6056,15 +6056,27 @@ export function applyNarrativeFinalPromptContract(
   const shotCharacterEvidence = promptFieldText(options.marketingPrompt
     ? (next.fields as FusionRecord).character ?? next.character
     : next.character ?? (next.fields as FusionRecord).character);
+  const nativeParticipantText = options.marketingPrompt
+    ? marketingNativeFieldText(next, "character") : "";
+  const registeredCharacterNames = [...new Set((options.characterPortraits ?? [])
+    .filter(profile => characterNames.includes(profile.name) && Boolean(profile.path?.trim()))
+    .map(profile => profile.name))];
+  const registeredIdentity = registeredCharacterNames.join("、");
+  const marketingCharacterConstraint = `人物仅限源剧本与本镜人物、动作合同明确声明的参与者；${registeredIdentity ? `${registeredIdentity}身份绑定已登记参考资料；` : ""}不得增加未声明人物。`;
+  const marketingCharacterContinuity = `${registeredIdentity ? `${registeredIdentity}外观、服装与发型依登记参考资料分别锁定；其他` : "本镜"}已声明参与者遵循源合同，不得合并、替换或增减人物。`;
   const shotCharacterRef = promptFieldText(next.characterRef);
   const explicitNoPersonInShot = /^(?:无|none|n\/a)$/iu.test(shotCharacterRef)
     || /(?:空镜无角色|无角色出场|不出现[^。；\n]{0,8}(?:人物|人手|身影|面部|陈卓)|画面主体仅[^。；\n]{0,12}(?:陈设|物件)|无人物出场)/u.test(shotCharacterEvidence);
   const shotNoPerson = Boolean(options.noCharacters) || explicitNoPersonInShot;
   if (!shotNoPerson && characterNames.length > 0) {
-    replaceField("角色", `${characterNames.join("、")}；保持当前授权角色档案、同一发型脸型、身高体型与服装，动作以本镜动作字段为准，不套用无关人物模板。`);
+    replaceField("角色", options.marketingPrompt && nativeParticipantText
+      ? `${nativeParticipantText}${registeredIdentity ? `；${registeredIdentity}身份沿用已登记参考资料。` : ""}`
+      : `${characterNames.join("、")}；保持当前授权角色档案、同一发型脸型、身高体型与服装，动作以本镜动作字段为准，不套用无关人物模板。`);
     replaceField("微动作", "微动作只服务于本镜动作与情绪：手部、呼吸、视线和重心做小幅连续变化，不使用固定微笑、张开双臂或其他无关模板。");
-    replaceField("角色约束", `本镜仅允许 ${characterNames.join("、")} 入画；不得合并、替换或增加其他人物。`);
-    replaceField("角色一致性", `所有镜头分别绑定 ${characterNames.join("、")} 的当前外观与服装锚点；不得合并、替换或增减人物。`);
+    replaceField("角色约束", options.marketingPrompt ? marketingCharacterConstraint
+      : `本镜仅允许 ${characterNames.join("、")} 入画；不得合并、替换或增加其他人物。`);
+    replaceField("角色一致性", options.marketingPrompt ? marketingCharacterContinuity
+      : `所有镜头分别绑定 ${characterNames.join("、")} 的当前外观与服装锚点；不得合并、替换或增减人物。`);
     if (characterNames.length === 1) {
       prompt = prompt.replace(
         /[^。；\n]{0,24}(?:门外走廊有一道人影|一道人影|有人正走到这扇门前|走近的身体重量)[^。；\n]*[。；]?/gu,
@@ -6263,6 +6275,10 @@ export function applyNarrativeFinalPromptContract(
       ? `${canonicalAnimalNames.join("、")}作为本镜唯一动物主体入画；外观锚点=${animalAppearanceAnchor || "以源需求中的品种、体型、毛色、眼睛颜色、湿度与动作描述为准"}；身份证据仅文字外观锚点，本审计轮无已登记图片参考资产；画面不出现人物、人影或人体局部。`
       : canonicalNoPerson
         ? "无人物、无人影、无人体局部入画。"
+      : nativeMarketing && nativeParticipantText
+        ? `${nativeParticipantText}${registeredIdentity ? `；${registeredIdentity}身份沿用已登记参考资料；${profileAppearance || "保持登记外观与服装锚点"}` : ""}`
+      : nativeMarketing && characterNames.length > 0
+        ? `${characterNames.join("、")}按源剧本人物描述入画；${registeredIdentity ? `${registeredIdentity}外观依已登记参考资料；${profileAppearance || "保持登记外观与服装锚点"}` : "外观与服妆依本镜源合同"}`
       : characterNames.length > 0
         ? `${characterNames.join("、")}入画；${profileAppearance || "保持当前授权角色档案中的发型脸型、身高体型与服装一致"}`
         : cleanText(shotCharacterEvidence) || "按本镜源证据执行";
@@ -6287,8 +6303,10 @@ export function applyNarrativeFinalPromptContract(
         ? "不适用：本镜无人物，不生成也不引用人像定妆照。"
       : (options.characterPortraits ?? []).filter((item) => characterNames.includes(item.name) && item.path)
         .map((item) => `${item.name}=${item.path}`).join("；")
-        || fieldValue("定妆照")
-        || "使用本次已审核角色档案中的当前定妆照，不得替换为未登记人物。";
+        || (!options.marketingPrompt ? fieldValue("定妆照") : "")
+        || (options.marketingPrompt
+          ? "不适用图片参考：当前未登记人像素材，仅按源人物外观文字执行；不声称图片绑定。"
+          : "使用本次已审核角色档案中的当前定妆照，不得替换为未登记人物。");
     const dialogueText = options.noDialogue
       ? "不适用：本片无台词、无旁白、无口播。"
       : promptFieldText(next.dialogue ?? (next.fields as FusionRecord).dialogue) || "按已确认台词合同执行。";
@@ -6429,8 +6447,10 @@ export function applyNarrativeFinalPromptContract(
       `22.【转场】${nativeMarketing?.transition || transitionTextForAction(assignedAction, Boolean(options.isLastShot))}`,
       `23.【音频】${audioText}`,
       `24.【负面约束】${[...new Set([...forbidden, "无暗黑风调色", "无塑料或金属感高光"])].join("、")}。`,
-      `25.【角色约束】${canonicalNoPerson ? "画面禁止人物、人影、人体局部和拟人化表演模板。" : `本镜仅允许 ${characterNames.join("、") || "已登记角色"} 入画；不得增加未声明人物。`}`,
-      `26.【角色一致性】${canonicalNoPerson ? "本镜无人物；锁定同一场景、道具、光源与空间关系。" : `分别绑定 ${characterNames.join("、") || "当前角色"} 的授权外观、服装与发型；不得合并、替换或增减人物。`}`,
+      `25.【角色约束】${canonicalNoPerson ? "画面禁止人物、人影、人体局部和拟人化表演模板。" : nativeMarketing
+        ? marketingCharacterConstraint : `本镜仅允许 ${characterNames.join("、") || "已登记角色"} 入画；不得增加未声明人物。`}`,
+      `26.【角色一致性】${canonicalNoPerson ? "本镜无人物；锁定同一场景、道具、光源与空间关系。" : nativeMarketing
+        ? marketingCharacterContinuity : `分别绑定 ${characterNames.join("、") || "当前角色"} 的授权外观、服装与发型；不得合并、替换或增减人物。`}`,
       `27.【本镜验收】${verificationText}`,
     ].join("\n");
     if (unicodeLength(prompt) < 1200) {
@@ -6512,15 +6532,14 @@ export function applyNarrativeFinalPromptContract(
       ].join("；") + "。");
       compactHostField("角色约束", canonicalNoPerson
         ? "禁人物/人影/人体局部及拟人化表演。"
-        : `仅${characterNames.join("、") || "已登记角色"}入画，禁增员。`);
+        : "仅源剧本及本镜合同声明人物；禁新增。");
       compactHostField("角色一致性", canonicalNoPerson
         ? "无人物；场景、道具、光源、空间关系锁定。"
-        : "授权外观/服装/发型锁定；禁角色合并/替换/增减。");
-      if (!canonicalNoPerson && !canonicalAnimalOnly && characterNames.length > 0
-        && characterNames.every(name => profiles.some(profile => profile.name === name && profile.path))) {
+        : `人物身份/服妆/发型锁定；禁合并/替换/增减。${registeredIdentity ? `${registeredIdentity}依登记参考。` : ""}`);
+      if (!canonicalNoPerson && !canonicalAnimalOnly && registeredCharacterNames.length > 0) {
         // Each registered identity remains explicit and its original asset path
         // stays in 定妆照; no unregistered or text-only identity is shortened.
-        compactHostField("角色", `${characterNames.join("、")}；外观以本镜登记定妆照和角色主档为准。`);
+        compactHostField("角色", `${nativeParticipantText ? `${nativeParticipantText}；` : `${characterNames.join("、")}按源合同入画；`}${registeredIdentity}外观以本镜登记定妆照和角色主档为准。`);
       }
       if (!portraitText.startsWith("不适用")) compactHostField("定妆照",
         portraitText.endsWith("；禁替换。") ? portraitText : `${portraitText}；禁替换。`);
@@ -6545,7 +6564,15 @@ export function applyNarrativeFinalPromptContract(
       shotSize,
       camera: cameraText,
       equipment: options.marketingPrompt ? "按本镜运镜执行；具体设备型号未声明" : "固定三脚架与常规电影镜头；具体型号未声明",
-      subjectCount: canonicalNoActors ? 0 : characterNames.length,
+      // Registered portrait identities are not an inventory of every declared
+      // participant. Do not turn one registered lead into a one-person scene.
+      subjectCount: canonicalNoActors ? 0 : nativeMarketing ? null : characterNames.length,
+      ...(nativeMarketing && !canonicalNoActors ? {
+        registeredSubjectCount: registeredCharacterNames.length,
+        registeredCharacterNames,
+        participants: nativeParticipantText || null,
+        subjectCountBasis: "not-inferred-from-portrait-registry",
+      } : {}),
       characterNames: canonicalNoActors ? [] : characterNames,
       costume,
       props: propsText.split("、").map(String).filter(Boolean),
