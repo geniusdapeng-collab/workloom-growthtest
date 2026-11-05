@@ -5710,6 +5710,7 @@ interface FusionAgent extends FusionRecord {
   _getAltLLMEngine?: () => FusionRecord | null;
   _saveSubCheckpoint?: (checkpointManager: unknown, blueprintHash: string, rows: FusionRecord[], completed: number, total: number) => void;
   _workloomSetFusionDraftRows?: (rows: FusionRecord[]) => void;
+  _isFieldSemanticallyComplete?: (shot: FusionRecord, field: string, fields: FusionRecord, blueprint?: FusionRecord | null) => boolean;
 }
 interface FusionPhase extends FusionRecord {
   agents: { promptFusion?: FusionAgent };
@@ -8079,7 +8080,7 @@ export function installVendorNarrativePromptReviewBridge(options: {
  * 每次执行独立的 agent 视图，避免并发 run 互改重试和子服务回调。
  * 只保留单次外调超时，不按整条任务已经运行的时间缩减后续创作。
  */
-const MARKETING_FIELD_WRITER_POLICY = "native-marketing-field-authority/v2";
+const MARKETING_FIELD_WRITER_POLICY = "native-marketing-field-authority/v3";
 
 function nativeMarketingBlueprint(blueprint: FusionRecord): boolean {
   return Boolean(recordValue(recordValue(recordValue(blueprint.meta)._metadata)._prd)._workloomMarketingPrompt);
@@ -8218,6 +8219,13 @@ function scopedFusionAgent(agent: FusionAgent, blueprint: FusionRecord): FusionA
   const currentMarketingWriter = nativeMarketingBlueprint(blueprint)
     && blueprint._workloomMarketingFieldWriterPolicy === MARKETING_FIELD_WRITER_POLICY;
   const authorContext = currentMarketingWriter ? scopeNativeMarketingAuthorContext(scoped, agent, blueprint) : () => "";
+  const frozenMetadata = recordValue(recordValue(blueprint.meta)._metadata);
+  const frozenSpeech = narrativeSpeechPolicy(frozenMetadata.dialogueRequirement);
+  if (currentMarketingWriter && frozenSpeech.allSpeechForbidden) {
+    scoped._isFieldSemanticallyComplete = (_shot, field, fields) => field === "dialogue"
+      && Object.hasOwn(fields, field)
+      && typeof fields[field] === "string" && fields[field].trim() === "";
+  }
   const checker = agent.consistencyChecker as FusionRecord | undefined;
   if (currentMarketingWriter
     && checker && typeof checker.check === "function" && typeof checker.autoFix === "function") {

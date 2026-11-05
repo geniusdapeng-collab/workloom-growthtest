@@ -37,7 +37,7 @@ const prefix = "【本轮跨镜作者上下文】\n";
 const boundary = "\n【跨镜执行边界】";
 const stop = "CROSS_SHOT_FIXTURE_STOP_AFTER_REAL_NATIVE_PROCESS";
 const marker = "_workloomMarketingFieldWriterPolicy";
-const currentPolicy = "native-marketing-field-authority/v2";
+const currentPolicy = "native-marketing-field-authority/v3";
 const privateContext = /workloom\.native-shot-author-context\/v1|【本轮跨镜作者上下文】|_workloomSetFusionDraftRows|"sourcePlan"|"authoredDrafts"/;
 
 function expectNoAuthorContext(rows: Row[]): void {
@@ -308,7 +308,7 @@ it("isolates two concurrent contexts on the same real base agent without leaking
 
 it.each([
   { label: "no marker", policy: null, marketing: true },
-  { label: "old marker", policy: "native-marketing-field-authority/v1", marketing: true },
+  { label: "old marker", policy: "native-marketing-field-authority/v2", marketing: true },
   { label: "non-marketing blueprint", policy: currentPolicy, marketing: false },
 ])("keeps the original native prompt path for $label", async ({ policy, marketing }) => {
   const uninstall = installVendorPhase3FusionBridge();

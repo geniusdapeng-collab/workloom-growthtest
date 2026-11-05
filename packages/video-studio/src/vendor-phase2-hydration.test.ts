@@ -183,6 +183,7 @@ it.each(["phase1", "phase2"])("reuses the original PF child after real safe seri
 it.each(["phase3", "phase3.5"].flatMap(phase => [
   { phase, priorWriterPolicy: undefined }, { phase, priorWriterPolicy: "native-marketing-field-authority/v0" },
   { phase, priorWriterPolicy: "native-marketing-field-authority/v1" },
+  { phase, priorWriterPolicy: "native-marketing-field-authority/v2" },
 ]))("reauthors same-feedback $phase from prior writer $priorWriterPolicy before reusing current native stamps", async ({ phase, priorWriterPolicy }) => {
   const directory = mkdtempSync(resolve(tmpdir(), "wl-marketing-writer-policy-"));
   // Capture the genuine native producer before installing the current host
@@ -202,7 +203,7 @@ it.each(["phase3", "phase3.5"].flatMap(phase => [
 
     const produced = await fixture.engine.produce(current);
     expect(produced.resumed).toBe(false);
-    expect(current._workloomMarketingFieldWriterPolicy).toBe("native-marketing-field-authority/v2");
+    expect(current._workloomMarketingFieldWriterPolicy).toBe("native-marketing-field-authority/v3");
     expect(fixture.author).toHaveBeenCalledTimes(authorCalls + 2);
     expect(fixture.processInputs).toHaveLength(2);
     expect(fixture.processInputs[1]!.effectiveKey).not.toBe(oldKey);
