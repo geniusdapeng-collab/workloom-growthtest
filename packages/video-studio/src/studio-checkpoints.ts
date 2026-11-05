@@ -8,7 +8,7 @@ const STUDIO_STAGE_POLICY_VERSION: Record<StudioEngineCheckpointStage, string> =
   G2_THEME: "theme-input-and-brief/v1",
   G3_INSIGHT: "source-bound-discovery-and-assumptions/v2",
   G3_PROFILE: "native-source-aware-production-profile/v2",
-  G4_PRD: "source-bound-prd-and-assumptions/v2",
+  G4_PRD: "source-bound-prd-native-local-contract/v3",
   SCRIPT: "native-script-and-metadata/v1",
   PRODUCTION: "native-production-camera-repair-feedback/v12",
   OPENING_TITLE: "native-opening-title-fields/v2",

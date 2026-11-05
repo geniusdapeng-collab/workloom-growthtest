@@ -3367,12 +3367,92 @@ function dominantColorTemperature(value: unknown, subjectLabel: string): string 
   return "色温按已确认视觉方案执行";
 }
 
+/** Identity assets enhance a matching authored person; their order is not cast order. */
+function samePrdIdentity(left: Record<string, unknown>, right: Record<string, unknown>): boolean {
+  const ids = (value: Record<string, unknown>) => [value.id, value.characterId, value.character_id, value.sourceCharacterId]
+    .filter((item): item is string => typeof item === "string" && Boolean(item.trim()));
+  const leftIds = ids(left);
+  return ids(right).some(id => leftIds.includes(id))
+    || typeof left.name === "string" && Boolean(left.name.trim()) && left.name === right.name;
+}
+
+/** Project native local evidence without turning the raw requirement list into a storyboard. */
+function buildMarketingShotContract(
+  prd: Record<string, unknown>,
+  safeAreaInsets: { topPercent: number; bottomPercent: number; rightRailPercent: number },
+): Array<Record<string, unknown>> {
+  if (Array.isArray(prd.shotContract) && prd.shotContract.length > 0) return prd.shotContract.map(recordValue);
+  const plan = recordValue(prd.scenePlan);
+  const scenes = Array.isArray(plan.scenes) ? plan.scenes.map(recordValue) : [];
+  const mappings = Array.isArray(plan.shotMapping) ? plan.shotMapping.map(recordValue) : [];
+  const cast = Array.isArray(recordValue(prd.characterSystem).characters)
+    ? (recordValue(prd.characterSystem).characters as unknown[]).map(recordValue) : [];
+  const visual = recordValue(prd.visualSpecification);
+  const rows: Array<Record<string, unknown>> = [];
+  const text = (...values: unknown[]) => values.find(value => typeof value === "string" && value.trim()) as string | undefined;
+  let cursor = 0;
+  for (const mapping of mappings) {
+    const scene = scenes.find(item => item.sceneId === mapping.sceneId);
+    if (!scene) continue; // No invented scene: the real G4 reviewer still sees the unresolved mapping.
+    const authored = Array.isArray(mapping.shots) ? mapping.shots.map(recordValue) : [];
+    const count = authored.length || Math.max(1, Math.round(Number(mapping.estimatedShots ?? 1)));
+    const hints = Array.isArray(mapping.shotBreakdownHint) ? mapping.shotBreakdownHint : [];
+    const sceneDuration = Math.max(0, Number(scene.duration ?? 0));
+    const sceneStart = cursor;
+    for (let index = 0; index < count; index += 1) {
+      const shot = authored[index] ?? {};
+      const hint = String(hints[index] ?? "");
+      const movementHint = /^(?:tracking|static|locked|handheld|pan|tilt|dolly|follow)(?:[_ -].*)?$/iu.test(hint) ? hint : undefined;
+      const movement = text(shot.cameraMovement, shot.camera_movement, recordValue(shot.camera).movement,
+        scene.cameraMovement, scene.camera_movement, mapping.cameraMovement, movementHint, visual.cameraLanguage) ?? "未明确运镜";
+      const start = typeof shot.startSeconds === "number" && Number.isFinite(shot.startSeconds)
+        ? shot.startSeconds : Number((sceneStart + sceneDuration * index / count).toFixed(2));
+      const end = typeof shot.endSeconds === "number" && Number.isFinite(shot.endSeconds)
+        ? shot.endSeconds : Number((sceneStart + sceneDuration * (index + 1) / count).toFixed(2));
+      const declared = [shot.participants, shot.subjectIds, scene.participants, scene.characters].find(Array.isArray) as unknown[] | undefined;
+      const participants = declared ? [...declared] : [];
+      const references = participants.map(value => typeof value === "string" ? value
+        : text(recordValue(value).characterId, recordValue(value).character_id, recordValue(value).id, recordValue(value).name) ?? "").filter(Boolean);
+      const resolveCast = (ref: string) => cast.find(person => samePrdIdentity(person, { id: ref, name: ref }));
+      const subjectIds = references.map(ref => {
+        const person = resolveCast(ref);
+        return person ? String(person.characterId ?? person.id ?? ref) : ref;
+      });
+      const subjectNames = references.map(ref => String(resolveCast(ref)?.name ?? ref));
+      const lighting = text(shot.lighting, scene.lighting, visual.lightingDirection) ?? "按原作者场景执行";
+      const audio = [shot.audioAnchors, shot.audio, scene.audioRequirements].find(Array.isArray) as unknown[] | undefined;
+      const props = [shot.keyProps, scene.keyProps].find(Array.isArray) as unknown[] | undefined;
+      rows.push({
+        ...shot,
+        shotId: text(shot.shotId, shot.shot_id) ?? `${String(mapping.sceneId)}-S${String(index + 1).padStart(2, "0")}`,
+        sceneId: mapping.sceneId,
+        status: "planned",
+        startSeconds: start, endSeconds: end, durationSeconds: Number((end - start).toFixed(2)),
+        shotSize: text(shot.shotSize, shot.shotType) ?? (movementHint ? "未明确景别" : hint || "未明确景别"),
+        cameraMovement: movement, cameraHint: hint,
+        purpose: text(shot.purpose, shot.action, scene.purpose) ?? "未明确镜头目的",
+        action: text(shot.action, scene.action) ?? "",
+        location: text(shot.location, scene.setting) ?? "",
+        visualRequirements: Array.isArray(scene.visualRequirements) ? scene.visualRequirements : [],
+        lighting, colorTemperature: text(shot.colorTemperature, scene.colorTemperature) ?? colorTemperatureFromText(lighting) ?? "色温按原作者场景执行",
+        participants, subjectIds, subjectCount: declared ? participants.length : null,
+        subjectLabel: subjectNames.length ? subjectNames.join("、") : "未逐镜声明主体；按原作者场景核对，身份资产不是人数上限",
+        keyProps: props ?? [], dialogue: shot.dialogue ?? scene.dialogue ?? "",
+        audio: audio ?? [], audioAnchors: audio ?? [], safeArea: true, safeAreaInsets, listeningVerified: false,
+      });
+    }
+    cursor += sceneDuration;
+  }
+  return rows;
+}
+
 function buildShotContract(
   prd: Record<string, unknown>,
   canonicalCharacters: Array<Record<string, unknown>>,
   safeAreaInsets: { topPercent: number; bottomPercent: number; rightRailPercent: number },
   marketingActions?: string[],
 ): Array<Record<string, unknown>> {
+  if (marketingActions !== undefined) return buildMarketingShotContract(prd, safeAreaInsets);
   const scenePlan = recordValue(prd.scenePlan);
   const scenes = Array.isArray(scenePlan.scenes)
     ? scenePlan.scenes.map(recordValue)
@@ -3381,14 +3461,14 @@ function buildShotContract(
     ? scenePlan.shotMapping.map(recordValue)
     : [];
   const sourceIntent = String(recordValue(prd.projectDefinition).sourceIntent ?? "");
-  const globalActionsBase = marketingActions ?? extractNarrativeActions({}, {
+  const globalActionsBase = extractNarrativeActions({}, {
     _originalStoryText: [
       sourceIntent,
       ...scenes.map((scene) => String(scene.purpose ?? "")),
     ].join("；"),
   });
   const totalRows = mappings.reduce((sum, mapping) => sum + Math.max(1, Math.round(Number(mapping.estimatedShots ?? 1))), 0);
-  const globalActions = marketingActions?.length === 0 ? [] : projectNarrativeActionSequence(globalActionsBase, totalRows);
+  const globalActions = projectNarrativeActionSequence(globalActionsBase, totalRows);
   const visual = recordValue(prd.visualSpecification);
   const globalLighting = String(visual.lightingDirection ?? "按已确认视觉方案执行");
   const globalColorText = [
@@ -3708,9 +3788,9 @@ export function normalizeNarrativePrdContract(
   positioning.frameRate = Number(positioning.frameRate ?? 24);
   prd.productPositioning = positioning;
   const scenePlan = recordValue(prd.scenePlan);
-  rebalanceSceneDurations(scenePlan, duration);
+  if (!marketingContract) rebalanceSceneDurations(scenePlan, duration);
   prd.scenePlan = scenePlan;
-  reconcileNarrativeScenePlan(prd, discovery, upstream, duration, Boolean(marketingContract));
+  if (!marketingContract) reconcileNarrativeScenePlan(prd, discovery, upstream, duration);
   const dialoguePolicy = [
     upstream.dialogue_requirement,
     upstream.special_notes,
@@ -3730,7 +3810,7 @@ export function normalizeNarrativePrdContract(
   if (marketingContract && sourceActions.length > 0) {
     const creative = recordValue(prd.creativeCore);
     creative.keyMessages = [...(Array.isArray(creative.keyMessages) ? creative.keyMessages : []),
-      `当前创作合同的必需动作（按顺序执行）：${sourceActions.join("；")}`];
+      `当前创作合同的原文必需项清单（覆盖约束，非逐镜时间线；由作者按本地场景安排）：${sourceActions.join("；")}`];
     prd.creativeCore = creative;
   } else if (sourceActions.length > 0) {
     const plannedShotCount = (Array.isArray(recordValue(prd.scenePlan).shotMapping)
@@ -3775,29 +3855,31 @@ export function normalizeNarrativePrdContract(
   const generated = Array.isArray(characterSystem.characters)
     ? characterSystem.characters.map(recordValue)
     : [];
-  if (!explicitNoCharacters && canonicalCharacters.length === 0 && generated.length > 0) {
+  if (!marketingContract && !explicitNoCharacters && canonicalCharacters.length === 0 && generated.length > 0) {
     canonicalCharacters = generated.filter((item) => !explicitNoAnimals || !isNarrativeAnimal(item.name)).map((item, index) => {
       const id = String(item.characterId ?? item.id ?? item.character_id ?? `char_${index + 1}`);
       return { ...item, id, characterId: id };
     });
   }
-  if (!explicitNoCharacters && canonicalCharacters.length === 0) {
+  if (!marketingContract && !explicitNoCharacters && canonicalCharacters.length === 0) {
     canonicalCharacters = inferNarrativeCharacters({
       intent: String(upstream._originalStoryText ?? upstream.description ?? upstream.theme ?? ""),
       discovery,
       upstream,
     }).map((item, index) => ({ ...item, id: `char_${index + 1}`, characterId: `char_${index + 1}` }));
   }
-  const noCharacters = canonicalCharacters.length === 0;
+  const unreferencedMarketingCast = Boolean(marketingContract) && canonicalCharacters.length === 0 && generated.length > 0;
+  const noCharacters = canonicalCharacters.length === 0 && (!marketingContract || generated.length === 0);
   const explicitWardrobe = canonicalCharacters.length === 1 ? marketingContract?.props.filter(item =>
     /(?:服|衣|裤|鞋|裙|护具|防护装备|头盔|手套)(?:$|和|与|及)/u.test(item)) ?? [] : [];
   if (canonicalCharacters.length > 0) {
-    characterSystem.characters = canonicalCharacters.map((item, index) => {
+    const enhanced = canonicalCharacters.map((item, index) => {
+      const authored = marketingContract ? generated.find(person => samePrdIdentity(person, item)) ?? {} : generated[index] ?? {};
       const id = String(item.id ?? item.characterId ?? `char_${index + 1}`);
-      const portrait = String(item.portraitRef ?? item.portraitPath ?? generated[index]?.portraitPath ?? "");
+      const portrait = String(item.portraitRef ?? item.portraitPath ?? authored.portraitPath ?? "");
       const authoritative = authoritativeCharacterProfile(id);
       const authorization = String(authoritative?.authorization ?? item.authorization ?? "unknown");
-      const baseAppearance = String(generated[index]?.appearance ?? "按已登记角色档案生成")
+      const baseAppearance = String(authored.appearance ?? "按已登记角色档案生成")
         .replace(/；模特ID=[^；]+；定妆照=[^；]+；授权=[^；]+/u, "");
       const authoritativeAppearance = String(authoritative?.appearance ?? "").trim();
       const wardrobeEntries = Array.isArray(authoritative?.wardrobe)
@@ -3818,19 +3900,19 @@ export function normalizeNarrativePrdContract(
         ?? wardrobeEntries.find((entry) => entry.scene)
         ?? wardrobeEntries[0]
         ?? {};
-      const plannedCostume = String(generated[index]?.costume ?? "").trim();
+      const plannedCostume = String(authored.costume ?? "").trim();
       const projectCostume = explicitWardrobe.length
         ? explicitWardrobe.every(item => plannedCostume.includes(item)) ? plannedCostume : explicitWardrobe.join("、")
         : null;
-      const name = String(authoritative?.name ?? item.name ?? generated[index]?.name ?? `角色${index + 1}`);
+      const name = String(authoritative?.name ?? item.name ?? authored.name ?? `角色${index + 1}`);
       const animal = isNarrativeAnimal(name);
       if (animal) {
         const animalAppearance = cleanNarrativeAnimalAppearance(authoritativeAppearance || baseAppearance);
         return {
-          ...(generated[index] ?? {}),
+          ...authored,
           characterId: id,
           name,
-          role: String(item.role ?? generated[index]?.role ?? "protagonist"),
+          role: String(item.role ?? authored.role ?? "protagonist"),
           gender: null,
           ageRange: null,
           appearance: `${animalAppearance || "动物主体；外观以源需求中的品种、体型、毛色、湿度与动作描述为准"}；角色ID=${id}；身份证据=仅文字外观锚点；无已登记图片参考资产`,
@@ -3842,12 +3924,13 @@ export function normalizeNarrativePrdContract(
         };
       }
       return {
-        ...(generated[index] ?? {}),
+        ...authored,
         characterId: id,
+        ...(marketingContract && authored.characterId && authored.characterId !== id ? { sourceCharacterId: authored.characterId } : {}),
         name,
-        role: String(item.role ?? generated[index]?.role ?? "protagonist"),
-        gender: authoritative?.gender ?? generated[index]?.gender ?? null,
-        ageRange: authoritative?.age ?? generated[index]?.ageRange ?? null,
+        role: String(item.role ?? authored.role ?? "protagonist"),
+        gender: authoritative?.gender ?? authored.gender ?? null,
+        ageRange: authoritative?.age ?? authored.ageRange ?? null,
         appearance: `${authoritativeAppearance || baseAppearance}；模特ID=${id}；定妆照=${portrait || "未指定"}；授权=${authorization}`,
         costume: String(
           projectCostume ?? ([wardrobe.name, wardrobe.detail].filter(Boolean).map(String).join("，")
@@ -3859,13 +3942,19 @@ export function normalizeNarrativePrdContract(
         consistencyRequirements: `所有镜头绑定 ${id} 的当前定妆照与指纹；不得替换为未登记人物`,
       };
     });
+    // An identity-reference list is not the complete cast. Keep actually authored
+    // contextual participants unchanged; no asset, likeness or authorization is invented.
+    characterSystem.characters = marketingContract
+      ? [...generated.map(person => enhanced.find(item => samePrdIdentity(item, person)) ?? person),
+        ...enhanced.filter(item => !generated.some(person => samePrdIdentity(item, person)))]
+      : enhanced;
     prd.characterSystem = characterSystem;
   }
   const requiresPortraits = canonicalCharacters.some((item) => !isNarrativeAnimal(item.name));
 
   const constraints = recordValue(prd.productionConstraints);
   for (const key of ["technicalConstraints", "businessConstraints", "forbiddenElements"]) {
-    if (Array.isArray(constraints[key])) constraints[key] = sanitizePrdText(constraints[key], duration, speechForbidden);
+    if (Array.isArray(constraints[key])) constraints[key] = sanitizePrdText(constraints[key], duration, !marketingContract && speechForbidden);
   }
   const configuredQualityThresholds = recordValue(constraints.qualityThresholds);
   const verificationThreshold = (label: string, method: string, key: string): string => {
@@ -3944,7 +4033,7 @@ export function normalizeNarrativePrdContract(
     action: "锁定失败镜头 ID 与失败字段，只重做该镜；保留已通过镜头、角色锚点和灯态，不做整片无依据重生成",
     expectedOutput: "失败镜定向修复；无法修复时保留未验证状态并停止渲染提交",
   };
-  if (recordValue(delivery.subtitles).mode === "none") {
+  if (!marketingContract && recordValue(delivery.subtitles).mode === "none") {
     const audience = recordValue(prd.audienceProfile);
     if (Array.isArray(audience.contentExpectations)) {
       audience.contentExpectations = (audience.contentExpectations as unknown[]).map((item) => {
@@ -3975,10 +4064,16 @@ export function normalizeNarrativePrdContract(
     .map((item) => item.item === "video_master"
       ? {
           ...item,
-          spec: `${size.width}x${size.height}, ${aspect}, ${duration}s ±0.3s, ${Number(positioning.frameRate ?? 24)}fps, MP4/H.264/AAC`,
+          spec: `${size.width}x${size.height}, ${aspect}, ${duration}s ±0.3s, ${Number(positioning.frameRate ?? 24)}fps, ${String(recordValue(delivery.outputFormat).container)}/${String(recordValue(delivery.outputFormat).videoCodec)}/${String(recordValue(delivery.outputFormat).audioCodec)}`,
         }
       : item);
-  if (noCharacters) {
+  if (unreferencedMarketingCast) {
+    delivery.characterAssets = {
+      required: false,
+      reason: "原作者声明了场景参与者，但本次没有已登记身份参考；不把匿名参与者自动升级为人像资产，不虚构定妆照或肖像授权",
+      referenceStrategy: "保留作者的外观、服装与局部参与声明，由真实确认门核对；身份未登记不等于画面无人",
+    };
+  } else if (noCharacters) {
     delivery.characterAssets = { required: false, reason: "本次结构化合同没有角色，不得生成或交付定妆照" };
   } else if (!requiresPortraits) {
     delivery.characterAssets = {
@@ -4005,13 +4100,13 @@ export function normalizeNarrativePrdContract(
       : `色温基准 ${canonicalK}`;
     prd.visualSpecification = visual;
   }
-  normalizeHomecomingPrdContinuity(prd, musicForbidden);
+  if (!marketingContract) normalizeHomecomingPrdContinuity(prd, musicForbidden);
   prd.shotContract = buildShotContract(prd, canonicalCharacters, safeAreaInsets, marketingContract?.actions);
   const normalizedCharacters = Array.isArray(recordValue(prd.characterSystem).characters)
     ? (recordValue(prd.characterSystem).characters as unknown[]).map(recordValue)
     : [];
   const gender = String(normalizedCharacters[0]?.gender ?? canonicalCharacters[0]?.gender ?? "unknown").toLowerCase();
-  if (gender === "female" || gender === "male") {
+  if (!marketingContract && (gender === "female" || gender === "male")) {
     const replacement = gender === "female" ? "她" : "他";
     const opposite = gender === "female" ? "他" : "她";
     const protectedKeys = new Set(["_originalStoryText", "sourceIntent", "original_story_text"]);
@@ -4039,7 +4134,7 @@ export function normalizeNarrativePrdContract(
     };
     applyPronoun(prd);
   }
-  if (speechForbidden) {
+  if (!marketingContract && speechForbidden) {
     const normalizedScenePlan = recordValue(prd.scenePlan);
     const scenes = Array.isArray(normalizedScenePlan.scenes)
       ? normalizedScenePlan.scenes.map(recordValue)
@@ -4098,13 +4193,14 @@ export function normalizeNarrativePrdContract(
     }
   };
   if (animalOnly || noCharacters || musicForbidden || canonicalK) normalizePrdStrings(prd);
-  if (normalizeHomecomingPrdContinuity(prd, musicForbidden)) {
-    prd.shotContract = buildShotContract(prd, canonicalCharacters, safeAreaInsets, marketingContract?.actions);
+  if (!marketingContract && normalizeHomecomingPrdContinuity(prd, musicForbidden)) {
+    prd.shotContract = buildShotContract(prd, canonicalCharacters, safeAreaInsets);
   }
-  reconcileShotContractExecutionCoherence(prd);
-  const normalized = sanitizePrdText(prd, duration || 30, speechForbidden) as Record<string, unknown>;
+  if (!marketingContract) reconcileShotContractExecutionCoherence(prd);
+  const normalized = sanitizePrdText(prd, duration || 30, !marketingContract && speechForbidden) as Record<string, unknown>;
   delete normalized._workloomMarketingPrompt;
   if (marketingContract?.intent) {
+    normalized._workloomCustomerIntent = marketingContract.intent;
     const copy = [...marketingContract.intent.matchAll(/(叠加|屏幕文字|尾帧|片尾卡)[\s：:]*[“「"]([^”」"\r\n]{1,160})[”」"]/gu)];
     normalized._workloomMarketingPrompt = {
       actions: marketingContract.actions,
@@ -4128,6 +4224,9 @@ export function renderPrdContractMarkdown(prd: Record<string, unknown>): string 
     ? (recordValue(prd.characterSystem).characters as unknown[]).map(recordValue)
     : [];
   const shots = Array.isArray(prd.shotContract) ? prd.shotContract.map(recordValue) : [];
+  const graphics = recordValue(prd._workloomMarketingPrompt);
+  const overlay = Array.isArray(graphics.overlay) ? graphics.overlay.map(String) : [];
+  const endCard = Array.isArray(graphics.endCard) ? graphics.endCard.map(String) : [];
   return [
     "",
     "## 12. 可验证交付契约",
@@ -4138,14 +4237,26 @@ export function renderPrdContractMarkdown(prd: Record<string, unknown>): string 
     `- **帧率**：${output.frameRate ?? positioning.frameRate ?? "未指定"}fps`,
     `- **视频**：${String(output.videoCodec ?? "H.264")} / ${String(output.container ?? "MP4")}`,
     `- **音频**：${String(output.audioCodec ?? "AAC")} / ${output.audioSampleRate ?? 48000}Hz / ${output.audioChannels ?? 2}ch / ${output.audioLoudnessLufs ?? -14} LUFS / true peak ${output.audioTruePeakDbtp ?? -1} dBTP`,
-    `- **字幕**：mode=${String(subtitles.mode ?? "unverified")}；burned=${String(subtitles.burned ?? false)}；sidecar=${String(subtitles.sidecar ?? false)}`,
+    `- **字幕**：mode=${String(subtitles.mode ?? "unverified")}；burned=${String(subtitles.burned ?? false)}；sidecar=${String(subtitles.sidecar ?? false)}${Object.keys(graphics).length ? "（语音字幕；画面图形与尾帧另行履行）" : ""}`,
     `- **验收方法**：ffprobe 校验画幅、时长、帧率与音频流；ffmpeg ebur128/loudnorm 实测 integrated loudness 与 true peak；抽首帧/中段/尾帧核字幕与平台安全区（${safeAreaLabel}）`,
     "",
+    ...(overlay.length || endCard.length ? [
+      "### 画面图形与尾帧（标准后期职责）",
+      "",
+      "以下是客户原文要求的画面图形，不属于语音字幕；subtitle mode=none 不取消这些要求。不得让底片模型伪造可读文字。",
+      ...overlay.map(value => `- 必需叠加原文：${value}`),
+      ...endCard.map(value => `- 必需尾帧原文：${value}`),
+      `- 执行与验收：标准后期按原文要求的出现范围与尾帧位置合成，遵守平台安全区（${safeAreaLabel}）；在交付前记录实际时间、位置与字体并抽帧核对文字和尾帧。当前 PRD 不将这些未实测参数标成已完成。`,
+      "",
+    ] : []),
     "### 角色可执行锚点",
     "",
     ...(characters.length > 0
       ? characters.map((item) => {
         const evidence = recordValue(item.portraitEvidence);
+        if (!Object.keys(evidence).length && !item.portraitPath && item.authorization === undefined) {
+          return `- ${String(item.name ?? "未命名")}：作者声明的场景参与者；ID=${String(item.characterId ?? item.id ?? "未指定")}；角色=${String(item.role ?? "未指定")}；外观=${String(item.appearance ?? "未指定")}；无已登记身份参考，不代表肖像授权或已生成定妆照。`;
+        }
         if (evidence.reason === "animal-character-no-human-portrait") {
           return `- ${String(item.name ?? "未命名")}：ID=${String(item.characterId ?? "未指定")}；动物角色不适用人像定妆照；外观锚点=${String(item.appearance ?? "未指定")}`;
         }
@@ -4229,6 +4340,27 @@ function marketingDiscoveryPrompt(agent: string | undefined, source: SourceBound
     ...(agent === "RiskAssessor" ? [
       "列 1 至 4 条本片风险，mitigationSuggestions 必须与 technicalRisks 数量相等且按同一索引一一对应。每项缓解措施写明该风险对象、可执行处理和检查点。",
     ] : []),
+  ].join("\n");
+}
+
+const nativePrdPromptBase = Symbol("source-bound-native-prd-prompt-base");
+type NativePrdPrompt = ((this: unknown, ...args: unknown[]) => string) & { [nativePrdPromptBase]?: NativePrdPrompt };
+
+function marketingPrdAuthorPrompt(discovery: Record<string, unknown>, source: SourceBoundMarketingDiscovery): string {
+  const upstream = recordValue(discovery.upstreamFields);
+  const risk = recordValue(discovery.riskAssessment);
+  return [
+    "【当前已核对的营销 PRD 创作合同】",
+    JSON.stringify({ customerIntent: source.intent, product: source.product, restrictions: source.restrictions,
+      approvedVoiceRequirement: upstream.dialogue_requirement ?? null,
+      approvedBusinessConstraints: risk.businessConstraints ?? [], approvedSceneStructure: discovery.sceneStructure ?? null,
+      registeredIdentityReferences: discovery._canonicalCharacters ?? [] }),
+    "customerIntent 是完整客户原文，优先于类型默认、示例和上游创作建议；approved 字段是本轮已确认的 G3 内容，不得冒充客户逐字指定的事实。",
+    "声音按原文和已确认声音合同执行。无台词不等于删掉原文允许的原生人声/环境声；未明确禁止音乐也不等于可以按广告类型擅加镜头外配乐。不要新增未声明音轨，不得把本段解释改写进客户原文。",
+    "保留 opening、scenes、ending 的完整叙事关系。requiredActions 是原文必需项清单，可能含总述与补充，不是可按索引平摊到镜头的时间线。请由原生作者完成本片局部场景、动作先后、空间、参与者及可辨识结果；不要混用别场的设定与动作。",
+    "身份资产是已登记的人物身份参考，不是全片人数上限。必要的匿名配角或背景参与者由你根据当前原文与场景创作并明确声明，不编造实名、定妆照路径或肖像授权；宿主不会替你补人或补剧情。",
+    "shotBreakdownHint 中的 medium/close-up 等景别不代表固定机位。运镜须来自本镜实际创作；需要逐镜细化时，在 scenePlan.shotMapping 每项的 shots 数组内给出 purpose、action、cameraMovement、participants、keyProps 及必要的 startSeconds/endSeconds。它们应与本场目的、场地、时长和前后动作一致。",
+    "无语音字幕与客户要求的画面图形是不同职责。按客户原文保留必需 overlay 与尾帧文字，交标准后期合成并核对平台安全区；不要让底片模型生成可读文字，也不要宣称未执行的后期已完成。",
   ].join("\n");
 }
 
@@ -4485,6 +4617,29 @@ export function installVendorDiscoveryNarrativeBridge(options: {
         return `${rendered}${renderPrdContractMarkdown(prd)}`;
       };
       restores.push(() => { prototype.generateMarkdown = original; });
+    }
+    for (const [filename, exported] of [
+      ["agent-2-creative-direction.js", "CreativeDirectionAgent"],
+      ["agent-3-production-specification.js", "ProductionSpecificationAgent"],
+    ]) {
+      const module = vendorRequire(resolvePath(repoRoot,
+        "vendor/supermickey/hyperreality-system/engines/prd-generator/agents", filename!)) as
+        Record<string, { prototype: Record<string, unknown> }>;
+      const prototype = module[exported!]?.prototype;
+      if (!prototype || typeof prototype._buildPrompt !== "function") continue;
+      const original = prototype._buildPrompt as NativePrdPrompt;
+      const native = original[nativePrdPromptBase] ?? original;
+      const patched: NativePrdPrompt = function sourceBoundNativePrdPrompt(this: unknown, ...args: unknown[]) {
+        const prompt = native.apply(this, args);
+        const marketing = options.marketingDiscovery?.();
+        if (!marketing) return prompt;
+        options.assertActive?.();
+        if (typeof prompt !== "string") throw new Error("MARKETING_PRD_UNVERIFIED：原生 PRD 作者提示词不是完整文本");
+        return `${prompt}\n\n${marketingPrdAuthorPrompt(recordValue(args[0]), marketing)}`;
+      };
+      Object.defineProperty(patched, nativePrdPromptBase, { value: native });
+      prototype._buildPrompt = patched;
+      restores.push(() => { prototype._buildPrompt = original; });
     }
 
     const discoveryMod = vendorRequire(resolvePath(

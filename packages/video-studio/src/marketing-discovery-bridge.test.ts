@@ -100,7 +100,7 @@ it("preserves native follow motion and exact post text in the G6 report for a so
   }
 });
 
-it("keeps the portrait identity while projecting explicit project wardrobe and approved actions into G4", () => {
+it("keeps portrait identity and wardrobe while preserving the native author's local G4 actions and props", () => {
   const identity = { id: "chen-zhuo", name: "陈卓", role: "protagonist",
     portraitRef: "bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png" };
   const actions = ["抬手检查扣带", "通过训练门架", "解扣后举盔"];
@@ -111,14 +111,27 @@ it("keeps the portrait identity while projecting explicit project wardrobe and a
     scenes: [{ duration: 4, purpose: "通过室内训练装置", keyElements: ["训练门架"] }],
     ending: { duration: 4, purpose: "安全停下后结束训练", keyElements: ["头盔"] },
   } };
-  const original = { characterSystem: { characters: [{ name: "陈卓", costume: "专业防护服与护具" }] }, scenePlan: {},
+  const scenePlan = { scenes: actions.map((purpose, index) => ({
+    sceneId: `AUTHOR-${index + 1}`, sequence: index + 1, duration: 4, purpose,
+    setting: ["室内训练区准备", "室内训练装置", "安全停车区"][index],
+    keyProps: [["护具"], ["训练门架"], ["头盔"]][index],
+    characters: ["chen-zhuo"], visualRequirements: [purpose], audioRequirements: ["本镜动作声"], dialogue: "",
+  })), shotMapping: actions.map((_action, index) => ({
+    sceneId: `AUTHOR-${index + 1}`, estimatedShots: 1, shotBreakdownHint: ["medium"],
+  })) };
+  const original = { characterSystem: { characters: [{ name: "陈卓", costume: "专业防护服与护具" }] }, scenePlan,
     projectDefinition: { sourceIntent: source }, creativeCore: { creativeHook: "扣带先出声" } };
-  const result = normalizeNarrativePrdContract(original, discovery, { actions, props: ["专业防护服", "护具"] });
+  const result = normalizeNarrativePrdContract(structuredClone(original), discovery, { actions, props: ["专业防护服", "护具"] });
   expect(result.characterSystem).toMatchObject({ characters: [expect.objectContaining({ characterId: identity.id,
     costume: "专业防护服与护具", portraitPath: identity.portraitRef, authorization: "real-authorized" })] });
   expect(result.creativeCore).toMatchObject({ creativeHook: "扣带先出声" });
   const shots = result.shotContract as Array<{ purpose: string; keyProps: string[] }>;
   expect(shots).toHaveLength(3);
+  expect(result.scenePlan).toEqual(scenePlan);
   actions.forEach((action, index) => expect(shots[index]?.purpose).toContain(action));
   expect(shots.map(shot => shot.keyProps)).toEqual([["护具"], ["训练门架"], ["头盔"]]);
+  const missingAuthor = normalizeNarrativePrdContract({ ...structuredClone(original), scenePlan: {} }, discovery,
+    { actions, props: ["专业防护服", "护具"] });
+  expect(missingAuthor.shotContract).toEqual([]);
+  expect(missingAuthor.scenePlan).toEqual({});
 });

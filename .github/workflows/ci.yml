@@ -52,7 +52,15 @@ jobs:
 
       # 包内媒体回归真实调用 ffmpeg/ffprobe，先安装再跑成功与失败路径。
       - name: 媒体工具（ffmpeg/ffprobe）
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+        run: |
+          set -euo pipefail
+          test -s /etc/apt/apt-mirrors.txt
+          sudo sed -i '/azure[.]archive[.]ubuntu[.]com/d' /etc/apt/apt-mirrors.txt
+          grep -Eq '^https?://archive[.]ubuntu[.]com/ubuntu/?([[:space:]]|$)' /etc/apt/apt-mirrors.txt
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          ffmpeg -version
+          ffprobe -version
 
       - name: 私有 UI 制品校验与原锁安装
         env:
