@@ -21,6 +21,22 @@ it("只有完整 AI 裁决打回可重跑，混合裁决和附带文字均不能
   expect(isProducerRejection({ success: false, confirmations: { unavailable: { approved: false,
     reason: "评审不可用，原文引用 producer-rejected(G2_THEME)" } } })).toBe(false);
 });
+it("提示词用途只忽略精确范围哨兵，真实G6打回仍是打回；其他失败不能被隐藏", () => {
+  const g6 = producerFailure("G6_PROMPT", { approved: false, status: "failed", via: "llm", degraded: false,
+    model: "unit-judge", score: 42, reason: "原合同动作缺失", suggestions: [] });
+  const deferred = { approved: false, reason: "PROMPT_REVIEW_PORTRAIT_DEFERRED" };
+  const scoped = { approved: false, reason: "PROMPT_REVIEW_SCOPE_REACHED" };
+  const result = { success: false, confirmations: { deferred, scoped, g6 } };
+  expect(isProducerRejection(result)).toBe(false);
+  expect(isProducerRejection(result, { promptReview: true })).toBe(true);
+  expect(isProducerRejection({ success: false, confirmations: { deferred, scoped } }, { promptReview: true })).toBe(false);
+  expect(isProducerRejection({ ...result, confirmations: { ...result.confirmations,
+    unavailable: { approved: false, reason: "producer-unavailable(G4_PRD)" } } }, { promptReview: true })).toBe(false);
+  expect(isProducerRejection({ ...result, confirmations: { ...result.confirmations,
+    quoted: { approved: false, reason: "PROMPT_REVIEW_PORTRAIT_DEFERRED 但另有异常" } } }, { promptReview: true })).toBe(false);
+  expect(isProducerRejection({ ...result, confirmations: { ...result.confirmations,
+    malformed: { approved: false, reason: { toString: () => "PROMPT_REVIEW_PORTRAIT_DEFERRED" } } } }, { promptReview: true })).toBe(false);
+});
 function fixture() {
   const root = path.join(dir, "characters", "P1"); mkdirSync(root, { recursive: true });
   const files: Record<string, string> = {};

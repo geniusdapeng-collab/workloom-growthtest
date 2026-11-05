@@ -167,11 +167,12 @@ export function producerFailure(
 export function isProducerRejection(result: {
   success?: boolean;
   confirmations?: Record<string, unknown>;
-}): boolean {
+}, options: { promptReview?: boolean } = {}): boolean {
   if (result?.success) return false;
   const failed = Object.values(result?.confirmations ?? {}).filter(
     (value): value is GateVerdict => Boolean(value && typeof value === "object" && (value as GateVerdict).approved === false),
-  );
+  ).filter(verdict => !options.promptReview || !(typeof verdict.reason === "string"
+    && ["PROMPT_REVIEW_PORTRAIT_DEFERRED", "PROMPT_REVIEW_SCOPE_REACHED"].includes(verdict.reason)));
   return failed.length > 0 && failed.every((verdict) => typeof verdict.reason === "string" && verdict.reason.startsWith("producer-rejected("));
 }
 

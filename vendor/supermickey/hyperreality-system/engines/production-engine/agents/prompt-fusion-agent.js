@@ -594,7 +594,7 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
    * 【v2.1.4-fix10-P25-fix3】字段完整性校验 + 定向补齐
    * 先校验,缺哪些就只让 LLM 补哪些,一次轻量调用搞定
    */
-  async _ensureFieldCompleteness(shot, fields, ratio, characters, trackCall = null, blueprint = null) {
+  async _ensureFieldCompleteness(shot, fields, ratio, characters, trackCall = null, blueprint = null, sourceShot = shot) {
     let usedRuleFallback = false;
     // 1. 找出缺失或过短字段
     const missing = _getRequiredFieldsForShot(shot).filter(f => {
@@ -609,7 +609,7 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
     console.log(`[PromptFusion] ${shot.shotId} 缺失/过短字段 ${missing.length} 个: ${missing.join(',')} → 定向补齐`);
 
     // 2. 只补缺失字段,给 LLM 一个极简、聚焦的 prompt
-    const fillPrompt = this._buildFillPrompt(shot, missing, fields, ratio, characters, blueprint);
+    const fillPrompt = this._buildFillPrompt(sourceShot, missing, fields, ratio, characters, blueprint);
     const fillSchema = { shotId: shot.shotId, fields: Object.fromEntries(missing.map(k => [k, STANDARD_FIELDS_SCHEMA[k]])) };
 
     try {
@@ -669,7 +669,7 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
       // 【v2.1.8-fix4】批量 LLM 降级:一次调用补齐所有缺失字段
       if (stillNeedLLM.length > 0) {
         console.log(`[PromptFusion] ${shot.shotId} 批量降级 ${stillNeedLLM.length} 个字段 → 单次 LLM 调用`);
-        const batchValues = await this._batchMinimalLLMDegradation(stillNeedLLM, shot, ratio, characters, trackCall, blueprint);
+        const batchValues = await this._batchMinimalLLMDegradation(stillNeedLLM, shot, ratio, characters, trackCall, blueprint, sourceShot);
         for (const f of stillNeedLLM) {
           fields[f] = batchValues[f] || this._defaultFieldValue(f, shot);
         }
@@ -793,7 +793,10 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
         console.log(`  🔄 补全尝试 ${attempt}/${maxRetries}...`);
         if (trackCall) trackCall();
         // 【v2.1.8-审计修复】传递 trackCall 到 _ensureFieldCompleteness
-        const completeness = await this._ensureFieldCompleteness(shotClone, fields, ratio, characters, trackCall, blueprint);
+        // Keep the original source only for author context. Completeness and
+        // fallback extraction must still use the cleaned clone, not source data
+        // masquerading as a newly generated field.
+        const completeness = await this._ensureFieldCompleteness(shotClone, fields, ratio, characters, trackCall, blueprint, shot);
 
         // 【审计修复】更新 fields,让下次重试基于最新状态
         Object.assign(fields, completeness.fields);
@@ -866,7 +869,7 @@ ${ctx}
    * 相比 v2.1.8-fix4 的全批量:字段间上下文更聚焦,质量接近逐个
    * 相比逐个:速度提升 5-6 倍(25 次 → 4-5 次调用)
    */
-  async _batchMinimalLLMDegradation(fields, shot, ratio, characters, trackCall = null, blueprint = null) {
+  async _batchMinimalLLMDegradation(fields, shot, ratio, characters, trackCall = null, blueprint = null, sourceShot = shot) {
     if (trackCall) trackCall();
     if (fields.length === 0) return {};
 
@@ -898,7 +901,7 @@ ${ctx}
       }
     }
 
-    const ctx = this._buildMinimalContext(shot, ratio, characters, blueprint);
+    const ctx = this._buildMinimalContext(sourceShot, ratio, characters, blueprint);
     const allResults = {};
 
     // 【P0-PROMPT-03 修复】组间并行执行,最多2组并发(避免API限流)
@@ -983,6 +986,25 @@ ${fieldDescs}
     return contexts[groupName] || contexts['instruction'];
   }
 
+  /** Explicit source fields only: never serialize the attached blueprint or generated fields. */
+  _buildShotSourceContract(shot) {
+    const keys = [
+      'shotId', 'sceneType', 'sceneFunction', 'scene_function', 'action', 'scene', 'sceneDescription',
+      'duration', 'timing', 'characters', 'character', 'characterRef', 'characterDescs',
+      'costume', 'makeup', 'props', 'visualDirection', 'visualNotes', 'visual_notes',
+      'cameraString', 'cameraMovement', 'camera', 'lightingString', 'lighting',
+      'timeline', 'audio', 'audioLayer', 'dialogue', 'dialogueText', 'dialogueBlocks',
+      'emotionalTarget', 'emotionArcTarget'
+    ];
+    const contract = Object.fromEntries(keys.filter(key => shot[key] !== undefined).map(key => [key, shot[key]]));
+    return `## 本镜源合同（原文字段）
+${JSON.stringify(contract)}
+本块是当前工位的设计输入，不是已批准产物。冻结客户需求与宿主核实的修复诊断优先于任何冲突的当前设计；当前服妆、光照、运镜或时间轴若有冲突，须由原生作者重写，不能因已出现在本块就当作不可更改。
+原始叙事职责与动作顺序优先于技能示例、静止调度建议和通用负面模板。不得将明确动作改成静止、已完成状态或画外完成；时间轴、构图、角色与服妆须能共同拍出本镜动作链。
+已登记角色用于固定同一身份，身份锚点不等于本镜总人数上限。保留源合同明确要求的参与者及关系，禁止添加合同外角色、物件或身份；不得用只许主角入画的通用模板排除已声明参与者。
+这些字段是本镜作者输入，不是本轮新生成结果；须由原生作者独立完成要求输出的字段，并继续接受原有校验与审核。`;
+  }
+
   _buildMinimalContext(shot, ratio, characters, blueprint = null) {
     const parts = [];
     const repair = this._productionRepairContext(blueprint || shot._blueprint || shot.blueprint);
@@ -990,6 +1012,7 @@ ${fieldDescs}
     parts.push(`场景: ${shot.scene || shot.sceneDescription || '未知'}`);
     parts.push(`情绪: ${shot.mood || shot.emotional_target || '未知'}`);
     parts.push(`动作: ${shot.action || '未知'}`);
+    parts.push(this._buildShotSourceContract(shot));
 
     if (shot.characters && shot.characters.length > 0) {
       parts.push(`角色: ${shot.characters.map(c => c.name || c).join(', ')}`);
@@ -1267,6 +1290,8 @@ ${fieldDescs}
 场景:${shot.scene || ''}
 情绪:${shot.mood || ''}
 台词:${(shot.dialogue?.lines?.map(l => l.content).join('; ') || shot.dialogue || '')}
+
+${this._buildShotSourceContract(shot)}
 
 ## 已生成字段(保持风格一致)
 ${ctx}
@@ -2054,6 +2079,7 @@ ${missing.map(f => `- ${f}:${FIELD_DESCS[f]}`).join('\n')}
       if (s._skillContext) {
         info += `\n## 🎬 好莱坞技能增强（必须融入 25 字段，不是附加说明）\n${s._skillContext}\n要求：【导演意图】【运镜】【灯光设计】【情绪】字段必须体现上述技法的具体手法；技能禁止词并入【负面约束】字段。`;
       }
+      info += `\n${this._buildShotSourceContract(s)}`;
       return info;
     }).join('\n');
 
