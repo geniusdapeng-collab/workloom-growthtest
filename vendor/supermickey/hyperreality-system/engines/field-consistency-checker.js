@@ -788,8 +788,10 @@ class FieldConsistencyChecker {
         severity: 'warning', fieldA: 'character', fieldB: 'costume',
         message: '角色描述没有引用服装字段的内容', fixable: true,
         fix: (f) => {
+          const currentCharacter = String(f.character);
+          if (currentCharacter.includes('（着装与服装字段一致）')) return null;
           const costumeHead = String(f.costume || '').replace(/^(.*?穿)/, '').slice(0, 8);
-          if (costumeHead && String(f.character).includes(costumeHead)) return {}; // 已含，不重复
+          if (costumeHead && currentCharacter.includes(costumeHead)) return {}; // 已含，不重复
           return { character: `${f.character}（着装与服装字段一致）` };
         }
       });

@@ -67,7 +67,7 @@ const FIELD_DESCS = {
   portraits: 'string,定妆照引用 image://...',
   dialogue: 'string,台词/旁白原文',
   timeline: 'string或object,分镜时间轴。支持两种格式:\n1. 纯文本: T00:00 - 描述;T00:XX - 描述(≥3段)\n2. 结构化: {"totalDuration":10,"beats":[{"time":0,"label":"开场","description":"...","cameraHint":"..."},{"time":3,"label":"推进","description":"...","cameraHint":"..."}],"sync":{"cameraMovement":"...","audio":"..."}}',
-  mood: 'string,情绪基调',
+  mood: 'string,中文情绪基调+符合本镜可见范围的具体表演（视线、眉眼、呼吸或手部微动作）；不得只列情绪关键词，不得补写镜头外表情',
   pacing: 'string,节奏',
   transition: 'string,转场方式',
   audio: 'string,≥100字符,环境音/配乐/音效',
@@ -210,7 +210,7 @@ class PromptFusionAgent extends BaseAgent {
 14. portraits: 定妆照路径(image://characters/...)
 15. dialogue: 角色台词(纯台词,不要旁白)
 16. timeline: 时间轴(T00:XX格式,≥3段,每段画面+动作)
-17. mood: 情绪关键词(1-2个,如tense/epic)
+17. mood: ${FIELD_DESCS.mood}
 18. pacing: 节奏(五段式:整体/开头/中段/高潮/结尾)
 19. transition: 转场(类型+持续时间+方向)
 20. audio: 音频(环境音+音乐风格+BPM)
@@ -2124,6 +2124,7 @@ ${missing.map(f => `- ${f}:${FIELD_DESCS[f]}`).join('\n')}
       ' camera_movement: 运动方式(推/拉/摇/移/跟/固定) + 速度参数 + 起幅落幅',
       ' negative: 按第6条',
       ' composition: 景别等级(远景/全景/中景/近景/特写) + 主体位置(三分法/中心/对称)',
+      ` mood: ${FIELD_DESCS.mood}`,
       ' bright_constraint: 一句定性要求(如"主体面部明亮,阴影不死黑"),不超过40字符,不复述灯光细节',
       ' 每个字段内容必须体现上述子要素,缺失会被标记为不合格。'
     ].join('\n');
@@ -2170,7 +2171,7 @@ ${sufficiency}
 - 错误运镜:无人机穿越微观世界、时间操控慢动作、宏大比例展示
 
 要求:
-1. 【语言约束 - 强制】所有字段内容必须使用中文输出,禁止出现英文(技术参数如8K/MP4/24fps/5600K等除外)。mood字段可用英文单词(如tense/epic)。
+1. 【语言约束 - 强制】所有字段内容必须使用中文输出,禁止出现英文(技术参数如8K/MP4/24fps/5600K等除外)。
 2. 按标准字段输出:【约束】【基础】【场景】【灯光/照明】【构图】【色彩/色调】【景深】【运镜】【角色】【服装】【化妆】【动作】【道具】【定妆照】【台词】【时间轴】【情绪】【节奏】【转场】【音频】【负面约束】【明亮约束】【角色约束】【导演指令】【角色一致性】
 3. 【台词】字段必须独立,角色直接对镜头说话,不要写"画外音""旁白"
 3. 场景要具体专业(门诊室、宣教室、检查室),不要写"社区健身区"。场景中不得出现含文字的物品:如"有文字的报告单"、"标牌上的文字"、"商标"、"有字的海报"等。可以描述"空白报告单"、"无文字标识牌"、"图形海报"等不含文字的物品
