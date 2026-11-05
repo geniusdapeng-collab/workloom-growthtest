@@ -103,7 +103,8 @@ it("authors within the exact dynamic remainder and preserves every native field,
   } finally { f.close(); }
 });
 
-it.each(["degraded", "fallback", "missing", "nonstring", "overbudget", "music"])(
+it.each(["degraded", "fallback", "missing", "nonstring", "overbudget", "music",
+  "mixed-speech", "mixed-music", "unban-speech", "unban-music"])(
   "rejects %s before the title checkpoint save and leaves native production intact", async mode => {
     const f = fixture(async (prompt, fallback) => {
       if (mode === "fallback") { fallback(); return { result: titles, degraded: false }; }
@@ -112,17 +113,50 @@ it.each(["degraded", "fallback", "missing", "nonstring", "overbudget", "music"])
       if (mode === "nonstring") result.title_animation = 42;
       if (mode === "overbudget") result.title_animation = "动".repeat(budgetFrom(prompt));
       if (mode === "music") result.opening_audio_design = "器物接触轻响；加入钢琴配乐。";
+      if (mode === "mixed-speech") result.opening_audio_design = "器物接触轻响；禁台词但加入一句旁白。";
+      if (mode === "mixed-music") result.opening_audio_design = "器物接触轻响；禁配乐但加入钢琴配乐。";
+      if (mode === "unban-speech") result.opening_audio_design = "器物接触轻响；解禁台词。";
+      if (mode === "unban-music") result.opening_audio_design = "器物接触轻响；解禁配乐。";
       return { result, degraded: mode === "degraded" };
     });
     try {
-      const source = production(); const before = structuredClone(source);
+      const source = production();
+      if (/^(?:mixed|unban)-/u.test(mode)) source.shots = source.prompts;
+      const heldPrompts = source.prompts; const heldRow = source.prompts[0]!;
+      const heldShots = source.shots; const heldShot = source.shots[0]!;
+      const before = structuredClone(source);
       await expect(f.system._optimizeOpeningTitle(source, { stages: { adapter: { title: "器物工序" } } }, {}))
         .rejects.toThrow(/OPENING_TITLE_/u);
       expect(f.records).toHaveLength(0);
       expect(f.failure).toHaveBeenCalledOnce();
       expect(source).toEqual(before);
+      expect(source.prompts).toBe(heldPrompts); expect(source.prompts[0]).toBe(heldRow);
+      expect(source.shots).toBe(heldShots); expect(source.shots[0]).toBe(heldShot);
     } finally { f.close(); }
   });
+
+it.each([false, true])("commits compact native title denials without changing shared aliases with noMusic=%s", async noMusic => {
+  const audio = "器物触桌一声轻响；仅本镜现场声，禁配乐禁台词。";
+  const authored = { ...titles, opening_audio_design: audio };
+  const f = fixture(async () => ({ result: authored, degraded: false }));
+  try {
+    const source = production(); source.shots = source.prompts;
+    const heldRows = source.prompts; const heldRow = source.prompts[0]!;
+    (heldRow._workloomPromptReviewPolicy as NarrativePromptReviewPolicy).noMusic = noMusic;
+    const originalFields = structuredClone(heldRow.fields);
+    await f.system._optimizeOpeningTitle(source, { stages: { adapter: { title: "器物工序" } } }, {});
+    expect(source.prompts).toBe(heldRows); expect(source.shots).toBe(heldRows);
+    expect(source.prompts[0]).toBe(heldRow); expect(source.shots[0]).toBe(heldRow);
+    for (const key of titleKeys) expect(heldRow[key]).toBe(authored[key as keyof typeof authored]);
+    expect(heldRow.fields).toEqual(originalFields);
+    expect(unicodeLength(String(heldRow.prompt))).toBeLessThanOrEqual(3000);
+    expect(f.author).toHaveBeenCalledOnce();
+    expect(f.records.map(record => record.stage)).toEqual(["OPENING_TITLE"]);
+    const saved = f.records[0]!.output as { productionAfter: { prompts: Row[] } };
+    expect(saved.productionAfter.prompts[0]!.opening_audio_design).toBe(audio);
+    expect(f.failure).not.toHaveBeenCalled();
+  } finally { f.close(); }
+});
 
 it("does not dispatch the native author when complete native content leaves no five-field capacity", async () => {
   const f = fixture(async () => ({ result: titles, degraded: false }));
