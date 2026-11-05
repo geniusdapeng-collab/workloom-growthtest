@@ -8078,11 +8078,44 @@ export function installVendorNarrativePromptReviewBridge(options: {
  * 每次执行独立的 agent 视图，避免并发 run 互改重试和子服务回调。
  * 只保留单次外调超时，不按整条任务已经运行的时间缩减后续创作。
  */
-function scopedFusionAgent(agent: FusionAgent): FusionAgent {
+const MARKETING_FIELD_WRITER_POLICY = "native-marketing-field-authority/v1";
+
+function nativeMarketingBlueprint(blueprint: FusionRecord): boolean {
+  return Boolean(recordValue(recordValue(recordValue(blueprint.meta)._metadata)._prd)._workloomMarketingPrompt);
+}
+
+function scopedFusionAgent(agent: FusionAgent, blueprint: FusionRecord): FusionAgent {
   const scoped = Object.create(agent) as FusionAgent;
   scoped._globalDeadline = Infinity;
   scoped._remainingMs = () => Infinity;
   scoped._callBudget = new Map(agent._callBudget instanceof Map ? agent._callBudget : []);
+  const checker = agent.consistencyChecker as FusionRecord | undefined;
+  if (nativeMarketingBlueprint(blueprint)
+    && blueprint._workloomMarketingFieldWriterPolicy === MARKETING_FIELD_WRITER_POLICY
+    && checker && typeof checker.check === "function" && typeof checker.autoFix === "function") {
+    const nativeCheck = checker.check as (this: FusionRecord, shot: unknown) => FusionRecord;
+    const nativeAutoFix = checker.autoFix as (this: FusionRecord, shot: unknown) => unknown;
+    const checkerView = Object.create(checker) as FusionRecord;
+    checkerView.autoFix = function preserveNativeMarketingDirection(shot: unknown) {
+      // Keep the public native check and its diagnostics unchanged. Only the
+      // automatic writer sees these two observed creative inferences as reports.
+      const fixView = Object.create(checker) as FusionRecord;
+      fixView.check = function diagnosticNativeMarketingCheck(value: unknown) {
+        const result = nativeCheck.call(checker, value);
+        const issues = Array.isArray(result.issues) ? result.issues.map((item: unknown) => {
+          const issue = recordValue(item);
+          const fastCamera = issue.fieldA === "action" && issue.fieldB === "camera_movement"
+            && issue.message === "动作快速但运镜没有快速/跟踪/手持";
+          const calmLighting = issue.fieldA === "mood" && issue.fieldB === "lighting"
+            && issue.message === "平静情绪需要均匀/柔光，当前灯光偏戏剧性 (mood: calm)";
+          return fastCamera || calmLighting ? { ...issue, fixable: false } : item;
+        }) : result.issues;
+        return { ...result, issues };
+      };
+      return nativeAutoFix.call(fixView, shot);
+    };
+    scoped.consistencyChecker = checkerView;
+  }
   const originalCall = agent._callLLM;
   if (typeof originalCall === "function") {
     scoped._callLLM = async (...args: unknown[]) => {
@@ -8233,7 +8266,7 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
         if (!agent || typeof agent.process !== "function") throw new CinematicSkillError("PHASE3_AGENT_MISSING", "PromptFusion Agent 不可用", "unverified");
         evidence.budget = { policy: "no-task-deadline" };
         evidence.blueprintHash = cinematicSkillHash(blueprint);
-        const scoped = scopedFusionAgent(agent);
+        const scoped = scopedFusionAgent(agent, blueprint);
         if (this.healthMonitor) {
           this.healthMonitor.setLongTaskMode("ProductionEngine", true, Infinity);
           healthEnabled = true;
@@ -8267,7 +8300,7 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
           updated = updated.map((row) => ({ ...row, degraded: true }));
         }
         const expectedIds = new Set(shots.map((shot) => String(shot.shotId ?? shot.shot_id)));
-        const nativeMarketing = Boolean(recordValue(recordValue(recordValue(blueprint.meta)._metadata)._prd)._workloomMarketingPrompt);
+        const nativeMarketing = nativeMarketingBlueprint(blueprint);
         const repairedRowIds: string[] = [];
         const repairResult = await repairPhase3FusionRows({
           rows: updated,
@@ -8615,6 +8648,14 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
     };
 
     enginePrototype.produce = async function guardedProduce(this: unknown, blueprint: FusionRecord, ...args: unknown[]) {
+      if (nativeMarketingBlueprint(blueprint)) {
+        // This installed writer is a real input to both native and full-blueprint
+        // cache identities. Keep it on the per-run context, including retained
+        // partial results, so existing stamps remain verifiable after return.
+        Object.defineProperty(blueprint, "_workloomMarketingFieldWriterPolicy", {
+          value: MARKETING_FIELD_WRITER_POLICY, enumerable: true, writable: true, configurable: true,
+        });
+      }
       const result = await originalProduce.call(this, blueprint, ...args);
       const stages = result.stages && typeof result.stages === "object" ? result.stages as FusionRecord : {};
       const phase = stages.phase3Fusion as FusionRecord | undefined;

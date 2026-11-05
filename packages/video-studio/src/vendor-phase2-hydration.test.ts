@@ -1,4 +1,5 @@
 import { createRequire } from "node:module";
+import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
@@ -103,7 +104,9 @@ function productionFixture(directory: string, boundedScene = false) {
   return { engine, native, author, pass, opening, logs, processInputs };
 }
 
-async function completedFusionFixture(directory: string, phase: string) {
+async function completedFusionFixture(directory: string, phase: string,
+  nativeProduce?: (this: Row, current: Row) => Promise<{ stages: Row; shots: Row[]; opening: unknown; llmStats: unknown }>,
+  priorWriterPolicy?: string) {
   const fixture = productionFixture(directory, true);
   Object.assign(fixture.engine, {
     // This fixture tests completed-checkpoint admission, not field-quality model output.
@@ -113,7 +116,8 @@ async function completedFusionFixture(directory: string, phase: string) {
     qualityGate: { run: async () => ({ passed: false, checks: [] }) },
   });
   const fresh = blueprint();
-  const result = await fixture.engine.produce(fresh);
+  if (priorWriterPolicy !== undefined) fresh._workloomMarketingFieldWriterPolicy = priorWriterPolicy;
+  const result = nativeProduce ? await nativeProduce.call(fixture.engine, fresh) : await fixture.engine.produce(fresh);
   expect(result.stages.phase3Fusion.status).toBe("passed");
   expect(result.shots.every((shot: Row) => (shot._workloomFusion as Row).blueprintHash === cinematicSkillHash(fresh))).toBe(true);
   if (phase === "phase3.5") {
@@ -173,6 +177,81 @@ it.each(["phase1", "phase2"])("reuses the original PF child after real safe seri
     for (const key of ["genre", "mood", "theme", "targetAudience", "description", "filmDirector", "filmDirectorSource"]) {
       expect(replayed[key]).toEqual(fresh[key]);
     }
+  } finally { uninstall(); rmSync(directory, { recursive: true, force: true }); }
+});
+
+it.each(["phase3", "phase3.5"].flatMap(phase => [
+  { phase, priorWriterPolicy: undefined }, { phase, priorWriterPolicy: "native-marketing-field-authority/v0" },
+]))("reauthors same-feedback $phase from prior writer $priorWriterPolicy before reusing current native stamps", async ({ phase, priorWriterPolicy }) => {
+  const directory = mkdtempSync(resolve(tmpdir(), "wl-marketing-writer-policy-"));
+  // Capture the genuine native producer before installing the current host
+  // writer. It seeds a disposable prior-policy cache through the native writer;
+  // no historical stamp or checkpoint body is edited to manufacture admission.
+  const nativeProduce = ProductionEngine.prototype.produce;
+  const uninstall = installVendorPhase3FusionBridge();
+  try {
+    const fixture = await completedFusionFixture(directory, phase, nativeProduce, priorWriterPolicy);
+    const prior = JSON.parse(fixture.originalBytes.toString("utf8"));
+    const oldKey = String(fixture.processInputs[0]!.effectiveKey);
+    const oldChild = resolve(directory, `checkpoint-phase3-${oldKey}.json`);
+    const oldChildBytes = readFileSync(oldChild);
+    const authorCalls = fixture.author.mock.calls.length;
+    const current = blueprint();
+    expect(current._workloomProductionRepairFeedback).toBe(fixture.fresh._workloomProductionRepairFeedback);
+
+    const produced = await fixture.engine.produce(current);
+    expect(produced.resumed).toBe(false);
+    expect(current._workloomMarketingFieldWriterPolicy).toBe("native-marketing-field-authority/v1");
+    expect(fixture.author).toHaveBeenCalledTimes(authorCalls + 2);
+    expect(fixture.processInputs).toHaveLength(2);
+    expect(fixture.processInputs[1]!.effectiveKey).not.toBe(oldKey);
+    expect(fixture.engine._blueprintFingerprint.hash).not.toBe(prior.blueprintFingerprint.hash);
+    expect(fixture.logs.some(row => row.stage === "RESUME" && row.message.includes("指纹不匹配"))).toBe(true);
+    expect(readFileSync(oldChild)).toEqual(oldChildBytes);
+    expect(produced.shots.every((shot: Row) => (shot._workloomFusion as Row).blueprintHash === cinematicSkillHash(current))).toBe(true);
+    if (phase === "phase3.5") {
+      await fixture.engine._saveCheckpoint(phase, produced.shots, { opening: produced.opening, llmStats: produced.llmStats });
+    }
+    const currentBytes = readFileSync(fixture.checkpoint);
+    const saved = JSON.parse(currentBytes.toString("utf8"));
+    const replayed = blueprint();
+    const reused = await fixture.engine.produce(replayed);
+    expect(reused.resumed).toBe(true);
+    expect(reused.stages.phase3Fusion).toMatchObject({ status: "passed", resumed: true });
+    expect(replayed._workloomMarketingFieldWriterPolicy).toBe(current._workloomMarketingFieldWriterPolicy);
+    expect(reused.shots.map((shot: Row) => shot._workloomFusion)).toEqual(saved.shots.map((shot: Row) => shot._workloomFusion));
+    expect(reused.shots.every((shot: Row) => (shot._workloomFusion as Row).blueprintHash === cinematicSkillHash(replayed))).toBe(true);
+    expect(fixture.author).toHaveBeenCalledTimes(authorCalls + 2);
+    expect(fixture.processInputs).toHaveLength(2);
+    expect(readFileSync(fixture.checkpoint)).toEqual(currentBytes);
+    expect(readFileSync(oldChild)).toEqual(oldChildBytes);
+  } finally { uninstall(); rmSync(directory, { recursive: true, force: true }); }
+});
+
+it.each([false, true])("keeps the exact unmarked narrative native fingerprint with feedback=%s", async withFeedback => {
+  const directory = mkdtempSync(resolve(tmpdir(), "wl-legacy-native-fingerprint-"));
+  const uninstall = installVendorPhase3FusionBridge();
+  try {
+    const fixture = productionFixture(directory, true);
+    const current = blueprint();
+    delete ((current.meta as Row)._metadata as Row)._prd;
+    if (!withFeedback) delete current._workloomProductionRepairFeedback;
+    const oldInput = withFeedback
+      ? { scenes: current.scenes, productionRepairFeedback: current._workloomProductionRepairFeedback }
+      : current.scenes;
+    const oldHash = createHash("md5").update(JSON.stringify(oldInput, (_key, value: unknown) => {
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        return Object.fromEntries(Object.entries(value).sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0));
+      }
+      return value;
+    })).digest("hex").slice(0, 8);
+    // Stop after the real fingerprint and cache-admission boundary; this case
+    // checks compatibility, not a synthetic narrative quality approval.
+    fixture.engine._runStage = vi.fn(async () => { throw new Error("LEGACY_FINGERPRINT_BOUNDARY"); });
+    await expect(fixture.engine.produce(current)).rejects.toThrow("PHASE3_FUSION_UNVERIFIED");
+    expect(fixture.engine._blueprintFingerprint.hash).toBe(oldHash);
+    expect(current).not.toHaveProperty("_workloomMarketingFieldWriterPolicy");
+    expect(fixture.author).not.toHaveBeenCalled();
   } finally { uninstall(); rmSync(directory, { recursive: true, force: true }); }
 });
 
