@@ -31,7 +31,7 @@ function nativeRow(shotId: string, scene: string, degraded = false) {
 }
 
 function fixture(baseDir: string, writeStarted: () => void = () => {}) {
-  const repaired = nativeRow("S1", `封闭检修工位，${"灰色墙面保留真实细节。".repeat(500)}`);
+  const repaired = nativeRow("S1", "封闭检修工位，灰色墙面与工作台保留真实细节。");
   const good = nativeRow("S2", "封闭检修工位，灰色工作台与金属工具清晰可见。");
   const first = [nativeRow("S1", "首次原生降级结果。", true), good];
   const process = vi.fn(async () => ({ shots: structuredClone(first), checkpointBlueprintHash: checkpointHash,
@@ -64,13 +64,14 @@ function fixture(baseDir: string, writeStarted: () => void = () => {}) {
   return { phase, process, repair, writer, finalCheckpoint, merge, blueprint, state, repaired, good };
 }
 
-it("persists the repaired native rows before canonical rejection without creating a passed Phase3 checkpoint", async () => {
+it("persists canonically accepted native rows before a later checkpoint failure without a passed Phase3 checkpoint", async () => {
   const baseDir = mkdtempSync(resolve(tmpdir(), "wl-host-phase3-repair-"));
   const uninstall = installVendorPhase3FusionBridge();
   try {
     const f = fixture(baseDir);
     const state = f.state();
-    await expect(f.phase.execute(state)).rejects.toThrow("FINAL_PROMPT_SOURCE_CAPACITY_EXCEEDED");
+    f.finalCheckpoint.mockRejectedValueOnce(new Error("OFFLINE_FINAL_CHECKPOINT_STOP"));
+    await expect(f.phase.execute(state)).rejects.toThrow("OFFLINE_FINAL_CHECKPOINT_STOP");
     expect(f.repair).toHaveBeenCalledTimes(1);
     expect(f.writer).toHaveBeenCalledTimes(1);
     expect(f.writer).toHaveBeenCalledWith({ baseDir }, checkpointHash, [f.repaired, f.good], 2, 2);
@@ -81,20 +82,21 @@ it("persists the repaired native rows before canonical rejection without creatin
     expect(saved.results[1]).toEqual(f.good);
     expect(state.result.stages.phase3Retry).toMatchObject({ repaired: ["S1"], rawCheckpointSaved: true });
     expect(state.result.stages.phase3Fusion).toMatchObject({ status: "unverified", code: "PHASE3_EXECUTION_FAILED" });
-    expect(f.finalCheckpoint).not.toHaveBeenCalled();
-    expect(f.merge).not.toHaveBeenCalled();
+    expect(f.finalCheckpoint).toHaveBeenCalledTimes(1);
+    expect(f.merge).toHaveBeenCalledTimes(1);
     expect(existsSync(resolve(baseDir, "checkpoint-phase3.json"))).toBe(false);
     expect(saved.results.every((row: Row) => !row._workloomFusion)).toBe(true);
 
-    // Already-repaired rows remain subject to canonical validation, but the
-    // host does not rewrite their native cache or call the single-shot repair.
+    // Already accepted fitting rows pass the same oracle without rewriting
+    // their raw cache or calling the native author again.
     f.process.mockResolvedValueOnce({ shots: saved.results, checkpointBlueprintHash: checkpointHash,
       degraded: false, stats: { total: 2, failed: 0 } });
     f.repair.mockClear(); f.writer.mockClear();
-    await expect(f.phase.execute(f.state())).rejects.toThrow("FINAL_PROMPT_SOURCE_CAPACITY_EXCEEDED");
+    f.finalCheckpoint.mockRejectedValueOnce(new Error("OFFLINE_FINAL_CHECKPOINT_STOP"));
+    await expect(f.phase.execute(f.state())).rejects.toThrow("OFFLINE_FINAL_CHECKPOINT_STOP");
     expect(f.repair).not.toHaveBeenCalled();
     expect(f.writer).not.toHaveBeenCalled();
-    expect(f.finalCheckpoint).not.toHaveBeenCalled();
+    expect(f.finalCheckpoint).toHaveBeenCalledTimes(2);
   } finally { uninstall(); rmSync(baseDir, { recursive: true, force: true }); }
 });
 

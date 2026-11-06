@@ -5865,6 +5865,7 @@ interface FusionAgent extends FusionRecord {
   _getAltLLMEngine?: () => FusionRecord | null;
   _saveSubCheckpoint?: (checkpointManager: unknown, blueprintHash: string, rows: FusionRecord[], completed: number, total: number) => void;
   _workloomSetFusionDraftRows?: (rows: FusionRecord[]) => void;
+  _workloomSetCanonicalCapacityRepair?: (context?: FusionRecord) => void;
   _isFieldSemanticallyComplete?: (shot: FusionRecord, field: string, fields: FusionRecord, blueprint?: FusionRecord | null) => boolean;
 }
 interface FusionPhase extends FusionRecord {
@@ -6033,6 +6034,21 @@ const MARKETING_NATIVE_FUSION_FIELDS = [
   ["mood", "emotion"], ["camera_movement", "cameraMovement", "cameraString"], ["pacing"],
   ["depth_of_field", "depthOfField"], ["audio"],
 ] as const;
+
+interface MarketingCanonicalCapacity {
+  shotId: string;
+  actualCharacters: number;
+  maxCharacters: number;
+  overByCharacters: number;
+}
+
+/** The failed final projector carries measurements, rather than an approximate per-field quota. */
+class MarketingCanonicalCapacityError extends Error {
+  constructor(readonly measurement: MarketingCanonicalCapacity, readonly projectionPolicy: FusionRecord) {
+    super(`FINAL_PROMPT_SOURCE_CAPACITY_EXCEEDED: ${measurement.shotId} 重建后 ${measurement.actualCharacters} 字符，超过 ${measurement.maxCharacters}；保留源合同并停止本次预生产`);
+    this.name = "MarketingCanonicalCapacityError";
+  }
+}
 
 function validMarketingNativeFusionRow(row: FusionRecord): boolean {
   return !Object.hasOwn(row, "_workloomLocalRecovery")
@@ -6808,6 +6824,13 @@ export function applyNarrativeFinalPromptContract(
   }
   // 营销先从完整原生字段重建；所有路径在此校验实际交付正文，不截断源动作。
   if (unicodeLength(prompt) > options.maxLength) {
+    if (options.canonicalize && options.marketingPrompt) {
+      const actualCharacters = unicodeLength(prompt);
+      throw new MarketingCanonicalCapacityError({
+        shotId: String(next.shotId ?? next.shot_id ?? "未编号镜头"), actualCharacters,
+        maxCharacters: options.maxLength, overByCharacters: actualCharacters - options.maxLength,
+      }, structuredClone(options) as unknown as FusionRecord);
+    }
     throw new Error(
       `FINAL_PROMPT_SOURCE_CAPACITY_EXCEEDED: ${String(next.shotId ?? next.shot_id ?? "未编号镜头")} 重建后 ${unicodeLength(prompt)} 字符，超过 ${options.maxLength}；保留源合同并停止本次预生产`,
     );
@@ -8287,7 +8310,7 @@ export function installVendorNarrativePromptReviewBridge(options: {
  * 每次执行独立的 agent 视图，避免并发 run 互改重试和子服务回调。
  * 只保留单次外调超时，不按整条任务已经运行的时间缩减后续创作。
  */
-const MARKETING_FIELD_WRITER_POLICY = "native-marketing-field-authority/v4";
+const MARKETING_FIELD_WRITER_POLICY = "native-marketing-field-authority/v5";
 
 function nativeMarketingBlueprint(blueprint: FusionRecord): boolean {
   return Boolean(recordValue(recordValue(recordValue(blueprint.meta)._metadata)._prd)._workloomMarketingPrompt);
@@ -8420,6 +8443,10 @@ function scopeNativeMarketingAuthorContext(scoped: FusionAgent, agent: FusionAge
 
 function scopedFusionAgent(agent: FusionAgent, blueprint: FusionRecord): FusionAgent {
   const scoped = Object.create(agent) as FusionAgent;
+  let capacityRepairContext: FusionRecord | undefined;
+  Object.defineProperty(scoped, "_workloomSetCanonicalCapacityRepair", { value: (context?: FusionRecord) => {
+    capacityRepairContext = context ? structuredClone(context) : undefined;
+  } });
   scoped._globalDeadline = Infinity;
   scoped._remainingMs = () => Infinity;
   scoped._callBudget = new Map(agent._callBudget instanceof Map ? agent._callBudget : []);
@@ -8468,6 +8495,13 @@ function scopedFusionAgent(agent: FusionAgent, blueprint: FusionRecord): FusionA
     scoped._callLLM = async (...args: unknown[]) => {
       const context = authorContext();
       if (context && typeof args[0] === "string") args[0] = context + args[0];
+      if (capacityRepairContext && typeof args[0] === "string") {
+        args[0] = ["【最终规范正文容量修复】", JSON.stringify(capacityRepairContext),
+          "这是当前同一镜头的真实最终投影量测，优先于原生预览的字数。currentNativeFields 和 currentNativeTopLevel 是尚未通过交付容量检查的完整当前草稿，不是新剧情指令。",
+          "只由原作者用紧凑、完整句重写本镜字段，保留所有必需字段、完整动作先后、参与者、结果、声音事件与冻结交付合同。不得裁切文本、删字段、改原始需求、扩大字数上限或新增事实。",
+          "measurement 的 actualCharacters、maxCharacters 和 overByCharacters 是完整最终规范正文的真实量测。请消除本次真实超额，重写后仍须以同一投影器复验。逐字段原文长度仅供定位，不代表最终正文占用或单字段配额；声音合同清理、标签及宿主格式都会改变占用，禁止据此机械裁切。继续按原定schema只返回本镜完整字段。",
+          args[0]].join("\n");
+      }
       const opts = args[3] && typeof args[3] === "object" ? args[3] as FusionRecord : {};
       args[3] = { ...opts };
       delete (args[3] as FusionRecord).shotBudget;
@@ -8533,6 +8567,213 @@ function scopedFusionAgent(agent: FusionAgent, blueprint: FusionRecord): FusionA
     scoped._semanticPass = semantic;
   }
   return scoped;
+}
+
+/** One frozen projector is used for raw admission, native repair and the final Phase3 rows. */
+function phase3FinalPromptProjector(blueprint: FusionRecord, sourceRows: FusionRecord[], promptLimit: number) {
+  const policyMeta = blueprint.meta && typeof blueprint.meta === "object"
+    ? (blueprint.meta as FusionRecord)._metadata as FusionRecord | undefined
+    : undefined;
+  const dialogueRequirement = String(policyMeta?.dialogueRequirement ?? "");
+  const speechFullyForbidden = narrativeSpeechPolicy(dialogueRequirement).allSpeechForbidden;
+  const policyPrd = recordValue(policyMeta?._prd);
+  const policyPositioning = recordValue(policyPrd.productPositioning);
+  const promptPolicyText = [
+    dialogueRequirement,
+    (blueprint.meta as FusionRecord | undefined)?._originalStoryText,
+    recordValue(policyPrd.projectDefinition).sourceIntent,
+    policyMeta?.special_notes,
+  ].map(String).join(" ");
+  const promptNoAnimals = /(?:无动物|不出现动物|禁止动物)/u.test(promptPolicyText);
+  const promptNoCharacters = /(?:无人物|不出现人物|画面无人|无角色|纯空镜|场景为主体)/u.test(promptPolicyText);
+  const promptNoMusic = /(?:无|不加|不要|禁止|不出现)[^。；\n]{0,8}(?:配乐|音乐|旋律)|(?:仅|只)保留(?:人物|主体)?(?:动作)?(?:与)?(?:画外)?(?:环境声|实拍声)/u.test(promptPolicyText);
+  const postRainOnly = /(?:雨后|雨停后|雨停了)/u.test(promptPolicyText);
+  const promptDuration = Number(
+    policyPositioning.targetDuration
+    ?? recordValue(blueprint.config).target_duration
+    ?? (blueprint.meta as FusionRecord | undefined)?.target_duration
+    ?? 0,
+  );
+  const promptAspect = String(
+    policyPositioning.aspectRatio
+    ?? recordValue(blueprint.meta).aspectRatio
+    ?? "9:16",
+  );
+  const promptResolution = String(policyPositioning.resolution ?? (promptAspect === "9:16" ? "1080x1920" : ""));
+  const promptColorTemperature = colorTemperatureFromText(JSON.stringify(policyPrd.visualSpecification)) ?? undefined;
+  const promptCharacterRecords = Array.isArray(recordValue(policyPrd.characterSystem).characters)
+    ? (recordValue(policyPrd.characterSystem).characters as unknown[]).map(recordValue)
+    : [];
+  const promptCharacters = promptCharacterRecords.map((item) => String(item.name ?? "").trim()).filter(Boolean);
+  const promptCharacterPortraits = promptCharacterRecords.map((item) => ({
+    name: String(item.name ?? "").trim(),
+    path: String(item.portraitPath ?? item.portraitRef ?? "").trim(),
+    appearance: String(item.appearance ?? "").trim(),
+    costume: String(item.costume ?? "").trim(),
+    authorization: String(item.authorization ?? "unverified").trim(),
+    ...(item.portraitEvidence && typeof item.portraitEvidence === "object"
+      ? {
+        sha256: String(recordValue(item.portraitEvidence).sha256 ?? "").trim() || undefined,
+        bytes: Number(recordValue(item.portraitEvidence).bytes) || undefined,
+      }
+      : {}),
+  })).filter((item) => item.name);
+  const promptSubtitles = recordValue(recordValue(policyPrd.deliveryStandard).subtitles);
+  const marketingPrompt = policyPrd._workloomMarketingPrompt as MarketingPromptPlan | undefined;
+  const promptNoTitles = promptSubtitles.mode === "none" || /(?:无字幕|无文字)/u.test(promptPolicyText);
+  const promptScenePlan = recordValue(policyPrd.scenePlan);
+  const promptVisual = recordValue(policyPrd.visualSpecification);
+  const promptSceneSettings = (Array.isArray(promptScenePlan.scenes) ? promptScenePlan.scenes.map(recordValue) : [])
+    .map((scene) => scene.setting).map(String).filter(Boolean);
+  const promptScene = promptSceneSettings.length > 0
+    ? [...new Set(promptSceneSettings)].join("；")
+    : String(recordValue(policyPrd.projectDefinition).sourceIntent ?? "");
+  const promptProps = [...new Set([
+    ...(Array.isArray(policyPrd.shotContract) ? policyPrd.shotContract.map(recordValue) : [])
+      .flatMap((shot) => Array.isArray(shot.keyProps) ? shot.keyProps.map(String) : []),
+    ...(Array.isArray(promptScenePlan.scenes) ? promptScenePlan.scenes.map(recordValue) : [])
+      .flatMap((scene) => Array.isArray(scene.keyProps) ? scene.keyProps.map(String) : []),
+  ].filter(Boolean))];
+  const extractedPromptActions = extractNarrativeActions({}, {
+    _originalStoryText: String(policyPrd._originalStoryText ?? promptScene),
+    special_notes: String(policyMeta?.special_notes ?? ""),
+  });
+  const promptActionsBase = marketingPrompt?.actions.length ? marketingPrompt.actions : extractedPromptActions.length > 0
+    ? extractedPromptActions
+    : sourceRows.map((shot) => promptFieldText(shot.action)).filter(Boolean);
+  const promptActions = marketingPrompt ? promptActionsBase : projectNarrativeActionSequence(promptActionsBase, sourceRows.length);
+  const promptContractShots = Array.isArray(policyPrd.shotContract)
+    ? policyPrd.shotContract.map(recordValue)
+    : [];
+  const promptSceneRecords = Array.isArray(promptScenePlan.scenes)
+    ? promptScenePlan.scenes.map(recordValue)
+    : [];
+  const promptLighting = promptFieldText(promptVisual.lightingDirection);
+  const promptColor = promptFieldText(promptVisual.colorPalette ?? promptVisual.colorGrading);
+  const promptProjectColor = promptColor && promptColor !== "色温按已确认视觉方案执行"
+    ? promptColor
+    : ((colorTemperatureFromText(promptVisual) ?? promptColor) || "色温按已确认视觉方案执行");
+  const promptReviewPolicy: NarrativePromptReviewPolicy = {
+    noDialogue: speechFullyForbidden,
+    maxLength: promptLimit,
+    noCharacters: promptNoCharacters,
+    noAnimals: promptNoAnimals,
+    noMusic: promptNoMusic,
+    noTitles: promptNoTitles,
+    durationSeconds: Number.isFinite(promptDuration) && promptDuration > 0 ? promptDuration : undefined,
+    aspectRatio: promptAspect,
+    resolution: promptResolution,
+    colorTemperature: promptColorTemperature,
+    characterNames: promptCharacters,
+    characterPortraits: promptCharacterPortraits,
+    postRainOnly,
+    projectScene: promptScene,
+    projectLighting: promptLighting,
+    projectColor: promptProjectColor,
+    projectProps: promptProps,
+    projectActions: promptActions,
+    marketingPrompt,
+  };
+  return { policy: promptReviewPolicy, projectRow: (shot: FusionRecord, shotIndex: number, totalShots: number): FusionRecord => {
+    const contractShot = !marketingPrompt && promptContractShots.length > 0
+      ? promptContractShots[Math.min(
+        promptContractShots.length - 1,
+        Math.floor(shotIndex * promptContractShots.length / Math.max(1, totalShots)),
+      )]!
+      : {};
+    const contractScene = promptFieldText(contractShot.location);
+    const contractLighting = promptFieldText(contractShot.lighting);
+    const contractColor = promptFieldText(contractShot.colorTemperature);
+    const contractProps = Array.isArray(contractShot.keyProps)
+      ? contractShot.keyProps.map(String).filter(Boolean)
+      : [];
+    const contractShotPurpose = promptFieldText(contractShot.purpose);
+    const sourceFirstFrameMatch = contractShotPurpose.match(/(?:^|[；;])\s*第一帧[:：]?\s*([^；;。]+)/u);
+    const contractSceneId = promptFieldText(contractShot.sceneId);
+    const scenePurpose = promptFieldText(
+      promptSceneRecords.find((scene) => promptFieldText(scene.sceneId) === contractSceneId)?.purpose,
+    );
+    const shotActions = extractNarrativeActions({}, { _originalStoryText: contractShotPurpose });
+    const sceneActions = extractNarrativeActions({}, { _originalStoryText: scenePurpose });
+    const sceneShotIds = promptContractShots
+      .filter((candidate) => promptFieldText(candidate.sceneId) === contractSceneId)
+      .map((candidate) => promptFieldText(candidate.shotId));
+    const sceneShotIndex = Math.max(0, sceneShotIds.indexOf(promptFieldText(contractShot.shotId)));
+    const contractAction = shotActions.length > 0
+      ? contractShotPurpose
+      : (sceneActions[Math.min(sceneActions.length - 1, sceneShotIndex)]
+        || promptActions[Math.min(
+          promptActions.length - 1,
+          Math.floor((shotIndex + 0.5) * promptActions.length / Math.max(1, totalShots)),
+        )]);
+    const orderedAction = marketingPrompt ? marketingNativeShotField(shot, "action") : String(
+      totalShots <= promptActions.length
+        ? promptActions[shotIndex]
+        : promptActions[Math.min(
+          promptActions.length - 1,
+          Math.floor((shotIndex + 0.5) * promptActions.length / Math.max(1, totalShots)),
+        )]
+      || contractAction
+      || "",
+    );
+    const sourceFirstFrame = !marketingPrompt && sourceFirstFrameMatch
+      && !["contact", "withdraw", "retreat", "curl"].includes(animalActionKind(orderedAction))
+      ? `第一帧${sourceFirstFrameMatch[1]!.trim()}`
+      : undefined;
+    const direction = deriveNarrativeShotDirection({
+      action: orderedAction,
+      fallbackScene: marketingPrompt ? marketingNativeShotField(shot, "scene", "sceneDescription") : contractScene || promptReviewPolicy.projectScene,
+      fallbackLighting: marketingPrompt ? marketingNativeShotField(shot, "lighting", "lightingString") : contractLighting || promptReviewPolicy.projectLighting,
+      fallbackColor: marketingPrompt ? marketingNativeShotField(shot, "color_palette", "colorPalette") : contractColor || promptReviewPolicy.projectColor,
+      fallbackProps: marketingPrompt ? [marketingNativeShotField(shot, "props")] : contractProps.length > 0 ? contractProps : promptReviewPolicy.projectProps,
+    });
+    const contractShotSize = marketingPrompt ? null : promptFieldText(contractShot.shotSize) || shotSizeForAction(orderedAction);
+    const contractCameraMovement = marketingPrompt ? "" : promptFieldText(contractShot.cameraMovement);
+    const rowPolicy: NarrativePromptReviewPolicy = {
+      ...promptReviewPolicy,
+      projectScene: direction.scene || promptReviewPolicy.projectScene,
+      projectLighting: direction.lighting || promptReviewPolicy.projectLighting,
+      projectColor: direction.color || promptReviewPolicy.projectColor,
+      projectProps: marketingPrompt ? direction.props : mergeNarrativeProps(direction.props, promptReviewPolicy.projectProps),
+      projectActions: promptActions,
+      sourceFirstFrame,
+    };
+    const projectedShot: FusionRecord = {
+      ...shot,
+      ...(contractShotSize ? { shotSize: contractShotSize, cameraHint: contractShotSize } : {}),
+      ...(contractCameraMovement ? { camera_movement: contractCameraMovement, cameraMovement: contractCameraMovement } : {}),
+    };
+    return {
+      ...applyNarrativeFinalPromptContract(projectedShot, {
+      noDialogue: speechFullyForbidden,
+      maxLength: promptLimit,
+      noCharacters: promptNoCharacters,
+      noAnimals: promptNoAnimals,
+      noMusic: promptNoMusic,
+      chineseOnly: true,
+      durationSeconds: Number.isFinite(promptDuration) && promptDuration > 0 ? promptDuration : undefined,
+      aspectRatio: promptAspect,
+      resolution: promptResolution,
+      colorTemperature: promptColorTemperature,
+      isLastShot: shotIndex === totalShots - 1,
+      characterNames: promptCharacters,
+      postRainOnly,
+      sourceFirstFrame,
+      noTitles: promptNoTitles,
+      deferOpeningFields: true,
+      canonicalize: true,
+      marketingPrompt,
+      characterPortraits: promptCharacterPortraits,
+      projectScene: rowPolicy.projectScene,
+      projectLighting: rowPolicy.projectLighting,
+      projectColor: rowPolicy.projectColor,
+      projectProps: rowPolicy.projectProps,
+      projectActions: rowPolicy.projectActions,
+      shotIndex,
+      }),
+      _workloomPromptReviewPolicy: rowPolicy,
+    };
+  } };
 }
 
 export function installVendorPhase3FusionBridge(options: { log?: (line: string) => void } = {}): () => void {
@@ -8650,6 +8891,22 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
         }
         const expectedIds = new Set(shots.map((shot) => String(shot.shotId ?? shot.shot_id)));
         const nativeMarketing = nativeMarketingBlueprint(blueprint);
+        const promptLimit = Number((vendorRequire(resolvePath(vendorRoot, "config/prompt-length.js")) as { HARD_MAX?: number }).HARD_MAX ?? 3000);
+        const capacityProjection = nativeMarketing ? phase3FinalPromptProjector(structuredClone(blueprint), updated, promptLimit) : undefined;
+        const capacityFailures = new Map<string, { row: FusionRecord; error: MarketingCanonicalCapacityError }>();
+        const capacityRepairs: FusionRecord[] = [];
+        const validateMarketingRow = (row: FusionRecord, expectedId: string): boolean => {
+          if (!validMarketingNativeFusionRow(row)) return false;
+          try {
+            capacityProjection!.projectRow(row, [...expectedIds].indexOf(expectedId), shots.length);
+            capacityFailures.delete(expectedId);
+            return true;
+          } catch (error) {
+            if (!(error instanceof MarketingCanonicalCapacityError)) throw error;
+            capacityFailures.set(expectedId, { row, error });
+            return false;
+          }
+        };
         const repairedRowIds: string[] = [];
         scoped._workloomSetFusionDraftRows?.(updated);
         const repairResult = await repairPhase3FusionRows({
@@ -8669,31 +8926,59 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
               ? (blueprint.character_system as FusionRecord).characters as FusionRecord[]
               : [];
             scoped._currentShotIdx = index;
-            const retry = await (scoped as FusionAgent & {
-              _fuseSingleShot?: (
-                shot: FusionRecord,
-                ratio: string,
-                characters: FusionRecord[],
-                blueprint: FusionRecord,
-                budget: number,
-              ) => Promise<unknown>;
-            })._fuseSingleShot?.(
-              this.cloneShots([source])[0]!,
-              ratio,
-              characters,
-              blueprint,
-              Infinity,
-            );
-            return retry;
+            const capacityFailure = capacityFailures.get(shotId);
+            if (capacityFailure) {
+              const current = capacityFailure.row;
+              const keys = [...new Set([...PROMPT_FIELD_KEYS, ...MARKETING_NATIVE_FUSION_FIELDS.flat(),
+                "cameraString", "lightingString", "backgroundSoundString"])];
+              scoped._workloomSetCanonicalCapacityRepair?.({
+                schemaVersion: "workloom.native-canonical-capacity-repair/v1",
+                measurement: capacityFailure.error.measurement,
+                currentNativeFields: recordValue(current.fields),
+                currentNativeFieldCharacters: Object.fromEntries(Object.entries(recordValue(current.fields))
+                  .map(([key, value]) => [key, unicodeLength(promptFieldText(value))])),
+                currentNativeTopLevel: Object.fromEntries(keys.filter(key => Object.hasOwn(current, key)).map(key => [key, current[key]])),
+                currentPreviewPrompt: current.prompt,
+                frozenProjectionPolicy: capacityFailure.error.projectionPolicy,
+              });
+            }
+            try {
+              const retry = await (scoped as FusionAgent & {
+                _fuseSingleShot?: (
+                  shot: FusionRecord,
+                  ratio: string,
+                  characters: FusionRecord[],
+                  blueprint: FusionRecord,
+                  budget: number,
+                ) => Promise<unknown>;
+              })._fuseSingleShot?.(
+                this.cloneShots([source])[0]!,
+                ratio,
+                characters,
+                blueprint,
+                Infinity,
+              );
+              if (capacityProjection && retry && typeof retry === "object" && !Array.isArray(retry)
+                && validMarketingNativeFusionRow(retry as FusionRecord)) {
+                // Run the same final oracle before the generic repair helper can
+                // accept this row or invoke its raw-checkpoint callback.
+                const projected = capacityProjection.projectRow(retry as FusionRecord, index, shots.length);
+                if (capacityFailure) capacityRepairs.push({ shotId,
+                  before: capacityFailure.error.measurement,
+                  afterCanonicalCharacters: unicodeLength(String(projected.prompt ?? "")) });
+              }
+              return retry;
+            } finally { scoped._workloomSetCanonicalCapacityRepair?.(); }
           },
-          ...(nativeMarketing ? { validateRow: validMarketingNativeFusionRow } : { recover: async (shotId: string, index: number) => {
+          ...(nativeMarketing ? { validateRow: validateMarketingRow } : { recover: async (shotId: string, index: number) => {
             const source = shots.find((shot) => String(shot.shotId ?? shot.shot_id) === shotId) ?? shots[index];
             if (!source) throw new CinematicSkillError("PHASE3_SHOTS_MISSING", `无法定位合同恢复镜头 ${shotId}`);
             return recoverPhase3RowFromSource(this.cloneShots([source])[0]!);
           } }),
           onRepaired: (rows, shotId) => {
             scoped._workloomSetFusionDraftRows?.(rows);
-            const retryEvidence: FusionRecord = { repaired: [...repairedRowIds, shotId], mode: "single-shot-llm-retry" };
+            const retryEvidence: FusionRecord = { repaired: [...repairedRowIds, shotId], mode: "single-shot-llm-retry",
+              ...(capacityRepairs.length ? { canonicalCapacityRepairs: [...capacityRepairs] } : {}) };
             stages.phase3Retry = retryEvidence;
             if (this.checkpointManager) {
               const checkpointHash = pfResult.checkpointBlueprintHash;
@@ -8721,215 +9006,8 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
             requiresFinalReviewProjection: true,
           };
         }
-        const policyMeta = blueprint.meta && typeof blueprint.meta === "object"
-          ? (blueprint.meta as FusionRecord)._metadata as FusionRecord | undefined
-          : undefined;
-        const dialogueRequirement = String(policyMeta?.dialogueRequirement ?? "");
-        const speechFullyForbidden = narrativeSpeechPolicy(dialogueRequirement).allSpeechForbidden;
-        const policyPrd = recordValue(policyMeta?._prd);
-        const policyPositioning = recordValue(policyPrd.productPositioning);
-        const promptPolicyText = [
-          dialogueRequirement,
-          (blueprint.meta as FusionRecord | undefined)?._originalStoryText,
-          recordValue(policyPrd.projectDefinition).sourceIntent,
-          policyMeta?.special_notes,
-        ].map(String).join(" ");
-        const promptNoAnimals = /(?:无动物|不出现动物|禁止动物)/u.test(promptPolicyText);
-        const promptNoCharacters = /(?:无人物|不出现人物|画面无人|无角色|纯空镜|场景为主体)/u.test(promptPolicyText);
-        const promptNoMusic = /(?:无|不加|不要|禁止|不出现)[^。；\n]{0,8}(?:配乐|音乐|旋律)|(?:仅|只)保留(?:人物|主体)?(?:动作)?(?:与)?(?:画外)?(?:环境声|实拍声)/u.test(promptPolicyText);
-        const postRainOnly = /(?:雨后|雨停后|雨停了)/u.test(promptPolicyText);
-        const promptDuration = Number(
-          policyPositioning.targetDuration
-          ?? recordValue(blueprint.config).target_duration
-          ?? (blueprint.meta as FusionRecord | undefined)?.target_duration
-          ?? 0,
-        );
-        const promptAspect = String(
-          policyPositioning.aspectRatio
-          ?? recordValue(blueprint.meta).aspectRatio
-          ?? "9:16",
-        );
-        const promptResolution = String(policyPositioning.resolution ?? (promptAspect === "9:16" ? "1080x1920" : ""));
-        const promptColorTemperature = colorTemperatureFromText(JSON.stringify(policyPrd.visualSpecification)) ?? undefined;
-        const promptCharacterRecords = Array.isArray(recordValue(policyPrd.characterSystem).characters)
-          ? (recordValue(policyPrd.characterSystem).characters as unknown[]).map(recordValue)
-          : [];
-        const promptCharacters = promptCharacterRecords.map((item) => String(item.name ?? "").trim()).filter(Boolean);
-        const promptCharacterPortraits = promptCharacterRecords.map((item) => ({
-          name: String(item.name ?? "").trim(),
-          path: String(item.portraitPath ?? item.portraitRef ?? "").trim(),
-          appearance: String(item.appearance ?? "").trim(),
-          costume: String(item.costume ?? "").trim(),
-          authorization: String(item.authorization ?? "unverified").trim(),
-          ...(item.portraitEvidence && typeof item.portraitEvidence === "object"
-            ? {
-              sha256: String(recordValue(item.portraitEvidence).sha256 ?? "").trim() || undefined,
-              bytes: Number(recordValue(item.portraitEvidence).bytes) || undefined,
-            }
-            : {}),
-        })).filter((item) => item.name);
-        const promptSubtitles = recordValue(recordValue(policyPrd.deliveryStandard).subtitles);
-        const marketingPrompt = policyPrd._workloomMarketingPrompt as MarketingPromptPlan | undefined;
-        const promptNoTitles = promptSubtitles.mode === "none" || /(?:无字幕|无文字)/u.test(promptPolicyText);
-        const promptScenePlan = recordValue(policyPrd.scenePlan);
-        const promptVisual = recordValue(policyPrd.visualSpecification);
-        const promptSceneSettings = (Array.isArray(promptScenePlan.scenes) ? promptScenePlan.scenes.map(recordValue) : [])
-          .map((scene) => scene.setting).map(String).filter(Boolean);
-        const promptScene = promptSceneSettings.length > 0
-          ? [...new Set(promptSceneSettings)].join("；")
-          : String(recordValue(policyPrd.projectDefinition).sourceIntent ?? "");
-        const promptProps = [...new Set([
-          ...(Array.isArray(policyPrd.shotContract) ? policyPrd.shotContract.map(recordValue) : [])
-            .flatMap((shot) => Array.isArray(shot.keyProps) ? shot.keyProps.map(String) : []),
-          ...(Array.isArray(promptScenePlan.scenes) ? promptScenePlan.scenes.map(recordValue) : [])
-            .flatMap((scene) => Array.isArray(scene.keyProps) ? scene.keyProps.map(String) : []),
-        ].filter(Boolean))];
-        const extractedPromptActions = extractNarrativeActions({}, {
-          _originalStoryText: String(policyPrd._originalStoryText ?? promptScene),
-          special_notes: String(policyMeta?.special_notes ?? ""),
-        });
-        const promptActionsBase = marketingPrompt?.actions.length ? marketingPrompt.actions : extractedPromptActions.length > 0
-          ? extractedPromptActions
-          : updated.map((shot) => promptFieldText(shot.action)).filter(Boolean);
-        const promptActions = marketingPrompt ? promptActionsBase : projectNarrativeActionSequence(promptActionsBase, updated.length);
-        const promptContractShots = Array.isArray(policyPrd.shotContract)
-          ? policyPrd.shotContract.map(recordValue)
-          : [];
-        const promptSceneRecords = Array.isArray(promptScenePlan.scenes)
-          ? promptScenePlan.scenes.map(recordValue)
-          : [];
-        const promptLighting = promptFieldText(promptVisual.lightingDirection);
-        const promptColor = promptFieldText(promptVisual.colorPalette ?? promptVisual.colorGrading);
-        const promptProjectColor = promptColor && promptColor !== "色温按已确认视觉方案执行"
-          ? promptColor
-          : ((colorTemperatureFromText(promptVisual) ?? promptColor) || "色温按已确认视觉方案执行");
-        const promptLimit = Number(
-          (vendorRequire(resolvePath(
-            repoRoot,
-            "vendor/supermickey/hyperreality-system/config/prompt-length.js",
-          )) as { HARD_MAX?: number }).HARD_MAX ?? 3000,
-        );
-        const promptReviewPolicy: NarrativePromptReviewPolicy = {
-          noDialogue: speechFullyForbidden,
-          maxLength: promptLimit,
-          noCharacters: promptNoCharacters,
-          noAnimals: promptNoAnimals,
-          noMusic: promptNoMusic,
-          noTitles: promptNoTitles,
-          durationSeconds: Number.isFinite(promptDuration) && promptDuration > 0 ? promptDuration : undefined,
-          aspectRatio: promptAspect,
-          resolution: promptResolution,
-          colorTemperature: promptColorTemperature,
-          characterNames: promptCharacters,
-          characterPortraits: promptCharacterPortraits,
-          postRainOnly,
-          projectScene: promptScene,
-          projectLighting: promptLighting,
-          projectColor: promptProjectColor,
-          projectProps: promptProps,
-          projectActions: promptActions,
-          marketingPrompt,
-        };
-        updated = updated.map((shot, shotIndex, allShots) => {
-          const contractShot = !marketingPrompt && promptContractShots.length > 0
-            ? promptContractShots[Math.min(
-              promptContractShots.length - 1,
-              Math.floor(shotIndex * promptContractShots.length / Math.max(1, allShots.length)),
-            )]!
-            : {};
-          const contractScene = promptFieldText(contractShot.location);
-          const contractLighting = promptFieldText(contractShot.lighting);
-          const contractColor = promptFieldText(contractShot.colorTemperature);
-          const contractProps = Array.isArray(contractShot.keyProps)
-            ? contractShot.keyProps.map(String).filter(Boolean)
-            : [];
-          const contractShotPurpose = promptFieldText(contractShot.purpose);
-          const sourceFirstFrameMatch = contractShotPurpose.match(/(?:^|[；;])\s*第一帧[:：]?\s*([^；;。]+)/u);
-          const contractSceneId = promptFieldText(contractShot.sceneId);
-          const scenePurpose = promptFieldText(
-            promptSceneRecords.find((scene) => promptFieldText(scene.sceneId) === contractSceneId)?.purpose,
-          );
-          const shotActions = extractNarrativeActions({}, { _originalStoryText: contractShotPurpose });
-          const sceneActions = extractNarrativeActions({}, { _originalStoryText: scenePurpose });
-          const sceneShotIds = promptContractShots
-            .filter((candidate) => promptFieldText(candidate.sceneId) === contractSceneId)
-            .map((candidate) => promptFieldText(candidate.shotId));
-          const sceneShotIndex = Math.max(0, sceneShotIds.indexOf(promptFieldText(contractShot.shotId)));
-          const contractAction = shotActions.length > 0
-            ? contractShotPurpose
-            : (sceneActions[Math.min(sceneActions.length - 1, sceneShotIndex)]
-              || promptActions[Math.min(
-                promptActions.length - 1,
-                Math.floor((shotIndex + 0.5) * promptActions.length / Math.max(1, allShots.length)),
-              )]);
-          const orderedAction = marketingPrompt ? marketingNativeShotField(shot, "action") : String(
-            allShots.length <= promptActions.length
-              ? promptActions[shotIndex]
-              : promptActions[Math.min(
-                promptActions.length - 1,
-                Math.floor((shotIndex + 0.5) * promptActions.length / Math.max(1, allShots.length)),
-              )]
-            || contractAction
-            || "",
-          );
-          const sourceFirstFrame = !marketingPrompt && sourceFirstFrameMatch
-            && !["contact", "withdraw", "retreat", "curl"].includes(animalActionKind(orderedAction))
-            ? `第一帧${sourceFirstFrameMatch[1]!.trim()}`
-            : undefined;
-          const direction = deriveNarrativeShotDirection({
-            action: orderedAction,
-            fallbackScene: marketingPrompt ? marketingNativeShotField(shot, "scene", "sceneDescription") : contractScene || promptReviewPolicy.projectScene,
-            fallbackLighting: marketingPrompt ? marketingNativeShotField(shot, "lighting", "lightingString") : contractLighting || promptReviewPolicy.projectLighting,
-            fallbackColor: marketingPrompt ? marketingNativeShotField(shot, "color_palette", "colorPalette") : contractColor || promptReviewPolicy.projectColor,
-            fallbackProps: marketingPrompt ? [marketingNativeShotField(shot, "props")] : contractProps.length > 0 ? contractProps : promptReviewPolicy.projectProps,
-          });
-          const contractShotSize = marketingPrompt ? null : promptFieldText(contractShot.shotSize) || shotSizeForAction(orderedAction);
-          const contractCameraMovement = marketingPrompt ? "" : promptFieldText(contractShot.cameraMovement);
-          const rowPolicy: NarrativePromptReviewPolicy = {
-            ...promptReviewPolicy,
-            projectScene: direction.scene || promptReviewPolicy.projectScene,
-            projectLighting: direction.lighting || promptReviewPolicy.projectLighting,
-            projectColor: direction.color || promptReviewPolicy.projectColor,
-            projectProps: marketingPrompt ? direction.props : mergeNarrativeProps(direction.props, promptReviewPolicy.projectProps),
-            projectActions: promptActions,
-            sourceFirstFrame,
-          };
-          const projectedShot: FusionRecord = {
-            ...shot,
-            ...(contractShotSize ? { shotSize: contractShotSize, cameraHint: contractShotSize } : {}),
-            ...(contractCameraMovement ? { camera_movement: contractCameraMovement, cameraMovement: contractCameraMovement } : {}),
-          };
-          return {
-            ...applyNarrativeFinalPromptContract(projectedShot, {
-            noDialogue: speechFullyForbidden,
-            maxLength: promptLimit,
-            noCharacters: promptNoCharacters,
-            noAnimals: promptNoAnimals,
-            noMusic: promptNoMusic,
-            chineseOnly: true,
-            durationSeconds: Number.isFinite(promptDuration) && promptDuration > 0 ? promptDuration : undefined,
-            aspectRatio: promptAspect,
-            resolution: promptResolution,
-            colorTemperature: promptColorTemperature,
-            isLastShot: shotIndex === allShots.length - 1,
-            characterNames: promptCharacters,
-            postRainOnly,
-            sourceFirstFrame,
-            noTitles: promptNoTitles,
-            deferOpeningFields: true,
-            canonicalize: true,
-            marketingPrompt,
-            characterPortraits: promptCharacterPortraits,
-            projectScene: rowPolicy.projectScene,
-            projectLighting: rowPolicy.projectLighting,
-            projectColor: rowPolicy.projectColor,
-            projectProps: rowPolicy.projectProps,
-            projectActions: rowPolicy.projectActions,
-            shotIndex,
-            }),
-            _workloomPromptReviewPolicy: rowPolicy,
-          };
-        });
+        const finalProjection = capacityProjection ?? phase3FinalPromptProjector(blueprint, updated, promptLimit);
+        updated = updated.map((shot, index, all) => finalProjection.projectRow(shot, index, all.length));
         const outputIds = new Set<string>();
         for (const row of updated) {
           const shot = fusionRecord(row, "融合镜头");
