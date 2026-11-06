@@ -29,6 +29,20 @@ const EN_PREFIX_FIELDS = new Set([
 /** 不做任何内容改动的字段(只保证闭合) */
 const PROTECTED_FIELDS = new Set(['【语言约束】']);
 
+// Shared with the native post-semantic transaction. These are the existing
+// exact display labels, not aliases inferred by the general standardizer.
+const DIRECT_FIELD_MAP = [
+ ['【场景】', 'scene'], ['【构图】', 'composition'], ['【色彩/色调】', 'color_palette'],
+ ['【景深】', 'depth_of_field'], ['【运镜】', 'camera_movement'], ['【角色】', 'character'],
+ ['【服装】', 'costume'], ['【化妆】', 'makeup'], ['【动作】', 'action'],
+ ['【道具】', 'props'], ['【定妆照】', 'portraits'], ['【时间轴】', 'timeline'],
+ ['【情绪】', 'mood'], ['【节奏】', 'pacing'], ['【转场】', 'transition'],
+ ['【音频】', 'audio'], ['【负面约束】', 'negative'],
+ ['【角色约束】', 'character_constraint'], ['【角色一致性】', 'consistency'],
+ ['【灯光设计】', 'lighting'], ['【明亮约束】', 'bright_constraint'],
+ ['【导演意图】', 'director_instruction'], ['【基础】', 'baseline'], ['【约束】', 'constraint']
+];
+
 /** 空镜(无角色)检测信号: 出现在【角色】字段正文中即判定空镜 */
 const EMPTY_SHOT_SIGNALS = /无角色|无人物|无指定角色|空镜|空车厢|画面纯粹以空间|人的缺席/;
 
@@ -124,21 +138,9 @@ class FieldContentRefiner {
  const camel = (s) => s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 
  // 1:1 映射字段(含拆分后的独立字段)
- const DIRECT_MAP = [
- ['【场景】', 'scene'], ['【构图】', 'composition'], ['【色彩/色调】', 'color_palette'],
- ['【景深】', 'depth_of_field'], ['【运镜】', 'camera_movement'], ['【角色】', 'character'],
- ['【服装】', 'costume'], ['【化妆】', 'makeup'], ['【动作】', 'action'],
- ['【道具】', 'props'], ['【定妆照】', 'portraits'], ['【时间轴】', 'timeline'],
- ['【情绪】', 'mood'], ['【节奏】', 'pacing'], ['【转场】', 'transition'],
- ['【音频】', 'audio'], ['【负面约束】', 'negative'],
- ['【角色约束】', 'character_constraint'], ['【角色一致性】', 'consistency'],
- ['【灯光设计】', 'lighting'], ['【明亮约束】', 'bright_constraint'],
- ['【导演意图】', 'director_instruction'], ['【基础】', 'baseline'], ['【约束】', 'constraint']
- ];
-
  const sections = [];
  const backMap = [];
- for (const [head, key] of DIRECT_MAP) {
+ for (const [head, key] of DIRECT_FIELD_MAP) {
  const v = getF(key, camel(key));
  if (typeof v === 'string' && v.trim()) { // 结构化时间轴对象等跳过, 不精炼
  sections.push({ head, body: v, sep: '' });
@@ -683,7 +685,7 @@ class FieldContentRefiner {
  }
 }
 
-module.exports = { FieldContentRefiner };
+module.exports = { FieldContentRefiner, DIRECT_FIELD_MAP };
 
 // ==================== 自测(直接 node 运行本文件时执行) ====================
 if (require.main === module) {

@@ -63,7 +63,7 @@ async function runFusion(respond: (attempt: number) => Response | Promise<Respon
     mergeShots: (_base: Row[], updated: Row[]) => updated, logFn: () => {}, saveCheckpoint: async () => {} });
   const state = { shots: [{ shotId: "S1", scene: "清晨湖面薄雾与远山倒影。", duration: 5, characters: [] }],
     adaptedBlueprint: { config: { aspectRatio: "9:16", target_duration: 5 },
-      ...(marketing ? { _workloomMarketingFieldWriterPolicy: "native-marketing-field-authority/v3" } : {}),
+      ...(marketing ? { _workloomMarketingFieldWriterPolicy: "native-marketing-field-authority/v4" } : {}),
       character_system: { characters: [] }, meta: { _metadata: { dialogueRequirement: "无人物、无对白。",
         ...(marketing ? { _prd: { _workloomMarketingPrompt: { actions: [], overlay: [], endCard: [] } } } : {}) } } },
     result: { stages: {}, llmStats: {} } };

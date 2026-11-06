@@ -8287,7 +8287,7 @@ export function installVendorNarrativePromptReviewBridge(options: {
  * 每次执行独立的 agent 视图，避免并发 run 互改重试和子服务回调。
  * 只保留单次外调超时，不按整条任务已经运行的时间缩减后续创作。
  */
-const MARKETING_FIELD_WRITER_POLICY = "native-marketing-field-authority/v3";
+const MARKETING_FIELD_WRITER_POLICY = "native-marketing-field-authority/v4";
 
 function nativeMarketingBlueprint(blueprint: FusionRecord): boolean {
   return Boolean(recordValue(recordValue(recordValue(blueprint.meta)._metadata)._prd)._workloomMarketingPrompt);

@@ -184,6 +184,7 @@ it.each(["phase3", "phase3.5"].flatMap(phase => [
   { phase, priorWriterPolicy: undefined }, { phase, priorWriterPolicy: "native-marketing-field-authority/v0" },
   { phase, priorWriterPolicy: "native-marketing-field-authority/v1" },
   { phase, priorWriterPolicy: "native-marketing-field-authority/v2" },
+  { phase, priorWriterPolicy: "native-marketing-field-authority/v3" },
 ]))("reauthors same-feedback $phase from prior writer $priorWriterPolicy before reusing current native stamps", async ({ phase, priorWriterPolicy }) => {
   const directory = mkdtempSync(resolve(tmpdir(), "wl-marketing-writer-policy-"));
   // Capture the genuine native producer before installing the current host
@@ -203,7 +204,7 @@ it.each(["phase3", "phase3.5"].flatMap(phase => [
 
     const produced = await fixture.engine.produce(current);
     expect(produced.resumed).toBe(false);
-    expect(current._workloomMarketingFieldWriterPolicy).toBe("native-marketing-field-authority/v3");
+    expect(current._workloomMarketingFieldWriterPolicy).toBe("native-marketing-field-authority/v4");
     expect(fixture.author).toHaveBeenCalledTimes(authorCalls + 2);
     expect(fixture.processInputs).toHaveLength(2);
     expect(fixture.processInputs[1]!.effectiveKey).not.toBe(oldKey);
@@ -227,6 +228,37 @@ it.each(["phase3", "phase3.5"].flatMap(phase => [
     expect(fixture.processInputs).toHaveLength(2);
     expect(readFileSync(fixture.checkpoint)).toEqual(currentBytes);
     expect(readFileSync(oldChild)).toEqual(oldChildBytes);
+  } finally { uninstall(); rmSync(directory, { recursive: true, force: true }); }
+});
+
+it.each(["phase1", "phase2"])("does not revive a v3 semantic field draft through a partial %s checkpoint", async resumePhase => {
+  const directory = mkdtempSync(resolve(tmpdir(), "wl-semantic-writer-partial-cache-"));
+  const nativeProduce = ProductionEngine.prototype.produce;
+  const uninstall = installVendorPhase3FusionBridge();
+  try {
+    const fixture = productionFixture(directory);
+    const prior = blueprint(); prior._workloomMarketingFieldWriterPolicy = "native-marketing-field-authority/v3";
+    expect((await nativeProduce.call(fixture.engine, prior)).success).toBe(false);
+    expect(fixture.author).toHaveBeenCalledTimes(2);
+    const oldKey = String(fixture.processInputs[0]!.effectiveKey);
+    const oldChild = resolve(directory, `checkpoint-phase3-${oldKey}.json`);
+    const oldChildBytes = readFileSync(oldChild);
+    if (resumePhase === "phase1") rmSync(resolve(directory, "checkpoint-phase2.json"));
+
+    const current = blueprint();
+    await expect(fixture.engine.produce(current)).rejects.toThrow("Phase3 未通过");
+    expect(current._workloomMarketingFieldWriterPolicy).toBe("native-marketing-field-authority/v4");
+    expect(fixture.logs.some(row => row.stage === "RESUME" && row.message.includes("指纹不匹配"))).toBe(true);
+    expect(fixture.author).toHaveBeenCalledTimes(4); expect(fixture.pass).toHaveBeenCalledTimes(8);
+    expect(fixture.opening).toHaveBeenCalledTimes(2); expect(fixture.processInputs).toHaveLength(2);
+    const currentKey = String(fixture.processInputs[1]!.effectiveKey);
+    expect(currentKey).not.toBe(oldKey); expect(readFileSync(oldChild)).toEqual(oldChildBytes);
+
+    // The freshly authored v4 draft remains resumable under the same policy;
+    // only the prior semantic contract is excluded.
+    await expect(fixture.engine.produce(blueprint())).rejects.toThrow("Phase3 未通过");
+    expect(fixture.processInputs[2]!.effectiveKey).toBe(currentKey);
+    expect(fixture.author).toHaveBeenCalledTimes(4); expect(readFileSync(oldChild)).toEqual(oldChildBytes);
   } finally { uninstall(); rmSync(directory, { recursive: true, force: true }); }
 });
 

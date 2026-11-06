@@ -5,8 +5,9 @@
  * v2.1.4-fix8: LLM输出标准字段格式(【约束】【基础】【场景】等)
  */
 const { BaseAgent } = require('./base-agent');
-const { FieldContentRefiner } = require('./field-content-refiner');
+const { FieldContentRefiner, DIRECT_FIELD_MAP } = require('./field-content-refiner');
 const { SemanticRefinementPass } = require('./semantic-refinement-pass');
+const { synchronizeSemanticFields } = require('./semantic-field-sync');
 const { OnscreenTextDesigner } = require('./onscreen-text-designer');
 const { ProductHeroDesigner } = require('./product-hero-designer');
 const { BgmStrategyDesigner } = require('./bgm-strategy-designer');
@@ -108,6 +109,14 @@ function _isEmptyScene(shot) {
 
 // 25 字段标准名称列表(用于校验) - 前置定义，避免TDZ风险
 const REQUIRED_FIELDS = Object.keys(STANDARD_FIELDS_SCHEMA);
+
+const OPENING_FIELDS = [
+  { key: 'title_content', label: '主标题内容' },
+  { key: 'subtitle_content', label: '副标题内容' },
+  { key: 'title_animation', label: '标题动画设计' },
+  { key: 'title_font_design', label: '标题字体设计' },
+  { key: 'opening_audio_design', label: '开场音频设计' }
+];
 
 /**
  * 获取镜头所需的必填字段
@@ -444,22 +453,37 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
         semantic.callLLM = (prompt, ...args) => originalCall.call(semantic, `${repair}\n\n${prompt}`, ...args);
       }
       const r = await semantic.refine(result.prompt, shot);
+      let applied = r.applied;
+      let fallbackReason = r.fallbackReason || null;
+      let fieldSync = null;
+      let nextResult = result;
       if (r.applied) {
-        result.prompt = r.prompt;
-        result.promptCharCount = this._countChars(r.prompt);
-      } else if (r.fallbackReason && r.fallbackReason !== 'disabled') {
-        console.warn(`[PromptFusionAgent] ${shot.shotId} 语义精炼回退: ${r.fallbackReason}`);
+        const synced = synchronizeSemanticFields(result, r.prompt, DIRECT_FIELD_MAP, OPENING_FIELDS);
+        fieldSync = synced.audit;
+        applied = synced.applied;
+        if (synced.applied) {
+          // Both native callers consume this return value. Construct the whole
+          // transaction without invoking setters or writing readonly input
+          // properties; an exception cannot leave an earlier alias half-written.
+          nextResult = { ...result, ...synced.topLevel, fields: synced.fields, prompt: r.prompt,
+            promptCharCount: this._countChars(r.prompt) };
+        } else {
+          fallbackReason = synced.reason;
+        }
       }
-      result.semanticRefinement = {
-        applied: r.applied,
+      if (!applied && fallbackReason && fallbackReason !== 'disabled') {
+        console.warn(`[PromptFusionAgent] ${shot.shotId} 语义精炼回退: ${fallbackReason}`);
+      }
+      return { ...nextResult, semanticRefinement: {
+        applied,
         actions: r.actions || [],
-        fallbackReason: r.fallbackReason || null
-      };
+        fallbackReason,
+        ...(fieldSync ? { fieldSync } : {})
+      } };
     } catch (e) {
       console.warn(`[PromptFusionAgent] ${shot.shotId} 语义精炼异常，保持规则精炼结果: ${e.message}`);
-      result.semanticRefinement = { applied: false, actions: [], fallbackReason: `异常:${e.message}` };
+      return { ...result, semanticRefinement: { applied: false, actions: [], fallbackReason: `异常:${e.message}` } };
     }
-    return result;
   }
 
   /**
@@ -1781,14 +1805,7 @@ ${missing.map(f => `- ${f}:${FIELD_DESCS[f]}`).join('\n')}
     // 【v2.2.0】片头专属字段(30字段体系): 片头镜头追加5个独立标签
     const isOpening = shot.sceneType === 'opening' || shot.shotId === 'SC00' || shot.shotId === 'S00';
     if (isOpening) {
-      const openingFields = [
-        { key: 'title_content', label: '主标题内容' },
-        { key: 'subtitle_content', label: '副标题内容' },
-        { key: 'title_animation', label: '标题动画设计' },
-        { key: 'title_font_design', label: '标题字体设计' },
-        { key: 'opening_audio_design', label: '开场音频设计' }
-      ];
-      for (const of of openingFields) {
+      for (const of of OPENING_FIELDS) {
         let value = getField(of.key) || shot[of.key] || fields?.[of.key];
         // 【v2.2.1-fix】title_animation 在优化器运行前可能为空，从片头设计的 beats 节拍表兜底生成
         if ((!value || !String(value).trim()) && of.key === 'title_animation') {
