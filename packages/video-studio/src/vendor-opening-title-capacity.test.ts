@@ -198,7 +198,7 @@ it("invalidates only the old title policy while reusing current production and e
   const seed = "same seed"; const input = { same: "frozen" };
   const prior = [ ["G2_THEME", "theme-input-and-brief/v1"], ["G3_INSIGHT", "source-bound-discovery-and-assumptions/v2"],
     ["G3_PROFILE", "native-source-aware-production-profile/v2"], ["G4_PRD", "source-bound-prd-native-local-contract/v3"],
-    ["SCRIPT", "native-script-and-metadata/v1"], ["PRODUCTION", "native-production-camera-repair-feedback/v14"],
+    ["SCRIPT", "native-script-and-metadata/v1"], ["PRODUCTION", "native-production-camera-repair-feedback/v15"],
     ["OPENING_TITLE", "native-opening-title-fields/v1"] ] as const;
   const records = new Map<string, StudioEngineCheckpoint>();
   const key = (r: StudioCheckpointRequest) => `${r.stage}/${r.inputSha256}/${r.dependencySha256}`;
