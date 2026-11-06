@@ -2,6 +2,8 @@
 
 在当前 GitHub 默认分支的干净检出中打开工作台。仓库身份为 `geniusdapeng-collab/workloom-growthtest`。按 [Agent 接入指引](AGENT-CLIENTS.md) 准备依赖、数据库、供应商和授权成员会话。客户端首先核对 `/health` 的产品、实例和源码提交，再用 `access.me` 核对成员与工作区。这个入口面向有可核实源码版本的服务；没有相同 `sourceCommit` 的运行实例需要由部署方按同一源码版本启动。
 
+Codex / Qoder 等有本机终端能力的 Agent 可按接入指引第 0 节，使用私有 profile 和 `scripts/workloom-client-setup.mjs video --profile … -- …` 调用下述正式前期命令。用户只在对话框描述目标，Agent 负责准备无秘密配置、真实 `doctor` 和同工作单续查；已有工作单始终使用其绑定的执行源码。MCP 的指南和发现不代替制作执行或审核。渲染交付继续使用本页最后的正式入口和业务授权。
+
 ## 从用户原话取得正式前期
 
 把原话放在 `intent`。仅在已知时附上 `durationSec`、`platform` 或 `product`。指定的人物、商品、情节和平台来自本次任务。镜头划分、逐镜时长、提示词和生成资格由系统产生。选择营销片时走商品情报和 G1；叙事片走同一工作台的叙事流程。解释片使用专用工位。

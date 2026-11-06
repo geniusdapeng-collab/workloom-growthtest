@@ -39,6 +39,7 @@ async function handle(request) {
         protocolVersion: version,
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: "workloom-agent", version: "1.0.0" },
+        instructions: "GrowthTest 视频任务先调用 workloom_growth_video_workbench_guide({}) 读取完整固定指南。当前 MCP 提供已列出的只读发现与查询，不提供视频生产写工具。制作使用已授权实例的 scripts/workloom-video.mjs start/status/prompts/resume-prompts 正式 CLI；先读取固定私有 profile，运行 scripts/workloom-client-setup.mjs check 与 doctor，核对 executorCommit、实例、成员与工作区。同一 jobRoot/jobFile 持续接续，start_unknown 只对账、禁止换文件重发。GitHub 或客户端登录不能替代产品成员权限；指南读取与本地配置成功不证明接通或成片。仓库规则与完整入口见 AGENTS.md、AGENTS.repo.md、docs/AGENT-CLIENTS.md、docs/video-native-agent-entry.md。",
       });
       return;
     }

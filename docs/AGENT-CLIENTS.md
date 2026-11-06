@@ -1,6 +1,39 @@
-# 从 GitHub 接入 Codex / DeepSeek Harness
+# 从 GitHub 接入 Codex / Qoder / DeepSeek Harness
 
 从本仓源码启动的 AI 工作台可以发现能力、读取回执，并通过正式 CLI 组织视频制作。第一次接入先跑本地只读验证。要调用文字模型、图片或视频供应商，再准备独立服务环境和当前工作区授权。视频制作、交付与恢复见 [视频工作台指南](ai-video-workbench-guide.md)。 直接用用户原话开工时，按 [正式视频入口](video-native-agent-entry.md) 启动并续跑同一作业。
+
+## 0. 用户只说目标，由 Agent 完成接入和续作业
+
+用户在对话框描述目标或说“继续上次任务”即可。下面的配置、命令和回读由 Codex / Qoder 等有本机终端能力的 Agent 执行。首次接入复用已授权实例；已有作业沿用原工作单。生产仍走正式 CLI，通用 MCP 提供指南、发现和已有只读能力。
+
+1. 读取根级 `AGENTS.md`、它指向的 `AGENTS.repo.md` 和本页，核对实际仓库、干净提交和运行实例。Codex 的项目 Skill 位于 [`.agents/skills`](../.agents/skills/workloom-growthtest-standard-video/SKILL.md)，Qoder 的薄入口位于 [`.qoder/skills`](../.qoder/skills/workloom-growthtest-standard-video/SKILL.md)；二者指向同一正式视频流程。
+2. Agent 从已授权实例、现有会话通道和原工作单取得真实值，准备私有客户端 profile，默认位置为 `~/.workloom/growthtest/client-profile.json`，也可用 `WORKLOOM_GROWTHTEST_PROFILE` 指向明确的绝对路径。profile 只保存仓库与 Node 路径、执行源码和提交、实例/工作区/成员身份、固定 `jobRoot` / `jobFile`，以及可选的既有受控成员 launcher 路径与摘要；不保存 token、登录 key、供应商密钥或任意 shell 字符串。
+3. 运行 `check` 核对本地配置，再用 `doctor` 回读同一工作单和实际成员会话。`check` 成功只表示本地检查通过；只有 `doctor` 的真实实例、提交和身份检查通过，才报告已接通。缺会话时保留缺项，不新开项目或模型请求来“试通”。
+4. 需要 MCP 时，先生成无秘密配置候选、检查目标客户端作用域和同名冲突，再由 Agent 安装并核对实际工具发现。保留用户已有配置和正常的项目信任/工具授权；文件存在不代表已经加载。
+
+```bash
+profile_file="${WORKLOOM_GROWTHTEST_PROFILE:-$HOME/.workloom/growthtest/client-profile.json}"
+node scripts/workloom-client-setup.mjs plan --profile "$profile_file"
+node scripts/workloom-client-setup.mjs check --profile "$profile_file"
+node scripts/workloom-client-setup.mjs doctor --profile "$profile_file"
+
+# 查询原工作单；不另外挑一个文件重发
+node scripts/workloom-client-setup.mjs video --profile "$profile_file" -- status
+```
+
+新作业的原话通过同一入口的 `video -- … start` 送入正式 CLI；已有工作单先查 `status`，合格后用 `prompts` 导出。被打回的原项目用 `resume-prompts` 和明确的同目录 `--out` 接续；受理后 Agent 显式把 profile 的 `jobFile` 更新为返回的新工作单，再查状态。原工作单的 commit、scope 和项目身份保持原样。`start_unknown` 先核对原任务，不能换文件名重复提交。
+
+接入代码可以随 main 更新；已有工作单的 `executorRoot` / `executorCommit` 必须继续对应其原执行源码和实际服务。配置工具不把两个提交当成同一个来源，也不为适配新客户端改写历史回执。profile 必须是当前用户私有的 `0600` 文件，`jobRoot` 必须是 `0700` 目录；字段合同及校验见 [`validateProfile`](../scripts/workloom-client-setup.mjs)，命令用 `--help` 查看。
+
+| profile 字段 | 由 Agent 核对的真实值 |
+|---|---|
+| `schemaVersion` | `workloom.growthtest-client-profile/v1` |
+| `repositoryRoot`、`node` | 接入工具所在 GrowthTest 检出与实际 Node 的绝对路径 |
+| `executorRoot`、`executorCommit` | 原工作单使用的干净执行源码目录及完整 40 位提交 |
+| `apiBase` | 已授权实例的实际地址，非回环地址必须 HTTPS |
+| `scope` | `instance`、`tenantId`、`workspaceId`、`memberId`、`memberNo`，均来自原回执及真实成员会话 |
+| `jobRoot`、`jobFile` | 固定的私有作业目录和目录内准确工作单路径，不按修改时间猜选任务 |
+| `launcher`（可选） | 既有受控 JS 成员 wrapper 的绝对 `script` 路径与 `sha256`；当前用户所有、不可被组或其他用户写入 |
 
 ---
 
@@ -164,6 +197,14 @@ codex mcp list
 ```
 
 接入后，在当前 Growthtest 仓库会话只需描述作业，例如“用 Growthtest 制作 18 秒雨后山间民宿短片，只拍空景”。根级指引会引导工作台检查实例、授权与素材，再使用[原生制作入口](video-native-agent-entry.md#从用户原话取得正式前期)。只要方案时明确说“先给方案”。
+
+### 3.1 Qoder CLI 与 IDE
+
+Qoder CLI 和 IDE 的项目 Skill 使用 `.qoder/skills/<产品技能名>/SKILL.md`。本仓提供产品专属薄入口，显式引导读取本页和正式视频指南。Qoder 官方 CLI 与 IDE 文档对同名用户/项目技能的优先级说明不同，因此不依赖覆盖来更新流程；分别核对实际加载的技能来源。[Qoder CLI Skills](https://docs.qoder.com/cli/Skills)、[Qoder IDE Skills](https://docs.qoder.com/extensions/skills)
+
+Qoder CLI 使用 JSON 的 `mcpServers`。共享项目可用 `.qoder/settings.json` 或 `.mcp.json`，本机路径通常放在不提交的 `.qoder/settings.local.json`；用户配置在 `~/.qoder/settings.json`，自定义 `QODER_CONFIG_DIR` 时按实际目录处理。用配置工具生成当前机器的候选并保留其它已有条目，同名服务器冲突时停止覆盖、核对原配置。项目服务器继续正常授权。[Qoder MCP 配置与作用域](https://docs.qoder.com/cli/mcp-reference)
+
+Qoder IDE 在其 MCP 设置面板配置同一 Node 和 stdio 入口，并实际回读工具列表；不把 CLI 的配置文件发现、`cwd` 或环境插值行为直接外推到 IDE。目标客户端尚未安装或未完成正常授权时，报告“配置候选已生成，客户端发现未验证”。不为接入测试新增生产任务。
 
 ---
 

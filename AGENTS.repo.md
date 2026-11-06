@@ -9,6 +9,7 @@
 收到“用 Growthtest 制作 X 秒某主题视频”等制作请求时，直接按 [正式前期入口](docs/video-native-agent-entry.md#从用户原话取得正式前期) 使用当前隔离实例的原生 Studio 自动分流。保留用户原话，将明确的目标秒数传为 `durationSec`，从同一项目继续核对正式渲染资格、原片和官方后期回执。制作途中保留阻断与原任务，禁止手工补镜头卡、另开同内容项目或用临时媒体合成替代正式交付。
 
 1. 从 [GitHub](https://github.com/geniusdapeng-collab/workloom-growthtest) 拉取默认分支并记录完整 SHA。在仓库根目录打开 Agent 工作区，按照 [Agent 接入指引](docs/AGENT-CLIENTS.md) 准备依赖、隔离数据库、运行环境和会话身份。
+   Codex / Qoder 对话接入先读取私有客户端 profile，运行 `scripts/workloom-client-setup.mjs check` 和真实只读 `doctor`。配置、命令和回执核对由 Agent 完成；用户只需描述目标。重开聊天先查 profile 固定的原工作单，不能改写其提交或 scope，也不能为重发未知请求换文件名。配置计划或文件生成不代表服务已接通，具体流程见接入指引第 0 节。
 2. 直接制作任务从 [正式视频入口](docs/video-native-agent-entry.md) 启动和续跑，再按 [视频工作台指南](docs/ai-video-workbench-guide.md) 固定人物、商品、平台、时长、声音、授权和预算。先运行 `growth.repo.readiness`、内置素材检查和 `video:doctor`，再用实际运行服务的 `/health` 和成员权限回读目标身份。MCP 可发现能力，制作的写操作走正式 CLI 或服务入口。
 3. 用同一工作区和项目依次取得前期方案、渲染资格和预算回执、供应商任务与原片、后期交付清单。超时后查询原任务；先核对已受理回执再决定下一步。只有当前成片文件可完整解码并通过交付检查，才向用户交付视频。
 
