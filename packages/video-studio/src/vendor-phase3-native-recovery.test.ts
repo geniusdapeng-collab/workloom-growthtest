@@ -85,14 +85,15 @@ it("retries only actual14-shaped recovered S1/S5 and preserves the five genuine 
     // Even complete fields cannot turn a source-recovery marker into native authorship.
     first[4] = { ...nativeRow("S5"), _workloomLocalRecovery: { mode: "contract-source-reprojection" } };
     const f = fixture(directory, first);
-    const realS1 = nativeRow("S1", `检修工位，${"灰色墙面保留真实细节。".repeat(500)}`);
+    const realS1 = nativeRow("S1", "检修工位，灰色墙面与金属工具保留真实细节。");
     const realS5 = nativeRow("S5");
     const neighborIndices: unknown[] = [];
     f.repair.mockImplementation(async function (this: Row, shot: Row) {
       neighborIndices.push(this._currentShotIdx);
       return shot.shotId === "S1" ? realS1 : realS5;
     });
-    await expect(f.phase.execute(f.state())).rejects.toThrow("FINAL_PROMPT_SOURCE_CAPACITY_EXCEEDED");
+    f.finalCheckpoint.mockRejectedValueOnce(new Error("OFFLINE_FINAL_CHECKPOINT_STOP"));
+    await expect(f.phase.execute(f.state())).rejects.toThrow("OFFLINE_FINAL_CHECKPOINT_STOP");
     expect(f.repair.mock.calls.map(([shot]) => shot.shotId)).toEqual(["S1", "S5"]);
     expect(neighborIndices).toEqual([0, 4]);
     expect(f.writer).toHaveBeenCalledTimes(2);
@@ -102,8 +103,8 @@ it("retries only actual14-shaped recovered S1/S5 and preserves the five genuine 
     expect(saved.results[4]).toEqual(realS5);
     for (const index of [1, 2, 3, 5, 6]) expect(saved.results[index]).toEqual(first[index]);
     expect(saved.results.every((row: Row) => !row._workloomLocalRecovery && !row._workloomFusion)).toBe(true);
-    expect(f.finalCheckpoint).not.toHaveBeenCalled();
-    expect(f.merge).not.toHaveBeenCalled();
+    expect(f.finalCheckpoint).toHaveBeenCalledTimes(1);
+    expect(f.merge).toHaveBeenCalledTimes(1);
   } finally { uninstall(); rmSync(directory, { recursive: true, force: true }); }
 });
 
@@ -127,12 +128,13 @@ it("persists a successful native S1 before S5 fails, then retries only S5 from t
     expect(f.finalCheckpoint).not.toHaveBeenCalled();
     expect(f.merge).not.toHaveBeenCalled();
 
-    const realS5 = nativeRow("S5", `检修工位，${"灰色墙面保留真实细节。".repeat(500)}`);
+    const realS5 = nativeRow("S5", "检修工位，灰色墙面与金属工具保留真实细节。");
     f.process.mockResolvedValueOnce({ shots: saved.results, checkpointBlueprintHash: checkpointHash,
       degraded: false, stats: { total: 7, failed: 0 } });
     f.repair.mockReset(); f.writer.mockClear();
     f.repair.mockResolvedValueOnce(realS5);
-    await expect(f.phase.execute(f.state())).rejects.toThrow("FINAL_PROMPT_SOURCE_CAPACITY_EXCEEDED");
+    f.finalCheckpoint.mockRejectedValueOnce(new Error("OFFLINE_FINAL_CHECKPOINT_STOP"));
+    await expect(f.phase.execute(f.state())).rejects.toThrow("OFFLINE_FINAL_CHECKPOINT_STOP");
     expect(f.repair.mock.calls.map(([shot]) => shot.shotId)).toEqual(["S5"]);
     expect(f.writer).toHaveBeenCalledTimes(1);
     const resumed = JSON.parse(readFileSync(f.cache, "utf8"));

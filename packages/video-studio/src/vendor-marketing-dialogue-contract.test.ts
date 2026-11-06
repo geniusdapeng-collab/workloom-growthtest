@@ -31,7 +31,7 @@ const { PromptFusionAgent } = require(resolve(vendor, "engines/production-engine
 const { Phase3PromptFusion } = require(resolve(vendor, "engines/production-engine/phases/phase-3-prompt-fusion.js"));
 const nativeProcess = PromptFusionAgent.prototype.process as NativeAgent["process"];
 const marker = "_workloomMarketingFieldWriterPolicy";
-const currentPolicy = "native-marketing-field-authority/v4";
+const currentPolicy = "native-marketing-field-authority/v5";
 const silentRequirement = "本片无台词、无对白、无旁白；只保留动作和环境声。";
 const stop = "DIALOGUE_CONTRACT_FIXTURE_STOP_WITHOUT_PRODUCTION_APPROVAL";
 
