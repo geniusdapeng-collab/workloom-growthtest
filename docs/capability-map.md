@@ -49,6 +49,18 @@
 | 视频域 E2E 演示剧本 | `pnpm exec tsx --env-file=.env scripts/demo-video.ts` | 视频经理链路演示输出 |
 | Mock 数据统一口径 | `mock/README.md` | 三端共享同一数据源 |
 
+### L1.1 Codex / Qoder 对话接入
+
+按 [Agent 接入指引第 0 节](AGENT-CLIENTS.md#0-用户只说目标由-agent-完成接入和续作业) 由 Agent 配置私有 profile，用户只描述目标。profile 固定真实实例、成员、执行源码和原工作单；MCP 负责现有只读指南与发现，制作继续走正式 CLI。
+
+| 能力 | 调用 | 验证 |
+|---|---|---|
+| 本地接入计划与检查 | `node scripts/workloom-client-setup.mjs check --profile /abs/private/profile.json` | `localReady` 只证明本地检查，不表示已连接 |
+| 原会话真实只读接通 | `node scripts/workloom-client-setup.mjs doctor --profile /abs/private/profile.json` | 核对 sourceCommit、实例、工作区、成员和固定工作单；连接与业务任务状态分别报告，0 新增模型 |
+| 无秘密 MCP 配置候选 | `node scripts/workloom-client-setup.mjs config --client codex --profile /abs/private/profile.json --out /abs/private/mcp.toml`；Qoder CLI 用 `qoder-cli` | 保留其它非秘密配置，同名冲突拒绝；实际客户端发现另行回读 |
+| 同工作单正式前期 | `node scripts/workloom-client-setup.mjs video --profile /abs/private/profile.json -- status` | 复用正式 CLI 与 scope；未知请求先对账，原工作单不改写 |
+| 接入回归 | `node --test scripts/workloom-client-setup.test.mjs scripts/ai-video-workbench-guide.test.mjs scripts/workloom-video.test.mjs` | 配置、路径、来源、权限、工作单与未知状态边界；loopback/mock 不代表生产审核通过 |
+
 ## L2 验证层 · 质量与发布纪律（硬性）
 
 | 能力 | 调用 | 验证 |

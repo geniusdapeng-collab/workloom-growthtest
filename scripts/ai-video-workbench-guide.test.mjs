@@ -105,9 +105,29 @@ test('real generic MCP discovers and reads guide; invalid extra fields fail with
   });
   assert.equal(result.status, 0, result.stderr);
   const replies = new Map(result.stdout.trim().split('\n').map(line => { const item = JSON.parse(line); return [item.id, item]; }));
+  const instructions = replies.get(1).result.instructions;
+  assert.match(instructions.slice(0, 512), /workloom_growth_video_workbench_guide/);
+  assert.match(instructions.slice(0, 512), /只读/);
+  assert.match(instructions, /start_unknown/);
+  assert.match(instructions, /workloom-client-setup\.mjs/);
+  assert.ok(replies.get(2).result.tools.every(tool => tool.annotations.readOnlyHint === true));
   assert.ok(replies.get(2).result.tools.some(tool => tool.name === 'workloom_growth_video_workbench_guide'));
   const guide = JSON.parse(replies.get(3).result.content[0].text);
   assert.equal(guide.result.markdown, bytes.toString('utf8')); assert.equal(guide.result.sha256, digest(bytes));
   assert.equal(replies.get(4).result.isError, true);
   assert.equal(JSON.parse(replies.get(4).result.content[0].text).error.code, 'INVALID_INPUT');
+});
+
+test('Codex and Qoder thin skills share canonical guides and durable job/profile boundary', () => {
+  for (const directory of ['.agents', '.qoder']) {
+    const path = join(root, directory, 'skills/workloom-growthtest-standard-video/SKILL.md');
+    const markdown = readFileSync(path, 'utf8');
+    assert.match(markdown, /name: workloom-growthtest-standard-video/);
+    assert.match(markdown, /description: .+/);
+    for (const ref of ['docs/AGENT-CLIENTS.md', 'docs/video-native-agent-entry.md', 'docs/ai-video-workbench-guide.md']) {
+      assert.ok(markdown.includes(ref), path + ' must point to ' + ref);
+      assert.ok(readFileSync(resolve(dirname(path), '../../../', ref)).length);
+    }
+    for (const boundary of ['client-profile.json', 'jobRoot', 'jobFile', 'executorCommit', 'start_unknown', 'purpose: prompt-review']) assert.ok(markdown.includes(boundary), boundary);
+  }
 });
