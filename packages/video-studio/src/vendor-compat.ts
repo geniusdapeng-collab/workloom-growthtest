@@ -6062,6 +6062,91 @@ function marketingNativeShotField(shot: FusionRecord, key: string, ...aliases: s
   throw new Error(`MARKETING_NATIVE_SHOT_FIELD_MISSING: ${String(shot.shotId ?? shot.shot_id ?? "未编号镜头")} 缺少原生字段 ${key}`);
 }
 
+/** A project identity catalog is not a declaration that every identity appears in every shot. */
+function marketingShotCharacterNames(
+  shot: FusionRecord,
+  catalog: readonly string[],
+  portraits: ReadonlyArray<{ name: string; path: string }> = [],
+): string[] {
+  const names = [...new Set(catalog.map(name => String(name).trim()).filter(Boolean))];
+  const participant = marketingNativeFieldText(shot, "character");
+  const constraint = marketingNativeFieldText(shot, "character_constraint", "characterConstraint");
+  const scene = marketingNativeFieldText(shot, "scene", "sceneDescription");
+  const action = marketingNativeFieldText(shot, "action");
+  const portraitName = marketingNativeFieldText(shot, "portraitName", "portrait_name");
+  const reference = marketingNativeFieldText(shot, "characterRef", "character_ref");
+  const positivelyMentions = (value: string, name: string): boolean => value.split(/[。；;，,\n]/u).some(clause => {
+    const index = clause.indexOf(name);
+    if (index < 0) return false;
+    const before = clause.slice(0, index);
+    const after = clause.slice(index + name.length);
+    return !/非$/u.test(before)
+      && !/(?:不出现|不包含|没有|无|禁止出现|不得出现|禁止增加|不得增加|不允许(?:出现|增加)?|禁止|不得)[^。；;，,\n]{0,6}$/u.test(before)
+      && !/^(?:本人|的面孔|及面孔|本人及面孔)?(?:一律)?(?:不入画|不得入画|禁止入画|不出镜|不得出镜|不露面|不得露面|禁止出现|不出现)/u.test(after);
+  });
+  const explicitlyExcludes = (name: string): boolean => constraint.split(/[。；;，,\n]/u).some(clause => {
+    const index = clause.indexOf(name);
+    if (index < 0) return false;
+    const before = clause.slice(0, index);
+    const after = clause.slice(index + name.length);
+    // A constraint on <name>分身 forbids a clone, not the named person.
+    if (/^分身/u.test(after)) return false;
+    return /(?:不出现|不包含|没有|无|禁止出现|不得出现|禁止增加|不得增加|不允许(?:出现|增加)?)[^。；;，,\n]{0,6}$/u.test(before)
+      || /(?:禁止|不得)[^。；;，,\n]{0,6}$/u.test(before) && /^(?:本人)?(?:入画|出镜|露面|同框|出现)/u.test(after)
+      || /^(?:本人|的面孔|及面孔|本人及面孔)?(?:一律)?(?:不入画|不得入画|禁止入画|不出镜|不得出镜|不露面|不得露面|禁止出现|不出现)/u.test(after);
+  });
+  const exclusive = [constraint, participant, scene, action].flatMap(value => [...value.matchAll(
+    /(?:本镜|本画面|画面(?:内|中)?)(?:仅|只)(?:允许|限于|限|有)?([^。；;\n]{1,160}?)(?:入画|出镜|出现|同框)/gu,
+  )].map(match => match[1]!));
+  // Explicit exclusions apply before the roster fast path. A direct negative
+  // identity qualifier such as 非<name> is not an on-screen declaration.
+  if (exclusive.length > 0) return names.filter(name => !explicitlyExcludes(name)
+    && exclusive.some(value => positivelyMentions(value, name)));
+  const evidence = [
+    participant, constraint, portraitName, reference, scene, action,
+  ];
+  const declared = Array.isArray(shot.characters) ? shot.characters.map(String) : [];
+  const selected = names.filter(name => !explicitlyExcludes(name)
+    && (declared.includes(name) || evidence.some(value => positivelyMentions(value, name))));
+  // Older native rows may omit the participant field while their caller binds
+  // one registered identity. Preserve that narrow fallback, never a multi-actor
+  // project roster and never over an authored participant or exclusion.
+  const localParticipationDeclared = declared.length > 0 || Boolean(portraitName || reference)
+    || /独自|只有|只见|仅见|仅有|一人(?:入画|出镜|出现|完成|表演)|无人物|不出现人物|画面无人/u.test(`${scene}；${action}`)
+    || names.some(name => [scene, action].some(value => value.includes(name) && !positivelyMentions(value, name)));
+  if (selected.length === 0 && !participant && !constraint && !localParticipationDeclared && names.length === 1
+    && portraits.some(profile => profile.name === names[0] && Boolean(profile.path.trim()))) return names;
+  return selected;
+}
+
+/** Split only authored list boundaries outside complete bracket/quote groups. */
+function marketingContractProps(value: string): string[] {
+  const source = value.trim();
+  const pairs = new Map([["（", "）"], ["(", ")"], ["[", "]"], ["【", "】"],
+    ["「", "」"], ["『", "』"], ["“", "”"], ["\"", "\""]]);
+  const closers = new Set(pairs.values());
+  const stack: string[] = [];
+  const result: string[] = [];
+  let start = 0;
+  for (let index = 0; index < source.length; index += 1) {
+    const character = source[index]!;
+    if (character === "\\") { index += 1; continue; }
+    if (stack.at(-1) === character) stack.pop();
+    else if (pairs.has(character)) stack.push(pairs.get(character)!);
+    else if (closers.has(character)) return source ? [source] : [];
+    else if (character === "、" && stack.length === 0) {
+      const item = source.slice(start, index).trim();
+      if (item) result.push(item);
+      start = index + 1;
+    }
+  }
+  // An incomplete source group stays opaque; the host must not invent its end.
+  if (stack.length > 0) return source ? [source] : [];
+  const final = source.slice(start).trim();
+  if (final) result.push(final);
+  return result;
+}
+
 /** Keep native sound events; remove only forbidden speech and postproduction music instructions. */
 function marketingAudioForContract(
   value: string,
@@ -6072,7 +6157,7 @@ function marketingAudioForContract(
   const native = source.split("【音频纪律】")[0]!.trim();
   const music = /背景音乐|配乐|音乐风格|音乐节拍|旋律|歌曲|音乐|弦乐|钢琴|器乐|合成器|电子鼓|贝斯|鼓点|\bBPM|\bBGM|soundtrack|background\s*music|\bmusic\b|\bscore\b/iu;
   const postproductionMusic = /背景音乐|配乐|音乐风格|音乐节拍|\bBGM\b|soundtrack|background\s*music/iu;
-  const musicDenial = /(?<![解违])禁(?:背景音乐|配乐|音乐|BGM|旋律|歌曲|soundtrack)|(?:无|没有|不含|不加|不出现|不加入|禁止|避免|无需|不要|严禁)[^，。；;、,\n]{0,8}(?:背景音乐|配乐|音乐|BGM|旋律|歌曲|soundtrack)/giu;
+  const musicDenial = /\bBPM\s*[:：]?\s*(?:不适用|不使用|无需|禁用|N\/A|not\s+applicable)|(?:无需|不使用|禁用|无)\s*BPM\b|(?<![解违])禁(?:背景音乐|配乐|音乐|BGM|旋律|歌曲|soundtrack)|(?:无|没有|不含|不加|不出现|不加入|禁止|避免|无需|不要|严禁)[^，。；;、,\n]{0,8}(?:背景音乐|配乐|音乐|BGM|旋律|歌曲|soundtrack)/giu;
   const speechDenial = /(?<![解违])禁(?:任何|额外|可辨)?(?:人声)?(?:台词|对白|对话|旁白|口播|voiceover)(?:人声)?|(?:无|没有|不添加|不加入|禁止|不得|不允许)(?:任何|额外|可辨)?(?:人声)?(?:台词|对白|对话|旁白|口播|voiceover)(?:人声)?/giu;
   const nonsemanticVoice = /欢呼|呼吸|喘息|笑声|呐喊|叹息|抽泣|哭声|咳嗽|含混|不可辨|不构成可辨语句|无可辨语义/u;
   const inSceneMusic = /画面内|画内|实况|街边音响|街头演奏|店内音响|现场(?:演奏|乐器|乐队)/u;
@@ -6083,7 +6168,7 @@ function marketingAudioForContract(
   for (const match of native.matchAll(/([^。；;，,\n]+)([。；;，,\n]*)/gu)) {
     const body = match[1]!.trim();
     const punctuation = match[2]!;
-    const resumesNative = /^(?:环境音|环境声|原生声|现场声|动作音效?|(?:只|仅)保留环境)/u.test(body)
+    const resumesNative = /^(?:环境音|环境声|原生声|现场声|动作音效?|(?:只|仅)保留(?:现场)?(?:原生声|环境|现场声|实拍声|动作音效?))/u.test(body)
       || /(?:保留|只剩|让)[^。；;\n]{0,12}(?:欢呼|呼吸|喘息|笑声|掌声|环境声)/u.test(body);
     if (resumesNative) musicContext = false;
     const explicitlyInScene = !options.noMusic && inSceneMusic.test(body);
@@ -6223,7 +6308,9 @@ export function applyNarrativeFinalPromptContract(
     (next.fields as FusionRecord).dialogue = "";
     replaceField("台词", "不适用：本片无台词、无旁白、无口播。");
   }
-  const characterNames = (options.characterNames ?? []).map((name) => String(name).trim()).filter(Boolean);
+  const catalogCharacterNames = (options.characterNames ?? []).map((name) => String(name).trim()).filter(Boolean);
+  const characterNames = options.marketingPrompt
+    ? marketingShotCharacterNames(next, catalogCharacterNames, options.characterPortraits) : catalogCharacterNames;
   const sourceEnvironmentProhibitions = [...new Set(
     [promptFieldText(next.negative ?? (next.fields as FusionRecord).negative ?? next.negative_prompt), fieldValue("负面约束")]
       .join("；").match(/(?:无|禁止|不出现)(?:船只|建筑|现代设备)/gu) ?? [],
@@ -6767,11 +6854,12 @@ export function applyNarrativeFinalPromptContract(
       ];
       compactRepeatedHostField("本镜验收", overlays.join("；") || "核对动作/声画/跨镜连续性。");
     }
+    const contractProps = nativeMarketing ? marketingContractProps(propsText) : propsText.split("、").map(String).filter(Boolean);
     next._workloomShotContract = {
       schema: "workloom.prompt-shot-contract/v1",
       shotId: String(next.shotId ?? next.shot_id ?? ""),
       durationSeconds: duration,
-      era: narrativeEraEvidence(sceneText, propsText.split("、").map(String).filter(Boolean)),
+      era: narrativeEraEvidence(sceneText, contractProps),
       space: sceneText,
       action: actionText,
       lighting: lightingText,
@@ -6790,7 +6878,7 @@ export function applyNarrativeFinalPromptContract(
       } : {}),
       characterNames: canonicalNoActors ? [] : characterNames,
       costume,
-      props: propsText.split("、").map(String).filter(Boolean),
+      props: contractProps,
       dialogue: dialogueText,
       audio: audioText,
       timeline: timelineText,
@@ -7185,8 +7273,14 @@ export function normalizeNarrativePromptsForReview(
         Array.isArray(policy.projectProps) ? policy.projectProps : [],
       ),
     });
+    const scopedCharacterNames = nativeMarketing
+      ? marketingShotCharacterNames(shot, rowPolicy.characterNames, rowPolicy.characterPortraits) : rowPolicy.characterNames;
     const normalizedPolicy: NarrativePromptReviewPolicy = {
       ...rowPolicy,
+      ...(nativeMarketing ? {
+        characterNames: scopedCharacterNames,
+        characterPortraits: rowPolicy.characterPortraits.filter(profile => scopedCharacterNames.includes(profile.name)),
+      } : {}),
       postRainOnly: rowPolicy.postRainOnly ?? policy.postRainOnly,
       sourceFirstFrame: rowPolicy.sourceFirstFrame ?? policy.sourceFirstFrame,
       projectScene: nativeMarketing?.scene ?? (sceneMatchesAction(action, rowPolicy.projectScene)
@@ -8310,7 +8404,7 @@ export function installVendorNarrativePromptReviewBridge(options: {
  * 每次执行独立的 agent 视图，避免并发 run 互改重试和子服务回调。
  * 只保留单次外调超时，不按整条任务已经运行的时间缩减后续创作。
  */
-const MARKETING_FIELD_WRITER_POLICY = "native-marketing-field-authority/v5";
+const MARKETING_FIELD_WRITER_POLICY = "native-marketing-field-authority/v6";
 
 function nativeMarketingBlueprint(blueprint: FusionRecord): boolean {
   return Boolean(recordValue(recordValue(recordValue(blueprint.meta)._metadata)._prd)._workloomMarketingPrompt);
@@ -8729,8 +8823,14 @@ function phase3FinalPromptProjector(blueprint: FusionRecord, sourceRows: FusionR
     });
     const contractShotSize = marketingPrompt ? null : promptFieldText(contractShot.shotSize) || shotSizeForAction(orderedAction);
     const contractCameraMovement = marketingPrompt ? "" : promptFieldText(contractShot.cameraMovement);
+    const scopedCharacterNames = marketingPrompt
+      ? marketingShotCharacterNames(shot, promptCharacters, promptCharacterPortraits) : promptCharacters;
     const rowPolicy: NarrativePromptReviewPolicy = {
       ...promptReviewPolicy,
+      ...(marketingPrompt ? {
+        characterNames: scopedCharacterNames,
+        characterPortraits: promptCharacterPortraits.filter(profile => scopedCharacterNames.includes(profile.name)),
+      } : {}),
       projectScene: direction.scene || promptReviewPolicy.projectScene,
       projectLighting: direction.lighting || promptReviewPolicy.projectLighting,
       projectColor: direction.color || promptReviewPolicy.projectColor,
@@ -8756,14 +8856,14 @@ function phase3FinalPromptProjector(blueprint: FusionRecord, sourceRows: FusionR
       resolution: promptResolution,
       colorTemperature: promptColorTemperature,
       isLastShot: shotIndex === totalShots - 1,
-      characterNames: promptCharacters,
+      characterNames: rowPolicy.characterNames,
       postRainOnly,
       sourceFirstFrame,
       noTitles: promptNoTitles,
       deferOpeningFields: true,
       canonicalize: true,
       marketingPrompt,
-      characterPortraits: promptCharacterPortraits,
+      characterPortraits: rowPolicy.characterPortraits,
       projectScene: rowPolicy.projectScene,
       projectLighting: rowPolicy.projectLighting,
       projectColor: rowPolicy.projectColor,

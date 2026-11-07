@@ -189,6 +189,7 @@ it.each(["phase3", "phase3.5"].flatMap(phase => [
   { phase, priorWriterPolicy: "native-marketing-field-authority/v2" },
   { phase, priorWriterPolicy: "native-marketing-field-authority/v3" },
   { phase, priorWriterPolicy: "native-marketing-field-authority/v4" },
+  { phase, priorWriterPolicy: "native-marketing-field-authority/v5" },
 ]))("reauthors same-feedback $phase from prior writer $priorWriterPolicy before reusing current native stamps", async ({ phase, priorWriterPolicy }) => {
   const directory = mkdtempSync(resolve(tmpdir(), "wl-marketing-writer-policy-"));
   // Capture the genuine native producer before installing the current host
@@ -208,7 +209,7 @@ it.each(["phase3", "phase3.5"].flatMap(phase => [
 
     const produced = await fixture.engine.produce(current);
     expect(produced.resumed).toBe(false);
-    expect(current._workloomMarketingFieldWriterPolicy).toBe("native-marketing-field-authority/v5");
+    expect(current._workloomMarketingFieldWriterPolicy).toBe("native-marketing-field-authority/v6");
     expect(fixture.author).toHaveBeenCalledTimes(authorCalls + 2);
     expect(fixture.processInputs).toHaveLength(2);
     expect(fixture.processInputs[1]!.effectiveKey).not.toBe(oldKey);
@@ -235,7 +236,7 @@ it.each(["phase3", "phase3.5"].flatMap(phase => [
   } finally { uninstall(); rmSync(directory, { recursive: true, force: true }); }
 });
 
-it.each(["v3", "v4"].flatMap(version => ["phase1", "phase2"].map(resumePhase => ({
+it.each(["v3", "v4", "v5"].flatMap(version => ["phase1", "phase2"].map(resumePhase => ({
   resumePhase, priorWriterPolicy: `native-marketing-field-authority/${version}`,
 }))))("does not revive a $priorWriterPolicy draft through a partial $resumePhase checkpoint", async ({ resumePhase, priorWriterPolicy }) => {
   const directory = mkdtempSync(resolve(tmpdir(), "wl-semantic-writer-partial-cache-"));
@@ -253,14 +254,14 @@ it.each(["v3", "v4"].flatMap(version => ["phase1", "phase2"].map(resumePhase => 
 
     const current = blueprint();
     await expect(fixture.engine.produce(current)).rejects.toThrow("Phase3 未通过");
-    expect(current._workloomMarketingFieldWriterPolicy).toBe("native-marketing-field-authority/v5");
+    expect(current._workloomMarketingFieldWriterPolicy).toBe("native-marketing-field-authority/v6");
     expect(fixture.logs.some(row => row.stage === "RESUME" && row.message.includes("指纹不匹配"))).toBe(true);
     expect(fixture.author).toHaveBeenCalledTimes(4); expect(fixture.pass).toHaveBeenCalledTimes(8);
     expect(fixture.opening).toHaveBeenCalledTimes(2); expect(fixture.processInputs).toHaveLength(2);
     const currentKey = String(fixture.processInputs[1]!.effectiveKey);
     expect(currentKey).not.toBe(oldKey); expect(readFileSync(oldChild)).toEqual(oldChildBytes);
 
-    // The freshly authored v5 draft remains resumable under the same policy;
+    // The freshly authored v6 draft remains resumable under the same policy;
     // only the prior semantic contract is excluded.
     await expect(fixture.engine.produce(blueprint())).rejects.toThrow("Phase3 未通过");
     expect(fixture.processInputs[2]!.effectiveKey).toBe(currentKey);

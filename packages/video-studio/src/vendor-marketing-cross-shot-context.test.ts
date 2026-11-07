@@ -37,7 +37,7 @@ const prefix = "【本轮跨镜作者上下文】\n";
 const boundary = "\n【跨镜执行边界】";
 const stop = "CROSS_SHOT_FIXTURE_STOP_AFTER_REAL_NATIVE_PROCESS";
 const marker = "_workloomMarketingFieldWriterPolicy";
-const currentPolicy = "native-marketing-field-authority/v5";
+const currentPolicy = "native-marketing-field-authority/v6";
 const privateContext = /workloom\.native-shot-author-context\/v1|【本轮跨镜作者上下文】|_workloomSetFusionDraftRows|"sourcePlan"|"authoredDrafts"/;
 
 function expectNoAuthorContext(rows: Row[]): void {
