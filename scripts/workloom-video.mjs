@@ -326,13 +326,19 @@ export async function statusVideo(jobFile, deps = {}) {
     if (error.code !== "NOT_FOUND") throw error;
     run = null;
   }
+  const promptRepair = run?.resultSummary && record(run.resultSummary.promptRepair)
+    ? run.resultSummary.promptRepair
+    : null;
   if (run !== null) {
     if (run?.runId !== job.runId || run?.projectId !== job.projectId) {
       return receipt(job, "status_unavailable", { error: "当前服务未返回与原工作单一致的运行；保留同一项目核对" });
     }
-    if (run.status === "running") return receipt(job, "preproduction_running");
+    if (run.status === "running") return receipt(job, "preproduction_running", promptRepair ? { promptRepair } : {});
     if (run.status === "awaiting_approval") return receipt(job, "awaiting_approval", { gate: run.currentGate ?? null, pendingApprovalId: run.pendingApprovalId ?? null });
-    if (run.status === "failed") return receipt(job, "preproduction_failed", { error: sanitizeErrorMessage(run.error ?? "预生产失败", deps.env ?? process.env) });
+    if (run.status === "failed") return receipt(job, "preproduction_failed", {
+      error: sanitizeErrorMessage(run.error ?? "预生产失败", deps.env ?? process.env),
+      ...(promptRepair ? { promptRepair } : {}),
+    });
     if (run.status !== "finished" || (job.purpose !== PROMPT_REVIEW && run.resultSummary?.success !== true)) {
       return receipt(job, "status_unavailable", { error: "运行终态没有预生产成功证明" });
     }
@@ -340,12 +346,15 @@ export async function statusVideo(jobFile, deps = {}) {
   try {
     if (job.purpose === PROMPT_REVIEW) {
       const source = await readPromptReview(session, job);
-      return receipt(job, "prompt_review_ready", { source: promptReviewSummary(source) });
+      return receipt(job, "prompt_review_ready", { source: promptReviewSummary(source), ...(promptRepair ? { promptRepair } : {}) });
     }
     // The live run registry is process-local. Only the exact current archived
     // source can recover readiness when the previous worker is no longer listed.
     const source = await requestVideoProcedure(session, "video.production.shots", { projectId: job.projectId });
-    return receipt(job, "preproduction_ready", { source: validateFormalVideoSource(source, job) });
+    return receipt(job, "preproduction_ready", {
+      source: validateFormalVideoSource(source, job),
+      ...(promptRepair ? { promptRepair } : {}),
+    });
   } catch (error) {
     return receipt(job, "status_unavailable", { error: sanitizeErrorMessage(error, deps.env ?? process.env) });
   }

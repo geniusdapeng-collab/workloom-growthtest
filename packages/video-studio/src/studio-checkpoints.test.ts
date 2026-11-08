@@ -127,6 +127,24 @@ it("serializes vendor blueprint data without calling its string-returning toJSON
   expect(() => studioCheckpointJson({ unsupported: new Map([["secret", "value"]]) })).toThrow("STUDIO_CHECKPOINT_INVALID");
 });
 
+it("keeps repair diagnoses in input identity but strips them from the saved checkpoint output", async () => {
+  const { adapter, records } = memoryStore();
+  const runner = createStudioCheckpointRunner(adapter, "seed");
+  await runner.run("PRODUCTION", {
+    _workloomProductionRepairFeedback: "必须影响 PRODUCTION 输入指纹",
+  }, async () => ({
+    shot: {
+      prompt: "最终作品",
+      _workloomProductionRepairFeedback: "不得写入产物断点",
+      _workloomPromptRepairContext: { rows: ["不得写入产物断点"] },
+      _workloomOtherAuthorization: "保留",
+    },
+  }));
+  expect([...records.values()][0]?.output).toEqual({
+    shot: { prompt: "最终作品", _workloomOtherAuthorization: "保留" },
+  });
+});
+
 it("keeps native output property order intact across replay while using canonical hashes", async () => {
   const { adapter } = memoryStore();
   const original = { zFirst: { second: 2, first: 1 }, aLast: "same content" };

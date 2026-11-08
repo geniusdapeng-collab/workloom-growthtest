@@ -114,6 +114,33 @@ export function gateDeterministicChecks(gate: GateKey, content: string): Array<{
         : `有效内容仅 ${trimmed.length} 字（下限 120，过短通常意味着上游字段过薄）`,
     }
   ];
+  if (gate === "G6_PROMPT") {
+    const blocks = [...trimmed.matchAll(/^```markdown\r?\n([\s\S]*?)\r?\n```[ \t]*$/gmu)].map(match => match[1]!);
+    const longest = blocks.reduce((max, block) => Math.max(max, Array.from(block).length), 0);
+    const invalidBlock = blocks.find(block =>
+      /_workloomPromptRepairContext|_workloomProductionRepairFeedback|\[object Object\]|undefined|null|NaN/u.test(block));
+    checks.push({
+      id: "g6-complete-prompt-blocks",
+      pass: blocks.length === 0 || longest <= 3000,
+      hard: true,
+      detail: blocks.length === 0
+        ? "G6 正文没有 markdown 镜头块；按旧格式交由完整模型审核"
+        : `完整镜头块 ${blocks.length} 个，最长 ${longest} 个 Unicode 字符（上限 3000）`,
+    });
+    checks.push({
+      id: "g6-no-private-or-placeholder-context",
+      pass: !invalidBlock,
+      hard: true,
+      detail: invalidBlock ? "G6 正文泄漏内部 repair 上下文或对象/未定义占位符" : "未泄漏内部 repair 上下文或占位符",
+    });
+    const fieldCounts = blocks.map(block => (block.match(/^\s*\d{2}\.【[^】]+】/gmu) ?? []).length);
+    checks.push({
+      id: "g6-field-structure",
+      pass: fieldCounts.length > 0 && fieldCounts.every(count => count >= 25),
+      hard: false,
+      detail: fieldCounts.length ? `逐镜编号字段数：${fieldCounts.join("/")}` : "未能从完整镜头块读取编号字段数",
+    });
+  }
   if (gate === "G5_PORTRAIT") {
     const pendingOnly = /completedPortraits["'\s:]+0/.test(trimmed) || /"pending"\s*:\s*true/.test(trimmed);
     checks.push({ id: "portrait-produced", pass: !pendingOnly, hard: true, detail: pendingOnly ? "定妆照仍是 pending / completedPortraits=0（只有规格包，未真出图）" : "定妆照有实际出图记录" });
@@ -150,7 +177,7 @@ export function writeGateArtifact(
 /** 仅完整的模型裁决允许发起一轮新的预生产。证据未核实或评审不可用时停线。 */
 export function producerFailure(
   gate: GateKey,
-  verdict?: Pick<ProducerVerdict, "approved" | "status" | "via" | "degraded" | "score" | "model" | "reason" | "suggestions"> | null,
+  verdict?: Pick<ProducerVerdict, "approved" | "status" | "via" | "degraded" | "score" | "model" | "reason" | "suggestions" | "findings"> | null,
 ): GateVerdict {
   const rejected = verdict?.approved === false && verdict.status === "failed" && verdict.via === "llm"
     && verdict.degraded === false && Boolean(verdict.model?.trim());
@@ -159,6 +186,7 @@ export function producerFailure(
     approved: false,
     reason: verdict?.reason ? `${result}：${verdict.reason}` : result,
     suggestions: verdict?.suggestions ?? [],
+    ...(verdict?.findings?.length ? { findings: verdict.findings } : {}),
     fatal: rejected ? "producer_rejected" : "producer_unavailable",
   };
 }

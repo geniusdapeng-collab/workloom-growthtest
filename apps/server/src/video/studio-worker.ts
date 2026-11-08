@@ -34,6 +34,15 @@ import {
   pipelineSha256,
   resolveVideoModel,
   reviewStage,
+  promptFindingKey,
+  promptFindingToGateFinding,
+  compilePromptArtifact,
+  derivePromptShotPlan,
+  promptRowCheckpoint,
+  type PromptFinding,
+  type PromptRepairContext,
+  type PromptRepairPlan,
+  type PromptRepairRow,
   updateContextBundle,
   buildDirectorDefaults, directorGuidance, resolveDeliveryTargets, compilePersonPresentation, shotPresentationGuidance,
   type CreativeDelegation, type DeliveryTargetPlan,
@@ -54,9 +63,10 @@ import {
 } from "@hyperreality/video-studio";
 import { buildServerGateRecord, withGateLedger } from "./gate-ledger-bridge.js";
 import { createDataMiningExecutor } from "./data-mining-executor.js";
-import { checkpointMarketingFacts, prepareMarketingFacts, restoreMarketingFacts, finalizeMarketingFacts,
+import { checkpointMarketingFacts, prepareMarketingFacts, restoreMarketingFacts, preflightMarketingFacts, finalizeMarketingFacts,
   MARKETING_SOURCE_POLICY_VERSION, marketingFactReviewCacheKey, verifyRejectedMarketingFactReview,
-  type PreparedMarketingFacts, type MarketingFactReviewCache, type MarketingShotFactReview } from "./marketing-authority.js";
+  type PreparedMarketingFacts, type MarketingFactReviewBatch, type MarketingFactReviewCache,
+  type MarketingShotFactReview } from "./marketing-authority.js";
 import { canonicalRenderJson, renderSha256 } from "./gen/compiled-request.js";
 import { acquireProjectLease, archiveWorkDir, makeLedgerWriter, readProjectMeta, scopedRows } from "./archive-host.js";
 import { isKnownStudioResume, readLatestStudioResumeStage } from "./archive-resume.js";
@@ -66,6 +76,14 @@ import { appendScenePolicyGuidance, resolveScenePolicyForIntent } from "./scene-
 import { appendPlatformGuidance, resolvePlatformForIntent } from "./platform-routing.js";
 import { captureStudioResumeInput } from "./studio-resume-input.js";
 import { createStudioCheckpointStore, studioCheckpointRepository } from "./studio-checkpoint-store.js";
+import {
+  PromptTextCallBudget,
+  isPromptRepairBudgetExhausted,
+  preparePromptRepairRound,
+  promptRepairFindings,
+  promptRepairProgressAfterRound,
+  promptRowsFromVendorResult,
+} from "./prompt-repair-supervisor.js";
 import { loadNativeProductionRepairEvidence, type KnownNativeProductionPrior,
   type NativeProductionRepairEvidence } from "./studio-native-repair-feedback.js";
 import {
@@ -110,6 +128,11 @@ const APPROVAL_POLL_MS = Number(process.env.HR_APPROVAL_POLL_MS ?? 2_000);
  */
 const PRODUCER_MODE: ProducerMode = producerModeFromEnv();
 const PROMPT_REVIEW_STOP = "PROMPT_REVIEW_SCOPE_REACHED";
+const PROMPT_REPAIR_MAX_ROUNDS = Math.max(1, Math.min(5, Number(process.env.PROMPT_REPAIR_MAX_ROUNDS ?? 2) || 2));
+const PROMPT_REPAIR_MAX_CALLS = Math.max(1, Math.min(200, Number(process.env.PROMPT_REPAIR_MAX_CALLS ?? 32) || 32));
+const PROMPT_REPAIR_MAX_CALLS_PER_SHOT = Math.max(1, Math.min(32, Number(process.env.PROMPT_REPAIR_MAX_CALLS_PER_SHOT ?? 8) || 8));
+const promptFactPreflightEnabled = (): boolean => (process.env.PROMPT_FACT_PREFLIGHT ?? "1") !== "0";
+const promptRepairEnabled = (): boolean => (process.env.PROMPT_REPAIR_ENABLED ?? "1") !== "0";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 /** 仓库根（apps/server/src/video → 上溯四级）：参考图相对路径按此解析 */
@@ -794,6 +817,24 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
   let promptReviewShots: StudioPromptReviewShot[] = [];
   let promptReviewReport: { text: string; model: string } | null = null;
   let promptReviewStopped = false;
+  let activePromptRepairBudget: PromptTextCallBudget | null = null;
+  let promptRepairRound = 0;
+  const reservePromptRepairCall = (stage: string): void => activePromptRepairBudget?.reserve(stage);
+  let marketingPreflightState: {
+    prepared: PreparedMarketingFacts;
+    cache: MarketingFactReviewCache;
+    batch?: MarketingFactReviewBatch;
+  } | null = null;
+  let lastPromptRejection: {
+    gate: GateKey;
+    findings: PromptFinding[];
+    reason: string;
+    issues: string[];
+    suggestions: string[];
+    rows: PromptRepairRow[];
+    repairable: boolean;
+    model: string | null;
+  } | null = null;
   const decideApproval: ApprovalCallback = async (req) => {
     // ApprovalCallback.gate 声明为 string，但适配层（studio.ts）保证已 resolveGate 过，运行时为 GateKey
     const gate = req.gate as GateKey;
@@ -804,11 +845,15 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
       promptReviewStopped = promptReviewReport !== null;
       return { approved: false, reason: promptReviewStopped ? PROMPT_REVIEW_STOP : "PROMPT_REVIEW_G6_REQUIRED", suggestions: [] };
     }
-    const scopedPromptGate = promptReview && gate === "G6_PROMPT";
+    const promptGate = gate === "G6_PROMPT";
+    const scopedPromptGate = promptReview && promptGate;
+    const promptPreflightGate = promptGate && req.vendorType === "prompt-preflight";
     const evidencePhase = gate === "G2_THEME" ? "theme" : gate === "G3_INSIGHT" ? "requirements" : undefined;
     if (scopedPromptGate) assertStudioPromptReviewText(req.contentMd ?? "", promptReviewShots);
     const gateObj = gateObjectOf(gate, req.vendorType);
-    const objectId = gate === "G7_FINAL" ? input.projectId : `${input.projectId}:${gate.toLowerCase()}`;
+    const objectId = promptPreflightGate
+      ? `${input.projectId}:g6_preflight`
+      : gate === "G7_FINAL" ? input.projectId : `${input.projectId}:${gate.toLowerCase()}`;
     /**
      * 内部准备门：**AI 监制评审** + 留痕（不插 approvals 行）。
      * 与下面的人工门共用同一事务口径：门事件经安全网关落事件账本（过程与时间线可见），
@@ -831,7 +876,39 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
          */
         const artifact = writeGateArtifact(runWorkDir, path.join(input.projectId,
           `${promptReview ? "prompt-review" : "attempt"}-${stageRef.attempt}`), gate, req.contentMd ?? "");
-        producerVerdict = cachedReview?.verdict ?? await reviewStage({
+        const marketingFacts = promptGate && marketingPreflightState && promptFactPreflightEnabled()
+          ? await preflightMarketingFacts(
+              marketingPreflightState.prepared,
+              promptReviewShots,
+              process.env,
+              marketingPreflightState.cache,
+              () => reservePromptRepairCall("marketing-fact-preflight"),
+            )
+          : null;
+        if (marketingFacts && !marketingFacts.pass) {
+          const firstShot = marketingFacts.rejectedShotIds[0] ?? promptReviewShots[0]?.shotId ?? "package";
+          const sourceVerdict = marketingFacts.verdicts[0];
+          producerVerdict = {
+            stage: "prompt",
+            status: sourceVerdict?.status ?? "unverified",
+            approved: false,
+            score: 0,
+            hardFailures: sourceVerdict?.hardFailures ?? [],
+            issues: marketingFacts.reasons,
+            suggestions: marketingFacts.findings.map(item => item.suggestion).filter((item): item is string => Boolean(item)),
+            findings: marketingFacts.findings,
+            rerun: true,
+            via: sourceVerdict?.via ?? "fallback",
+            model: sourceVerdict?.model,
+            ms: 0,
+            reason: `事实预检未通过（${firstShot}）`,
+            degraded: sourceVerdict?.degraded ?? true,
+            evidence: sourceVerdict?.evidence ?? [],
+            receipts: sourceVerdict?.receipts ?? [],
+          };
+        } else {
+          if (marketingPreflightState && marketingFacts) marketingPreflightState.batch = marketingFacts;
+          producerVerdict = cachedReview?.verdict ?? await reviewStage({
           stage: producerStage,
           projectId: input.projectId,
           artifacts: [{ path: artifact.path, kind: "text", note: req.title }],
@@ -843,7 +920,7 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
             ...(gate === "G1_DOSSIER" ? [
               "creativeRequirements.intent 中的原文是本片创作与交付合同。人物、情节、披露和尾帧不属于商品事实，应核对两者分区及 restrictions 约束，具体镜头是否落实由后续门判定。",
             ] : []),
-            ...(scopedPromptGate ? ["以 context.request 为本次创作合同，核对每个必需剧情动作、顺序、连续性、角色身份、声音与平台时长；任何明确要求被遗漏、替换或互相冲突须拒绝。",
+            ...(promptGate ? ["以 context.request 为本次创作合同，核对每个必需剧情动作、顺序、连续性、角色身份、声音与平台时长；任何明确要求被遗漏、替换或互相冲突须拒绝。",
               "正文中 registeredSubjectCount、registeredCharacterNames 是已登记身份参考资产的数量与名单，不代表镜头总人数；subjectCount 为 null 或 subjectCountBasis 为 not-inferred-from-portrait-registry 时，不得从身份资产登记数推断总入画人数。按原始需求、participants、人物与动作字段核对已声明的剧情参与者及其跨镜一致性；已声明参与者未登记肖像参考不自动等于违规增加人物，也不能据此放行未声明人物或真实身份、授权与人数冲突。",
               "原文列出的必需叠加文字与尾帧是必须落实的项目，不是排他白名单，除非原文明示只能使用这些文字或禁止其他文字。原文明示的文字或人物禁令仍须执行。片头可以在原始创作许可内增加主题表达，但不得省略必需披露、引入无来源的商品事实、违反声音要求或破坏叙事连续性。",
               "原文允许的虚构胜利、竞赛结果和表演属于创作要求，不要求用真实战绩来源证明虚构情节；仍须核对虚构边界与必需披露，不得暗示真实成绩、人物背书或商品性能保证。",
@@ -851,21 +928,49 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
             `门内容全长 ${artifact.chars} 字，已随附件送审；摘录（供定位，不是全文）：${(req.contentMd ?? "").slice(0, 600)}`
           ],
           context: { gate, vendorType: req.vendorType, runId: entry.runId, contentChars: (req.contentMd ?? "").length,
-            ...(scopedPromptGate || evidencePhase ? { request: input.rawIntent ?? input.intent, targetSeconds: input.durationSec,
+            ...(promptGate || evidencePhase ? { request: input.rawIntent ?? input.intent, targetSeconds: input.durationSec,
               platform: selectedPlatform.decision.id, ...(promptReview ? { purpose: "prompt-review" } : {}) } : {}) },
+          beforeRequest: () => reservePromptRepairCall("gate-review"),
           // 内部准备门默认 fail-closed：评审模型不可用即打回，不静默放行
           allowFallbackApprove: (process.env.HR_PRODUCER_FALLBACK_APPROVE ?? "0") === "1",
           log: (line) => console.log(line)
-        });
+          });
+        }
         if (producerVerdict.unknownOutcome) checkpointStore?.markUnknown();
       }
       const approved = effectiveProducerMode === "auto" ? true : Boolean(producerVerdict?.approved);
+      if (promptGate && !approved) {
+        const findings = promptRepairFindings({
+          findings: producerVerdict?.findings,
+          issues: producerVerdict?.issues,
+          suggestions: producerVerdict?.suggestions,
+          reason: producerVerdict?.reason,
+        });
+        lastPromptRejection = {
+          gate,
+          findings,
+          reason: producerVerdict?.reason ?? "G6 提示词审核未通过",
+          issues: producerVerdict?.issues ?? [],
+          suggestions: producerVerdict?.suggestions ?? [],
+          repairable: producerVerdict?.status === "failed" && producerVerdict.via === "llm"
+            && producerVerdict.degraded === false && Boolean(producerVerdict.model),
+          model: producerVerdict?.model ?? null,
+          rows: promptReviewShots.map(shot => ({
+            shotId: shot.shotId,
+            prompt: shot.prompt,
+            fields: shot.fields && typeof shot.fields === "object" && !Array.isArray(shot.fields)
+              ? structuredClone(shot.fields as Record<string, unknown>)
+              : {},
+            duration: shot.durationSec,
+          })),
+        };
+      }
       /**
        * 门外账本字段（2026-09-25）：把平台门按 **step_key** 记账，与 CLI 运行时同一套口径。
        * 能一一对应的门（G5/G6/G7）在事件 payload 里带 `stepKey` 与规范化 `gateEvent`；
        * 未知/未映射门返回 null，payload 保持原样（**不猜映射**，审计一眼能看出"这个门没有 step_key"）。
        */
-      const gateRecord = buildServerGateRecord({
+      const gateRecord = promptPreflightGate ? null : buildServerGateRecord({
         gate,
         vendorType: String(req.vendorType ?? ""),
         projectId: input.projectId,
@@ -888,11 +993,27 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
           },
           object: { type: gateObj.type, id: objectId },
           decision: {
-            action: gateObj.action,
+            action: promptPreflightGate ? "video.prompt.preflight" : gateObj.action,
             after: withGateLedger({
               gate: req.gate, vendorType: req.vendorType, runId: entry.runId, title: req.title,
+              projectId: input.projectId,
+              pipelineKind,
               producerMode: effectiveProducerMode,
               approved,
+              ...(promptGate ? {
+                promptRevision: stageRef.attempt,
+                attempt: stageRef.attempt,
+                promptPolicyVersion: "native-production-prompt-repair/v1",
+                promptRepairRound,
+                promptSetSha256: promptReviewShots.length
+                  ? renderSha256(canonicalRenderJson(promptReviewShots))
+                  : null,
+                promptRowHashes: Object.fromEntries(promptReviewShots.map(shot => [
+                  shot.shotId,
+                  renderSha256(canonicalRenderJson(shot)),
+                ])),
+                renderAuthorized: false,
+              } : {}),
               ...(cachedReview ? { reusedFrom: { runId: cachedReview.originRunId, reviewEventId: cachedReview.reviewEventId } } : {}),
               ...(producerVerdict
                 ? {
@@ -919,14 +1040,16 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
       } finally {
         autoClient.release();
       }
-      if (producerVerdict && producerEventId) {
+      if (!promptPreflightGate && producerVerdict && producerEventId) {
         await checkpointStore?.saveGate(gate, req.contentMd ?? "", producerVerdict,
           cachedReview?.reviewEventId ?? producerEventId, cachedReview?.originRunId);
       }
-      gateProofs.set(gate, { gate, approved, status: producerVerdict?.status ?? "unverified",
-        via: producerVerdict?.via ?? "auto", degraded: producerVerdict?.degraded ?? true,
-        model: producerVerdict?.model ?? null, evidence: producerVerdict?.evidence ?? [],
-        ...(producerVerdict?.status === "not_applicable" ? { basis: producerVerdict.reason } : {}) });
+      if (!promptPreflightGate) {
+        gateProofs.set(gate, { gate, approved, status: producerVerdict?.status ?? "unverified",
+          via: producerVerdict?.via ?? "auto", degraded: producerVerdict?.degraded ?? true,
+          model: producerVerdict?.model ?? null, evidence: producerVerdict?.evidence ?? [],
+          ...(producerVerdict?.status === "not_applicable" ? { basis: producerVerdict.reason } : {}) });
+      }
       if (scopedPromptGate && producerVerdict?.approved === true && producerVerdict.status === "passed"
         && producerVerdict.via === "llm" && producerVerdict.degraded === false && producerVerdict.model
         && producerVerdict.evidence?.some(item => item.scope === "complete-text" && item.sha256 === renderSha256(req.contentMd ?? ""))) {
@@ -1120,7 +1243,7 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
     checkDelegatedRun();
     const verdict = await decideApproval(req);
     checkDelegatedRun();
-    if (studioShadow) {
+    if (studioShadow && !(req.gate === "G6_PROMPT" && req.vendorType === "prompt-preflight")) {
       const planGate = /^(G\d+)/u.exec(req.gate)?.[1] ?? req.gate;
       const decision = verdict.approved
         ? "passed" as const
@@ -1136,18 +1259,20 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
         content: req.contentMd ?? "",
         issues: decision === "rejected" ? [String(verdict.reason ?? "gate rejected").slice(0, 2_000)] : [],
         suggestions: Array.isArray(verdict.suggestions) ? verdict.suggestions.slice(0, 50).map(String) : [],
-        findings: decision === "passed" ? [] : [{
-          code: decision === "unverified" ? `${planGate}_UNVERIFIED` : `${planGate}_REJECTED`,
-          severity: "P1",
-          targetType: "stage",
-          targetId: planGate,
-          fieldPath: null,
-          expected: "passed",
-          actual: verdict.reason ?? decision,
-          evidenceRefs: [pipelineSha256(req.contentMd ?? "")],
-          repairClass: decision === "unverified" ? "human_input" : "semantic",
-          blocking: true,
-        }],
+        findings: decision === "passed" ? [] : verdict.findings?.length
+          ? verdict.findings.map(promptFindingToGateFinding)
+          : [{
+              code: decision === "unverified" ? `${planGate}_UNVERIFIED` : `${planGate}_REJECTED`,
+              severity: "P1",
+              targetType: "stage",
+              targetId: planGate,
+              fieldPath: null,
+              expected: "passed",
+              actual: verdict.reason ?? decision,
+              evidenceRefs: [pipelineSha256(req.contentMd ?? "")],
+              repairClass: decision === "unverified" ? "human_input" : "semantic",
+              blocking: true,
+            }],
         evidenceHashes: [pipelineSha256(req.contentMd ?? "")],
       }));
     }
@@ -1156,6 +1281,18 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
 
   let marketingDossierRoot: string | undefined;
   let marketingDossierRef: string | undefined;
+  const promptPreflight = promptReview || (process.env.PROMPT_PREFLIGHT_REQUIRED ?? "1") === "0"
+    ? undefined
+    : async (input: { prompts: readonly Record<string, unknown>[]; contentMd: string; runId: string | null }) => {
+        promptReviewShots = captureStudioPromptReviewShots(input.prompts);
+        return onApproval({
+          runId: input.runId ?? entry.runId,
+          gate: "G6_PROMPT",
+          vendorType: "prompt-preflight",
+          title: "提示词预审（定妆照与媒体前）",
+          contentMd: input.contentMd,
+        });
+      };
   const studioConfig: StudioConfig = {
     llm,
     workDir: runWorkDir,
@@ -1164,7 +1301,10 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
     // 片型硬闸必须在 G8 之前审完整分镜，禁止 env 让 vendor 在审计前直接渲染。
     deferRender: promptReview || Boolean(delegated || selectedScenePolicy.policy) || (process.env.HR_DEFER_RENDER ?? "1") !== "0",
     portraits: promptReview ? { enabled: false } : portraitConfig(runInput.metadata, directorMode ? input.directorIdentityImages : undefined),
-    ...(promptReview ? { onPromptReview: (rows) => { promptReviewShots = captureStudioPromptReviewShots(rows); } } : {}),
+    ...(promptReview || promptFactPreflightEnabled()
+      ? { onPromptReview: (rows) => { promptReviewShots = captureStudioPromptReviewShots(rows); } }
+      : {}),
+    ...(promptPreflight ? { onPromptPreflight: promptPreflight } : {}),
     /** 营销路由 → 情报五站真跑（叙事路由不装配，vendor 也不会进情报层） */
     dataMining: input.isMarketing ? undefined : dataMiningConfigFor(runInput.metadata, llm, scope.workspaceId),
     log: (line) => console.log(line),
@@ -1303,6 +1443,9 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
       const maxAttempts = promptReview ? 1 : Math.max(1, Number(process.env.VM_PRODUCER_RETRY ?? 0) + 1);
       let promptReviewReceipt: StudioPromptReview | null = null;
       let checkpointPriorRunId = verifiedResumePrior?.runId;
+      let activePromptRepairFeedback: string | undefined;
+      let activePromptRepairContext: PromptRepairContext | undefined;
+      let activePromptRepairPlan: PromptRepairPlan | undefined;
       const runOnce = async (): Promise<Awaited<ReturnType<VideoStudio["runPreproduction"]>>> => {
         checkDelegatedRun();
         const runnerStore = archive;
@@ -1319,6 +1462,8 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
             ...(verifiedResumePrior ? { resumePrior: verifiedResumePrior } : {}), resumeInput },
           async (ctx) => {
             gateProofs.clear();
+            lastPromptRejection = null;
+            marketingPreflightState = null;
             completedVendorResult = null;
             checkpointStore = createStudioCheckpointStore({
               identity: { ...scope, projectId: input.projectId, projectCreatedAt: projectMeta!.createdAt,
@@ -1331,6 +1476,7 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
               hasUnknownOutcome: () => llm.hasUnknownOutcome(),
             });
             await checkpointStore.begin();
+            const inheritedPromptRows = await checkpointStore.loadValue<PromptRepairRow[]>("PROMPT_REPAIR_ROWS") ?? [];
             let marketing: PreparedMarketingFacts | undefined;
             const rejectedFactKey = (key: string) => `FACT_REJECTION_${key.slice("FACT_".length)}`;
             const factReviewCache: MarketingFactReviewCache = {
@@ -1379,6 +1525,7 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
                 root: archive.root, metadata: input.metadata ?? {}, intent: input.rawIntent ?? input.intent, llm,
                 ...(promptReview ? { stageId: "prompt_review" as const } : {}) }));
               await checkpointStore.saveValue("MARKETING", marketing, marketing.bundle.sourceScope?.runId);
+              marketingPreflightState = { prepared: marketing, cache: factReviewCache };
               const verdict = await onApproval({ runId: entry.runId, gate: "G1_DOSSIER", vendorType: "host-source-dossier",
                 title: "本次营销来源正文与逐主张事实审核", contentMd: marketing.g1Content });
               const proof = gateProofs.get("G1_DOSSIER");
@@ -1422,7 +1569,37 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
             });
             if (nativeRepairEvidence) await checkpointStore.saveValue("NATIVE_PRODUCTION_FEEDBACK", nativeRepairEvidence,
               nativeRepairEvidence.diagnoses.at(-1)!.originRunId);
-            const productionRepairFeedback = productionRejections.length || nativeRepairEvidence ? canonicalRenderJson({
+            const historicalFindings = [
+              ...productionRejections.flatMap(review => promptRepairFindings({
+                findings: review.verdict.findings,
+                issues: review.verdict.issues,
+                suggestions: review.verdict.suggestions,
+                reason: review.verdict.reason,
+              })),
+              ...(nativeRepairEvidence?.diagnoses.flatMap(diagnosis => promptRepairFindings({
+                issues: diagnosis.issues,
+                suggestions: "suggestions" in diagnosis ? diagnosis.suggestions : [],
+                reason: diagnosis.message,
+              })) ?? []),
+            ];
+            const inheritedRepair = inheritedPromptRows.length && historicalFindings.length
+              ? preparePromptRepairRound({
+                  projectId: input.projectId,
+                  revision: ctx.attempt,
+                  round: 0,
+                  enabled: promptRepairEnabled(),
+                  rows: inheritedPromptRows,
+                  findings: historicalFindings,
+                  policyVersion: "prompt-repair/v1",
+                  maxRepairRounds: PROMPT_REPAIR_MAX_ROUNDS,
+                  maxTextCalls: PROMPT_REPAIR_MAX_CALLS,
+                  maxTextCallsPerShot: PROMPT_REPAIR_MAX_CALLS_PER_SHOT,
+                  rawIntent: input.rawIntent ?? input.intent,
+                  metadata: input.metadata,
+                  targetSeconds: input.durationSec,
+                })
+              : null;
+            const baseProductionRepairFeedback = productionRejections.length || nativeRepairEvidence ? canonicalRenderJson({
               instruction: [
                 ...(productionRejections.length ? ["根据已核实的完整来源和原事实审核诊断修订生产提示词。纠正或删除未支持的主张，保留其他已通过的创作成果；不得把原坏镜或审核指令直接拼入作品，不得修改来源或替评审作出通过裁决。"] : []),
                 ...(nativeRepairEvidence ? ["根据完整冻结需求、当前蓝图逐镜动作合同、已核实来源和原失败诊断修订生产提示词。保持每个必需动作及先后顺序，不得为修运镜而删除动作、人物或服装变化；转场须区分入场/出场边界，景别跨度达到原生门槛时须有真实成立的白名单动机或调整景别，不能只改叠化/闪白或虚构标签。保留其他已通过创作成果，不得把原坏镜或审核指令直接拼入作品，不得修改来源或替评审作出通过裁决。"] : []),
@@ -1435,8 +1612,17 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
                 nativeProductionFailures: nativeRepairEvidence.diagnoses } : {}),
               ...(productionRejections.length ? { rejected: productionRejections } : {}),
             }) : undefined;
+            const productionRepairFeedback = [
+              baseProductionRepairFeedback,
+              activePromptRepairFeedback,
+              inheritedRepair?.ok ? inheritedRepair.round.feedback : undefined,
+            ].filter((value): value is string => Boolean(value)).join("\n\n") || undefined;
+            const effectivePromptRepairContext = activePromptRepairContext
+              ?? (inheritedRepair?.ok ? inheritedRepair.round.context : undefined);
             const studio = new VideoStudio({ ...studioConfig, checkpoints: checkpointStore.engine,
-              ...(productionRepairFeedback ? { productionRepairFeedback } : {}), ...(marketing ? { dataMining: {
+              ...(productionRepairFeedback ? { productionRepairFeedback } : {}),
+              ...(effectivePromptRepairContext ? { promptRepairContext: effectivePromptRepairContext } : {}),
+              ...(marketing ? { dataMining: {
               mode: "api", storeRoot: marketing.storeRoot, refresh: true,
               verifiedRaw: { projectId: input.projectId, rawJson: canonicalRenderJson(marketing.raw), sha256: marketing.bundle.rawSha256, productQuery: marketing.bundle.productQuery,
                 specSourceUrls: marketing.specSourceUrls, creativeRequirements: marketing.bundle.creativeRequirements, restrictions: marketing.bundle.restrictions,
@@ -1452,6 +1638,30 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
               : await withVendorEngineBridge(llm, () => withVendorPortraitBindingBridge(portraitBindingOptions, () => studio.runPreproduction(runInput)));
             checkDelegatedRun();
             completedVendorResult = r;
+            const producedPromptRows = promptRowsFromVendorResult(r);
+            if (producedPromptRows.length > 0) {
+              await checkpointStore.saveValue("PROMPT_REPAIR_ROWS", producedPromptRows);
+              for (const [index, row] of producedPromptRows.entries()) {
+                const plan = derivePromptShotPlan(input.projectId, stageRef.attempt, row,
+                  [`run:${entry.runId}`, `shot:${row.shotId}`]);
+                const artifact = compilePromptArtifact(plan, row);
+                const rowPoint = promptRowCheckpoint(row, {
+                  projectId: input.projectId,
+                  revision: stageRef.attempt,
+                  policyVersion: "native-production-fields/v1",
+                  dependencyShotIds: [producedPromptRows[index - 1]?.shotId, producedPromptRows[index + 1]?.shotId]
+                    .filter((id): id is string => Boolean(id)),
+                  status: row.degraded === true ? "rejected" : "passed",
+                });
+                await checkpointStore.saveValue(`PROMPT_SHOT_PLAN_${row.shotId}`, plan);
+                await checkpointStore.saveValue(`PROMPT_ARTIFACT_${row.shotId}`, artifact);
+                await checkpointStore.saveValue(`PROMPT_ROW_${row.shotId}`, rowPoint);
+              }
+              const rejectionState = lastPromptRejection as {
+                rows: PromptRepairRow[];
+              } | null;
+              if (rejectionState) rejectionState.rows = producedPromptRows;
+            }
             if (promptReview) {
               rawResult = r;
               const stop = (r.stages?.preproductionReview as { reason?: unknown } | undefined)?.reason;
@@ -1465,7 +1675,14 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
                 return { output: { purpose: "prompt-review", state: "prompt_review_failed", renderAuthorized: false, failureMessage: message },
                   outcome: { status: "failed" as const, errorClass: isProducerRejection(r, { promptReview: true }) ? "GATE_REJECTED" : classifyError(new Error(message)), errorMsg: message } };
               }
-              const marketingFacts = marketing ? await finalizeMarketingFacts(marketing, promptReviewShots, process.env, factReviewCache) : null;
+              const preReviewed = marketingPreflightState?.batch;
+              const marketingFacts = marketing
+                ? preReviewed
+                  ? await finalizeMarketingFacts(marketing, promptReviewShots, process.env, factReviewCache, preReviewed,
+                    () => reservePromptRepairCall("marketing-fact-finalize"))
+                  : await finalizeMarketingFacts(marketing, promptReviewShots, process.env, factReviewCache, undefined,
+                    () => reservePromptRepairCall("marketing-fact-finalize"))
+                : null;
               const receipt = await issueStudioPromptReview({ app: getAppPool(), scope, projectId: input.projectId,
                 runId: entry.runId, attempt: ctx.attempt, pipeline: pipelineKind, targetSeconds: input.durationSec!,
                 rawIntent: input.rawIntent ?? input.intent, reviewReport: promptReviewReport.text,
@@ -1679,8 +1896,17 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
                 + `（stages/preproduction/attempt-${ctx.attempt}.prompts.json，sha256=${promptsArtifact.sha256.slice(0, 12)}）`,
               );
             }
-            const marketingFacts = marketing && r.success && promptPack ? await finalizeMarketingFacts(marketing,
-              promptPack.shots.map(shot => ({ shotId: String(shot.shotId ?? ""), prompt: shot.prompt, fields: shot.fields })), process.env, factReviewCache) : undefined;
+            const finalShots = promptPack?.shots.map(shot => ({
+              shotId: String(shot.shotId ?? ""), prompt: shot.prompt, fields: shot.fields,
+            }));
+            const preReviewed = marketingPreflightState?.batch;
+            const marketingFacts = marketing && r.success && finalShots
+              ? preReviewed
+                ? await finalizeMarketingFacts(marketing, finalShots, process.env, factReviewCache, preReviewed,
+                  () => reservePromptRepairCall("marketing-fact-finalize"))
+                : await finalizeMarketingFacts(marketing, finalShots, process.env, factReviewCache, undefined,
+                  () => reservePromptRepairCall("marketing-fact-finalize"))
+              : undefined;
             if (marketing && r.success && !marketingFacts) throw new Error("MARKETING_PROMPTS_UNVERIFIED：营销预生产没有完整最终镜头事实审核");
             return {
               output: {
@@ -1761,12 +1987,186 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
         console.log(`[studio-worker] AI 监制打回 → 自动重跑第 ${attempts}/${maxAttempts} 次（同一项目、同一门口径）`);
         result = await runOnce();
       }
+      let promptRepairStopReason: string | null = null;
+      const promptRepairBudget = promptRepairEnabled()
+        ? new PromptTextCallBudget(PROMPT_REPAIR_MAX_CALLS)
+        : null;
+      const promptRepairReusedShotIds = new Set<string>();
+      const promptRepairRepairedShotIds = new Set<string>();
+      const promptRepairTargetedShotIds = new Set<string>();
+      let promptRepairExhaustedReported = false;
+      const reportPromptRepairExhausted = async (code: string, planHash: string | null, extra: Record<string, unknown> = {}) => {
+        if (promptRepairExhaustedReported) return;
+        promptRepairExhaustedReported = true;
+        await onEvent({
+          kind: "pipeline.prompt.repair_exhausted",
+          projectId: input.projectId,
+          runId: entry.runId,
+          payload: {
+            round: promptRepairRound,
+            pipelineKind,
+            planHash,
+            code,
+            ...(promptRepairBudget ? { budget: promptRepairBudget.snapshot() } : {}),
+            reusedShotIds: [...promptRepairReusedShotIds],
+            repairedShotIds: [...promptRepairRepairedShotIds],
+            ...extra,
+          },
+        });
+      };
+      while (isProducerRejection(result) && lastPromptRejection?.repairable
+        && promptRepairRound < PROMPT_REPAIR_MAX_ROUNDS && promptRepairEnabled()) {
+        if (promptRepairBudget?.snapshot().exhausted) {
+          promptRepairStopReason = "PROMPT_REPAIR_BUDGET_EXHAUSTED";
+          await reportPromptRepairExhausted(promptRepairStopReason, activePromptRepairPlan?.planHash ?? null);
+          break;
+        }
+        const rejection = lastPromptRejection;
+        const rows = rejection.rows.length > 0 ? rejection.rows : promptRowsFromVendorResult(result);
+        if (rows.length === 0) {
+          promptRepairStopReason = "PROMPT_REPAIR_ROWS_UNAVAILABLE";
+          await reportPromptRepairExhausted(promptRepairStopReason, activePromptRepairPlan?.planHash ?? null);
+          break;
+        }
+        const repair = preparePromptRepairRound({
+          projectId: input.projectId,
+          revision: stageRef.attempt,
+          round: promptRepairRound + 1,
+          enabled: promptRepairEnabled(),
+          rows,
+          findings: rejection.findings,
+          policyVersion: "native-production-prompt-repair/v1",
+          maxRepairRounds: PROMPT_REPAIR_MAX_ROUNDS,
+          maxTextCalls: PROMPT_REPAIR_MAX_CALLS,
+          maxTextCallsPerShot: PROMPT_REPAIR_MAX_CALLS_PER_SHOT,
+          rawIntent: input.rawIntent ?? input.intent,
+          metadata: input.metadata,
+          targetSeconds: input.durationSec,
+        });
+        if (!repair.ok) {
+          promptRepairStopReason = repair.code;
+          console.log(`[studio-worker] 提示词局部修复停止：${repair.code} · ${repair.reason}`);
+          await onEvent({
+            kind: "pipeline.prompt.repair_blocked",
+            projectId: input.projectId,
+            runId: entry.runId,
+            payload: {
+              pipelineKind,
+              code: repair.code,
+              reason: repair.reason,
+              round: promptRepairRound + 1,
+              ...(promptRepairBudget ? { budget: promptRepairBudget.snapshot() } : {}),
+            },
+          });
+          break;
+        }
+        promptRepairRound += 1;
+        activePromptRepairPlan = repair.round.plan;
+        activePromptRepairContext = repair.round.context;
+        activePromptRepairFeedback = repair.round.feedback;
+        const targetShotIdSet = new Set(repair.round.targetShotIds);
+        for (const shotId of targetShotIdSet) promptRepairTargetedShotIds.add(shotId);
+        for (const row of repair.round.context.rows) {
+          if (!targetShotIdSet.has(row.shotId)) promptRepairReusedShotIds.add(row.shotId);
+        }
+        await checkpointStore?.saveValue(`PROMPT_REPAIR_PLAN_R${promptRepairRound}`, repair.round.plan);
+        await checkpointStore?.saveValue("PROMPT_REPAIR_ROWS", repair.round.context.rows);
+        for (const artifact of repair.round.artifacts) {
+          await checkpointStore?.saveValue(`PROMPT_ARTIFACT_${artifact.shotId}`, artifact);
+        }
+        for (const checkpoint of repair.round.rowCheckpoints) {
+          await checkpointStore?.saveValue(`PROMPT_ROW_${checkpoint.shotId}`, checkpoint);
+        }
+        await onEvent({
+          kind: "pipeline.prompt.repair_requested",
+          projectId: input.projectId,
+          runId: entry.runId,
+          payload: {
+            round: promptRepairRound,
+            pipelineKind,
+            planHash: repair.round.plan.planHash,
+            targetShotIds: repair.round.targetShotIds,
+            findingKeys: rejection.findings.map(promptFindingKey),
+            ...(promptRepairBudget ? { budget: promptRepairBudget.snapshot() } : {}),
+          },
+        });
+        const priorRows = repair.round.context.rows;
+        activePromptRepairBudget = promptRepairBudget;
+        try {
+          result = promptRepairBudget
+            ? await llm.withDispatchGuard(
+                () => promptRepairBudget.reserve("native-author-or-source"),
+                runOnce,
+              )
+            : await runOnce();
+        } catch (error) {
+          if (!isPromptRepairBudgetExhausted(error)) throw error;
+          promptRepairStopReason = "PROMPT_REPAIR_BUDGET_EXHAUSTED";
+          await reportPromptRepairExhausted(promptRepairStopReason, repair.round.plan.planHash);
+          break;
+        } finally {
+          activePromptRepairBudget = null;
+        }
+        attempts += 1;
+        if (promptRepairBudget?.snapshot().exhausted) {
+          promptRepairStopReason = "PROMPT_REPAIR_BUDGET_EXHAUSTED";
+          await reportPromptRepairExhausted(promptRepairStopReason, repair.round.plan.planHash);
+          break;
+        }
+        const nextRejection = lastPromptRejection;
+        const repairPassed = promptReview ? promptReviewReceipt !== null : result.success;
+        if (!nextRejection) {
+          if (!repairPassed) {
+            promptRepairStopReason = "PROMPT_REPAIR_UNVERIFIED";
+            await reportPromptRepairExhausted(promptRepairStopReason, repair.round.plan.planHash);
+            break;
+          }
+          for (const shotId of repair.round.targetShotIds) promptRepairRepairedShotIds.add(shotId);
+          await onEvent({
+            kind: "pipeline.prompt.repair_completed",
+            projectId: input.projectId,
+            runId: entry.runId,
+            payload: {
+              pipelineKind,
+              round: promptRepairRound,
+              planHash: repair.round.plan.planHash,
+              ...(promptRepairBudget ? { budget: promptRepairBudget.snapshot() } : {}),
+              reusedShotIds: [...promptRepairReusedShotIds],
+              repairedShotIds: [...promptRepairRepairedShotIds],
+            },
+          });
+          break;
+        }
+        const progress = promptRepairProgressAfterRound({
+          priorPlan: repair.round.plan,
+          priorRows,
+          nextFindings: nextRejection.findings,
+          nextRows: nextRejection.rows.length > 0 ? nextRejection.rows : promptRowsFromVendorResult(result),
+        });
+        if (!progress.progress) {
+          promptRepairStopReason = "PROMPT_REPAIR_NO_PROGRESS";
+          await reportPromptRepairExhausted(promptRepairStopReason, repair.round.plan.planHash, {
+            priorFindingKeys: progress.priorFindingKeys,
+            nextFindingKeys: progress.nextFindingKeys,
+          });
+          break;
+        }
+      }
+      if (isProducerRejection(result) && promptRepairRound >= PROMPT_REPAIR_MAX_ROUNDS) {
+        promptRepairStopReason = "PROMPT_REPAIR_EXHAUSTED";
+        await reportPromptRepairExhausted(promptRepairStopReason, activePromptRepairPlan?.planHash ?? null);
+      }
       if (promptReview) {
         const receipt = promptReviewReceipt as StudioPromptReview | null;
         entry.status = receipt ? "finished" : "failed";
         entry.error = receipt ? null : terminalFailureMessageOf(result, entry.error, { promptReview: true });
         entry.resultSummary = { purpose: "prompt-review", state: receipt?.state ?? "prompt_review_failed",
-          renderAuthorized: false, ...(receipt ? { promptShotCount: receipt.shots.length, plannedSeconds: receipt.plannedSeconds } : {}) };
+          renderAuthorized: false, ...(receipt ? { promptShotCount: receipt.shots.length, plannedSeconds: receipt.plannedSeconds } : {}),
+          promptRepair: { rounds: promptRepairRound, planHash: activePromptRepairPlan?.planHash ?? null,
+            targetShotIds: activePromptRepairContext?.targetShotIds ?? [],
+            targetedShotIds: [...promptRepairTargetedShotIds], stopReason: promptRepairStopReason,
+            reusedShotIds: [...promptRepairReusedShotIds], repairedShotIds: [...promptRepairRepairedShotIds],
+            ...(promptRepairBudget ? { budget: promptRepairBudget.snapshot() } : {}) } };
         return;
       }
       entry.status = result.success ? "finished" : "failed";
@@ -1779,6 +2179,11 @@ function launchRun(scope: Scope, input: StudioRunInput, delegated?: { assertActi
         success: result.success,
         stages: Object.keys(result.stages ?? {}),
         producerAttempts: attempts,
+        promptRepair: { rounds: promptRepairRound, planHash: activePromptRepairPlan?.planHash ?? null,
+          targetShotIds: activePromptRepairContext?.targetShotIds ?? [],
+          targetedShotIds: [...promptRepairTargetedShotIds], stopReason: promptRepairStopReason,
+          reusedShotIds: [...promptRepairReusedShotIds], repairedShotIds: [...promptRepairRepairedShotIds],
+          ...(promptRepairBudget ? { budget: promptRepairBudget.snapshot() } : {}) },
         ...(directorMode?{creativeMode:"director_auto",confirmationSteps:0,deliveryTargetPlan,profileHash:directorProfile!.profileHash}:{}),
         ...(dataMiningStage
           ? {

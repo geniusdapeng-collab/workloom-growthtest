@@ -5,8 +5,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   PRODUCER_RUBRICS,
+  REVIEW_CONTEXT_BUDGET,
   resolveProducerLlm,
   reviewStage,
+  splitPromptReviewBatches,
   type ProducerGateOptions,
 } from "./producer-gate.js";
 
@@ -92,6 +94,21 @@ describe("AI producer evidence gate", () => {
       fetchImpl: judge(good, bodies),
     }));
     expect(verdict).toMatchObject({ status: "failed", approved: false });
+    expect(bodies).toHaveLength(0);
+  });
+
+  it("rejects before provider dispatch when the host call budget is exhausted", async () => {
+    const bodies: string[] = [];
+    const verdict = await reviewStage(textOptions({
+      beforeRequest: () => { throw new Error("PROMPT_REPAIR_BUDGET_EXHAUSTED: hard stop"); },
+      fetchImpl: judge(good, bodies),
+    }));
+    expect(verdict).toMatchObject({
+      status: "unverified",
+      approved: false,
+      via: "fallback",
+      reason: "PROMPT_REPAIR_BUDGET_EXHAUSTED: hard stop",
+    });
     expect(bodies).toHaveLength(0);
   });
 
@@ -312,6 +329,28 @@ describe("AI producer evidence gate", () => {
     }
   });
 
+  it("does not approve a self-contradictory answer that retains a blocking finding", async () => {
+    const verdict = await reviewStage(textOptions({
+      fetchImpl: judge({
+        ...good,
+        findings: [{
+          code: "ACTION_MISSING",
+          severity: "blocking",
+          shotId: "S2",
+          fieldPath: "fields.action",
+          issue: "缺少必需动作",
+          suggestion: "补回动作",
+          evidenceRefs: ["rawIntent"],
+          repairClass: "semantic",
+        }],
+      }),
+    }));
+    expect(verdict).toMatchObject({ approved: false, status: "failed" });
+    expect(verdict.findings).toEqual([
+      expect.objectContaining({ code: "ACTION_MISSING", shotId: "S2", severity: "blocking" }),
+    ]);
+  });
+
   it("valid JSON with unsafe field semantics fails closed without a repair call", async () => {
     const bodies: string[] = [];
     const fetchImpl = (async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
@@ -360,6 +399,26 @@ describe("AI producer evidence gate", () => {
     expect(bodies).toHaveLength(1);
     expect(bodies[0]?.match(/"type":"image_url"/g)).toHaveLength(7);
     expect(verdict.evidence).toHaveLength(7);
+  });
+
+  it("splits over-budget prompt reports at complete shot boundaries", async () => {
+    const header = "# 提示词审核报告\n\n## 镜头总览\n\n| 镜头 | 时长 |\n|---|---|\n";
+    const blocks = Array.from({ length: 12 }, (_, index) =>
+      `### S${index + 1}\n\n\`\`\`markdown\n${String(index + 1).repeat(2_600)}\n\`\`\``).join("\n\n");
+    const content = `${header}${blocks}`;
+    const batches = splitPromptReviewBatches(content);
+    expect(batches.length).toBeGreaterThan(1);
+    expect(batches.every(batch => Array.from(batch).length <= REVIEW_CONTEXT_BUDGET)).toBe(true);
+    expect(batches.join("\n\n")).toContain("### S1");
+    expect(batches.join("\n\n")).toContain("### S12");
+
+    const bodies: string[] = [];
+    const verdict = await reviewStage(textOptions({
+      artifacts: [{ path: file("long-prompt.md", content), kind: "text" }],
+      fetchImpl: judge(good, bodies),
+    }));
+    expect(verdict.approved).toBe(true);
+    expect(bodies.length).toBe(batches.length);
   });
 
   it("binds expected artifact hashes before and after review", async () => {

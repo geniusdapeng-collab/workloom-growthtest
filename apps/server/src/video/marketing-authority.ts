@@ -6,7 +6,8 @@ import { constants } from "node:fs";
 import { mkdir, open, realpath, writeFile } from "node:fs/promises";
 import { freezeMarketingCreativeRequirements, installVendorMarketingPriceBridge, installVendorMarketingReferenceBridge,
   MARKETING_CREATIVE_RESTRICTIONS, sourceBoundMarketingAssemblyRaw, verifyMarketingCreativeRequirements,
-  verifiedMarketingDossierInput, reviewStage, type MarketingCreativeRequirements, type ProducerVerdict } from "@hyperreality/video-studio";
+  verifiedMarketingDossierInput, reviewStage, normalizePromptFinding, type MarketingCreativeRequirements,
+  type ProducerVerdict, type PromptFinding } from "@hyperreality/video-studio";
 import { createDataMiningExecutor, type DataMiningStagePlan, type ExecutorLlm, type IntelStage, type SearchFn, type SearchHit } from "./data-mining-executor.js";
 import { fetchMarketingSource, sourceUrl, type SourceSnapshot } from "./marketing-source-fetcher.js";
 import { assertMarketingFactsFresh, validateStageFacts, revalidateStageFacts, type ValidatedStageFacts } from "./marketing-facts.js";
@@ -281,61 +282,166 @@ export async function restoreMarketingFacts(prepared: PreparedMarketingFacts, in
     bundle: { ...structuredClone(source), scope: input.scope, sourceScope, outputReviews: [] } };
 }
 
-export async function finalizeMarketingFacts(prepared: PreparedMarketingFacts, shots: Array<{ shotId: string; prompt: string; fields: unknown }>, env: NodeJS.ProcessEnv = process.env,
-  cache?: MarketingFactReviewCache): Promise<{ ref: string; sha256: string }> {
+export interface MarketingFactReviewBatch {
+  pass: boolean;
+  reviews: MarketingShotFactReview[];
+  findings: PromptFinding[];
+  verdicts: ProducerVerdict[];
+  rejectedShotIds: string[];
+  reasons: string[];
+}
+
+async function reviewMarketingShot(input: {
+  prepared: PreparedMarketingFacts;
+  shot: { shotId: string; prompt: string; fields: unknown };
+  index: number;
+  env: NodeJS.ProcessEnv;
+  cache?: MarketingFactReviewCache;
+  beforeRequest?: () => void;
+}): Promise<
+  | { accepted: true; review: MarketingShotFactReview }
+  | { accepted: false; reason: string; findings: PromptFinding[]; verdict: ProducerVerdict }
+> {
+  const { prepared, shot, index, env, cache, beforeRequest } = input;
+  const evidenceBody = shotFactReviewEvidence(prepared.bundle, shot);
+  const cacheKey = marketingFactReviewCacheKey(prepared.bundle, shot);
+  const knownRejection = await cache?.loadRejected?.(cacheKey);
+  if (knownRejection) {
+    await verifyRejectedMarketingFactReview(prepared, shot, knownRejection);
+    try { await cache?.reject?.(cacheKey, knownRejection); }
+    catch (error) { throw marketingFactsReceiptError("原镜头语义拒绝的接续回执保存失败，保留原审核后对账", error); }
+    return {
+      accepted: false,
+      reason: `同一镜头内容已有完整事实拒绝，须先由作者修复，禁止重复评审：${knownRejection.verdict.reason}`,
+      findings: verdictFindings(knownRejection.verdict, shot.shotId),
+      verdict: knownRejection.verdict,
+    };
+  }
+  const cached = await cache?.load(cacheKey);
+  if (cached) {
+    await verifyShotFactReview(prepared, shot, cached);
+    try { await cache!.save(cacheKey, cached); }
+    catch (error) { throw marketingFactsReceiptError("原镜头通过审核的接续回执保存失败，保留原审核后对账", error); }
+    return { accepted: true, review: cached };
+  }
+  const evidence = await writeBound(prepared.root, `${prepared.prefix}-shot-${index + 1}.review.json`, canonicalRenderJson(
+    evidenceBody));
+  const verdict = await reviewStage({ stage: "prompt", projectId: prepared.bundle.scope.projectId, env,
+    ...(beforeRequest ? { beforeRequest } : {}),
+    artifacts: [{ path: evidence.path, kind: "json", note: "完整最终镜头与逐主张事实证据；禁止无证据营销声明" }],
+    deterministic: [{ id: "marketing-current-facts", pass: true, hard: true, detail: "本次G1事实包与完整最终镜头同scope/run/attempt" }],
+    requiredCheckIds: ["marketing-current-facts"], minScore: 85,
+    rubric: ["逐句核对shot.prompt与全部结构fields中的商品事实、数字、价格、效果、评价和竞品主张，仅sourceClaims可作为事实依据",
+      "必须遵守restrictions；不得把用户意图、推断、生成情节、广告愿望、缺证据或无冲突当成事实支持；任一未支持或夸大主张必须拒绝",
+      "创意可使用虚构情节和角色设定，但不得暗示真实战绩、无来源的商品性能、认证或真实人物背书",
+      "creativeRequirements 是本片原始创作与交付合同。核对当前镜头承担的角色、画面文字、披露或尾帧要求；全片、其他镜头或后期才承担的内容不要求在每个镜头重复",
+      "若拒绝，findings 必须绑定当前 shotId，至少指出 prompt 或 structure fields 中的准确问题。"],
+    context: { purpose: "marketing-final-fact-review", shotId: shot.shotId, scope: prepared.bundle.scope },
+  });
+  let verdictArchive: { ref: string; sha256: string };
+  try {
+    verdictArchive = await writeBound(prepared.root, `${prepared.prefix}-shot-${index + 1}.verdict.json`, canonicalRenderJson(verdict));
+  } catch (error) { throw marketingFactsReceiptError("镜头事实审核已返回，但完整裁决归档未完成，保留原请求先对账", error, verdict.unknownOutcome === true); }
+  if (verdict.unknownOutcome) fail("VIDEO_MODEL_OUTCOME_UNKNOWN", "镜头事实评审的供应商回执待核实，保留原请求");
+  const reviewed: MarketingShotFactReview = { shotId: shot.shotId, promptSha256: renderSha256(shot.prompt), fieldsSha256: renderSha256(canonicalRenderJson(shot.fields)),
+    ref: evidence.ref, sha256: evidence.sha256, verdict, scope: prepared.bundle.scope,
+    verdictArchive: { ref: verdictArchive.ref, sha256: verdictArchive.sha256 } };
+  if (rejected(verdict, evidence.path, evidence.sha256)) {
+    reviewed.rejectedShot = structuredClone(shot);
+    await verifyRejectedMarketingFactReview(prepared, shot, reviewed);
+    try { await cache?.reject?.(cacheKey, reviewed); }
+    catch (error) { throw marketingFactsReceiptError("镜头语义拒绝已核实，但负回执保存未完成，保留原审核先对账", error); }
+    return {
+      accepted: false,
+      reason: `营销镜头事实未通过，须按原裁决修复作者内容：${verdict.reason}`,
+      findings: verdictFindings(verdict, shot.shotId),
+      verdict,
+    };
+  }
+  if (!accepted(verdict, evidence.path, evidence.sha256)) {
+    return {
+      accepted: false,
+      reason: `营销镜头事实未通过：${verdict.reason}`,
+      findings: verdictFindings(verdict, shot.shotId),
+      verdict,
+    };
+  }
+  try { await cache?.save(cacheKey, reviewed); }
+  catch (error) { throw marketingFactsReceiptError("镜头事实审核已通过，但接续回执保存未完成，保留原审核先对账", error); }
+  return { accepted: true, review: reviewed };
+}
+
+function verdictFindings(verdict: ProducerVerdict, shotId: string): PromptFinding[] {
+  const findings = verdict.findings?.filter(item => item.severity === "blocking" || item.severity === "major") ?? [];
+  if (findings.length > 0) {
+    return findings.map(item => ({
+      ...item,
+      shotId: item.shotId ?? shotId,
+      severity: "blocking",
+      repairClass: "evidence",
+    }));
+  }
+  const derived = verdict.issues.flatMap((issue, index) => {
+    const finding = normalizePromptFinding({
+      code: "MARKETING_FACT_REJECTED",
+      severity: "blocking",
+      shotId,
+      issue,
+      suggestion: verdict.suggestions[index] ?? verdict.suggestions[0] ?? null,
+      repairClass: "evidence",
+    }, index);
+    return finding ? [finding] : [];
+  });
+  if (derived.length) return derived;
+  const fallback = normalizePromptFinding({
+    code: "MARKETING_FACT_REJECTED",
+    severity: "blocking",
+    shotId,
+    issue: verdict.reason,
+    suggestion: verdict.suggestions[0] ?? null,
+    repairClass: "evidence",
+  });
+  return fallback ? [fallback] : [];
+}
+
+export async function preflightMarketingFacts(
+  prepared: PreparedMarketingFacts,
+  shots: Array<{ shotId: string; prompt: string; fields: unknown }>,
+  env: NodeJS.ProcessEnv = process.env,
+  cache?: MarketingFactReviewCache,
+  beforeRequest?: () => void,
+): Promise<MarketingFactReviewBatch> {
   if (!shots.length || new Set(shots.map(shot => shot.shotId)).size !== shots.length) fail("MARKETING_PROMPTS_INVALID", "营销镜头为空或镜头标识重复");
+  const reviews: MarketingShotFactReview[] = [];
+  const findings: PromptFinding[] = [];
+  const verdicts: ProducerVerdict[] = [];
+  const rejectedShotIds: string[] = [];
+  const reasons: string[] = [];
   for (const [index, item] of shots.entries()) {
     const shot = { shotId: item.shotId, prompt: item.prompt, fields: item.fields };
     if (!shot.prompt.trim()) fail("MARKETING_PROMPTS_INVALID", "营销镜头正文为空");
-    const evidenceBody = shotFactReviewEvidence(prepared.bundle, shot);
-    const cacheKey = marketingFactReviewCacheKey(prepared.bundle, shot);
-    const knownRejection = await cache?.loadRejected?.(cacheKey);
-    if (knownRejection) {
-      await verifyRejectedMarketingFactReview(prepared, shot, knownRejection);
-      try { await cache?.reject?.(cacheKey, knownRejection); }
-      catch (error) { throw marketingFactsReceiptError("原镜头语义拒绝的接续回执保存失败，保留原审核后对账", error); }
-      fail("MARKETING_PROMPT_FACTS_REJECTED", `同一镜头内容已有完整事实拒绝，须先由作者修复，禁止重复评审：${knownRejection.verdict.reason}`);
+    const reviewed = await reviewMarketingShot({ prepared, shot, index, env, cache, beforeRequest });
+    if (reviewed.accepted) reviews.push(reviewed.review);
+    else {
+      findings.push(...reviewed.findings);
+      verdicts.push(reviewed.verdict);
+      rejectedShotIds.push(shot.shotId);
+      reasons.push(reviewed.reason);
     }
-    const cached = await cache?.load(cacheKey);
-    if (cached) {
-      await verifyShotFactReview(prepared, shot, cached);
-      try { await cache!.save(cacheKey, cached); }
-      catch (error) { throw marketingFactsReceiptError("原镜头通过审核的接续回执保存失败，保留原审核后对账", error); }
-      prepared.bundle.outputReviews.push(cached);
-      continue;
-    }
-    const evidence = await writeBound(prepared.root, `${prepared.prefix}-shot-${index + 1}.review.json`, canonicalRenderJson(
-      evidenceBody));
-    const verdict = await reviewStage({ stage: "prompt", projectId: prepared.bundle.scope.projectId, env,
-      artifacts: [{ path: evidence.path, kind: "json", note: "完整最终镜头与逐主张事实证据；禁止无证据营销声明" }],
-      deterministic: [{ id: "marketing-current-facts", pass: true, hard: true, detail: "本次G1事实包与完整最终镜头同scope/run/attempt" }],
-      requiredCheckIds: ["marketing-current-facts"], minScore: 85,
-      rubric: ["逐句核对shot.prompt与全部结构fields中的商品事实、数字、价格、效果、评价和竞品主张，仅sourceClaims可作为事实依据",
-        "必须遵守restrictions；不得把用户意图、推断、生成情节、广告愿望、缺证据或无冲突当成事实支持；任一未支持或夸大主张必须拒绝",
-        "创意可使用虚构情节和角色设定，但不得暗示真实战绩、无来源的商品性能、认证或真实人物背书",
-        "creativeRequirements 是本片原始创作与交付合同。核对当前镜头承担的角色、画面文字、披露或尾帧要求；全片、其他镜头或后期才承担的内容不要求在每个镜头重复"],
-      context: { purpose: "marketing-final-fact-review", shotId: shot.shotId, scope: prepared.bundle.scope },
-    });
-    let verdictArchive: { ref: string; sha256: string };
-    try {
-      verdictArchive = await writeBound(prepared.root, `${prepared.prefix}-shot-${index + 1}.verdict.json`, canonicalRenderJson(verdict));
-    } catch (error) { throw marketingFactsReceiptError("镜头事实审核已返回，但完整裁决归档未完成，保留原请求先对账", error, verdict.unknownOutcome === true); }
-    if (verdict.unknownOutcome) fail("VIDEO_MODEL_OUTCOME_UNKNOWN", "镜头事实评审的供应商回执待核实，保留原请求");
-    const reviewed: MarketingShotFactReview = { shotId: shot.shotId, promptSha256: renderSha256(shot.prompt), fieldsSha256: renderSha256(canonicalRenderJson(shot.fields)),
-      ref: evidence.ref, sha256: evidence.sha256, verdict, scope: prepared.bundle.scope,
-      verdictArchive: { ref: verdictArchive.ref, sha256: verdictArchive.sha256 } };
-    if (rejected(verdict, evidence.path, evidence.sha256)) {
-      reviewed.rejectedShot = structuredClone(shot);
-      await verifyRejectedMarketingFactReview(prepared, shot, reviewed);
-      try { await cache?.reject?.(cacheKey, reviewed); }
-      catch (error) { throw marketingFactsReceiptError("镜头语义拒绝已核实，但负回执保存未完成，保留原审核先对账", error); }
-      fail("MARKETING_PROMPT_FACTS_REJECTED", `营销镜头事实未通过，须按原裁决修复作者内容：${verdict.reason}`);
-    }
-    if (!accepted(verdict, evidence.path, evidence.sha256)) fail("MARKETING_PROMPT_FACTS_REJECTED", `营销镜头事实未通过：${verdict.reason}`);
-    try { await cache?.save(cacheKey, reviewed); }
-    catch (error) { throw marketingFactsReceiptError("镜头事实审核已通过，但接续回执保存未完成，保留原审核先对账", error); }
-    prepared.bundle.outputReviews.push(reviewed);
   }
+  return { pass: rejectedShotIds.length === 0, reviews, findings, verdicts, rejectedShotIds, reasons };
+}
+
+export async function finalizeMarketingFacts(prepared: PreparedMarketingFacts, shots: Array<{ shotId: string; prompt: string; fields: unknown }>, env: NodeJS.ProcessEnv = process.env,
+  cache?: MarketingFactReviewCache, preReviewed?: MarketingFactReviewBatch, beforeRequest?: () => void): Promise<{ ref: string; sha256: string }> {
+  const batch = preReviewed ?? await preflightMarketingFacts(prepared, shots, env, cache, beforeRequest);
+  if (preReviewed && (preReviewed.pass === false || preReviewed.reviews.length !== shots.length)) {
+    fail("MARKETING_PROMPT_FACTS_REJECTED", preReviewed.reasons.join("；") || "预审回执与当前镜头不一致");
+  }
+  if (!batch.pass) {
+    fail("MARKETING_PROMPT_FACTS_REJECTED", batch.reasons.join("；"));
+  }
+  prepared.bundle.outputReviews = structuredClone(batch.reviews);
   const saved = await writeBound(prepared.root, `${prepared.prefix}-facts.json`, canonicalRenderJson(prepared.bundle));
   await verifyMarketingFacts({ root: prepared.root, ref: saved.ref, sha256: saved.sha256, scope: prepared.bundle.scope,
     stageId: prepared.stageId, shots });

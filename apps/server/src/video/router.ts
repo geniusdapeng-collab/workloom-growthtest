@@ -61,6 +61,7 @@ import { resolvePlatformForIntent } from "./platform-routing.js";
 import { makeStageArchive } from "./archive-host.js";
 import { readArchiveSummary, resumeProject, scanStaleRunsOnStartup } from "./archive-resume.js";
 import { isStudioPromptReviewProject } from "./prompt-review-authority.js";
+import { readPromptSuccessMetrics } from "./prompt-success-metrics.js";
 import { applyRouteToMetadata, buildPipelineIntent, filmTargetSecondsFromIntent, platformIdOf, routeVideoPipeline,
   unicodeLength, VIDEO_INTENT_MAX_CHARACTERS } from "@hyperreality/video-studio";
 import { routedLlmCall } from "../service/llm.js";
@@ -704,6 +705,14 @@ const studioRouter = router({
         error: entry.error,
         resultSummary: entry.resultSummary,
       };
+    }),
+
+  /** Read-only prompt success funnel for the current workspace. */
+  promptMetrics: protectedProcedure
+    .input(z.object({ since: z.string().datetime().optional() }).optional())
+    .query(({ ctx, input }) => {
+      const since = input?.since ?? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      return readPromptSuccessMetrics(getAppPool(), scopeOf(ctx.identity), since);
     }),
 
   /**

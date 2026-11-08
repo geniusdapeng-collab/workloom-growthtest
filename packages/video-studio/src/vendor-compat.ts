@@ -8481,6 +8481,8 @@ function scopeNativeMarketingAuthorContext(scoped: FusionAgent, agent: FusionAge
     sourcePlan = shots.map(row => ({ ...project(row, sourceKeys), shotId: String(row.shotId ?? row.shot_id ?? "") }));
     sourceIndexes = new Map(sourcePlan.map((row, index) => [String(row.shotId), index]));
     drafts.clear(); mode = "serial"; processing = true;
+    const repair = recordValue(currentBlueprint._workloomPromptRepairContext);
+    if (Array.isArray(repair.rows)) remember(repair.rows, "repair-prior");
     try { return await originalProcess.call(this, shots, currentBlueprint, options); }
     finally { processing = false; }
   };
@@ -8538,6 +8540,31 @@ function scopeNativeMarketingAuthorContext(scoped: FusionAgent, agent: FusionAge
 function scopedFusionAgent(agent: FusionAgent, blueprint: FusionRecord): FusionAgent {
   const scoped = Object.create(agent) as FusionAgent;
   let capacityRepairContext: FusionRecord | undefined;
+  const promptRepair = recordValue(blueprint._workloomPromptRepairContext);
+  const perShotTextBudget = Number(promptRepair.plan && recordValue(promptRepair.plan).budget
+    ? recordValue(recordValue(promptRepair.plan).budget).maxTextCallsPerShot
+    : 0);
+  const promptRepairShotCalls = new Map<number, number>();
+  const originalPromptRepairCall = scoped._callLLM;
+  if (Number.isInteger(perShotTextBudget) && perShotTextBudget > 0 && typeof originalPromptRepairCall === "function") {
+    Object.defineProperty(scoped, "_callLLM", {
+      value: function boundedPromptRepairCall(this: FusionAgent, ...args: unknown[]) {
+        const index = typeof this._currentShotIdx === "number" ? this._currentShotIdx : undefined;
+        if (index !== undefined) {
+          const used = (promptRepairShotCalls.get(index) ?? 0) + 1;
+          if (used > perShotTextBudget) {
+            const error = new Error(`PROMPT_REPAIR_BUDGET_EXHAUSTED: 镜头 ${index + 1} 超过 ${perShotTextBudget} 次文字调用上限`);
+            Object.assign(error, { code: "PROMPT_REPAIR_BUDGET_EXHAUSTED" });
+            throw error;
+          }
+          promptRepairShotCalls.set(index, used);
+        }
+        return originalPromptRepairCall.apply(this, args as Parameters<typeof originalPromptRepairCall>);
+      },
+      configurable: true,
+      writable: true,
+    });
+  }
   Object.defineProperty(scoped, "_workloomSetCanonicalCapacityRepair", { value: (context?: FusionRecord) => {
     capacityRepairContext = context ? structuredClone(context) : undefined;
   } });

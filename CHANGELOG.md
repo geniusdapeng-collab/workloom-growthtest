@@ -1,5 +1,16 @@
 # Changelog
 
+## [video-prompt-repair] - 2026-11-08 · 提示词有界局部修复与成功率漏斗（T-2026-1108-9001）
+
+- G6/FACT/原生相机拒绝现在生成绑定 `shotId + fieldPath + evidence` 的结构化 `PromptFinding`；兼容旧字符串 `issues/suggestions` 回执。
+- 新增 `workloom.prompt-repair-plan/v1`、镜头级 row checkpoint、ShotPlan 和 PromptArtifact 旁路合同；修复只命中目标镜头，未命中已合格镜头直接复用，相邻镜头只做连续性复核。
+- Studio Worker 默认最多两轮文字局部修复，在发请求前统一预占总文字调用与单镜作者调用硬预算，不提交图片、视频、发布或外呼；同 finding 无进展时停止。`resume-prompts` 保留为修复耗尽、重启或人工接续入口。
+- 完整视频在 PortraitStudio/media 之前执行 prompt preflight；营销片先逐镜事实预检，再执行最终 G6。最终 G6/FACT 仍是唯一签发门槛。
+- G6 支持结构化 findings、独立 `PRODUCER_LLM_*` reviewer 路由；超过 30k 字符的提示词报告按完整镜头边界分批送审，并增加完整 markdown 镜头块、容量、私有 repair 上下文和占位符确定性检查。
+- 新增 `video.studio.promptMetrics` 只读漏斗，按 marketing/narrative 分桶记录 preflight、G6、局部修复完成/阻塞/耗尽。
+- 保持不变：25 个标准字段的名称/顺序/含义、片头额外 5 字段、3000 Unicode 字符上限、授权、预算、逐镜 FACT 和渲染资格。
+- 回滚：`PROMPT_REPAIR_ENABLED=0`、`PROMPT_FACT_PREFLIGHT=0`、`PROMPT_PREFLIGHT_REQUIRED=0` 恢复旧执行顺序；历史断点和事件不删除。
+
 ## [video-pipeline-stress-repair] - 2026-10-31 · AI 视频预生产收口与 60 场景排雷（T-2026-1031-9004）
 
 - 新增真实预生产最终化资格合同：除 prompt、时长、画幅和 PipelineGuard 外，逐镜核验人物 ID、`PENDING_GENERATION`、当前活动定妆照、授权、空镜冲突、PRD 角色映射与 G5 跳过原因；任何缺口均阻断 G8。

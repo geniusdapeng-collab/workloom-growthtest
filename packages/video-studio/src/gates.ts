@@ -4,6 +4,7 @@
  * vendor 引擎内部的确认门 type 字面值保持原样（唯一真源在 vendor 代码），
  * 本模块只负责把 type 翻译成业务门 G1-G7，供围栏与审批卡使用。
  */
+import type { PromptFinding } from "./prompt-finding.js";
 
 export type GateKey =
   | "G1_DOSSIER"
@@ -71,6 +72,7 @@ export interface GateVerdict {
   approved: boolean;
   reason?: string;
   suggestions?: string[];
+  findings?: PromptFinding[];
   fatal?: string;
 }
 
