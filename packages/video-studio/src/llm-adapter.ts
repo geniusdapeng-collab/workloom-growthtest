@@ -102,6 +102,7 @@ export class WorkloomLLMEngine {
   };
   private outcomeUnknown = false;
   private activeRequests = 0;
+  private readonly dispatchGuardScope = new AsyncLocalStorage<() => void>();
   readonly stats = { totalCalls: 0, totalFailures: 0 };
 
   get model(): string {
@@ -115,6 +116,15 @@ export class WorkloomLLMEngine {
   /** A resumed run must reconcile an uncertain dispatch before sending another request. */
   hasUnknownOutcome(): boolean {
     return this.outcomeUnknown || this.activeRequests > 0;
+  }
+
+  /**
+   * Apply a host-owned, async-scoped precondition to every provider dispatch.
+   * Repair rounds use this to freeze the call budget before fallback code can
+   * issue another request.
+   */
+  async withDispatchGuard<T>(guard: () => void, run: () => Promise<T>): Promise<T> {
+    return this.dispatchGuardScope.run(guard, run);
   }
 
   constructor(config: WorkloomLLMEngineConfig) {
@@ -175,6 +185,7 @@ export class WorkloomLLMEngine {
     if (this.outcomeUnknown) {
       return { success: false, unknown: true, retryable: false, error: "VIDEO_MODEL_OUTCOME_UNKNOWN: 当前运行已有结果未知的模型请求，未重复提交" };
     }
+    this.dispatchGuardScope.getStore()?.();
     const activeModel = canonicalDeepSeekModel(opts.model ?? this.cfg.model);
     if (opts.strictAuthorModel !== undefined && opts.strictAuthorModel !== activeModel) {
       return { success: false, retryable: false, error: "VIDEO_AUTHOR_MODEL_CHANGED: 结构修复必须沿用已结算的原模型" };

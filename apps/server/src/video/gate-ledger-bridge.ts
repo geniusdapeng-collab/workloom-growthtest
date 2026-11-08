@@ -10,7 +10,7 @@
  * 纪律：未知门返回 `null`（不猜、不静默映射），调用方按"没有 step_key"如实记录。
  */
 import { buildGateEvent, type GateEvent, type PipelineGateStepKey } from "@hyperreality/video-studio";
-import type { GateKey } from "@hyperreality/video-studio";
+import type { GateKey, PromptFinding } from "@hyperreality/video-studio";
 
 /** 平台门 → 管线 step_key（只有能一一对应的才映射；G8 渲染提交走独立路由，暂不映射） */
 export const SERVER_GATE_STEP_KEY: Partial<Record<GateKey, PipelineGateStepKey>> = {
@@ -45,6 +45,7 @@ export interface ServerGateVerdictLike {
   reason?: string;
   issues?: string[];
   suggestions?: string[];
+  findings?: PromptFinding[];
   model?: string | null;
 }
 
@@ -74,11 +75,12 @@ export function buildServerGateRecord(input: {
   const stepKey = SERVER_GATE_STEP_KEY[input.gate];
   if (!stepKey) return null;
   const verdict = input.verdict ?? null;
+  const findings = verdict?.findings ?? [];
   const event = buildGateEvent({
     stepKey,
     projectId: input.projectId,
     sourceStage: "apps/server:onApproval",
-    shotIds: [],
+    shotIds: [...new Set(findings.map(finding => finding.shotId).filter((id): id is string => Boolean(id)))],
     checks: [{
       id: "producer-verdict",
       pass: input.approved,
@@ -99,7 +101,8 @@ export function buildServerGateRecord(input: {
       producerMode: input.producerMode ?? "review",
       model: verdict?.model ?? null,
       issues: verdict?.issues?.slice(0, 5) ?? [],
-      suggestions: verdict?.suggestions?.slice(0, 5) ?? []
+      suggestions: verdict?.suggestions?.slice(0, 5) ?? [],
+      findings: findings.slice(0, 50)
     },
     at: input.at
   });

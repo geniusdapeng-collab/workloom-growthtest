@@ -165,3 +165,50 @@ it.each([false, true])("native shot resume includes diagnosis=%s while preservin
     expect(agent._fuseSingleShotWithDeadline).toHaveBeenCalledTimes(repair ? 1 : 0);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
+
+it("targeted prompt repair reuses every unaffected native row and authors only the dirty shot", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "wl-production-targeted-repair-"));
+  try {
+    const agent = Object.create(PromptFusionAgent.prototype);
+    const priorRows = [
+      { shotId: "S1", prompt: "S1 已通过", duration: 5, fields: { action: "建立环境" } },
+      { shotId: "S2", prompt: "S2 旧稿", duration: 5, fields: { action: "只有转动" } },
+      { shotId: "S3", prompt: "S3 已通过", duration: 5, fields: { action: "收束" } },
+    ];
+    const author = vi.fn(async shot => ({ ...shot, prompt: "S2 按诊断修复", fields: { action: "拿起后转动并放稳" } }));
+    Object.assign(agent, {
+      _fuseSingleShotWithDeadline: author,
+      _semanticPass: { enabled: false },
+      consistencyChecker: { check: () => ({ valid: true, warningCount: 0 }), autoFix: (value: unknown) => value },
+      _countChars: (value: string) => Array.from(value).length,
+    });
+    const result = await agent.process(
+      priorRows.map(({ shotId, duration }) => ({ shotId, duration })),
+      {
+        config: {},
+        _workloomProductionRepairFeedback: feedback,
+        _workloomPromptRepairContext: {
+          schemaVersion: "workloom.prompt-repair-context/v1",
+          plan: { planHash: "a".repeat(64) },
+          rows: priorRows,
+          targetShotIds: ["S2"],
+          targetAll: false,
+        },
+      },
+      { checkpointManager: { baseDir: directory }, blueprintHash: "targeted-repair" },
+    );
+    expect(author).toHaveBeenCalledTimes(1);
+    expect(author.mock.calls[0]?.[0]).toMatchObject({ shotId: "S2" });
+    expect(result.shots[0]).toEqual(priorRows[0]);
+    expect(result.shots[2]).toEqual(priorRows[2]);
+    expect(result.shots[1]).toMatchObject({ shotId: "S2", prompt: "S2 按诊断修复" });
+    expect(result.repair).toMatchObject({
+      targetShotIds: ["S2"],
+      targetAll: false,
+      reusedShotIds: ["S1", "S3"],
+      repairedShotIds: ["S2"],
+    });
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});

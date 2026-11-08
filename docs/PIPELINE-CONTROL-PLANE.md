@@ -1,15 +1,19 @@
 # GrowthTest 视频管线控制面（一期）
 
-- 状态：已实现，影子模式
+- 状态：控制面影子观察；旧 Studio 执行器已接入有界提示词局部修复
 - 任务：`T-2026-1030-9001`
 - 基线：`d70b1c28eee47b7c4269f22ab694ae05d64db12c`
 - 范围：`CompiledPipelinePlan + Durable Control Plane + 双状态 + 统一项目租约 + StageAdapter 影子接入`
-- 明确不做：总制片人 Agent、自动修复、真实媒体执行切换、vendor 算法重写、业务门禁语义调整
+- 明确不做：总制片人 Agent、控制面接管自动修复、真实媒体执行切换、vendor 算法重写、业务门禁语义调整
 
 ## 运行边界
 
 旧执行器继续是真实出片路径。新控制面只观察已经发生的运行、阶段、产物和门裁决；影子写入失败只记
 `[pipeline-shadow]` 日志，不得改变旧链路成败。
+
+提示词局部修复由旧 Studio 执行器内部的 `PromptRepairPlan` 有界循环执行，并复用本控制面的
+`GateFinding` / `itemKey` 数据结构；控制面自身仍是观察者，不调度模型、不提交媒体，也不改变
+G6、FACT、授权或预算。
 
 当前接入点：
 
@@ -116,9 +120,9 @@ wait_resource / manual_fix / done`）和结构化 blocker。只读 tRPC：
 已吸收：三轴 + `nextAction`、结构化 GateFinding、artifact manifest hash、StageRun itemKey、只读
 状态/事件/产物/门裁决查询，以及旧恢复工具兼容筛选。
 
-暂不吸收：RepairPlan / playbook / 自动修复、总制片人 Agent、资源租约池、vendor 内部拆段和真实
-执行默认切换。跨仓共享核心也不在本仓隔离任务中执行；公共化必须先走提案，不得违反
-`none-in-none-out`。
+暂不吸收：由控制面调度 RepairPlan / playbook / 自动修复、总制片人 Agent、资源租约池、vendor
+内部拆段和真实执行默认切换。提示词有界局部修复目前由旧 Studio 执行器内部完成，控制面只使用
+同一套 findings/状态合同进行观察。跨仓共享核心仍必须先走提案，不得违反 `none-in-none-out`。
 
 ## 一期验收
 

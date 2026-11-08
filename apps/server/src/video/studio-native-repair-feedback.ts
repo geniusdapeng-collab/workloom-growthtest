@@ -1,6 +1,11 @@
 import path from "node:path";
 import { constants } from "node:fs";
 import { open, realpath } from "node:fs/promises";
+import {
+  derivePromptFindings,
+  normalizePromptFinding,
+  type PromptFinding,
+} from "@hyperreality/video-studio";
 import { canonicalRenderJson, renderSha256 } from "./gen/compiled-request.js";
 
 export const NATIVE_CAMERA_FAILURE_PREFIX = "STUDIO_CHECKPOINT_INVALID: PRODUCTION 未完成有效原生产物；运镜诊断：";
@@ -45,6 +50,7 @@ interface NativeG6Diagnosis {
   message: string;
   issues: string[];
   suggestions: string[];
+  findings: PromptFinding[];
   reviewEventId: string;
   reviewEventSha256: string;
   reviewEvent: NativeG6ReviewEvent;
@@ -125,6 +131,7 @@ async function g6Diagnosis(value: unknown, prior: KnownNativeProductionPrior, co
   }
   let issues = after.issues;
   let suggestions = after.suggestions;
+  let findings: PromptFinding[] = [];
   let evidenceMode: NativeG6Diagnosis["evidenceMode"] = "legacy-event";
   if (after.producerVerdict !== undefined) {
     const verdict = after.producerVerdict;
@@ -161,14 +168,22 @@ async function g6Diagnosis(value: unknown, prior: KnownNativeProductionPrior, co
     }
     issues = verdict.issues;
     suggestions = verdict.suggestions;
+    if (verdict.findings !== undefined) {
+      if (!Array.isArray(verdict.findings)) invalid("G6 完整原裁决 findings 无效");
+      const normalized = verdict.findings.map((item, index) => normalizePromptFinding(item, index));
+      if (normalized.some(item => !item)
+        || canonicalRenderJson(normalized) !== canonicalRenderJson(verdict.findings)) invalid("G6 完整原裁决 findings 无法无损归一");
+      findings = normalized as PromptFinding[];
+    }
     evidenceMode = "complete-producer-verdict";
   }
+  if (findings.length === 0) findings = derivePromptFindings(issues, suggestions, after.reason);
   const reviewEvent: NativeG6ReviewEvent = { eventId: value.eventId, tenantId: context.tenantId,
     workspaceId: context.workspaceId, objectId: value.objectId, action: "prompt.confirm", createdAt: at,
     after: structuredClone(after) };
   return { kind: "g6-prompt-rejection", originRunId: prior.runId, attempt: prior.attempt, stageId: prior.stageId,
     originStartedAt: prior.startedAt, originFinishedAt: prior.finishedAt, failedAt: at,
-    message: after.reason, issues: [...issues], suggestions: [...suggestions], reviewEventId: reviewEvent.eventId,
+    message: after.reason, issues: [...issues], suggestions: [...suggestions], findings, reviewEventId: reviewEvent.eventId,
     reviewEventSha256: renderSha256(canonicalRenderJson(reviewEvent)), reviewEvent, evidenceMode };
 }
 
@@ -226,7 +241,13 @@ async function checkedEvidence(value: unknown, g6Review?: G6ReviewContext): Prom
       const diagnosis = await g6Diagnosis(item.reviewEvent, { runId: item.originRunId, attempt: Number(item.attempt),
         stageId: item.stageId as KnownNativeProductionPrior["stageId"], status: "failed",
         startedAt: String(item.originStartedAt), finishedAt: String(item.originFinishedAt) }, g6Review);
-      if (!diagnosis || canonicalRenderJson(diagnosis) !== canonicalRenderJson(item)) invalid("继承的G6完整诊断不一致");
+      if (!diagnosis) invalid("继承的G6完整诊断无法重建");
+      const { findings: diagnosisFindings, ...diagnosisBase } = diagnosis;
+      const { findings: inheritedFindings, ...inheritedBase } = item;
+      if (canonicalRenderJson(diagnosisBase) !== canonicalRenderJson(inheritedBase)
+        || inheritedFindings !== undefined && canonicalRenderJson(diagnosisFindings) !== canonicalRenderJson(inheritedFindings)) {
+        invalid("继承的G6完整诊断不一致");
+      }
       if (seen.has(item.originRunId)) invalid("继承的原生反馈含重复运行");
       seen.add(item.originRunId);
       continue;

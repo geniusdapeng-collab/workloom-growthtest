@@ -165,7 +165,7 @@ export const GateFindingSchema = z.object({
   expected: z.unknown().optional(),
   actual: z.unknown().optional(),
   evidenceRefs: z.array(NonEmptyText).max(200).default([]),
-  repairClass: z.enum(["schema", "deterministic", "semantic", "human_input", "no_repair"]),
+  repairClass: z.enum(["schema", "deterministic", "semantic", "evidence", "human_input", "replan", "no_repair"]),
   blocking: z.boolean(),
 }).strict();
 

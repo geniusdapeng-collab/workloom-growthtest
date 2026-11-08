@@ -1984,6 +1984,36 @@ class HyperrealitySystem {
         console.warn(' ⚠️ 审核前片头优化异常（不阻断流程）:', e.message);
       }
 
+      // Prompt-only preflight runs before any portrait or media generation. A failure
+      // aborts without spending image/video quota; the normal final G6 remains authoritative.
+      if (typeof options.promptPreflight === 'function' && !options.skipPromptPreflight) {
+        try {
+          const preflightContent = this._generatePromptsReport(productionResult.prompts || []);
+          const preflightVerdict = await options.promptPreflight({
+            prompts: productionResult.prompts || [],
+            contentMd: preflightContent,
+            runId: this._runId || null,
+          });
+          result.confirmations.promptPreflight = preflightVerdict;
+          result.stages.promptPreflight = {
+            status: preflightVerdict && preflightVerdict.approved === true ? 'passed' : 'rejected',
+            reason: preflightVerdict && preflightVerdict.reason || null,
+            findings: preflightVerdict && Array.isArray(preflightVerdict.findings) ? preflightVerdict.findings : [],
+          };
+          if (!preflightVerdict || preflightVerdict.approved !== true) {
+            result.success = false;
+            return result;
+          }
+        } catch (promptPreflightError) {
+          result.success = false;
+          result.stages.promptPreflight = {
+            status: 'unverified',
+            reason: promptPreflightError.message,
+          };
+          return result;
+        }
+      }
+
       // ⭐ v2.8.0: 定妆照生成环节（PortraitStudio，审核前）
       // 角色按戏份重要性分级配角度；商品走独立分支链路（搜参考图→抠图/白底/光影→风格化）
       // 交互模式：输出计划 → 人工确认 → 执行；批量模式：免询问自动执行

@@ -22,6 +22,7 @@ import { resolveGate, type GateVerdict } from "./gates.js";
 import { WorkloomLLMEngine } from "./llm-adapter.js";
 import { createPortraitRuntime, type PortraitRuntimeOptions } from "./portrait-runtime.js";
 import { bindStudioEngineCheckpoints, bindStudioProductionRepairFeedback, type StudioCheckpointAdapter } from "./studio-checkpoints.js";
+import type { PromptRepairContext } from "./prompt-repair-plan.js";
 import {
   applyDurationPolicyToManager,
   installVendorAudioDisciplineBridge,
@@ -104,6 +105,10 @@ export type EventSink = (event: {
     | "pipeline.duration.infeasible"
     | "pipeline.duration.skipped"
     | "pipeline.duration.package_check"
+    | "pipeline.prompt.repair_requested"
+    | "pipeline.prompt.repair_completed"
+    | "pipeline.prompt.repair_blocked"
+    | "pipeline.prompt.repair_exhausted"
     | "pipeline.finished"
     | "pipeline.failed"
     | "pipeline.deferred_render_incomplete";
@@ -126,10 +131,18 @@ export interface StudioConfig {
   onEvent?: EventSink;
   /** Capture the current native rows after normalization, immediately before G6 sees them. */
   onPromptReview?: (prompts: readonly Record<string, unknown>[]) => void;
+  /** Preflight the exact native prompt report before portrait/media generation. */
+  onPromptPreflight?: (input: {
+    prompts: readonly Record<string, unknown>[];
+    contentMd: string;
+    runId: string | null;
+  }) => Promise<GateVerdict>;
   /** The host verifies durable checkpoint identity, approval, dependencies and source freshness. */
   checkpoints?: StudioCheckpointAdapter;
   /** Private verified late-stage diagnosis; affects only PRODUCTION author input and descendants. */
   productionRepairFeedback?: string;
+  /** Structured, host-verified repair scope. It is author context, never a final prompt field. */
+  promptRepairContext?: PromptRepairContext;
   /** @deprecated 仅保留调用兼容性，已忽略；超时由各次模型请求的传输层负责。 */
   totalDeadlineMs?: number;
   llmTimeoutMs?: number;
@@ -674,7 +687,11 @@ export class VideoStudio {
           });
         }
         if (cfg.productionRepairFeedback !== undefined) {
-          bindStudioProductionRepairFeedback(system as unknown as Record<string, unknown>, cfg.productionRepairFeedback);
+          bindStudioProductionRepairFeedback(
+            system as unknown as Record<string, unknown>,
+            cfg.productionRepairFeedback,
+            cfg.promptRepairContext,
+          );
         }
         /** 实例级放宽 rhythmProfiles（standard 12 / slow 15 → 模型上限），否则 30s 单镜会被重新夹紧 */
         applyDurationPolicyToManager(
@@ -693,6 +710,7 @@ export class VideoStudio {
           _workloomCustomerIntent: input.rawIntent ?? input.intent,
         };
         if (cfg.deferRender === true) createOptions.skipRender = true;
+        if (cfg.onPromptPreflight) createOptions.promptPreflight = cfg.onPromptPreflight;
         /**
          * 商品情报档案（Stage -2）开关透传：只有宿主显式装配才生效，
          * 未装配时 vendor 保持原有行为（spec 模式出任务书、不落档案）。

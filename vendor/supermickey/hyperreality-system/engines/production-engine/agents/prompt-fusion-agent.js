@@ -264,9 +264,20 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
           originalBlueprintHash, productionRepairFeedback: repairFeedback
         })).digest('hex').slice(0, 24)
       : originalBlueprintHash;
+    const repairContext = blueprint && typeof blueprint._workloomPromptRepairContext === 'object'
+      ? blueprint._workloomPromptRepairContext : null;
+    const repairRows = new Map((Array.isArray(repairContext?.rows) ? repairContext.rows : [])
+      .filter(row => row && (row.shotId || row.shot_id))
+      .map(row => [String(row.shotId || row.shot_id), JSON.parse(JSON.stringify(row))]));
+    const repairTargets = new Set((Array.isArray(repairContext?.targetShotIds) ? repairContext.targetShotIds : [])
+      .map(String));
+    const targetedRepair = Boolean(repairContext?.schemaVersion === 'workloom.prompt-repair-context/v1'
+      && repairRows.size > 0);
+    const targetOf = shot => targetedRepair
+      && (repairContext.targetAll === true || repairTargets.has(String(shot.shotId || shot.shot_id)));
     let resumeIndex = 0;
     let resumeResults = [];
-    if (checkpointMgr && blueprintHash) {
+    if (!targetedRepair && checkpointMgr && blueprintHash) {
       try {
         const subCkpt = this._loadSubCheckpoint(checkpointMgr, blueprintHash);
         if (subCkpt && subCkpt.results && subCkpt.results.length > 0) {
@@ -296,6 +307,16 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
       const shot = shots[i];
       this._currentShotIdx = i; // 【camera-coherence】当前镜索引，供邻镜上下文定位
 
+      if (targetedRepair && !targetOf(shot)) {
+        const shotId = String(shot.shotId || shot.shot_id);
+        const prior = repairRows.get(shotId);
+        if (prior) {
+          results[i] = prior;
+          console.log(`  ↺ ${shotId} 复用已合格原生行（局部修复未命中）`);
+          continue;
+        }
+      }
+
       // 每3个镜头检查一次内存,启发式GC(P0-PERF-04 修复)
       if (i % 3 === 0) {
         const mem = process.memoryUsage();
@@ -315,7 +336,13 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
       }
 
       // 【P0-ARCH-03 修复】降级路径调用计数器,防止重试风暴
-      const callCounter = { count: 0, max: 8 }; // 单镜头最多8次LLM调用
+      const configuredShotBudget = Number(repairContext?.plan?.budget?.maxTextCallsPerShot);
+      const callCounter = {
+        count: 0,
+        max: targetedRepair && Number.isInteger(configuredShotBudget) && configuredShotBudget >= 1
+          ? Math.min(32, configuredShotBudget)
+          : 8
+      };
       const trackCall = () => {
         callCounter.count++;
         if (callCounter.count > callCounter.max) {
@@ -387,6 +414,14 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
       }
     }
 
+    if (targetedRepair && checkpointMgr && blueprintHash) {
+      try {
+        this._saveSubCheckpoint(checkpointMgr, blueprintHash, results, results.length, shots.length);
+      } catch (e) {
+        console.warn(`[PromptFusionAgent] 局部修复完整子 checkpoint 保存失败: ${e.message}`);
+      }
+    }
+
     if (failed > 0) {
       console.warn(`[PromptFusionAgent] ⚠️ ${failed}/${shots.length} 镜头需要补全/兜底`);
     }
@@ -402,7 +437,17 @@ scene≥120, lighting≥150, composition≥100, action≥120, camera_movement≥
       checkpointBlueprintHash: blueprintHash,
       degraded: failed > 0,
       degradeReason: failed > 0 ? `${failed}个镜头融合或补全失败` : null,
-      stats: { total: shots.length, failed, success: shots.length - failed }
+      stats: { total: shots.length, failed, success: shots.length - failed },
+      repair: targetedRepair ? {
+        targetShotIds: [...repairTargets],
+        targetAll: repairContext.targetAll === true,
+        reusedShotIds: shots
+          .map(shot => String(shot.shotId || shot.shot_id))
+          .filter(shotId => !repairContext.targetAll && !repairTargets.has(shotId) && repairRows.has(shotId)),
+        repairedShotIds: shots
+          .map(shot => String(shot.shotId || shot.shot_id))
+          .filter(shotId => repairContext.targetAll || repairTargets.has(shotId))
+      } : null
     };
   }
 

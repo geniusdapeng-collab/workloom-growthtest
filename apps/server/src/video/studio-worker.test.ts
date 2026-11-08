@@ -112,7 +112,8 @@ vi.mock("@hyperreality/video-studio", async (importOriginal) => ({
   },
   reviewStage: doubles.review,
   WorkloomLLMEngine: { fromEnv: () => ({ model: "test-author", hasUnknownOutcome: () => false,
-    attachRouter: vi.fn(), attachConfiguredRouter: vi.fn() }) },
+    attachRouter: vi.fn(), attachConfiguredRouter: vi.fn(),
+    withDispatchGuard: async (_guard: () => void, run: () => Promise<unknown>) => run() }) },
   withVendorEngineBridge: (_engine: unknown, run: () => Promise<unknown>) => run(),
   withVendorPortraitBindingBridge: async (_options: unknown, run: () => Promise<unknown>) => {
     try { return await run(); } finally { doubles.uninstall(); }
@@ -134,6 +135,8 @@ afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv("PROMPT_FACT_PREFLIGHT", "0");
+  vi.stubEnv("PROMPT_REPAIR_ENABLED", "0");
   const eventReceipt = { eventId: "EVT-studio-test", seq: 1n, hash: "a".repeat(64), deduped: false, piiHits: 0 };
   doubles.checkpointEvents.length = 0;
   vi.mocked(gatewayAppend).mockReset().mockImplementation(async (_pool, identity, event) => {
@@ -956,8 +959,15 @@ describe("正式 G6 提示词工作单", () => {
     expect(receipt.reviewReportSha256).toBe(createHash("sha256").update(report).digest("hex"));
     if (kind === "marketing") {
       expect(doubles.prepare).toHaveBeenCalledWith(expect.objectContaining({ stageId: "prompt_review" }));
-      expect(doubles.finalize).toHaveBeenCalledWith(expect.anything(), receipt.shots, process.env,
-        expect.objectContaining({ load: expect.any(Function), save: expect.any(Function) }));
+      const finalizeCall = doubles.finalize.mock.calls.find(([prepared, shots]) =>
+        Boolean(prepared) && Array.isArray(shots) && shots.length === receipt.shots.length
+        && shots.every((shot: { shotId?: unknown; prompt?: unknown }, index: number) =>
+          shot.shotId === receipt.shots[index]?.shotId && shot.prompt === receipt.shots[index]?.prompt));
+      expect(finalizeCall?.slice(0, 4)).toEqual([
+        expect.anything(), receipt.shots, process.env,
+        expect.objectContaining({ load: expect.any(Function), save: expect.any(Function) }),
+      ]);
+      expect(finalizeCall?.[5]).toEqual(expect.any(Function));
       expect(doubles.verifyMarketingFacts).toHaveBeenCalledWith(expect.objectContaining({ stageId: "prompt_review",
         intentSha256: receipt.intentSha256, shots: receipt.shots }));
     }
@@ -1130,8 +1140,15 @@ describe("默认导演委托与立项事务", () => {
     });
     const { entry, projectId } = await runToTerminal(); expect(entry.status).toBe("finished");
     expect(doubles.prepare).toHaveBeenCalledWith(expect.objectContaining({ scope: expect.objectContaining({ ...scope, projectId, attempt: 1 }) }));
-    expect(doubles.finalize).toHaveBeenCalledWith(expect.anything(), [{ shotId: "SC-1", prompt: "01.【场景】窗边桌面", fields: { scene: "窗边桌面" } }], process.env,
-      expect.objectContaining({ load: expect.any(Function), save: expect.any(Function) }));
+    const finalizeCall = doubles.finalize.mock.calls.find(([, shots]) =>
+      JSON.stringify(shots) === JSON.stringify([{ shotId: "SC-1", prompt: "01.【场景】窗边桌面", fields: { scene: "窗边桌面" } }]));
+    expect(finalizeCall?.slice(0, 4)).toEqual([
+      expect.anything(),
+      [{ shotId: "SC-1", prompt: "01.【场景】窗边桌面", fields: { scene: "窗边桌面" } }],
+      process.env,
+      expect.objectContaining({ load: expect.any(Function), save: expect.any(Function) }),
+    ]);
+    expect(finalizeCall?.[5]).toEqual(expect.any(Function));
     expect(await archiveOutput(projectId, 1)).toMatchObject({ marketingFactsRef: "stages/preproduction/attempt-1.marketing-facts.json", marketingFactsSha256: "b".repeat(64) });
     expect(doubles.studioConfigs[0]?.dataMining.verifiedRaw.projectId).toBe(projectId);
   });
@@ -1444,5 +1461,174 @@ describe("正式宿主按最终事实诊断返工，并保留后续基础设施�
     expect(scenario.authors.PRODUCTION).toBe(1);
     expect(scenario.factCalls()).toBe(1);
     expect(doubles.checkpointEvents.some(event => event.kind === "PRODUCTION_REJECTION")).toBe(false);
+  });
+});
+
+describe("提示词局部自动修复", () => {
+  it("G6只打回S2时自动生成定向计划，并只把S2修复上下文送回作者", async () => {
+    vi.stubEnv("PROMPT_REPAIR_ENABLED", "1");
+    vi.stubEnv("PROMPT_REPAIR_MAX_ROUNDS", "2");
+    useNarrativeProject();
+    const rows = [
+      { shotId: "S1", duration: 5, prompt: "01.【场景】S1已通过", fields: { scene: "S1已通过" } },
+      { shotId: "S2", duration: 5, prompt: "01.【动作】S2旧稿", fields: { action: "只有转动" } },
+      { shotId: "S3", duration: 5, prompt: "01.【场景】S3已通过", fields: { scene: "S3已通过" } },
+    ];
+    let productionCalls = 0;
+    let g6ReviewCalls = 0;
+    doubles.runPreproduction.mockImplementation(async () => {
+      productionCalls += 1;
+      if (productionCalls > 1) return { ...success(), stages: { ...success().stages, productionEngine: { shots: rows } } };
+      const config = doubles.studioConfigs.at(-1)!;
+      const report = `# G6\n| S1 | 5s | 20 |\n| S2 | 5s | 20 |\n| S3 | 5s | 20 |\n\n` +
+        rows.map(row => `### ${row.shotId}\n\n\`\`\`markdown\n${row.prompt}\n\`\`\`\n`).join("\n");
+      const verdict = await config.onApproval({
+        gate: "G6_PROMPT", vendorType: "prompt", runId: "vendor-run", title: "完整提示词",
+        contentMd: report,
+      });
+      return {
+        success: false,
+        confirmations: { prompt: verdict },
+        stages: { productionEngine: { shots: rows } },
+      };
+    });
+    doubles.review.mockImplementation(async options => {
+      const failed = options.context?.gate === "G6_PROMPT" && ++g6ReviewCalls === 1;
+      return {
+        stage: options.stage,
+        status: failed ? "failed" : "passed",
+        approved: !failed,
+        score: failed ? 42 : 95,
+        via: "llm",
+        model: "test-judge",
+        degraded: false,
+        issues: failed ? ["S2缺少拿起动作"] : [],
+        suggestions: failed ? ["按原合同补回S2动作"] : [],
+        findings: failed ? [{
+          schemaVersion: "workloom.prompt-finding/v1",
+          code: "ACTION_MISSING",
+          severity: "blocking",
+          shotId: "S2",
+          fieldPath: "fields.action",
+          expected: "拿起后转动",
+          actual: "只有转动",
+          issue: "S2缺少拿起动作",
+          suggestion: "按原合同补回S2动作",
+          evidenceRefs: ["rawIntent"],
+          repairClass: "semantic",
+        }] : [],
+        hardFailures: [],
+        rerun: failed,
+        reason: failed ? "S2动作缺失" : "通过",
+        ms: 1,
+        evidence: await Promise.all(options.artifacts.map(async (artifact: { path: string; kind: string }) => ({
+          path: artifact.path,
+          sha256: createHash("sha256").update(await readFile(artifact.path)).digest("hex"),
+          scope: artifact.kind === "image" ? "image" : "complete-text",
+        }))),
+      };
+    });
+
+    const projectId = `VID-targeted-repair-${++projectSequence}`;
+    const runId = worker.startRun(scope, { projectId, intent: "先建立环境，S2拿起并转动，S3收束" });
+    await vi.waitFor(() => expect(worker.getRun(runId, scope.workspaceId)?.finishedAt).not.toBeNull(),
+      { timeout: 3_000, interval: 10 });
+    const entry = worker.getRun(runId, scope.workspaceId)!;
+    expect(entry).toMatchObject({
+      status: "finished",
+      error: null,
+      resultSummary: {
+        success: true,
+        promptRepair: { rounds: 1, targetShotIds: ["S2"], stopReason: null },
+      },
+    });
+    expect(doubles.runPreproduction).toHaveBeenCalledTimes(2);
+    const repairConfig = doubles.studioConfigs.at(-1)!;
+    expect(repairConfig.promptRepairContext).toMatchObject({
+      targetShotIds: ["S2"],
+      targetAll: false,
+      rows: [{ shotId: "S1" }, { shotId: "S2" }, { shotId: "S3" }],
+    });
+    expect(JSON.parse(repairConfig.productionRepairFeedback as string)).toMatchObject({
+      schemaVersion: "workloom.prompt-repair-feedback/v1",
+      targets: [{ shotId: "S2", fields: ["fields.action"] }],
+    });
+    expect(doubles.checkpointEvents.some(event => event.kind === "PROMPT_REPAIR_PLAN_R1")).toBe(true);
+    expect(entry.error).toBeNull();
+  });
+
+  it("stops after one repair when the same finding and target bytes make no progress", async () => {
+    vi.stubEnv("PROMPT_REPAIR_ENABLED", "1");
+    vi.stubEnv("PROMPT_REPAIR_MAX_ROUNDS", "2");
+    useNarrativeProject();
+    const rows = [
+      { shotId: "S1", duration: 5, prompt: "S1已通过", fields: { scene: "S1已通过" } },
+      { shotId: "S2", duration: 5, prompt: "S2旧稿", fields: { action: "只有转动" } },
+    ];
+    let productionCalls = 0;
+    doubles.runPreproduction.mockImplementation(async () => {
+      productionCalls += 1;
+      const config = doubles.studioConfigs.at(-1)!;
+      const report = `# G6\n| S1 | 5s | 20 |\n| S2 | 5s | 20 |\n\n`
+        + rows.map(row => `### ${row.shotId}\n\n\`\`\`markdown\n${row.prompt}\n\`\`\`\n`).join("\n");
+      const verdict = await config.onApproval({
+        gate: "G6_PROMPT", vendorType: "prompt", runId: "vendor-run", title: "完整提示词", contentMd: report,
+      });
+      return { success: false, confirmations: { prompt: verdict }, stages: { productionEngine: { shots: rows } } };
+    });
+    doubles.review.mockImplementation(async options => ({
+      stage: options.stage,
+      status: "failed",
+      approved: false,
+      score: 42,
+      via: "llm",
+      model: "test-judge",
+      degraded: false,
+      issues: ["S2缺少拿起动作"],
+      suggestions: ["按原合同补回S2动作"],
+      findings: [{
+        schemaVersion: "workloom.prompt-finding/v1",
+        code: "ACTION_MISSING",
+        severity: "blocking",
+        shotId: "S2",
+        fieldPath: "fields.action",
+        expected: "拿起后转动",
+        actual: "只有转动",
+        issue: "S2缺少拿起动作",
+        suggestion: "按原合同补回S2动作",
+        evidenceRefs: ["rawIntent"],
+        repairClass: "semantic",
+      }],
+      hardFailures: [],
+      rerun: true,
+      reason: "S2动作缺失",
+      ms: 1,
+      evidence: await Promise.all(options.artifacts.map(async (artifact: { path: string; kind: string }) => ({
+        path: artifact.path,
+        sha256: createHash("sha256").update(await readFile(artifact.path)).digest("hex"),
+        scope: artifact.kind === "image" ? "image" : "complete-text",
+      }))),
+    }));
+
+    const runId = worker.startRun(scope, {
+      projectId: `VID-no-progress-${++projectSequence}`,
+      intent: "先建立环境，S2拿起并转动",
+    });
+    await vi.waitFor(() => expect(worker.getRun(runId, scope.workspaceId)?.finishedAt).not.toBeNull(),
+      { timeout: 3_000, interval: 10 });
+    expect(worker.getRun(runId, scope.workspaceId)).toMatchObject({
+      status: "failed",
+      resultSummary: {
+        promptRepair: {
+          rounds: 1,
+          targetShotIds: ["S2"],
+          stopReason: "PROMPT_REPAIR_NO_PROGRESS",
+        },
+      },
+    });
+    expect(productionCalls).toBe(2);
+    expect(vi.mocked(gatewayAppend).mock.calls.some(([, , event]) =>
+      event.decision.action === "pipeline.prompt.repair_exhausted"
+      && (event.decision.after as { code?: string } | undefined)?.code === "PROMPT_REPAIR_NO_PROGRESS")).toBe(true);
   });
 });

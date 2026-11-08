@@ -56,6 +56,12 @@ import { normalizeShotIntent, shotIntentHash, type ShotIntentStatus } from "./sh
 import { devicePolicyPromptLines } from "./device-policy.js";
 import { environmentDefects, expandShotWithBible, environmentProfilePromptLines, propInteractionPromptLines, type SceneBible } from "./scene-bible.js";
 import { resolveEraProfile, type EraProfile } from "./era-profile.js";
+import {
+  derivePromptFindings,
+  normalizePromptFinding,
+  type PromptFinding,
+  type PromptRepairClass,
+} from "./prompt-finding.js";
 
 export interface DeterministicCheck {
   status?: QualityStatus;
@@ -94,6 +100,8 @@ export interface ProducerVerdict {
   hardFailures: string[];
   issues: string[];
   suggestions: string[];
+  /** Structured, per-shot/field author feedback. Legacy callers may ignore it. */
+  findings?: PromptFinding[];
   /** 建议重跑本环节（approved=false 时恒为 true） */
   rerun: boolean;
   via: "deterministic" | "llm" | "fallback";
@@ -196,6 +204,51 @@ export interface ProducerReviewContract {
  * 预算常量在这里集中定义，供 `film-contracts.ts` 判断"还能不能带原稿"时复用同一口径。
  */
 export const REVIEW_CONTEXT_BUDGET = 30_000;
+
+/**
+ * Split the structured prompt report into contiguous complete-shot batches.
+ * The overview and package contract stay attached to every batch so a long
+ * film never turns into one unbounded reviewer request.
+ */
+export function splitPromptReviewBatches(
+  content: string,
+  maxCharacters = REVIEW_CONTEXT_BUDGET,
+): string[] {
+  const total = Array.from(content).length;
+  if (total <= maxCharacters) return [content];
+  const starts = [...content.matchAll(/^###[ \t]+[^\r\n]+$/gmu)].map(match => match.index ?? -1).filter(index => index >= 0);
+  if (starts.length === 0) {
+    throw new Error("PROMPT_REVIEW_CONTEXT_UNBOUNDED: 长提示词报告缺少可分批的镜头标题");
+  }
+  const header = content.slice(0, starts[0]).trimEnd();
+  const headerBudget = Math.min(6_000, Math.floor(maxCharacters / 3));
+  const context = Array.from(header).length <= headerBudget
+    ? header
+    : `${Array.from(header).slice(0, headerBudget).join("")}\n\n[报告概览其余部分因批次预算省略；完整正文仍绑定本批文件。]`;
+  const blocks = starts.map((start, index) =>
+    content.slice(start, starts[index + 1] ?? content.length).trimEnd()).filter(Boolean);
+  const contextLength = Array.from(context).length;
+  const batches: string[] = [];
+  let current = context;
+  let currentLength = contextLength;
+  for (const block of blocks) {
+    const blockLength = Array.from(block).length;
+    const separator = current.endsWith("\n") ? "\n" : "\n\n";
+    if (currentLength > contextLength && currentLength + separator.length + blockLength > maxCharacters) {
+      batches.push(current);
+      current = context;
+      currentLength = contextLength;
+    }
+    const nextSeparator = current === context ? "\n\n" : "\n\n";
+    if (contextLength + blockLength + nextSeparator.length > maxCharacters) {
+      throw new Error(`PROMPT_REVIEW_CONTEXT_UNBOUNDED: 单镜内容超过 ${maxCharacters} 字符评审批次上限`);
+    }
+    current += `${nextSeparator}${block}`;
+    currentLength += nextSeparator.length + blockLength;
+  }
+  if (currentLength > contextLength) batches.push(current);
+  return batches.length > 0 ? batches : [content];
+}
 /** Shared author contracts are compiled before any paid review; this does not prove image quality. */
 export function buildProducerReviewContract(input: ProducerReviewContracts): ProducerReviewContract {
   if (!input || !Array.isArray(input.shots) || !input.shots.length) throw new Error("PRODUCER_CONTRACT_INVALID: shots必须为非空数组");
@@ -254,6 +307,8 @@ export interface ProducerGateOptions {
   allowFallbackApprove?: boolean;
   env?: Record<string, string | undefined>;
   fetchImpl?: typeof fetch;
+  /** Host-owned hard precondition checked immediately before every reviewer dispatch. */
+  beforeRequest?: () => void;
   log?: (line: string) => void;
   /**
    * 评审图压缩器（2026-09-24 三轮审计）：送审图大于预算时调用，返回压缩后的图片路径（失败返回 null）。
@@ -270,9 +325,9 @@ interface LlmConfig {
 
 /** 解析评审模型（与 model-router 的 LLM_* 口径一致，兼容 DEEPSEEK_* 秘密文件） */
 export function resolveProducerLlm(env: Record<string, string | undefined> = process.env): LlmConfig | null {
-  const baseUrl = resolveOpenAiCompatibleBaseUrl(env);
-  const apiKey = resolveVideoApiKey(env);
-  const model = resolveVideoModel(env);
+  const baseUrl = env.PRODUCER_LLM_BASE_URL?.trim() || resolveOpenAiCompatibleBaseUrl(env);
+  const apiKey = env.PRODUCER_LLM_API_KEY?.trim() || resolveVideoApiKey(env);
+  const model = env.PRODUCER_LLM_MODEL?.trim() || resolveVideoModel(env);
   if (!baseUrl || !apiKey || !model) return null;
   return { baseUrl, apiKey, model };
 }
@@ -313,7 +368,14 @@ function parseJudgeJson(raw: string): unknown {
   return JSON.parse(raw.trim()) as unknown;
 }
 
-type JudgeResult = { approved: boolean; score: number; issues: string[]; suggestions: string[]; reason: string };
+type JudgeResult = {
+  approved: boolean;
+  score: number;
+  issues: string[];
+  suggestions: string[];
+  reason: string;
+  findings: PromptFinding[];
+};
 
 /**
  * 评审结果结构归一（2026-09-28 T1 真机：10 镜逐镜监制有 2 镜返回"结构非法"）。
@@ -375,9 +437,41 @@ export function coerceJudgeResult(json: unknown): JudgeResult | null {
     const reasonRaw = record.reason ?? record.summary ?? record.conclusion ?? record["理由"] ?? record["结论"];
     const reason = typeof reasonRaw === "string" ? reasonRaw : "";
     if (approved === null || score === null || !Number.isFinite(score) || score < 0 || score > 100 || !issues || !suggestions) continue;
-    return { approved, score, issues, suggestions, reason };
+    const rawFindings = Array.isArray(record.findings) ? record.findings : [];
+    const findings = rawFindings
+      .map((item, index) => normalizePromptFinding(item, index, suggestions[index]))
+      .filter((item): item is PromptFinding => Boolean(item));
+    return {
+      approved,
+      score,
+      issues,
+      suggestions,
+      reason,
+      findings: findings.length > 0
+        ? findings
+        : approved === false
+          ? derivePromptFindings(issues, suggestions, reason)
+          : [],
+    };
   }
   return null;
+}
+
+function structuredFindings(
+  messages: readonly string[],
+  repair: PromptRepairClass,
+  suggestions: readonly string[] = [],
+): PromptFinding[] {
+  return messages.flatMap((message, index) => {
+    const finding = normalizePromptFinding({
+      code: repair === "deterministic" ? "DETERMINISTIC_CHECK_FAILED" : "PRODUCER_REVIEW_FAILED",
+      severity: "blocking",
+      issue: message,
+      suggestion: suggestions[index] ?? null,
+      repairClass: repair,
+    }, index, suggestions[index]);
+    return finding ? [finding] : [];
+  });
 }
 
 /**
@@ -403,6 +497,8 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
       hardFailures,
       issues: softFailures,
       suggestions: [`按硬闸失败项修复后重跑本环节：${hardFailures[0]}`],
+      findings: structuredFindings(hardFailures, "deterministic",
+        [`按硬闸失败项修复后重跑本环节：${hardFailures[0]}`]),
       rerun: true,
       via: "deterministic",
       ms: Date.now() - started,
@@ -416,6 +512,8 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
   const reject = (reason: string, via: ProducerVerdict["via"] = "deterministic", model?: string): ProducerVerdict => ({
     stage, status: "unverified", approved: false, score: 0, hardFailures: [], contractHash: contract?.contractHash,
     issues: [...softFailures, reason], suggestions: ["补齐有效证据或修复评审组件后重跑本环节"],
+    findings: structuredFindings([...softFailures, reason], via === "deterministic" ? "deterministic" : "human_input",
+      ["补齐有效证据或修复评审组件后重跑本环节"]),
     rerun: true, via, model, ms: Date.now() - started, reason, degraded: true, evidence
   });
   try { if (options.contracts !== undefined) contract = buildProducerReviewContract(options.contracts); }
@@ -438,6 +536,7 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
   if (!Number.isFinite(minScore) || minScore < 0 || minScore > 100) return reject("评审分数阈值非法");
   const tempPaths: string[] = [];
   const textContent: ModelContentPart[] = [];
+    let promptReviewBatches: ModelContentPart[][] | null = null;
   const images: Array<{ path: string; label: string }> = [];
   try {
     if (options.artifacts.length === 0) throw new Error("缺少待评审产物");
@@ -458,6 +557,15 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
         const raw = bytes.toString("utf8");
         if (artifact.kind === "json") JSON.parse(raw);
         textContent.push({ type: "text", text: `以下是产物正文（完整）：${artifact.path}\n${raw}` });
+        if (stage === "prompt" && artifact.kind === "text") {
+          const split = splitPromptReviewBatches(raw);
+          if (split.length > 1) {
+            promptReviewBatches = split.map(batch => [{
+              type: "text",
+              text: `以下是本次提示词报告的一个连续镜头批次；批次内镜头均为完整正文：${artifact.path}\n${batch}`,
+            }]);
+          }
+        }
         evidence.push({ path: artifact.path, sha256, scope: "complete-text" });
       } else if (artifact.kind === "image") {
         images.push({ path: artifact.path, label: "待评审产物" });
@@ -516,25 +624,41 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
       ? options.batchSize as number
       : Math.max(1, artifactImages);
     const batches = Math.max(1, Math.ceil(artifactImages / batchSize));
-    const answers: Array<{ approved: boolean; score: number; issues: string[]; suggestions: string[]; reason: string }> = [];
+    const reviewBatchCount = Math.max(batches, promptReviewBatches?.length ?? 1);
+    const answers: Array<{
+      approved: boolean;
+      score: number;
+      issues: string[];
+      suggestions: string[];
+      reason: string;
+      findings: PromptFinding[];
+    }> = [];
     const receipts: NonNullable<ProducerVerdict["receipts"]> = [];
     const provider = new OpenAiCompatibleProvider(llm.model, {
       baseUrl: llm.baseUrl,
       apiKey: llm.apiKey,
       fetchImpl: options.fetchImpl,
     });
-    for (let batch = 0; batch < batches; batch += 1) {
+    for (let batch = 0; batch < reviewBatchCount; batch += 1) {
+      const textEvidence = promptReviewBatches
+        ? promptReviewBatches[Math.min(batch, promptReviewBatches.length - 1)]!
+        : textContent;
       const content: ModelContentPart[] = [{ type: "text", text: [
-        `你是视频监制。项目 ${options.projectId}，环节 ${stage}，证据批次 ${batch + 1}/${batches}。`,
+        `你是视频监制。项目 ${options.projectId}，环节 ${stage}，证据批次 ${batch + 1}/${reviewBatchCount}。`,
         ...rubric.map((r, i) => `${i + 1}. ${r}`),
         "只评审实际收到的证据，视频为带时间戳抽帧，不代表逐帧、口型或听音验证。缺证据必须拒绝，不能猜测。",
         summarizeArtifacts(options.artifacts),
         "确定性检查（含失败与不适用）：", ...options.deterministic.map((c) => `${c.id}: ${c.status ?? (c.pass ? "passed" : "failed")} ${c.detail}`),
         context,
         "只对当前阶段适用的项目评审。", contractText,
-        '只输出 JSON: {"approved":true|false,"score":0-100,"issues":[],"suggestions":[],"reason":"结论"}'
-      ].join("\n") }, ...textContent, ...encoded.slice(batch * batchSize, Math.min(artifactImages, (batch + 1) * batchSize)).flat(), ...encoded.slice(artifactImages).flat()];
+        "问题可定位时必须给出镜头、字段和证据；不要只写无法执行的泛泛结论。",
+        '只输出 JSON: {"approved":true|false,"score":0-100,"issues":[],"suggestions":[],"reason":"结论","findings":[{"code":"大写问题码","severity":"blocking|major|minor|advisory","shotId":"S1或null","fieldPath":"fields.action或null","expected":"期望","actual":"实际","issue":"问题","suggestion":"可直接执行的修改","evidenceRefs":[],"repairClass":"schema|deterministic|semantic|evidence|human_input|replan"}]}'
+      ].join("\n") }, ...textEvidence, ...encoded.slice(
+        Math.min(batch * batchSize, artifactImages),
+        Math.min(artifactImages, (batch + 1) * batchSize),
+      ).flat(), ...encoded.slice(artifactImages).flat()];
       const requestReview = () => provider.chat([{ role: "user", content }], {
+        ...(options.beforeRequest ? { beforeDispatch: options.beforeRequest } : {}),
         scene: "video.quality.producer-review",
         timeoutMs: 600_000,
         temperature: 0.2,
@@ -581,13 +705,14 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
           content: [
             "仅修复 JSON 的语法和字段结构，不得重新判定证据，不得改变 approved、score、issues、suggestions 或 reason 的语义。",
             "只输出一个可被 JSON.parse 直接解析的对象，且严格满足：",
-            '{"approved":true|false,"score":0-100,"issues":[],"suggestions":[],"reason":"结论"}',
-            "issues 和 suggestions 必须是字符串数组；approved 必须是布尔值；score 必须是数字。",
+            '{"approved":true|false,"score":0-100,"issues":[],"suggestions":[],"reason":"结论","findings":[]}',
+            "issues 和 suggestions 必须是字符串数组；findings 必须是数组；approved 必须是布尔值；score 必须是数字。",
             "<malformed_result>",
             result.text,
             "</malformed_result>",
           ].join("\n"),
         }], {
+          ...(options.beforeRequest ? { beforeDispatch: options.beforeRequest } : {}),
           scene: "video.quality.producer-review",
           timeoutMs: 120_000,
           temperature: 0,
@@ -618,11 +743,19 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
       if (currentHash !== item.sha256) throw new Error(`评审期间产物发生变化：${item.path}`);
     }
     if (contract && options.contracts && shotIntentHash(options.contracts) !== contract.sourceHash) throw new Error("评审期间原镜头合同发生变化");
-    const approved = answers.every((a) => a.approved && a.score >= minScore);
+    const blockingFindings = answers.flatMap(answer => answer.findings)
+      .filter(finding => finding.severity === "blocking" || finding.severity === "major");
+    const approved = answers.every((a) => a.approved && a.score >= minScore)
+      && blockingFindings.length === 0;
     return { stage, status: approved ? "passed" : "failed", approved, contractHash: contract?.contractHash, score: Math.min(...answers.map((a) => a.score)),
       hardFailures: [], issues: [...softFailures, ...answers.flatMap((a) => a.issues)], suggestions: answers.flatMap((a) => a.suggestions),
+      findings: [
+        ...structuredFindings(softFailures, "deterministic"),
+        ...answers.flatMap((a) => a.findings),
+      ],
       rerun: !approved, via: "llm", model: llm.model, ms: Date.now() - started,
-      reason: answers.map((a) => a.reason).join("；") + (approved ? "" : `（所有证据批次需通过且评分≥${minScore}）`), degraded: false, evidence, receipts };
+      reason: answers.map((a) => a.reason).join("；")
+        + (approved ? "" : `（所有证据批次需通过且评分≥${minScore}；不得保留阻塞 finding）`), degraded: false, evidence, receipts };
   } catch (err) {
     return {
       ...reject(err instanceof Error ? err.message : String(err), "fallback", llm.model),

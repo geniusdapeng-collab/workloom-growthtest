@@ -212,6 +212,34 @@ function deferred() {
 }
 
 describe("VideoStudio 确认作用域与装配清理", () => {
+  it("passes the prompt preflight callback into the native create options before media execution", async () => {
+    const preflight = vi.fn(async (_input: {
+      prompts: readonly Record<string, unknown>[];
+      contentMd: string;
+      runId: string | null;
+    }) => ({ approved: true, reason: "prompt preflight passed" }));
+    let captured: Record<string, unknown> | undefined;
+    studioMocks.create.mockImplementation(async (_intent: string, _metadata: unknown, options: Record<string, unknown>) => {
+      captured = options;
+      const verdict = await (options.promptPreflight as typeof preflight)({
+        prompts: [{ shotId: "S1", prompt: "完整提示词", fields: {} }],
+        contentMd: "# G6\n```markdown\n完整提示词\n```",
+        runId: "native-run",
+      });
+      return { success: verdict.approved, confirmations: {}, stages: {} };
+    });
+    const instance = new VideoStudio({
+      llm: new WorkloomLLMEngine({ baseUrl: "https://example.invalid", apiKey: "test-only", model: "deepseek-flash" }),
+      workDir: "/unused/prompt-preflight-test",
+      onApproval: async () => ({ approved: true }),
+      onPromptPreflight: preflight,
+      log: () => undefined,
+    });
+    await instance.runPreproduction({ projectId: "P-preflight", intent: "完整空镜短片" });
+    expect(captured?.promptPreflight).toBe(preflight);
+    expect(preflight).toHaveBeenCalledWith(expect.objectContaining({ runId: "native-run" }));
+  });
+
   it("两条真实 studio 运行交错确认，项目与事件不串线", async () => {
     const ready = [deferred(), deferred()];
     const release = [deferred(), deferred()];

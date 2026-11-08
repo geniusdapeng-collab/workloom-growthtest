@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { validatePromptRepairContext, type PromptRepairContext } from "./prompt-repair-plan.js";
 
 export const STUDIO_ENGINE_CHECKPOINT_SCHEMA = "workloom.studio-engine-checkpoint/v1" as const;
 export type StudioEngineCheckpointStage = "G2_THEME" | "G3_INSIGHT" | "G3_PROFILE" | "G4_PRD" | "SCRIPT" | "PRODUCTION" | "OPENING_TITLE";
@@ -65,9 +66,17 @@ const record = (value: unknown): value is RecordValue => Boolean(value && typeof
  * Install outside the PRODUCTION checkpoint wrapper so its input hash includes
  * the private, host-verified diagnosis. Upstream metadata and seed stay intact.
  */
-export function bindStudioProductionRepairFeedback(system: RecordValue, feedback: string): void {
+export function bindStudioProductionRepairFeedback(
+  system: RecordValue,
+  feedback: string,
+  repairContext?: PromptRepairContext,
+): void {
   if (typeof feedback !== "string" || !feedback.trim()) {
     throw new StudioCheckpointError("STUDIO_CHECKPOINT_INVALID", "生产修复诊断必须是宿主核实的完整非空文本");
+  }
+  const verifiedRepairContext = repairContext ? validatePromptRepairContext(repairContext) : undefined;
+  if (repairContext && !verifiedRepairContext) {
+    throw new StudioCheckpointError("STUDIO_CHECKPOINT_INVALID", "提示词局部修复上下文与计划、镜头行或来源摘要不一致");
   }
   const production = system.productionEngine;
   if (!record(production) || typeof production.produce !== "function") {
@@ -78,6 +87,7 @@ export function bindStudioProductionRepairFeedback(system: RecordValue, feedback
     if (!value || typeof value !== "object" || seen.has(value)) return;
     seen.add(value);
     delete (value as RecordValue)._workloomProductionRepairFeedback;
+    delete (value as RecordValue)._workloomPromptRepairContext;
     for (const child of Object.values(value)) clearPrivateContext(child, seen);
   };
   production.produce = async function diagnosedNativeProduction(this: RecordValue, ...args: unknown[]) {
@@ -85,7 +95,17 @@ export function bindStudioProductionRepairFeedback(system: RecordValue, feedback
     if (!record(blueprint)) throw new StudioCheckpointError("STUDIO_CHECKPOINT_INVALID", "生产修复缺少原生蓝图");
     const field = "_workloomProductionRepairFeedback";
     const prior = Object.getOwnPropertyDescriptor(blueprint, field);
+    const repairField = "_workloomPromptRepairContext";
+    const priorRepair = Object.getOwnPropertyDescriptor(blueprint, repairField);
     Object.defineProperty(blueprint, field, { value: feedback, enumerable: true, writable: true, configurable: true });
+    if (repairContext) {
+      Object.defineProperty(blueprint, repairField, {
+        value: structuredClone(verifiedRepairContext!),
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+    }
     try {
       const output = await original.apply(this, args);
       // Replayed native rows can hold detached blueprint copies. Clear the
@@ -96,6 +116,8 @@ export function bindStudioProductionRepairFeedback(system: RecordValue, feedback
     finally {
       if (prior) Object.defineProperty(blueprint, field, prior);
       else delete blueprint[field];
+      if (priorRepair) Object.defineProperty(blueprint, repairField, priorRepair);
+      else delete blueprint[repairField];
     }
   };
 }
@@ -265,8 +287,17 @@ export function studioCheckpointHash(value: unknown): string {
   return createHash("sha256").update(studioCheckpointJson(value)).digest("hex");
 }
 
-function plainCheckpointValue(value: unknown): unknown {
+function stripTransientPrivateFields(value: unknown, seen = new WeakSet<object>()): void {
+  if (!value || typeof value !== "object" || seen.has(value)) return;
+  seen.add(value);
+  delete (value as RecordValue)._workloomPromptRepairContext;
+  delete (value as RecordValue)._workloomProductionRepairFeedback;
+  for (const child of Object.values(value)) stripTransientPrivateFields(child, seen);
+}
+
+function plainCheckpointValue(value: unknown, stripPrivateOutput = false): unknown {
   const plain = structuredClone(value);
+  if (stripPrivateOutput) stripTransientPrivateFields(plain);
   // Canonical order belongs to fingerprints. Replay retains native insertion order because
   // native gate renderers and model prompts may stringify nested source objects verbatim.
   studioCheckpointJson(plain);
@@ -297,12 +328,12 @@ export function createStudioCheckpointRunner(adapter: StudioCheckpointAdapter, s
           || !/^[a-f0-9]{64}$/u.test(saved.outputSha256) || studioCheckpointHash(saved.output) !== saved.outputSha256) {
           throw new StudioCheckpointError("STUDIO_CHECKPOINT_INVALID", `${stage} 的断点身份、依赖或产物摘要不一致`);
         }
-        output = plainCheckpointValue(saved.output) as T;
+        output = plainCheckpointValue(saved.output, true) as T;
         outputSha256 = saved.outputSha256;
         if (restore) output = restore(output);
       } else {
         output = await execute();
-        const plainOutput = plainCheckpointValue(output);
+        const plainOutput = plainCheckpointValue(output, true);
         outputSha256 = studioCheckpointHash(plainOutput);
         try { await adapter.save({ ...request, output: plainOutput, outputSha256 }); }
         catch (error) {

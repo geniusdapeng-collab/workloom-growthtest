@@ -4,7 +4,7 @@ import { mkdtemp, realpath, rm, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { checkpointMarketingFacts, prepareMarketingFacts, restoreMarketingFacts, finalizeMarketingFacts, verifyMarketingFacts,
+import { checkpointMarketingFacts, prepareMarketingFacts, restoreMarketingFacts, preflightMarketingFacts, finalizeMarketingFacts, verifyMarketingFacts,
   marketingFactReviewCacheKey, verifyRejectedMarketingFactReview, type PreparedMarketingFacts, type MarketingShotFactReview } from "./marketing-authority.js";
 import { primeSearchCache } from "./data-mining-executor.js";
 import { fetchMarketingSource, requestSource } from "./marketing-source-fetcher.js";
@@ -125,6 +125,22 @@ async function prepare(options: {
 }
 const shots = [{ shotId: "S1", prompt: "窗边展示星野 F3 风扇，字幕说明风量 9 档。", fields: { 场景: "窗边", 产品: "星野 F3", 规格: "9 档" } }];
 describe("营销事实宿主完整执行", () => {
+  it("preflights every shot before final G6 and returns shot-bound evidence findings", async () => {
+    const prepared = await prepare();
+    rejectJudge = true;
+    modelCalls = [];
+    const input = [
+      shots[0]!,
+      { shotId: "S2", prompt: "镜头二虚构999档并声称市场第一。", fields: { 规格: "999 档", 评价: "市场第一" } },
+    ];
+    const batch = await preflightMarketingFacts(prepared, input, env);
+    expect(batch).toMatchObject({ pass: false, rejectedShotIds: ["S1", "S2"] });
+    expect(batch.findings.length).toBeGreaterThanOrEqual(2);
+    expect(new Set(batch.findings.map(item => item.shotId))).toEqual(new Set(["S1", "S2"]));
+    expect(batch.findings.every(item => item.repairClass === "evidence" && item.severity === "blocking")).toBe(true);
+    expect(modelCalls).toHaveLength(2);
+  });
+
   it.each(["note", "multiple-specs"] as const)("%s结构失败的原raw/实际诊断/修复请求及选定有效raw完整复读", async structuralDefect => {
     const prepared = await prepare({ structuralDefect });
     const stage = prepared.bundle.stages[0]!, attempt = stage.supportAttempts![0]!, history = attempt.structureRepair!;
