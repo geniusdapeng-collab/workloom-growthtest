@@ -1,6 +1,8 @@
-# WorkLoom Growthtest · 获客增长系统（隔离实验副本）
+# AI 超增长 · WorkLoom GrowthTest（实验版）
 
-WorkLoom Growthtest 是面向企业增长与内容运营团队的隔离实验副本，把目标、数字员工岗位、内容生产、任务协作和过程记录放进同一个工作空间。产品目标是连接意图洞察、社媒与 GEO 触达、线索承接、转化和复盘；当前代码中，**视频生产与交付有专用执行链，通用工作台和行业包提供组织与治理机制，部分增长工具仍处于声明或接入阶段**。
+给内容和增长团队使用的制作与获客实验工作区。从一句话需求开始，保留原话与目标时长，在导演工作台比较视频方案，再沿同一个项目推进渲染、标准后期、成片与交付记录。
+
+视频成片和媒资可用于同一选题的社媒与 GEO 作业。团队还能核对岗位交接、线索流程和复盘。正式制作需授权的工位、素材与预算，发布、监测和真实归因依赖各自的连接器和业务数据。
 
 [GitHub 源码](https://github.com/geniusdapeng-collab/workloom-growthtest) · [Agent 接入指引](docs/AGENT-CLIENTS.md) · [AI 工作台视频调用指南](docs/ai-video-workbench-guide.md) · [产品身份](product.manifest.json) · [代码入口导览](docs/capabilities.auto.md) · [开发指引](AGENTS.md) · [Apache-2.0](LICENSE)
 
@@ -23,7 +25,7 @@ WorkLoom Growthtest 是面向企业增长与内容运营团队的隔离实验副
 | 企业负责人、项目负责人 | 看清任务交给谁、交付什么、哪里待决定 | 工作台、任务线程、协作契约与组合看板组织交接和状态 | 看板和事件存在不等于营收归因已接通；演示订单不能当实际收入 |
 | 增长策略与渠道运营人员 | 同一选题用于社媒内容与 GEO，并积累可复用作业规范 | `geo-growth` 声明岗位、技能、围栏和管线，复用视频与视觉制作能力 | query 采集、能见度监测、线索评分和分发等专用工具仍需逐项接线与验收 |
 
-本仓 `repository` 是 `geniusdapeng-collab/workloom-growthtest`，属于 `none-in-none-out` 隔离副本。manifest 中的 `productId` 为 `workloom-ai-growth`，角色为 `industry`，默认行业包为 `geo-growth`。读取指南或调用能力时，同时核对 repository 和实际运行实例。酒店包提供组合依赖和垂直业务样例。来源：[product.manifest.json](product.manifest.json)、[主包 manifest](bundles/geo-growth/bundle.json)。
+本仓按 `none-in-none-out` 策略独立运行。产品标识为 `workloom-ai-growth`，GitHub 仓库为 `geniusdapeng-collab/workloom-growthtest`，默认行业包为 `geo-growth`。接入时同时核对仓库与运行实例。酒店行业包提供可组合的行业能力和业务样例。 [产品清单](product.manifest.json) · [GEO 行业包](bundles/geo-growth/bundle.json)
 
 ## 功能状态：代码做到哪里
 
